@@ -1344,6 +1344,8 @@
           "partition": {
             "description": "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
             "format": "int32",
+            "maximum": 255,
+            "minimum": 0,
             "type": "integer"
           },
           "readOnly": {
@@ -1353,6 +1355,7 @@
           "volumeID": {
             "default": "",
             "description": "volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -1396,6 +1399,7 @@
         "properties": {
           "localhostProfile": {
             "description": "localhostProfile indicates a profile loaded on the node that should be used. The profile must be preconfigured on the node to work. Must match the loaded name of the profile. Must be set if and only if type is \"Localhost\".",
+            "maxLength": 4095,
             "type": "string"
           },
           "type": {
@@ -1408,12 +1412,23 @@
           "type"
         ],
         "type": "object",
-        "x-kubernetes-unions": [
+        "x-kubernetes-validations": [
           {
-            "discriminator": "type",
-            "fields-to-discriminateBy": {
-              "localhostProfile": "LocalhostProfile"
-            }
+            "fieldPath": ".localhostProfile",
+            "message": "must be set when AppArmor type is Localhost",
+            "reason": "FieldValueRequired",
+            "rule": "self.type != \"Localhost\" || has(self.localhostProfile) && self.localhostProfile.trim().size() > 0"
+          },
+          {
+            "fieldPath": ".localhostProfile",
+            "message": "must not be padded with whitespace",
+            "reason": "FieldValueInvalid",
+            "rule": "self.type != \"Localhost\" || !has(self.localhostProfile) || self.localhostProfile.trim() == self.localhostProfile"
+          },
+          {
+            "fieldPath": ".localhostProfile",
+            "message": "can only be set when AppArmor type is Localhost",
+            "rule": "self.type == \"Localhost\" || !has(self.localhostProfile)"
           }
         ]
       },
@@ -1421,28 +1436,34 @@
         "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
         "properties": {
           "cachingMode": {
+            "default": "ReadWrite",
             "description": "cachingMode is the Host Caching mode: None, Read Only, Read Write.",
             "type": "string"
           },
           "diskName": {
             "default": "",
             "description": "diskName is the Name of the data disk in the blob storage",
+            "minLength": 1,
             "type": "string"
           },
           "diskURI": {
             "default": "",
             "description": "diskURI is the URI of data disk in the blob storage",
+            "minLength": 1,
             "type": "string"
           },
           "fsType": {
+            "default": "ext4",
             "description": "fsType is Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
             "type": "string"
           },
           "kind": {
+            "default": "Shared",
             "description": "kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
             "type": "boolean"
           }
@@ -1451,7 +1472,17 @@
           "diskName",
           "diskURI"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "supported values: /subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}",
+            "rule": "has(self.kind) && self.kind == \"Managed\" ? self.?diskURI.orValue(\"\").indexOf(\"/subscriptions/\") == 0 : true"
+          },
+          {
+            "message": "supported values: https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd",
+            "rule": "has(self.kind) && self.kind != \"Managed\" ? self.?diskURI.orValue(\"\").indexOf(\"https://\") == 0 : true"
+          }
+        ]
       },
       "io.k8s.api.core.v1.AzureFileVolumeSource": {
         "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
@@ -1463,11 +1494,13 @@
           "secretName": {
             "default": "",
             "description": "secretName is the  name of secret that contains Azure Storage Account Name and Key",
+            "minLength": 1,
             "type": "string"
           },
           "shareName": {
             "default": "",
             "description": "shareName is the azure share Name",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -1483,7 +1516,15 @@
           "driver": {
             "default": "",
             "description": "driver is the name of the CSI driver that handles this volume. Consult with your admin for the correct name as registered in the cluster.",
-            "type": "string"
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self.lowerAscii()).value()",
+                "rule": "!format.dns1123Label().validate(self.lowerAscii()).hasValue()"
+              }
+            ]
           },
           "fsType": {
             "description": "fsType to mount. Ex. \"ext4\", \"xfs\", \"ntfs\". If not provided, the empty value is passed to the associated CSI driver which will determine the default filesystem to apply.",
@@ -1495,7 +1536,20 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.LocalObjectReference"
               }
             ],
-            "description": "nodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed."
+            "description": "nodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed.",
+            "x-kubernetes-validations": [
+              {
+                "fieldPath": ".name",
+                "message": "Required value",
+                "reason": "FieldValueRequired",
+                "rule": "has(self.name) && self.name.size() > 0"
+              },
+              {
+                "fieldPath": ".name",
+                "messageExpression": "format.dns1123Subdomain().validate(self.name).value()",
+                "rule": "self.?name.orValue(\"\").size() == 0 || !format.dns1123Subdomain().validate(self.name).hasValue()"
+              }
+            ]
           },
           "readOnly": {
             "description": "readOnly specifies a read-only configuration for the volume. Defaults to false (read/write).",
@@ -1548,6 +1602,7 @@
               "default": "",
               "type": "string"
             },
+            "minItems": 1,
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
@@ -1556,6 +1611,7 @@
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
             "type": "boolean"
           },
@@ -1598,11 +1654,19 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.LocalObjectReference"
               }
             ],
-            "description": "secretRef is optional: points to a secret object containing parameters used to connect to OpenStack."
+            "description": "secretRef is optional: points to a secret object containing parameters used to connect to OpenStack.",
+            "x-kubernetes-validations": [
+              {
+                "fieldPath": ".name",
+                "message": "Required value",
+                "rule": "has(self.name) && self.name.size() > 0"
+              }
+            ]
           },
           "volumeID": {
             "default": "",
             "description": "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -1616,14 +1680,36 @@
         "properties": {
           "resourceClaimName": {
             "description": "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this pod.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           },
           "resourceClaimTemplateName": {
             "description": "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this pod.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this pod. When this pod is deleted, the ResourceClaim will also be deleted. The pod name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "\"must specify one of: `resourceClaimName`, `resourceClaimTemplateName`",
+            "rule": "has(self.resourceClaimName) || has(self.resourceClaimTemplateName)"
+          },
+          {
+            "message": "at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified",
+            "rule": "!has(self.resourceClaimName) || !has(self.resourceClaimTemplateName)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.ClusterTrustBundleProjection": {
         "description": "ClusterTrustBundleProjection describes how to select a set of ClusterTrustBundle objects and project their contents into the pod filesystem.",
@@ -1638,7 +1724,18 @@
           },
           "name": {
             "description": "Select a single ClusterTrustBundle by object name.  Mutually-exclusive with signerName and labelSelector.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "self.contains(\":\") || !format.dns1123Subdomain().validate(self).hasValue()"
+              },
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self.substring(self.lastIndexOf(\":\") + 1)).value()",
+                "rule": "!self.contains(\":\") || !format.dns1123Subdomain().validate(self.substring(self.lastIndexOf(\":\") + 1)).hasValue()"
+              }
+            ]
           },
           "optional": {
             "description": "If true, don't block pod startup if the referenced ClusterTrustBundle(s) aren't available.  If using name, then the named ClusterTrustBundle is allowed not to exist.  If using signerName, then the combination of signerName and labelSelector is allowed to match zero ClusterTrustBundles.",
@@ -1647,17 +1744,71 @@
           "path": {
             "default": "",
             "description": "Relative path from the volume root to write the bundle.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not start with \"..\"",
+                "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not contain \"..\"",
+                "rule": "!self.split(\"/\").exists(x, x == \"..\")"
+              },
+              {
+                "message": "must be a relative path",
+                "rule": "self.size() == 0 || !self.startsWith(\"/\")"
+              }
+            ]
           },
           "signerName": {
             "description": "Select all ClusterTrustBundles that match this signer name. Mutually-exclusive with name.  The contents of all selected ClusterTrustBundles will be unified and deduplicated.",
-            "type": "string"
+            "maxLength": 571,
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be a fully qualified domain and path of the form 'example.com/signer-name'",
+                "rule": "self.size() == 0 || self.split(\"/\").size() == 2"
+              },
+              {
+                "message": "domain part must have at most 253 bytes",
+                "rule": "!self.contains(\"/\") || self.split(\"/\")[0].size() <= 253"
+              },
+              {
+                "messageExpression": "self.split(\"/\")[0].split(\".\").map(lbl, format.dns1123Label().validate(lbl).orValue([])).filter(x, x.size() > 0)[0]",
+                "rule": "!self.contains(\"/\") || self.split(\"/\")[0].split(\".\").all(lbl, !format.dns1123Label().validate(lbl).hasValue())"
+              },
+              {
+                "message": "should be a domain with at least two segments separated by dots",
+                "rule": "!self.contains(\"/\") || self.split(\"/\")[0].split(\".\").size() >= 2"
+              },
+              {
+                "messageExpression": "self.split(\"/\")[1].split(\".\").map(lbl, format.dns1123Subdomain().validate(lbl).orValue([])).filter(x, x.size() > 0)[0]",
+                "rule": "!self.contains(\"/\") || self.split(\"/\")[1].split(\".\").all(lbl, !format.dns1123Subdomain().validate(lbl).hasValue())"
+              }
+            ]
           }
         },
         "required": [
           "path"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "only one of name and signerName may be used",
+            "rule": "!(has(self.name) && has(self.signerName))"
+          },
+          {
+            "fieldPath": ".labelSelector",
+            "message": "labelSelector must be unset if name is specified",
+            "rule": "has(self.labelSelector) ? !has(self.name) || has(self.signerName) : true"
+          },
+          {
+            "message": "either name or signerName must be specified",
+            "rule": "has(self.name) || has(self.signerName)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.ConfigMapEnvSource": {
         "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
@@ -1671,15 +1822,59 @@
             "type": "boolean"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".name",
+            "message": "Required value",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.name) && self.name.size() > 0"
+          },
+          {
+            "fieldPath": ".name",
+            "messageExpression": "format.dns1123Subdomain().validate(self.name).value()",
+            "rule": "!has(self.name) || !format.dns1123Subdomain().validate(self.name).hasValue()"
+          }
+        ]
       },
       "io.k8s.api.core.v1.ConfigMapKeySelector": {
+        "allOf": [
+          {
+            "properties": {
+              "name": {
+                "x-kubernetes-validations": [
+                  {
+                    "messageExpression": "format.dns1123Subdomain().validate(self.?name.orValue(\"\")).value()",
+                    "rule": "!format.dns1123Subdomain().validate(self.?name.orValue(\"\")).hasValue()"
+                  }
+                ]
+              }
+            }
+          }
+        ],
         "description": "Selects a key from a ConfigMap.",
         "properties": {
           "key": {
             "default": "",
             "description": "The key to select.",
-            "type": "string"
+            "maxLength": 253,
+            "minLength": 1,
+            "pattern": "^[-._a-zA-Z0-9]+$",
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "may not start with '..'",
+                "rule": "self == \"..\" || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not be '.'",
+                "rule": "self != \".\""
+              },
+              {
+                "message": "must not be '..'",
+                "rule": "self != \"..\""
+              }
+            ]
           },
           "name": {
             "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
@@ -1727,8 +1922,11 @@
         "description": "Adapts a ConfigMap into a volume.\n\nThe contents of the target ConfigMap's Data field will be presented in a volume as files using the keys in the Data field as the file names, unless the items element is populated with specific mappings of keys to paths. ConfigMap volumes support ownership management and SELinux relabeling.",
         "properties": {
           "defaultMode": {
+            "default": 420,
             "description": "defaultMode is optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "maximum": 511,
+            "minimum": 0,
             "type": "integer"
           },
           "items": {
@@ -1753,7 +1951,14 @@
             "type": "boolean"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "Required value",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.name) && self.name.size() > 0"
+          }
+        ]
       },
       "io.k8s.api.core.v1.Container": {
         "description": "A single application container that you want to run within a pod.",
@@ -1765,7 +1970,14 @@
               "type": "string"
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "command": {
             "description": "Entrypoint array. Not executed within a shell. The container image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell",
@@ -1774,7 +1986,14 @@
               "type": "string"
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "env": {
             "description": "List of environment variables to set in the container. Cannot be updated.",
@@ -1792,7 +2011,14 @@
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-patch-strategy": "merge",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "envFrom": {
             "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
@@ -1805,15 +2031,30 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "image": {
             "description": "Container image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.",
+            "minLength": 1,
             "type": "string"
           },
           "imagePullPolicy": {
             "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "lifecycle": {
             "allOf": [
@@ -1821,7 +2062,14 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Lifecycle"
               }
             ],
-            "description": "Actions that the management system should take in response to container lifecycle events. Cannot be updated."
+            "description": "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "livenessProbe": {
             "allOf": [
@@ -1829,12 +2077,32 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+            "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "name": {
             "default": "",
             "description": "Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "reason": "FieldValueInvalid",
+                "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"
+              },
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "ports": {
             "description": "List of ports to expose from the container. Not specifying a port here DOES NOT prevent that port from being exposed. Any port which is listening on the default \"0.0.0.0\" address inside a container will be accessible from the network. Modifying this array with strategic merge patch may corrupt the data. For more information See https://github.com/kubernetes/kubernetes/issues/108255. Cannot be updated.",
@@ -1853,7 +2121,14 @@
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "containerPort",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-patch-strategy": "merge",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "readinessProbe": {
             "allOf": [
@@ -1861,7 +2136,19 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+            "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              },
+              {
+                "fieldPath": ".terminationGracePeriodSeconds",
+                "message": "must not be set for readinessProbes",
+                "rule": "!has(self.terminationGracePeriodSeconds)"
+              }
+            ]
           },
           "resizePolicy": {
             "description": "Resources resize policy for the container.",
@@ -1883,7 +2170,14 @@
               }
             ],
             "default": {},
-            "description": "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+            "description": "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "restartPolicy": {
             "description": "RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is \"Always\". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
@@ -1903,25 +2197,51 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+            "description": "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "stdin": {
+            "default": false,
             "description": "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
             "type": "boolean"
           },
           "stdinOnce": {
+            "default": false,
             "description": "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
             "type": "boolean"
           },
           "terminationMessagePath": {
+            "default": "/dev/termination-log",
             "description": "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "terminationMessagePolicy": {
+            "default": "File",
             "description": "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "tty": {
+            "default": false,
             "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
             "type": "boolean"
           },
@@ -1959,15 +2279,30 @@
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "mountPath",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-patch-strategy": "merge",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "workingDir": {
             "description": "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           }
         },
         "required": [
-          "name"
+          "name",
+          "image"
         ],
         "type": "object"
       },
@@ -1978,6 +2313,7 @@
             "default": 0,
             "description": "Number of port to expose on the pod's IP address. This must be a valid port number, 0 < x < 65536.",
             "format": "int32",
+            "minimum": 1,
             "type": "integer"
           },
           "hostIP": {
@@ -1987,11 +2323,20 @@
           "hostPort": {
             "description": "Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.",
             "format": "int32",
+            "minimum": 1,
             "type": "integer"
           },
           "name": {
             "description": "If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.",
-            "type": "string"
+            "maxLength": 15,
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.portName().validate(self).value()",
+                "rule": "!format.portName().validate(self).hasValue()"
+              }
+            ]
           },
           "protocol": {
             "default": "TCP",
@@ -2051,18 +2396,34 @@
               {
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ObjectFieldSelector"
               }
-            ],
-            "description": "Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported."
+            ]
           },
           "mode": {
             "description": "Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "maximum": 511,
+            "minimum": 0,
             "type": "integer"
           },
           "path": {
             "default": "",
             "description": "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not start with '..'",
+                "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not contain '..'",
+                "rule": "!self.split(\"/\").exists(x, x == \"..\")"
+              },
+              {
+                "message": "must be a relative path",
+                "rule": "self.size() == 0 || !self.startsWith(\"/\")"
+              }
+            ]
           },
           "resourceFieldRef": {
             "allOf": [
@@ -2070,20 +2431,41 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceFieldSelector"
               }
             ],
-            "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
+            "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+            "x-kubernetes-validations": [
+              {
+                "fieldPath": ".containerName",
+                "message": "Required value",
+                "reason": "FieldValueRequired",
+                "rule": "has(self.containerName) && self.containerName.size() > 0"
+              },
+              {
+                "message": "supported values: [limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory, requests.ephemeral-storage]",
+                "rule": "[\"limits.cpu\",\"limits.memory\",\"limits.ephemeral-storage\",\"requests.cpu\",\"requests.memory\",\"requests.ephemeral-storage\"].exists(x, x == self.resource) || [\"requests.hugepages-\", \"limits.hugepages-\"].exists(prefix, self.resource.startsWith(prefix))"
+              }
+            ]
           }
         },
         "required": [
           "path"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "fieldRef and resourceFieldRef can not be specified simultaneously",
+            "rule": "!has(self.fieldRef) || !has(self.resourceFieldRef)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.DownwardAPIVolumeSource": {
         "description": "DownwardAPIVolumeSource represents a volume containing downward API info. Downward API volumes support ownership management and SELinux relabeling.",
         "properties": {
           "defaultMode": {
+            "default": 420,
             "description": "Optional: mode bits to use on created files by default. Must be a Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "maximum": 511,
+            "minimum": 0,
             "type": "integer"
           },
           "items": {
@@ -2096,6 +2478,7 @@
               ],
               "default": {}
             },
+            "minItems": 1,
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           }
@@ -2115,7 +2498,13 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
               }
             ],
-            "description": "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir"
+            "description": "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+            "x-kubernetes-validations": [
+              {
+                "message": "SizeLimit field must be a valid resource quantity",
+                "rule": "isQuantity(self) && !quantity(self).isLessThan(quantity(0))"
+              }
+            ]
           }
         },
         "type": "object"
@@ -2133,7 +2522,22 @@
           },
           "prefix": {
             "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
-            "type": "string"
+            "pattern": "^[-._a-zA-Z][-._a-zA-Z0-9]*$",
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "may not start with '..'",
+                "rule": "self == \"..\" || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not be '.'",
+                "rule": "self != \".\""
+              },
+              {
+                "message": "must not be '..'",
+                "rule": "self != \"..\""
+              }
+            ]
           },
           "secretRef": {
             "allOf": [
@@ -2144,7 +2548,17 @@
             "description": "The Secret to select from"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "may not have more than one field specified at a time",
+            "rule": "has(self.configMapRef) ? !has(self.secretRef) : true"
+          },
+          {
+            "message": "must specify one of: `configMapRef` or `secretRef`",
+            "rule": "has(self.configMapRef) || has(self.secretRef)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.EnvVar": {
         "description": "EnvVar represents an environment variable present in a Container.",
@@ -2152,7 +2566,23 @@
           "name": {
             "default": "",
             "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
-            "type": "string"
+            "minLength": 1,
+            "pattern": "^[-._a-zA-Z][-._a-zA-Z0-9]*$",
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "may not start with '..'",
+                "rule": "self == \"..\" || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not be '.'",
+                "rule": "self != \".\""
+              },
+              {
+                "message": "must not be '..'",
+                "rule": "self != \"..\""
+              }
+            ]
           },
           "value": {
             "description": "Variable references $(VAR_NAME) are expanded using the previously defined environment variables in the container and any service environment variables. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\". Escaped references will never be expanded, regardless of whether the variable exists or not. Defaults to \"\".",
@@ -2170,10 +2600,16 @@
         "required": [
           "name"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".valueFrom",
+            "message": "may not be specified when `value` is not empty",
+            "rule": "has(self.value) ? !has(self.valueFrom) : true"
+          }
+        ]
       },
       "io.k8s.api.core.v1.EnvVarSource": {
-        "description": "EnvVarSource represents a source for the value of an EnvVar.",
         "properties": {
           "configMapKeyRef": {
             "allOf": [
@@ -2197,7 +2633,13 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceFieldSelector"
               }
             ],
-            "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported."
+            "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.",
+            "x-kubernetes-validations": [
+              {
+                "message": "supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.hostIPs, status.podIP, status.podIPs",
+                "rule": "[\"metadata.name\",\"metadata.namespace\",\"metadata.uid\",\"spec.nodeName\",\"spec.serviceAccountName\",\"status.hostIP\",\"status.hostIPs\",\"status.podIP\",\"status.podIPs\"].exists(x, x == self.resource) || [\"requests.hugepages-\", \"limits.hugepages-\"].exists(prefix, self.resource.startsWith(prefix)"
+              }
+            ]
           },
           "secretKeyRef": {
             "allOf": [
@@ -2220,7 +2662,14 @@
               "type": "string"
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "command": {
             "description": "Entrypoint array. Not executed within a shell. The image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. \"$$(VAR_NAME)\" will produce the string literal \"$(VAR_NAME)\". Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell",
@@ -2247,7 +2696,14 @@
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-patch-strategy": "merge",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "envFrom": {
             "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
@@ -2260,15 +2716,36 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "image": {
             "description": "Container image name. More info: https://kubernetes.io/docs/concepts/containers/images",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not have leading or trailing whitespace",
+                "rule": "self.trim() == self"
+              }
+            ]
           },
           "imagePullPolicy": {
             "description": "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "lifecycle": {
             "allOf": [
@@ -2276,7 +2753,14 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Lifecycle"
               }
             ],
-            "description": "Lifecycle is not allowed for ephemeral containers."
+            "description": "Lifecycle is not allowed for ephemeral containers.",
+            "x-kubernetes-validations": [
+              {
+                "message": "lifecycle is not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "false"
+              }
+            ]
           },
           "livenessProbe": {
             "allOf": [
@@ -2284,12 +2768,27 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "Probes are not allowed for ephemeral containers."
+            "description": "Probes are not allowed for ephemeral containers.",
+            "x-kubernetes-validations": [
+              {
+                "message": "probes are not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "false"
+              }
+            ]
           },
           "name": {
             "default": "",
             "description": "Name of the ephemeral container specified as a DNS_LABEL. This name must be unique among all containers, init containers and ephemeral containers.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "reason": "FieldValueInvalid",
+                "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"
+              }
+            ]
           },
           "ports": {
             "description": "Ports are not allowed for ephemeral containers.",
@@ -2308,7 +2807,14 @@
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "containerPort",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-patch-strategy": "merge",
+            "x-kubernetes-validations": [
+              {
+                "message": "field is not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "false"
+              }
+            ]
           },
           "readinessProbe": {
             "allOf": [
@@ -2316,7 +2822,14 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "Probes are not allowed for ephemeral containers."
+            "description": "Probes are not allowed for ephemeral containers.",
+            "x-kubernetes-validations": [
+              {
+                "message": "probes are not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "false"
+              }
+            ]
           },
           "resizePolicy": {
             "description": "Resources resize policy for the container.",
@@ -2329,7 +2842,14 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "field is not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "false"
+              }
+            ]
           },
           "resources": {
             "allOf": [
@@ -2338,11 +2858,25 @@
               }
             ],
             "default": {},
-            "description": "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod."
+            "description": "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
+            "x-kubernetes-validations": [
+              {
+                "message": "field is not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "!has(self.claims) && !has(self.requests) && !has(self.limits)"
+              }
+            ]
           },
           "restartPolicy": {
             "description": "Restart policy for the container to manage the restart behavior of each container within a pod. This may only be set for init containers. You cannot set this field on ephemeral containers.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "field is not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "false"
+              }
+            ]
           },
           "securityContext": {
             "allOf": [
@@ -2358,7 +2892,14 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
               }
             ],
-            "description": "Probes are not allowed for ephemeral containers."
+            "description": "Probes are not allowed for ephemeral containers.",
+            "x-kubernetes-validations": [
+              {
+                "message": "probes are not allowed for ephemeral containers",
+                "reason": "FieldValueForbidden",
+                "rule": "false"
+              }
+            ]
           },
           "stdin": {
             "description": "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
@@ -2373,12 +2914,28 @@
             "type": "string"
           },
           "terminationMessagePath": {
+            "default": "/dev/termination-log",
             "description": "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "terminationMessagePolicy": {
+            "default": "File",
             "description": "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "tty": {
             "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
@@ -2403,6 +2960,36 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "volumeMounts": {
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "subPath": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "cannot be set for an Ephemeral Container",
+                              "reason": "FieldValueForbidden",
+                              "rule": "false"
+                            }
+                          ]
+                        },
+                        "subPathExpr": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "cannot be set for an Ephemeral Container",
+                              "reason": "FieldValueForbidden",
+                              "rule": "false"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers. Cannot be updated.",
             "items": {
               "allOf": [
@@ -2418,15 +3005,30 @@
             ],
             "x-kubernetes-list-type": "map",
             "x-kubernetes-patch-merge-key": "mountPath",
-            "x-kubernetes-patch-strategy": "merge"
+            "x-kubernetes-patch-strategy": "merge",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           },
           "workingDir": {
             "description": "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Field is immutable",
+                "reason": "FieldValueForbidden",
+                "rule": "self == oldSelf"
+              }
+            ]
           }
         },
         "required": [
-          "name"
+          "name",
+          "image"
         ],
         "type": "object"
       },
@@ -2442,6 +3044,9 @@
             "description": "Will be used to create a stand-alone PVC to provision the volume. The pod in which this EphemeralVolumeSource is embedded will be the owner of the PVC, i.e. the PVC will be deleted together with the pod.  The name of the PVC will be `<pod name>-<volume name>` where `<volume name>` is the name from the `PodSpec.Volumes` array entry. Pod validation will reject the pod if the concatenated name is not valid for a PVC (for example, too long).\n\nAn existing PVC with that name that is not owned by the pod will *not* be used for the pod to avoid using an unrelated volume by mistake. Starting the pod is then blocked until the unrelated PVC is removed. If such a pre-created PVC is meant to be used by the pod, the PVC has to updated with an owner reference to the pod once the pod exists. Normally this should not be necessary, but it may be useful when manually reconstructing a broken cluster.\n\nThis field is read-only and no changes will be made by Kubernetes to the PVC after it has been created.\n\nRequired, must not be nil."
           }
         },
+        "required": [
+          "volumeClaimTemplate"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.ExecAction": {
@@ -2453,10 +3058,14 @@
               "default": "",
               "type": "string"
             },
+            "minItems": 1,
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           }
         },
+        "required": [
+          "command"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.FCVolumeSource": {
@@ -2469,6 +3078,8 @@
           "lun": {
             "description": "lun is Optional: FC target lun number",
             "format": "int32",
+            "maximum": 255,
+            "minimum": 0,
             "type": "integer"
           },
           "readOnly": {
@@ -2494,7 +3105,26 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".targetWWNs",
+            "message": "must specify either targetWWNs or wwids, but not both",
+            "reason": "FieldValueRequired",
+            "rule": "self.?targetWWNs.orValue([]).size() > 0 || self.?wwids.orValue([]).size() > 0"
+          },
+          {
+            "fieldPath": ".targetWWNs",
+            "message": "targetWWNs and wwids can not be specified simultaneously",
+            "rule": "self.?targetWWNs.orValue([]).size() == 0 || self.?wwids.orValue([]).size() == 0"
+          },
+          {
+            "fieldPath": ".lun",
+            "message": "lun is required if targetWWNs is specified",
+            "reason": "FieldValueRequired",
+            "rule": "self.?targetWWNs.orValue([]).size() == 0 || has(self.lun)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.FlexVolumeSource": {
         "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
@@ -2502,6 +3132,7 @@
           "driver": {
             "default": "",
             "description": "driver is the name of the driver to use for this volume.",
+            "minLength": 1,
             "type": "string"
           },
           "fsType": {
@@ -2514,7 +3145,13 @@
               "type": "string"
             },
             "description": "options is Optional: this field holds extra command options if any.",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "kubernetes.io and k8s.io namespaces are reserved",
+                "rule": "!self.exists(k, k.matches(\"[^/]*(kubernetes[.]io|k8s[.]io)([/].*)?$\"))"
+              }
+            ]
           },
           "readOnly": {
             "description": "readOnly is Optional: defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
@@ -2539,14 +3176,31 @@
         "properties": {
           "datasetName": {
             "description": "datasetName is Name of the dataset stored as metadata -> name on the dataset for Flocker should be considered as deprecated",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not contain '/'",
+                "rule": "!self.contains(\"/\")"
+              }
+            ]
           },
           "datasetUUID": {
             "description": "datasetUUID is the UUID of the dataset. This is unique identifier of a Flocker dataset",
             "type": "string"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "datasetName and datasetUUID can not be specified simultaneously",
+            "rule": "has(self.datasetName) ? !has(self.datasetUUID) : true"
+          },
+          {
+            "message": "one of datasetUUID and datasetName is required",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.datasetUUID) || has(self.datasetName)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.GCEPersistentDiskVolumeSource": {
         "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
@@ -2558,11 +3212,14 @@
           "partition": {
             "description": "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
             "format": "int32",
+            "maximum": 255,
+            "minimum": 0,
             "type": "integer"
           },
           "pdName": {
             "default": "",
             "description": "pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+            "minLength": 1,
             "type": "string"
           },
           "readOnly": {
@@ -2581,6 +3238,8 @@
             "default": 0,
             "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
             "format": "int32",
+            "maximum": 65535,
+            "minimum": 1,
             "type": "integer"
           },
           "service": {
@@ -2599,11 +3258,22 @@
         "properties": {
           "directory": {
             "description": "directory is the target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not contain '..'",
+                "rule": "self.split('/').all(e, e != \"..\")"
+              },
+              {
+                "message": "must be a relative path",
+                "rule": "!self.startsWith(\"/\")"
+              }
+            ]
           },
           "repository": {
             "default": "",
             "description": "repository is the URL",
+            "minLength": 1,
             "type": "string"
           },
           "revision": {
@@ -2622,14 +3292,17 @@
           "endpoints": {
             "default": "",
             "description": "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+            "minLength": 1,
             "type": "string"
           },
           "path": {
             "default": "",
             "description": "path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+            "minLength": 1,
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
             "type": "boolean"
           }
@@ -2661,7 +3334,9 @@
             "x-kubernetes-list-type": "atomic"
           },
           "path": {
+            "default": "/",
             "description": "Path to access on the HTTP server.",
+            "minLength": 1,
             "type": "string"
           },
           "port": {
@@ -2670,10 +3345,20 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
               }
             ],
-            "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+            "description": "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+            "maximum": 65535,
+            "minimum": 1,
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.portName().validate(self).value()",
+                "rule": "type(self) != string || !format.portName().validate(self).hasValue()"
+              }
+            ]
           },
           "scheme": {
+            "default": "HTTP",
             "description": "Scheme to use for connecting to the host. Defaults to HTTP.",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -2688,6 +3373,7 @@
           "name": {
             "default": "",
             "description": "The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.",
+            "pattern": "^[-A-Za-z0-9]+$",
             "type": "string"
           },
           "value": {
@@ -2706,6 +3392,18 @@
         "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
         "properties": {
           "hostnames": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                      "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Hostnames for the above IP address.",
             "items": {
               "default": "",
@@ -2716,7 +3414,13 @@
           },
           "ip": {
             "description": "IP address of the host file entry.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)",
+                "rule": "isIP(self)"
+              }
+            ]
           }
         },
         "type": "object"
@@ -2727,9 +3431,17 @@
           "path": {
             "default": "",
             "description": "path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not contain '..'",
+                "rule": "self.split('/').all(e, e != \"..\")"
+              }
+            ]
           },
           "type": {
+            "default": "",
             "description": "type for HostPath Volume Defaults to \"\" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
             "type": "string"
           }
@@ -2743,10 +3455,12 @@
         "description": "Represents an ISCSI disk. ISCSI volumes can only be mounted as read/write once. ISCSI volumes support ownership management and SELinux relabeling.",
         "properties": {
           "chapAuthDiscovery": {
+            "default": false,
             "description": "chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication",
             "type": "boolean"
           },
           "chapAuthSession": {
+            "default": false,
             "description": "chapAuthSession defines whether support iSCSI Session CHAP authentication",
             "type": "boolean"
           },
@@ -2756,14 +3470,52 @@
           },
           "initiatorName": {
             "description": "initiatorName is the custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be valid format starting with iqn, eui, or naa",
+                "rule": "self.startsWith(\"iqn\") || self.startsWith(\"eui\") || self.startsWith(\"naa\")"
+              },
+              {
+                "message": "must be a valid format",
+                "rule": "!self.startsWith(\"iqn\") || self.matches(\"iqn\\\\.\\\\d{4}-\\\\d{2}\\\\.([[:alnum:]-.]+)(:[^,;*&$|\\\\s]+)$\")"
+              },
+              {
+                "message": "must be a valid format",
+                "rule": "!self.startsWith(\"eui\") || self.matches(\"^eui.[[:alnum:]]{16}$\")"
+              },
+              {
+                "message": "must be a valid format",
+                "rule": "!self.startsWith(\"naa\") || self.matches(\"^naa.[[:alnum:]]{32}$\")"
+              }
+            ]
           },
           "iqn": {
             "default": "",
             "description": "iqn is the target iSCSI Qualified Name.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be valid format starting with iqn, eui, or naa",
+                "rule": "self.size() == 0 || self.startsWith(\"iqn\") || self.startsWith(\"eui\") || self.startsWith(\"naa\")"
+              },
+              {
+                "message": "must be a valid format",
+                "rule": "!self.startsWith(\"iqn\") || self.matches(\"iqn\\\\.\\\\d{4}-\\\\d{2}\\\\.([[:alnum:]-.]+)(:[^,;*&$|\\\\s]+)$\")"
+              },
+              {
+                "message": "must be a valid format",
+                "rule": "!self.startsWith(\"eui\") || self.matches(\"^eui.[[:alnum:]]{16}$\")"
+              },
+              {
+                "message": "must be a valid format",
+                "rule": "!self.startsWith(\"naa\") || self.matches(\"^naa.[[:alnum:]]{32}$\")"
+              }
+            ]
           },
           "iscsiInterface": {
+            "default": "default",
             "description": "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
             "type": "string"
           },
@@ -2771,6 +3523,8 @@
             "default": 0,
             "description": "lun represents iSCSI Target Lun number.",
             "format": "int32",
+            "maximum": 255,
+            "minimum": 0,
             "type": "integer"
           },
           "portals": {
@@ -2783,6 +3537,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
             "type": "boolean"
           },
@@ -2797,6 +3552,7 @@
           "targetPortal": {
             "default": "",
             "description": "targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -2805,7 +3561,15 @@
           "iqn",
           "lun"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".secretRef",
+            "message": "Required value",
+            "reason": "FieldValueRequired",
+            "rule": "(self.?chapAuthDiscovery.orValue(false) || self.?chapAuthSession.orValue(false)) ? has(self.secretRef) : true"
+          }
+        ]
       },
       "io.k8s.api.core.v1.KeyToPath": {
         "description": "Maps a string key to a path within a volume.",
@@ -2813,17 +3577,35 @@
           "key": {
             "default": "",
             "description": "key is the key to project.",
+            "minLength": 1,
             "type": "string"
           },
           "mode": {
             "description": "mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "maximum": 511,
+            "minimum": 0,
             "type": "integer"
           },
           "path": {
             "default": "",
             "description": "path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not start with \"..\"",
+                "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must be a relative path",
+                "rule": "self.size() == 0 || !self.startsWith(\"/\")"
+              },
+              {
+                "message": "must not contain \"..\"",
+                "rule": "!self.split(\"/\").exists(x, x == \"..\")"
+              }
+            ]
           }
         },
         "required": [
@@ -2890,7 +3672,18 @@
             "description": "Deprecated. TCPSocket is NOT supported as a LifecycleHandler and kept for the backward compatibility. There are no validation of this field and lifecycle hooks will fail in runtime when tcp handler is specified."
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "must specify a handler type",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.exec) || has(self.httpGet) || has(self.sleep) || has(self.tcpSocket)"
+          },
+          {
+            "message": "may not specify more than 1 handler type",
+            "rule": "(has(self.exec)?1:0) + (has(self.httpGet)?1:0) + (has(self.sleep)?1:0) + (has(self.tcpSocket)?1:0) <= 1"
+          }
+        ]
       },
       "io.k8s.api.core.v1.LocalObjectReference": {
         "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
@@ -2927,6 +3720,8 @@
           "path": {
             "default": "",
             "description": "path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+            "minLength": 1,
+            "pattern": "^/",
             "type": "string"
           },
           "readOnly": {
@@ -2936,6 +3731,7 @@
           "server": {
             "default": "",
             "description": "server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -2986,7 +3782,14 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "must have at least one node selector term",
+                "reason": "FieldValueRequired",
+                "rule": "self.size() > 0"
+              }
+            ]
           }
         },
         "required": [
@@ -3028,6 +3831,46 @@
         "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
         "properties": {
           "matchExpressions": {
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "key": {
+                          "x-kubernetes-validations": [
+                            {
+                              "messageExpression": "format.named(\"qualifiedName\").value().validate(self).value()",
+                              "rule": "!format.named(\"qualifiedName\").value().validate(self).hasValue()"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be specified when `operator` is 'In' or 'NotIn'",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() > 0 : true"
+                    },
+                    {
+                      "fieldPath": ".values",
+                      "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'",
+                      "reason": "FieldValueForbidden",
+                      "rule": "self.operator == 'Exists' || self.operator == 'DoesNotExist' ? !has(self.values) || self.values.size() == 0 : true"
+                    },
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be specified single value when `operator` is 'Lt' or 'Gt'",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'Gt' || self.operator == 'Lt' ? has(self.values) && self.values.size() == 1 : true"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "A list of node selector requirements by node's labels.",
             "items": {
               "allOf": [
@@ -3041,7 +3884,59 @@
             "x-kubernetes-list-type": "atomic"
           },
           "matchFields": {
-            "description": "A list of node selector requirements by node's fields.",
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "key": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "not a valid field selector key",
+                              "reason": "FieldValueInvalid",
+                              "rule": "[\"metadata.name\"].exists(n, n == self)"
+                            }
+                          ]
+                        },
+                        "operator": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "not a valid selector operator",
+                              "reason": "FieldValueInvalid",
+                              "rule": "self == 'In' || self == 'NotIn'"
+                            }
+                          ]
+                        },
+                        "values": {
+                          "allOf": [
+                            {
+                              "items": {
+                                "x-kubernetes-validations": [
+                                  {
+                                    "messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self).value()",
+                                    "rule": "!format.named(\"dns1123Subdomain\").value().validate(self).hasValue()"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be only one value when `operator` is 'In' or 'NotIn' for node field selector",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() == 1 : true"
+                    }
+                  ]
+                }
+              }
+            ],
+            "description": "A list of node selector requirements by node's fields. !TODO: Use variables for name format to use here, fortunately only one is valid so we use that",
             "items": {
               "allOf": [
                 {
@@ -3061,16 +3956,34 @@
         "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
         "properties": {
           "apiVersion": {
+            "default": "v1",
             "description": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\".",
+            "minLength": 1,
             "type": "string"
           },
           "fieldPath": {
             "default": "",
             "description": "Path of the field to select in the specified API version.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "does not support subscript",
+                "rule": "!self.contains(\"[\") || !self.contains(\"]\") || [\"metadata.annotations\", \"metadata.labels\"].exists(x, self.startsWith(x + \"['\") && self.endsWith(\"']\"))"
+              },
+              {
+                "messageExpression": "format.qualifiedName().validate(self.substring(22, self.size() - 2).lowerAscii()).value()",
+                "rule": "!self.startsWith(\"metadata.annotations['\") || !self.endsWith(\"']\") || !format.qualifiedName().validate(self.substring(22, self.size() - 2).lowerAscii()).hasValue()"
+              },
+              {
+                "messageExpression": "format.qualifiedName().validate(self.substring(17, self.size() - 2)).value()",
+                "rule": "!self.startsWith(\"metadata.labels['\") || !self.endsWith(\"']\") ||!format.qualifiedName().validate(self.substring(17, self.size() - 2)).hasValue()"
+              }
+            ]
           }
         },
         "required": [
+          "apiVersion",
           "fieldPath"
         ],
         "type": "object",
@@ -3303,7 +4216,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.PersistentVolumeClaimTemplate": {
-        "description": "PersistentVolumeClaimTemplate is used to produce PersistentVolumeClaim objects as part of an EphemeralVolumeSource.",
+        "description": "PersistentVolumeClaimTemplate is used to produce PersistentVolumeClaim objects as part of an EphemeralVolumeSource. ?k8s:validation:cel[0]:rule>!self.metadata.exists(k, k != \"labels\" && k != \"annotations\") ?k8s:validation:cel[0]:message>pvc template metadata may only contain labels and annotations",
         "properties": {
           "metadata": {
             "allOf": [
@@ -3335,9 +4248,11 @@
           "claimName": {
             "default": "",
             "description": "claimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+            "minLength": 1,
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly Will force the ReadOnly setting in VolumeMounts. Default false.",
             "type": "boolean"
           }
@@ -3357,6 +4272,7 @@
           "pdID": {
             "default": "",
             "description": "pdID is the ID that identifies Photon Controller persistent disk",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -3409,6 +4325,18 @@
             "description": "A label query over a set of resources, in this case pods. If it's null, this PodAffinityTerm matches with no Pods."
           },
           "matchLabelKeys": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.qualifiedName().validate(self).value()",
+                      "rule": "!format.qualifiedName().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
             "items": {
               "default": "",
@@ -3418,6 +4346,18 @@
             "x-kubernetes-list-type": "atomic"
           },
           "mismatchLabelKeys": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.qualifiedName().validate(self).value()",
+                      "rule": "!format.qualifiedName().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
             "items": {
               "default": "",
@@ -3435,6 +4375,18 @@
             "description": "A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means \"this pod's namespace\". An empty selector ({}) matches all namespaces."
           },
           "namespaces": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.dns1123Label().validate(self).value()",
+                      "rule": "!format.dns1123Label().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "namespaces specifies a static list of namespace names that the term applies to. The term is applied to the union of the namespaces listed in this field and the ones selected by namespaceSelector. null or empty namespaces list and null namespaceSelector means \"this pod's namespace\".",
             "items": {
               "default": "",
@@ -3446,13 +4398,26 @@
           "topologyKey": {
             "default": "",
             "description": "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.qualifiedName().validate(self).value()",
+                "rule": "!format.qualifiedName().validate(self).hasValue()"
+              }
+            ]
           }
         },
         "required": [
           "topologyKey"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "matchLabelKeys key must not be in mismatchLabelKeys",
+            "rule": "!has(self.mismatchLabelKeys) || !has(self.matchLabelKeys) || self.matchLabelKeys.all(x, !self.mismatchLabelKeys.exists(y, y == x))"
+          }
+        ]
       },
       "io.k8s.api.core.v1.PodAntiAffinity": {
         "description": "Pod anti affinity is a group of inter pod anti affinity scheduling rules.",
@@ -3490,11 +4455,24 @@
         "description": "PodDNSConfig defines the DNS parameters of a pod in addition to those generated from DNSPolicy.",
         "properties": {
           "nameservers": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)",
+                      "rule": "isIP(self)"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "A list of DNS name server IP addresses. This will be appended to the base nameservers generated from DNSPolicy. Duplicated nameservers will be removed.",
             "items": {
               "default": "",
               "type": "string"
             },
+            "maxItems": 3,
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
@@ -3512,13 +4490,32 @@
             "x-kubernetes-list-type": "atomic"
           },
           "searches": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.dns1123Subdomain().validate(self.substring(0, self.size() - (self.endsWith(\".\") ? 1 : 0))).value()",
+                      "rule": "!format.dns1123Subdomain().validate(self.substring(0, self.size() - (self.endsWith(\".\") ? 1 : 0))).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "A list of DNS search domains for host-name lookup. This will be appended to the base search paths generated from DNSPolicy. Duplicated search paths will be removed.",
             "items": {
               "default": "",
               "type": "string"
             },
+            "maxItems": 32,
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not have more than 2048 characters (including spaces) in the search list",
+                "rule": "self.map(x, x.size()).sum() + self.size() - 1 <= 2048"
+              }
+            ]
           }
         },
         "type": "object"
@@ -3528,12 +4525,16 @@
         "properties": {
           "name": {
             "description": "Required.",
+            "minLength": 1,
             "type": "string"
           },
           "value": {
             "type": "string"
           }
         },
+        "required": [
+          "name"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.PodOS": {
@@ -3556,7 +4557,13 @@
           "conditionType": {
             "default": "",
             "description": "ConditionType refers to a condition in the pod's condition list with matching type.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.qualifiedName().validate(self).value()",
+                "rule": "!format.qualifiedName().validate(self).hasValue()"
+              }
+            ]
           }
         },
         "required": [
@@ -3570,7 +4577,15 @@
           "name": {
             "default": "",
             "description": "Name uniquely identifies this resource claim inside the pod. This must be a DNS_LABEL.",
-            "type": "string"
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasValue()"
+              }
+            ]
           },
           "source": {
             "allOf": [
@@ -3593,7 +4608,13 @@
           "name": {
             "default": "",
             "description": "Name of the scheduling gate. Each scheduling gate must have a unique name field.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.qualifiedName().validate(self).value()",
+                "rule": "!format.qualifiedName().validate(self).hasValue()"
+              }
+            ]
           }
         },
         "required": [
@@ -3615,6 +4636,8 @@
           "fsGroup": {
             "description": "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw----\n\nIf unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.",
             "format": "int64",
+            "maximum": 2147483647,
+            "minimum": 0,
             "type": "integer"
           },
           "fsGroupChangePolicy": {
@@ -3624,6 +4647,8 @@
           "runAsGroup": {
             "description": "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
             "format": "int64",
+            "maximum": 2147483647,
+            "minimum": 0,
             "type": "integer"
           },
           "runAsNonRoot": {
@@ -3633,6 +4658,8 @@
           "runAsUser": {
             "description": "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
             "format": "int64",
+            "maximum": 2147483647,
+            "minimum": 0,
             "type": "integer"
           },
           "seLinuxOptions": {
@@ -3652,6 +4679,14 @@
             "description": "The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows."
           },
           "supplementalGroups": {
+            "allOf": [
+              {
+                "items": {
+                  "maximum": 2147483647,
+                  "minimum": 0
+                }
+              }
+            ],
             "description": "A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.",
             "items": {
               "default": 0,
@@ -3691,6 +4726,8 @@
           "activeDeadlineSeconds": {
             "description": "Optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
             "format": "int64",
+            "maximum": 2147483647,
+            "minimum": 1,
             "type": "integer"
           },
           "affinity": {
@@ -3706,6 +4743,20 @@
             "type": "boolean"
           },
           "containers": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".restartPolicy",
+                      "message": "may not be set for non-init containers",
+                      "reason": "FieldValueForbidden",
+                      "rule": "!has(self.restartPolicy)"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated.",
             "items": {
               "allOf": [
@@ -3732,6 +4783,7 @@
             "description": "Specifies the DNS parameters of a pod. Parameters specified here will be merged to the generated DNS configuration based on DNSPolicy."
           },
           "dnsPolicy": {
+            "default": "ClusterFirst",
             "description": "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
             "type": "string"
           },
@@ -3793,7 +4845,13 @@
           },
           "hostname": {
             "description": "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasValue()"
+              }
+            ]
           },
           "imagePullSecrets": {
             "description": "ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec. If specified, these secrets will be passed to individual puller implementations for them to use. More info: https://kubernetes.io/docs/concepts/containers/images#specifying-imagepullsecrets-on-a-pod",
@@ -3814,6 +4872,60 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "initContainers": {
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "resizePolicy": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "must not be set for init containers",
+                              "rule": "false"
+                            }
+                          ]
+                        },
+                        "restartPolicy": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "supported values: \"Always\"",
+                              "rule": "self == \"Always\""
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".lifecycle",
+                      "message": "may not be set for init containers without restartPolicy=Always",
+                      "reason": "FieldValueForbidden",
+                      "rule": "!has(self.lifecycle) || self.?restartPolicy.orValue(\"\") == \"Always\""
+                    },
+                    {
+                      "fieldPath": ".livenessProbe",
+                      "message": "may not be set for init containers without restartPolicy=Always",
+                      "reason": "FieldValueForbidden",
+                      "rule": "!has(self.livenessProbe) || self.?restartPolicy.orValue(\"\") == \"Always\""
+                    },
+                    {
+                      "fieldPath": ".readinessProbe",
+                      "message": "may not be set for init containers without restartPolicy=Always",
+                      "reason": "FieldValueForbidden",
+                      "rule": "!has(self.readinessProbe) || self.?restartPolicy.orValue(\"\") == \"Always\""
+                    },
+                    {
+                      "fieldPath": ".startupProbe",
+                      "message": "may not be set for init containers without restartPolicy=Always",
+                      "reason": "FieldValueForbidden",
+                      "rule": "!has(self.startupProbe) || self.?restartPolicy.orValue(\"\") == \"Always\""
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
             "items": {
               "allOf": [
@@ -3833,16 +4945,40 @@
           },
           "nodeName": {
             "description": "NodeName indicates in which node this pod is scheduled. If empty, this pod is a candidate for scheduling by the scheduler defined in schedulerName. Once this field is set, the kubelet for this node becomes responsible for the lifecycle of this pod. This field should not be used to express a desire for the pod to be scheduled on a specific node. https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           },
           "nodeSelector": {
             "additionalProperties": {
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
             "type": "object",
-            "x-kubernetes-map-type": "atomic"
+            "x-kubernetes-map-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "self.all(k, format.qualifiedName().validate(k).value().orValue([])).filter(x, x.size() > 0)[0]",
+                "rule": "self.all(k, !format.qualifiedName().validate(k).hasValue())"
+              }
+            ]
           },
           "os": {
             "allOf": [
@@ -3870,7 +5006,13 @@
           },
           "priorityClassName": {
             "description": "If specified, indicates the pod's priority. \"system-node-critical\" and \"system-cluster-critical\" are two special keywords which indicate the highest priorities with the former being the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           },
           "readinessGates": {
             "description": "If specified, all readiness gates will be evaluated for pod readiness. A pod is ready when all its containers are ready AND all conditions specified in the readiness gates have status equal to \"True\" More info: https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates",
@@ -3904,14 +5046,29 @@
             "x-kubernetes-patch-strategy": "merge,retainKeys"
           },
           "restartPolicy": {
+            "default": "Always",
             "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "Required value",
+                "reason": "FieldValueRequired",
+                "rule": "self.size() > 0"
+              }
+            ]
           },
           "runtimeClassName": {
             "description": "RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           },
           "schedulerName": {
+            "default": "default-scheduler",
             "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
             "type": "string"
           },
@@ -3947,7 +5104,13 @@
           },
           "serviceAccountName": {
             "description": "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           },
           "setHostnameAsFQDN": {
             "description": "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
@@ -3959,7 +5122,13 @@
           },
           "subdomain": {
             "description": "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasValue()"
+              }
+            ]
           },
           "terminationGracePeriodSeconds": {
             "description": "Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
@@ -4020,7 +5189,78 @@
         "required": [
           "containers"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".shareProcessNamespace",
+            "message": "ShareProcessNamespace and HostPID cannot both be enabled",
+            "rule": "!self.?shareProcessNamespace.orValue(false) || !self.?hostPID.orValue(false)"
+          },
+          {
+            "fieldPath": ".containers",
+            "message": "`hostPort` must match `containerPort` when `hostNetwork` is true",
+            "rule": "!self.?hostNetwork.orValue(false) || self.?containers.orValue([]).all(c, c.?ports.orValue([]).all(p, p.?hostPort.orValue(0) == p.?containerPort.orValue(0)))"
+          },
+          {
+            "fieldPath": ".hostNetwork",
+            "message": "when `pod.Spec.HostUsers` is false",
+            "reason": "FieldValueForbidden",
+            "rule": "has(self.hostUsers) && !self.hostUsers ? !self.hostNetwork : true"
+          },
+          {
+            "fieldPath": ".hostPID",
+            "message": "when `pod.Spec.HostUsers` is false",
+            "reason": "FieldValueForbidden",
+            "rule": "has(self.hostUsers) && !self.hostUsers ? !self.hostPID : true"
+          },
+          {
+            "fieldPath": ".hostIPC",
+            "message": "when `pod.Spec.HostUsers` is false",
+            "reason": "FieldValueForbidden",
+            "rule": "has(self.hostUsers) && !self.hostUsers ? !self.hostIPC : true"
+          },
+          {
+            "fieldPath": ".containers",
+            "message": "container lifecycle sleep seconds must be less than or equal to `terminationGracePeriodSeconds`",
+            "rule": "!has(self.terminationGracePeriodSeconds) || self.containers.all(c, c.?lifecycle.?preStop.?sleep.?seconds.orValue(0) <= self.terminationGracePeriodSeconds && c.?lifecycle.?postStart.?sleep.?seconds.orValue(0) <= self.terminationGracePeriodSeconds)"
+          },
+          {
+            "fieldPath": ".dnsConfig",
+            "message": "must provide `dnsConfig` when `dnsPolicy` is None",
+            "reason": "FieldValueRequired",
+            "rule": "!has(self.dnsPolicy) || self.dnsPolicy != \"None\" || has(self.dnsConfig)"
+          },
+          {
+            "fieldPath": ".dnsConfig.nameservers",
+            "message": "must provide at least one DNS nameserver when `dnsPolicy` is None",
+            "reason": "FieldValueRequired",
+            "rule": "!has(self.dnsPolicy) || self.dnsPolicy != \"None\" || !has(self.dnsConfig) || (self.dnsConfig.?nameservers.optMap(x, x.size()).orValue(0) > 0)"
+          },
+          {
+            "fieldPath": ".initContainers",
+            "message": "init container name must not match any container name",
+            "reason": "FieldValueDuplicate",
+            "rule": "self.?initContainers.orValue([]).all(ic, self.?containers.orValue([]).all(c, c.name != ic.name))"
+          },
+          {
+            "fieldPath": ".ephemeralContainers",
+            "message": "ephemeral container name must not match any container name",
+            "reason": "FieldValueDuplicate",
+            "rule": "self.?ephemeralContainers.orValue([]).all(ec, self.?containers.orValue([]).all(c, c.name != ec.name))"
+          },
+          {
+            "fieldPath": ".ephemeralContainers",
+            "message": "ephemeral container name must not match any init container name",
+            "reason": "FieldValueDuplicate",
+            "rule": "self.?ephemeralContainers.orValue([]).all(ec, self.?initContainers.orValue([]).all(ic, ic.name != ec.name))"
+          },
+          {
+            "fieldPath": ".ephemeralContainers",
+            "message": "ephemeral container targetContainerName must match a container name",
+            "reason": "FieldValueInvalid",
+            "rule": "self.?ephemeralContainers.orValue([]).all(ec, ec.?targetContainerName.orValue(\"\").size() == 0 || self.containers.exists(c, c.name == ec.targetContainerName) || self.initContainers.exists(ic, ic.name == ec.targetContainerName))"
+          }
+        ]
       },
       "io.k8s.api.core.v1.PodTemplateSpec": {
         "description": "PodTemplateSpec describes the data a pod should have when created from a template",
@@ -4060,6 +5300,7 @@
           "volumeID": {
             "default": "",
             "description": "volumeID uniquely identifies a Portworx volume",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -4084,6 +5325,8 @@
             "default": 0,
             "description": "Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.",
             "format": "int32",
+            "maximum": 100,
+            "minimum": 1,
             "type": "integer"
           }
         },
@@ -4105,8 +5348,10 @@
             "description": "Exec specifies the action to take."
           },
           "failureThreshold": {
+            "default": 3,
             "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
             "format": "int32",
+            "minimum": 0,
             "type": "integer"
           },
           "grpc": {
@@ -4128,16 +5373,21 @@
           "initialDelaySeconds": {
             "description": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
             "format": "int32",
+            "minimum": 0,
             "type": "integer"
           },
           "periodSeconds": {
+            "default": 10,
             "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
             "format": "int32",
+            "minimum": 0,
             "type": "integer"
           },
           "successThreshold": {
+            "default": 1,
             "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.",
             "format": "int32",
+            "minimum": 0,
             "type": "integer"
           },
           "tcpSocket": {
@@ -4149,24 +5399,42 @@
             "description": "TCPSocket specifies an action involving a TCP port."
           },
           "terminationGracePeriodSeconds": {
+            "default": 30,
             "description": "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
             "format": "int64",
+            "minimum": 1,
             "type": "integer"
           },
           "timeoutSeconds": {
+            "default": 1,
             "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
             "format": "int32",
+            "minimum": 0,
             "type": "integer"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "must specify a handler type",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.exec) || has(self.httpGet) || has(self.tcpSocket) || has(self.grpc)"
+          },
+          {
+            "message": "may not specify more than 1 handler type",
+            "rule": "(has(self.exec)?1:0) + (has(self.httpGet)?1:0) + (has(self.tcpSocket)?1:0) + (has(self.grpc)?1:0) <= 1"
+          }
+        ]
       },
       "io.k8s.api.core.v1.ProjectedVolumeSource": {
         "description": "Represents a projected volume source",
         "properties": {
           "defaultMode": {
+            "default": 420,
             "description": "defaultMode are the mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "maximum": 511,
+            "minimum": 0,
             "type": "integer"
           },
           "sources": {
@@ -4193,16 +5461,25 @@
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
             "type": "boolean"
           },
           "registry": {
             "default": "",
             "description": "registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be a host:port pair or multiple pairs separated by commas",
+                "rule": "self.size() == 0 || self.split(',').all(e, e.contains(':'))"
+              }
+            ]
           },
           "tenant": {
             "description": "tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin",
+            "maxLength": 65,
             "type": "string"
           },
           "user": {
@@ -4212,6 +5489,7 @@
           "volume": {
             "default": "",
             "description": "volume is a string that references an already created Quobyte volume by name.",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -4231,6 +5509,7 @@
           "image": {
             "default": "",
             "description": "image is the rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+            "minLength": 1,
             "type": "string"
           },
           "keyring": {
@@ -4243,6 +5522,7 @@
               "default": "",
               "type": "string"
             },
+            "minItems": 1,
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
@@ -4305,6 +5585,7 @@
           "resource": {
             "default": "",
             "description": "Required: resource to select",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -4312,7 +5593,25 @@
           "resource"
         ],
         "type": "object",
-        "x-kubernetes-map-type": "atomic"
+        "x-kubernetes-map-type": "atomic",
+        "x-kubernetes-validations": [
+          {
+            "message": "only divisor's values 1m and 1 are supported with the cpu resource",
+            "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource == \"limits.cpu\" || self.resource == \"requests.cpu\") ||\n[\"1m\", \"1\"].exists(x, x == self.divisor)"
+          },
+          {
+            "message": "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource",
+            "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource == \"limits.memory\" || self.resource == \"requests.memory\") ||\n[\"1\", \"1k\", \"1M\", \"1G\", \"1T\", \"1P\", \"1E\", \"1Ki\", \"1Mi\", \"1Gi\", \"1Ti\", \"1Pi\", \"1Ei\"].exists(x, x == self.divisor)"
+          },
+          {
+            "message": "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the local ephemeral storage resource",
+            "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource == \"limits.ephemeral-storage\" || self.resource == \"requests.ephemeral-storage\") ||\n[\"1\", \"1k\", \"1M\", \"1G\", \"1T\", \"1P\", \"1E\", \"1Ki\", \"1Mi\", \"1Gi\", \"1Ti\", \"1Pi\", \"1Ei\"].exists(x, x == self.divisor)"
+          },
+          {
+            "message": "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the hugepages resource",
+            "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource.startsWith(\"requests.hugepages-\") || self.resource.startsWith(\"limits.hugepages-\")) ||\n[\"1\", \"1k\", \"1M\", \"1G\", \"1T\", \"1P\", \"1E\", \"1Ki\", \"1Mi\", \"1Gi\", \"1Ti\", \"1Pi\", \"1Ei\"].exists(x, x == self.divisor)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.ResourceRequirements": {
         "description": "ResourceRequirements describes the compute resource requirements.",
@@ -4337,6 +5636,18 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "must be greater than or equal to 0",
+                      "rule": "isQuantity(self) && quantity(self).asApproximateFloat() >= 0"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
             "type": "object"
           },
@@ -4344,11 +5655,37 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "must be greater than or equal to 0",
+                      "rule": "isQuantity(self) && quantity(self).asApproximateFloat() >= 0"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
             "type": "object"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "limits and requests keys must be a standard resource type or fully qualified",
+            "rule": "[self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,\n\t!format.qualifiedName().validate(k).hasValue()\n))"
+          },
+          {
+            "message": "limits and requests keys must be a standard resource for containers",
+            "rule": "[self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,\n\t\tk.split('/').size() != 1 || ([\"cpu\",\"memory\",\"ephemeral-storage\"].exists(std, std == k) || k.startsWith(\"hugepages-\"))\n))"
+          },
+          {
+            "message": "limits and requests must follow extended resource name standard if not standard container name",
+            "rule": "[self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,\n\t\tk.split('/').size() == 1 || !k.contains(\"/\") || k.startsWith(\"kubernetes.io/\") ||\n\t\t!k.startsWith(\"requests.\") && !format.qualifiedName().validate(\"requests.\" + k).hasValue()\n\t))"
+          }
+        ]
       },
       "io.k8s.api.core.v1.SELinuxOptions": {
         "description": "SELinuxOptions are the labels to be applied to the container",
@@ -4376,12 +5713,14 @@
         "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
         "properties": {
           "fsType": {
+            "default": "xfs",
             "description": "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\".",
             "type": "string"
           },
           "gateway": {
             "default": "",
             "description": "gateway is the host address of the ScaleIO API Gateway.",
+            "minLength": 1,
             "type": "string"
           },
           "protectionDomain": {
@@ -4405,6 +5744,7 @@
             "type": "boolean"
           },
           "storageMode": {
+            "default": "ThinProvisioned",
             "description": "storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
             "type": "string"
           },
@@ -4415,26 +5755,38 @@
           "system": {
             "default": "",
             "description": "system is the name of the storage system as configured in ScaleIO.",
+            "minLength": 1,
             "type": "string"
           },
           "volumeName": {
+            "default": "",
             "description": "volumeName is the name of a volume already created in the ScaleIO system that is associated with this volume source.",
+            "minLength": 1,
             "type": "string"
           }
         },
         "required": [
           "gateway",
           "system",
-          "secretRef"
+          "volumeName"
         ],
         "type": "object"
       },
       "io.k8s.api.core.v1.SeccompProfile": {
-        "description": "SeccompProfile defines a pod/container's seccomp profile settings. Only one profile source may be set.",
         "properties": {
           "localhostProfile": {
             "description": "localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be a relative path",
+                "rule": "self.size() == 0 || !self.startsWith(\"/\")"
+              },
+              {
+                "message": "must not contain '..'",
+                "rule": "!self.split(\"/\").exists(x, x == \"..\")"
+              }
+            ]
           },
           "type": {
             "default": "",
@@ -4445,15 +5797,7 @@
         "required": [
           "type"
         ],
-        "type": "object",
-        "x-kubernetes-unions": [
-          {
-            "discriminator": "type",
-            "fields-to-discriminateBy": {
-              "localhostProfile": "LocalhostProfile"
-            }
-          }
-        ]
+        "type": "object"
       },
       "io.k8s.api.core.v1.SecretEnvSource": {
         "description": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
@@ -4467,15 +5811,59 @@
             "type": "boolean"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".name",
+            "message": "Required value",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.name) && self.name.size() > 0"
+          },
+          {
+            "fieldPath": ".name",
+            "messageExpression": "format.dns1123Subdomain().validate(self.name).value()",
+            "rule": "!has(self.name) || !format.dns1123Subdomain().validate(self.name).hasValue()"
+          }
+        ]
       },
       "io.k8s.api.core.v1.SecretKeySelector": {
+        "allOf": [
+          {
+            "properties": {
+              "name": {
+                "x-kubernetes-validations": [
+                  {
+                    "messageExpression": "format.dns1123Subdomain().validate(self.?name.orValue(\"\")).value()",
+                    "rule": "!format.dns1123Subdomain().validate(self.?name.orValue(\"\")).hasValue()"
+                  }
+                ]
+              }
+            }
+          }
+        ],
         "description": "SecretKeySelector selects a key of a Secret.",
         "properties": {
           "key": {
             "default": "",
             "description": "The key of the secret to select from.  Must be a valid secret key.",
-            "type": "string"
+            "maxLength": 253,
+            "minLength": 1,
+            "pattern": "^[-._a-zA-Z0-9]+$",
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "may not start with '..'",
+                "rule": "self == \"..\" || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not be '.'",
+                "rule": "self != \".\""
+              },
+              {
+                "message": "must not be '..'",
+                "rule": "self != \"..\""
+              }
+            ]
           },
           "name": {
             "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
@@ -4517,7 +5905,15 @@
             "type": "boolean"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".name",
+            "message": "Required value",
+            "reason": "FieldValueRequired",
+            "rule": "self.?name.orValue(\"\").size() > 0"
+          }
+        ]
       },
       "io.k8s.api.core.v1.SecretVolumeSource": {
         "description": "Adapts a Secret into a volume.\n\nThe contents of the target Secret's Data field will be presented in a volume as files using the keys in the Data field as the file names. Secret volumes support ownership management and SELinux relabeling.",
@@ -4525,6 +5921,8 @@
           "defaultMode": {
             "description": "defaultMode is Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
             "format": "int32",
+            "maximum": 511,
+            "minimum": 0,
             "type": "integer"
           },
           "items": {
@@ -4546,9 +5944,13 @@
           },
           "secretName": {
             "description": "secretName is the name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
+            "minLength": 1,
             "type": "string"
           }
         },
+        "required": [
+          "secretName"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.SecurityContext": {
@@ -4589,6 +5991,8 @@
           "runAsGroup": {
             "description": "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.",
             "format": "int64",
+            "maximum": 2147483647,
+            "minimum": 0,
             "type": "integer"
           },
           "runAsNonRoot": {
@@ -4598,6 +6002,8 @@
           "runAsUser": {
             "description": "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.",
             "format": "int64",
+            "maximum": 2147483647,
+            "minimum": 0,
             "type": "integer"
           },
           "seLinuxOptions": {
@@ -4625,7 +6031,17 @@
             "description": "The Windows specific settings applied to all containers. If unspecified, the options from the PodSecurityContext will be used. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is linux."
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "cannot set `allowPrivilegeEscalation` to false and `privileged` to true",
+            "rule": "has(self.allowPrivilegeEscalation) && !self.allowPrivilegeEscalation ? !self.?privileged.orValue(false) : true"
+          },
+          {
+            "message": "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN",
+            "rule": "has(self.allowPrivilegeEscalation) && !self.allowPrivilegeEscalation ? !self.capabilities.add.exists(c, c == \"SYS_CAP_ADMIN\") : true"
+          }
+        ]
       },
       "io.k8s.api.core.v1.ServiceAccountTokenProjection": {
         "description": "ServiceAccountTokenProjection represents a projected service account token volume. This projection can be used to insert a service account token into the pods runtime filesystem for use against APIs (Kubernetes API Server or otherwise).",
@@ -4635,14 +6051,32 @@
             "type": "string"
           },
           "expirationSeconds": {
+            "default": 3600,
             "description": "expirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
             "format": "int64",
+            "maximum": 86400,
+            "minimum": 600,
             "type": "integer"
           },
           "path": {
             "default": "",
             "description": "path is the path relative to the mount point of the file to project the token into.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not start with \"..\"",
+                "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not contain \"..\"",
+                "rule": "!self.split(\"/\").exists(x, x == \"..\")"
+              },
+              {
+                "message": "must be a relative path",
+                "rule": "self.size() == 0 || !self.startsWith(\"/\")"
+              }
+            ]
           }
         },
         "required": [
@@ -4657,6 +6091,7 @@
             "default": 0,
             "description": "Seconds is the number of seconds to sleep.",
             "format": "int64",
+            "minimum": 0,
             "type": "integer"
           }
         },
@@ -4682,15 +6117,36 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.LocalObjectReference"
               }
             ],
-            "description": "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted."
+            "description": "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
+            "x-kubernetes-validations": [
+              {
+                "fieldPath": ".name",
+                "message": "Required value",
+                "reason": "FieldValueRequired",
+                "rule": "has(self.name) && self.name.size() > 0"
+              }
+            ]
           },
           "volumeName": {
             "description": "volumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasVlaue()"
+              }
+            ]
           },
           "volumeNamespace": {
             "description": "volumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasVlaue()"
+              }
+            ]
           }
         },
         "type": "object"
@@ -4701,6 +6157,9 @@
           "name": {
             "default": "",
             "description": "Name of a property to set",
+            "maxLength": 253,
+            "minLength": 1,
+            "pattern": "^([a-z0-9]([-_a-z0-9]*[a-z0-9])?[\\./])*[a-z0-9]([-_a-z0-9]*[a-z0-9])?$",
             "type": "string"
           },
           "value": {
@@ -4728,7 +6187,15 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
               }
             ],
-            "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME."
+            "description": "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+            "maximum": 65535,
+            "minimum": 1,
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.portName().validate(self).value()",
+                "rule": "type(self) != string || !format.portName().validate(self).hasValue()"
+              }
+            ]
           }
         },
         "required": [
@@ -4745,7 +6212,13 @@
           },
           "key": {
             "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.qualifiedName().validate(self).value()",
+                "rule": "!format.qualifiedName().validate(self).hasValue()"
+              }
+            ]
           },
           "operator": {
             "description": "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
@@ -4761,7 +6234,29 @@
             "type": "string"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".operator",
+            "message": "operator must be Exists when `key` is empty, which means \"match all values and all keys\"",
+            "rule": "(self.?key.orValue(\"\").size() > 0) || self.?operator.orValue(\"\") == 'Exists'"
+          },
+          {
+            "fieldPath": ".effect",
+            "message": "must be 'NoExecute' when `tolerationSeconds` is set",
+            "rule": "!has(self.tolerationSeconds) || self.effect == 'NoExecute'"
+          },
+          {
+            "fieldPath": ".operator",
+            "messageExpression": "format.labelValue().validate(self.value).value()",
+            "rule": "(has(self.operator) && self.operator != 'Equal' && self.operator != \"\") || !format.labelValue().validate(self.?value.orValue(\"\")).hasValue()"
+          },
+          {
+            "fieldPath": ".operator",
+            "message": "value must be empty when `operator` is 'Exists'",
+            "rule": "!has(self.operator) || self.operator != 'Exists' || self.?value.orValue(\"\").size() == 0"
+          }
+        ]
       },
       "io.k8s.api.core.v1.TopologySpreadConstraint": {
         "description": "TopologySpreadConstraint specifies how to spread matching pods among the given topology.",
@@ -4775,6 +6270,18 @@
             "description": "LabelSelector is used to find matching pods. Pods that match this label selector are counted to determine the number of pods in their corresponding topology domain."
           },
           "matchLabelKeys": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.dns1123Label().validate(self).value()",
+                      "rule": "!format.dns1123Label().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.\n\nThis is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).",
             "items": {
               "default": "",
@@ -4787,11 +6294,13 @@
             "default": 0,
             "description": "MaxSkew describes the degree to which pods may be unevenly distributed. When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference between the number of matching pods in the target topology and the global minimum. The global minimum is the minimum number of matching pods in an eligible domain or zero if the number of eligible domains is less than MinDomains. For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same labelSelector spread as 2/2/1: In this case, the global minimum is 1. | zone1 | zone2 | zone3 | |  P P  |  P P  |   P   | - if MaxSkew is 1, incoming pod can only be scheduled to zone3 to become 2/2/2; scheduling it onto zone1(zone2) would make the ActualSkew(3-1) on zone1(zone2) violate MaxSkew(1). - if MaxSkew is 2, incoming pod can be scheduled onto any zone. When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence to topologies that satisfy it. It's a required field. Default value is 1 and 0 is not allowed.",
             "format": "int32",
+            "minimum": 0,
             "type": "integer"
           },
           "minDomains": {
             "description": "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.",
             "format": "int32",
+            "minimum": 0,
             "type": "integer"
           },
           "nodeAffinityPolicy": {
@@ -4805,6 +6314,7 @@
           "topologyKey": {
             "default": "",
             "description": "TopologyKey is the key of node labels. Nodes that have a label with this key and identical values are considered to be in the same topology. We consider each <key, value> as a \"bucket\", and try to put balanced number of pods into each bucket. We define a domain as a particular instance of a topology. Also, we define an eligible domain as a domain whose nodes meet the requirements of nodeAffinityPolicy and nodeTaintsPolicy. e.g. If TopologyKey is \"kubernetes.io/hostname\", each Node is a domain of that topology. And, if TopologyKey is \"topology.kubernetes.io/zone\", each zone is a domain of that topology. It's a required field.",
+            "minLength": 1,
             "type": "string"
           },
           "whenUnsatisfiable": {
@@ -4818,7 +6328,13 @@
           "topologyKey",
           "whenUnsatisfiable"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "\"minDomains must be nil when whenUnsatisfiable is not DoNotSchedule\"",
+            "rule": "self.?whenUnsatisfiable.orValue(\"\") == \"DoNotSchedule\" ? !has(self.minDomains) : true"
+          }
+        ]
       },
       "io.k8s.api.core.v1.TypedLocalObjectReference": {
         "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
@@ -4873,7 +6389,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.Volume": {
-        "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
+        "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod. ?k8s:validation:cel[1]:rule>self.size() > has(self.name) ? 1 : 0 ?k8s:validation:cel[1]:message>must specify at least one volume type ?k8s:validation:cel[2]:rule>self.size() == has(self.name) ? 2 : 1 ?k8s:validation:cel[2]:message>may not specify more than one volume type",
         "properties": {
           "awsElasticBlockStore": {
             "allOf": [
@@ -5022,7 +6538,14 @@
           "name": {
             "default": "",
             "description": "name of the volume. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"
+              }
+            ]
           },
           "nfs": {
             "allOf": [
@@ -5116,7 +6639,13 @@
         "required": [
           "name"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "Total length of <volume name>:<iscsi.targetPortal> must be under 64 characters if iscsi.initiatorName is specified.",
+            "rule": "!has(self.iscsi) || !has(self.iscsi.initiatorName) || self.?name.orValue(\"\").size() + 1 + self.iscsi.targetPortal.size() <= 64"
+          }
+        ]
       },
       "io.k8s.api.core.v1.VolumeDevice": {
         "description": "volumeDevice describes a mapping of a raw block device within a container.",
@@ -5144,6 +6673,7 @@
           "mountPath": {
             "default": "",
             "description": "Path within the container at which the volume should be mounted.  Must not contain ':'.",
+            "minLength": 1,
             "type": "string"
           },
           "mountPropagation": {
@@ -5153,6 +6683,7 @@
           "name": {
             "default": "",
             "description": "This must match the Name of a Volume.",
+            "minLength": 1,
             "type": "string"
           },
           "readOnly": {
@@ -5165,7 +6696,21 @@
           },
           "subPath": {
             "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be a relative path",
+                "rule": "self.size() == 0 || !self.startsWith(\"/\")"
+              },
+              {
+                "message": "must not start with '..'",
+                "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"
+              },
+              {
+                "message": "must not contain '..'",
+                "rule": "!self.split(\"/\").exists(x, x == \"..\")"
+              }
+            ]
           },
           "subPathExpr": {
             "description": "Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to \"\" (volume's root). SubPathExpr and SubPath are mutually exclusive.",
@@ -5176,7 +6721,14 @@
           "name",
           "mountPath"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".subPathExpr",
+            "message": "subPathExpr and subPath are mutually exclusive",
+            "rule": "!has(self.subPath) || !has(self.subPathExpr)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.VolumeProjection": {
         "description": "Projection that may be projected along with other supported volume types",
@@ -5222,7 +6774,14 @@
             "description": "serviceAccountToken is information about the serviceAccountToken data to project"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "may not specify more than 1 volume type",
+            "reason": "FieldValueForbidden",
+            "rule": "[has(self.secret), has(self.downwardAPI), has(self.configMap), has(self.serviceAccountToken), has(self.clusterTrustBundle)].filter(x, x).size() <= 1"
+          }
+        ]
       },
       "io.k8s.api.core.v1.VolumeResourceRequirements": {
         "description": "VolumeResourceRequirements describes the storage resource requirements for a volume.",
@@ -5262,6 +6821,7 @@
           "volumePath": {
             "default": "",
             "description": "volumePath is the path that identifies vSphere volume vmdk",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -5286,6 +6846,8 @@
             "default": 0,
             "description": "weight associated with matching the corresponding podAffinityTerm, in the range 1-100.",
             "format": "int32",
+            "maximum": 100,
+            "minimum": 1,
             "type": "integer"
           }
         },
@@ -5300,11 +6862,19 @@
         "properties": {
           "gmsaCredentialSpec": {
             "description": "GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.",
+            "maxLength": 65536,
+            "minLength": 1,
             "type": "string"
           },
           "gmsaCredentialSpecName": {
             "description": "GMSACredentialSpecName is the name of the GMSA credential spec to use.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           },
           "hostProcess": {
             "description": "HostProcess determines if a container should be run as a 'Host Process' container. All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers). In addition, if HostProcess is true then HostNetwork must also be set to true.",
@@ -5312,7 +6882,43 @@
           },
           "runAsUserName": {
             "description": "The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
-            "type": "string"
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not contain control characters",
+                "rule": "!self.matches(\"[[:cntrl:]]+\")"
+              },
+              {
+                "message": "runAsUserName cannot contain more than one backslash",
+                "rule": "self.indexOf(\"\\\\\") == self.lastIndexOf(\"\\\\\")"
+              },
+              {
+                "message": "domain part of runAsUserName must be under 256 characters",
+                "rule": "!self.contains(\"\\\\\") || self.size() - self.indexOf(\"\\\\\") - 1 <= 256"
+              },
+              {
+                "message": "runAsUserName's Domain doesn't match the NetBios nor the DNS format",
+                "rule": "!self.contains(\"\\\\\") || self.substring(0, self.indexOf(\"\\\\\")).matches('^([^\\\\/:\\*\\?\"<>|\\.][^\\\\/:\\*\\?\"<>|]{0,14})|([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$')"
+              },
+              {
+                "message": "runAsUserName's User length must not be longer than 104 characters",
+                "rule": "[self.indexOf(\"\\\\\"), self.size()].max() <= 104"
+              },
+              {
+                "message": "runAsUserName's User cannot be empty",
+                "rule": "self.indexOf(\"\\\\\") != 0"
+              },
+              {
+                "message": "runAsUserName's User cannot contain only periods or spaces",
+                "rule": "!self.matches('^[\\. ]+(\\\\\\\\.*)?$')"
+              },
+              {
+                "message": "runAsUserName's User cannot contain the following characters: \"/\\:;|=,+*?<>@[]",
+                "rule": "self.matches('^[^\"/\\\\:;|=,\\+\\*\\?<>@\\[\\]]*(\\\\\\\\.*)?$')"
+              }
+            ]
           }
         },
         "type": "object"
@@ -5808,6 +7414,18 @@
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
             "type": "object"
           }
@@ -5821,7 +7439,13 @@
           "key": {
             "default": "",
             "description": "key is the label key that the selector applies to.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.qualifiedName().validate(self).value()",
+                "rule": "!format.qualifiedName().validate(self).hasValue()"
+              }
+            ]
           },
           "operator": {
             "default": "",
@@ -5829,6 +7453,18 @@
             "type": "string"
           },
           "values": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
               "default": "",
@@ -5842,7 +7478,21 @@
           "key",
           "operator"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".values",
+            "message": "must be specified when `operator` is 'In' or 'NotIn'",
+            "reason": "FieldValueRequired",
+            "rule": "self.operator == \"In\" || self.operator == \"NotIn\" ? has(self.values) && self.values.size() > 0 : true"
+          },
+          {
+            "fieldPath": ".values",
+            "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'",
+            "reason": "FieldValueForbidden",
+            "rule": "self.operator == \"Exists\" || self.operator == \"DoesNotExist\" ? !has(self.values) || self.values.size() == 0 : true"
+          }
+        ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta": {
         "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
@@ -5918,7 +7568,13 @@
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "annotation keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
+              }
+            ]
           },
           "creationTimestamp": {
             "allOf": [
@@ -5965,8 +7621,26 @@
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "label keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k).hasValue())"
+              }
+            ]
           },
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",

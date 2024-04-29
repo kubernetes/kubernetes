@@ -22,13 +22,15 @@ limitations under the License.
 package openapi
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 	common "k8s.io/kube-openapi/pkg/common"
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
+	ptr "k8s.io/utils/ptr"
 )
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
@@ -2153,6 +2155,11 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicy(ref com
 							Ref:         ref("k8s.io/api/admissionregistration/v1.ValidatingAdmissionPolicyStatus"),
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".metadata.namespace", "message": "not allowed on this type", "reason": "FieldValueForbidden", "rule": "!has(self.metadata.__namespace__) || self.metadata.__namespace__.size() == 0"}},
 				},
 			},
 		},
@@ -4534,6 +4541,11 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicy(re
 							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.ValidatingAdmissionPolicyStatus"),
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".metadata.namespace", "message": "not allowed on this type", "reason": "FieldValueForbidden", "rule": "!has(self.metadata.__namespace__) || self.metadata.__namespace__.size() == 0"}},
 				},
 			},
 		},
@@ -17067,6 +17079,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					"parallelism": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the maximum desired number of pods the job should run at any given time. The actual number of pods running in steady state will be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism), i.e. when the work left to do is less than max parallelism. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17074,6 +17087,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					"completions": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the desired number of successfully finished pods the job should be run with.  Setting to null means that the success of any pod signals the success of all pods, and allows parallelism to have any positive value.  Setting to 1 means that parallelism is limited to 1 and the success of that pod signals the success of the job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17081,6 +17095,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					"activeDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the duration in seconds relative to the startTime that the job may be continuously active before the system tries to terminate it; value must be positive integer. If a Job is suspended (at creation or through an update), this timer will effectively be stopped and reset when the Job is resumed again.",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -17100,6 +17115,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					"backoffLimit": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the number of retries before marking this job failed. Defaults to 6",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17107,6 +17123,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					"backoffLimitPerIndex": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the limit for the number of retries within an index before marking this index as failed. When enabled the number of failures per index is kept in the pod's batch.kubernetes.io/job-index-failure-count annotation. It can only be set when Job's completionMode=Indexed, and the Pod's restart policy is Never. The field is immutable. This field is beta-level. It can be used when the `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17114,6 +17131,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					"maxFailedIndexes": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the maximal number of failed indexes before marking the Job as failed, when backoffLimitPerIndex is set. Once the number of failed indexes exceeds this number the entire Job is marked as Failed and its execution is terminated. When left as null the job continues execution of all of its indexes and is marked with the `Complete` Job condition. It can only be specified when backoffLimitPerIndex is set. It can be null or up to completions. It is required and must be less than or equal to 10^4 when is completions greater than 10^5. This field is beta-level. It can be used when the `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17135,12 +17153,46 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 						SchemaProps: spec.SchemaProps{
 							Description: "Describes the pod that will be created when executing a job. The only allowed template.spec.restartPolicy values are \"Never\" or \"OnFailure\". More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Properties: map[string]spec.Schema{
+											"spec": {
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Properties: map[string]spec.Schema{
+																	"restartPolicy": {
+																		SchemaProps: spec.SchemaProps{
+																			Enum: []interface{}{
+																				"OnFailure",
+																				"Never",
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".spec.restartPolicy", "message": "valid values: \"OnFailure\", \"Never\"", "reason": "FieldValueRequired", "rule": "self.?restartPolicy.orValue(\"\").size() > 0"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Ref: ref("k8s.io/api/core/v1.PodTemplateSpec"),
 						},
 					},
 					"ttlSecondsAfterFinished": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes.",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17169,14 +17221,25 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 						},
 					},
 					"managedBy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a domain-prefixed path (such as \"acme.io/foo\")", "rule": "self.indexOf(\"/\") > 0 && self.indexOf(\"/\") == self.lastIndexOf(\"/\")"}, map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self.substring(0, self.indexOf(\"/\"))).value()", "rule": "!self.contains(\"/\") || !format.dns1123Subdomain().validate(self.substring(0, self.indexOf(\"/\"))).hasValue()"}, map[string]interface{}{"messageExpression": "Invalid path (regex used for validation is '[A-Za-z0-9/\\-._~%!$&'()*+,;=:]+')", "rule": "!self.contains(\"/\") || self.substring(self.indexOf(\"/\") + 1, self.size()).matches(\"[A-Za-z0-9/\\\\-._~%!$&'()*+,;=:]+\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "ManagedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 64 characters.\n\nThis field is alpha-level. The job controller accepts setting the field when the feature gate JobManagedBy is enabled (disabled by default).",
+							MaxLength:   ptr.To[int64](63),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
 				Required: []string{"template"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".backoffLimitPerIndex", "message": "when maxFailedIndexes is specified", "reason": "FieldValueRequired", "rule": "!has(self.maxFailedIndexes) || has(self.backoffLimitPerIndex)"}, map[string]interface{}{"fieldPath": ".completions", "message": "when completion mode is Indexed", "reason": "FieldValueRequired", "rule": "!has(self.completionMode) || self.completionMode != \"Indexed\" || has(self.completions)"}, map[string]interface{}{"fieldPath": ".parallelism", "message": "must be less than or equal to 100000 when completion mode is Indexed", "rule": "!has(self.completionMode) || !has(self.parallelism) || self.completionMode != \"Indexed\" || self.parallelism <= 100000"}, map[string]interface{}{"fieldPath": ".maxFailedIndexes", "message": "must be less than or equal to completions", "rule": "!has(self.completions) || !has(self.completionMode) || !has(self.maxFailedIndexes) || self.completionMode != \"Indexed\" || self.maxFailedIndexes <= self.completions"}, map[string]interface{}{"fieldPath": ".maxFailedIndexes", "message": "must be less than or equal to 100000", "rule": "!has(self.maxFailedIndexes) || !has(self.completionMode) || self.completionMode != \"Indexed\" || self.maxFailedIndexes <= 100000"}, map[string]interface{}{"fieldPath": ".maxFailedIndexes", "message": "must be specified when completions is above 100000 and backoffLimitPerIndex is set", "reason": "FieldValueRequired", "rule": "has(self.completions) && self.completions > 100000 && has(self.backoffLimitPerIndex) ? has(self.maxFailedIndexes) : true"}, map[string]interface{}{"fieldPath": ".parallelism", "message": "must be less than or equal to 10000 when completions are above 100000 and used with backoff limit per index", "rule": "has(self.completions) && self.completions > 100000 && has(self.backoffLimitPerIndex) && has(self.parallelism) ? self.parallelism <= 10000 : true"}, map[string]interface{}{"fieldPath": ".maxFailedIndexes", "message": "must be less than or equal to 10000 when completions are above 100000 and used with backoff limit per index", "rule": "has(self.completions) && self.completions > 100000 && has(self.backoffLimitPerIndex) && has(self.maxFailedIndexes) ? self.maxFailedIndexes <= 10000 : true"}, map[string]interface{}{"fieldPath": ".backoffLimitPerIndex", "message": "requires indexed completion mode", "rule": "self.?completionMode.orValue(\"NonIndexed\") != \"Indexed\" ? !has(self.backoffLimitPerIndex) : true"}, map[string]interface{}{"fieldPath": ".maxFailedIndexes", "message": "requires indexed completion mode", "rule": "self.?completionMode.orValue(\"NonIndexed\") != \"Indexed\" ? !has(self.maxFailedIndexes) : true"}, map[string]interface{}{"fieldPath": ".podFailurePolicy.rules", "message": "FailIndex rule action requires the backoffLimitPerIndex to be set", "rule": "self.?podFailurePolicy.?rules.orValue([]).all(r, r.action != \"FailIndex\" || has(self.backoffLimitPerIndex))"}, map[string]interface{}{"fieldPath": ".successPolicy", "message": "requires indexed completion mode", "rule": "!has(self.successPolicy) || self.?completionMode.orValue(\"NonIndexed\") == \"Indexed\""}, map[string]interface{}{"fieldPath": ".podReplacementPolicy", "message": "must be \"Failed\" when podFailurePolicy is used", "rule": "!has(self.podReplacementPolicy) || !has(self.podFailurePolicy) || self.podReplacementPolicy == \"Failed\""}, map[string]interface{}{"fieldPath": ".template.spec.restartPolicy", "message": "only \"Never\" is supported when podFailurePolicy is specified", "rule": "!has(self.podFailurePolicy) || self.?template.?spec.?restartPolicy.orValue(\"\") == \"Never\""}, map[string]interface{}{"fieldPath": ".podFailurePolicy.rules", "message": "must be one of the container or initContainer names in the pod template\"", "rule": "self.?podFailurePolicy.?rules.orValue([]).all(r, !has(r.onExitCodes) || !has(r.onExitCodes.containerName) || self.?template.?spec.?containers.orValue([]).exists(c, c.name == r.onExitCodes.containerName) || self.?template.?spec.?initContainers.orValue([]).exists(c, c.name == r.onExitCodes.containerName))"}, map[string]interface{}{"fieldPath": ".successPolicy.rules", "message": "successPolicy.rules.succeededCount must be less than or equal to spec.completions", "rule": "!has(self.successPolicy) || self.successPolicy.?rules.orValue([]).all(r, !has(r.succeededCount) || r.succeededCount <= self.?completions.orValue(0))"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -17305,7 +17368,29 @@ func schema_k8sio_api_batch_v1_JobTemplateSpec(ref common.ReferenceCallback) com
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/batch/v1.JobSpec"),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Properties: map[string]spec.Schema{
+											"manualSelector": {
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "supported values: nil, false", "rule": "!self"}},
+													},
+												},
+											},
+											"selector": {
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "`selector` will be auto-generated", "rule": "false"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Ref: ref("k8s.io/api/batch/v1.JobSpec"),
 						},
 					},
 				},
@@ -17331,6 +17416,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicy(ref common.ReferenceCallback) co
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "A list of pod failure policy rules. The rules are evaluated in order. Once a rule matches a Pod failure, the remaining of the rules are ignored. When no rule matches the Pod failure, the default handling applies - the counter of pod failures is incremented and it is checked against the backoffLimit. At most 20 elements are allowed.",
+							MaxItems:    ptr.To[int64](20),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -17377,11 +17463,14 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnExitCodesRequirement(ref common
 					"values": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
+								"x-kubernetes-list-type":   "set",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be ordered", "rule": "self.isSorted()"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the set of values. Each returned container exit code (might be multiple in case of multiple containers) is checked against this set of values with respect to the operator. The list of values must be ordered and must not contain duplicates. Value '0' cannot be used for the In operator. At least one element is required. At most 255 elements are allowed.",
+							MinItems:    ptr.To[int64](1),
+							MaxItems:    ptr.To[int64](255),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -17397,6 +17486,11 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnExitCodesRequirement(ref common
 				},
 				Required: []string{"operator", "values"},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".values", "message": "values must not be 0 for the In operator", "rule": "self.?operator.orValue(\"\") != \"In\" || !self.?values.orValue([]).exists(v, v == 0)"}},
+				},
+			},
 		},
 	}
 }
@@ -17409,6 +17503,11 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnPodConditionsPattern(ref common
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"type": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the required Pod condition type. To match a pod condition it is required that specified type equals the pod condition type.",
 							Default:     "",
@@ -17420,8 +17519,13 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnPodConditionsPattern(ref common
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the required Pod condition status. To match a pod condition it is required that the specified status equals the pod condition status. Defaults to True.",
 							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Enum: []interface{}{
+								"False",
+								"True",
+								"Unknown",
+							},
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
 				},
@@ -17461,6 +17565,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Represents the requirement on the pod conditions. The requirement is represented as a list of pod condition patterns. The requirement is satisfied if at least one pattern matches an actual pod condition. At most 20 elements are allowed.",
+							MaxItems:    ptr.To[int64](20),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -17474,6 +17579,11 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 					},
 				},
 				Required: []string{"action"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "specifying both OnExitCodes and OnPodConditions is not supported", "rule": "!has(self.onExitCodes) || !has(self.onPodConditions)"}, map[string]interface{}{"message": "specifying one of OnExitCodes and OnPodConditions is required", "rule": "has(self.onExitCodes) || has(self.onPodConditions)"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -17496,6 +17606,8 @@ func schema_k8sio_api_batch_v1_SuccessPolicy(ref common.ReferenceCallback) commo
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "rules represents the list of alternative rules for the declaring the Jobs as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met, the \"SucceededCriteriaMet\" condition is added, and the lingering pods are removed. The terminal state for such a Job has the \"Complete\" condition. Additionally, these rules are evaluated in order; Once the Job meets one of the rules, other rules are ignored. At most 20 elements are allowed.",
+							MinItems:    ptr.To[int64](1),
+							MaxItems:    ptr.To[int64](20),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -17524,8 +17636,15 @@ func schema_k8sio_api_batch_v1_SuccessPolicyRule(ref common.ReferenceCallback) c
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"succeededIndexes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "non-increasing order, must be a list of intervals where the first number is less than the second", "rule": "!self.matches(\"^(\\\\d+(-\\\\d+)?)(,\\\\d+(-\\\\d+)?)*$\") || self.split(\",\").all(range, optional.of(range.split(\"-\")).optMap(spl, (spl.size() == 2 ? int(spl[0]) < int(spl[1]) : true)).value())"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "succeededIndexes specifies the set of indexes which need to be contained in the actual set of the succeeded indexes for the Job. The list of indexes must be within 0 to \".spec.completions-1\" and must not contain duplicates. At least one element is required. The indexes are represented as intervals separated by commas. The intervals can be a decimal integer or a pair of decimal integers separated by a hyphen. The number are listed in represented by the first and last element of the series, separated by a hyphen. For example, if the completed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". When this field is null, this field doesn't default to any value and is never evaluated at any time.",
+							MaxLength:   ptr.To[int64](65536),
+							Pattern:     "^$|(\\d+(-\\d+)?)(,\\d+(-\\d+)?)*$",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -17533,10 +17652,16 @@ func schema_k8sio_api_batch_v1_SuccessPolicyRule(ref common.ReferenceCallback) c
 					"succeededCount": {
 						SchemaProps: spec.SchemaProps{
 							Description: "succeededCount specifies the minimal required size of the actual set of the succeeded indexes for the Job. When succeededCount is used along with succeededIndexes, the check is constrained only to the set of indexes specified by succeededIndexes. For example, given that succeededIndexes is \"1-4\", succeededCount is \"3\", and completed indexes are \"1\", \"3\", and \"5\", the Job isn't declared as succeeded because only \"1\" and \"3\" indexes are considered in that rules. When this field is null, this doesn't default to any value and is never evaluated at any time. When specified it needs to be a positive integer.",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "at least one of succeededCount or succeededIndexes must be specified", "reason": "FieldValueRequired", "rule": "has(self.succeededIndexes) || has(self.succeededCount)"}},
 				},
 			},
 		},
@@ -18910,6 +19035,7 @@ func schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref common.Refere
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -18924,6 +19050,8 @@ func schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref common.Refere
 					"partition": {
 						SchemaProps: spec.SchemaProps{
 							Description: "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](255),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -18994,6 +19122,7 @@ func schema_k8sio_api_core_v1_AppArmorProfile(ref common.ReferenceCallback) comm
 					"localhostProfile": {
 						SchemaProps: spec.SchemaProps{
 							Description: "localhostProfile indicates a profile loaded on the node that should be used. The profile must be preconfigured on the node to work. Must match the loaded name of the profile. Must be set if and only if type is \"Localhost\".",
+							MaxLength:   ptr.To[int64](4095),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19003,14 +19132,7 @@ func schema_k8sio_api_core_v1_AppArmorProfile(ref common.ReferenceCallback) comm
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
-					"x-kubernetes-unions": []interface{}{
-						map[string]interface{}{
-							"discriminator": "type",
-							"fields-to-discriminateBy": map[string]interface{}{
-								"localhostProfile": "LocalhostProfile",
-							},
-						},
-					},
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".localhostProfile", "message": "must be set when AppArmor type is Localhost", "reason": "FieldValueRequired", "rule": "self.type != \"Localhost\" || has(self.localhostProfile) && self.localhostProfile.trim().size() > 0"}, map[string]interface{}{"fieldPath": ".localhostProfile", "message": "must not be padded with whitespace", "reason": "FieldValueInvalid", "rule": "self.type != \"Localhost\" || !has(self.localhostProfile) || self.localhostProfile.trim() == self.localhostProfile"}, map[string]interface{}{"fieldPath": ".localhostProfile", "message": "can only be set when AppArmor type is Localhost", "rule": "self.type == \"Localhost\" || !has(self.localhostProfile)"}},
 				},
 			},
 		},
@@ -19092,6 +19214,7 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "diskName is the Name of the data disk in the blob storage",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19100,6 +19223,7 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "diskURI is the URI of data disk in the blob storage",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19107,6 +19231,7 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 					"cachingMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "cachingMode is the Host Caching mode: None, Read Only, Read Write.\n\nPossible enum values:\n - `\"None\"`\n - `\"ReadOnly\"`\n - `\"ReadWrite\"`",
+							Default:     "ReadWrite",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"None", "ReadOnly", "ReadWrite"},
@@ -19115,6 +19240,7 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 					"fsType": {
 						SchemaProps: spec.SchemaProps{
 							Description: "fsType is Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+							Default:     "ext4",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19122,6 +19248,7 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -19129,6 +19256,7 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 					"kind": {
 						SchemaProps: spec.SchemaProps{
 							Description: "kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared\n\nPossible enum values:\n - `\"Dedicated\"`\n - `\"Managed\"`\n - `\"Shared\"`",
+							Default:     "Shared",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Dedicated", "Managed", "Shared"},
@@ -19136,6 +19264,11 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 					},
 				},
 				Required: []string{"diskName", "diskURI"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "supported values: /subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}", "rule": "has(self.kind) && self.kind == \"Managed\" ? self.?diskURI.orValue(\"\").indexOf(\"/subscriptions/\") == 0 : true"}, map[string]interface{}{"message": "supported values: https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd", "rule": "has(self.kind) && self.kind != \"Managed\" ? self.?diskURI.orValue(\"\").indexOf(\"https://\") == 0 : true"}},
+				},
 			},
 		},
 	}
@@ -19152,6 +19285,7 @@ func schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref common.Referen
 						SchemaProps: spec.SchemaProps{
 							Description: "secretName is the name of secret that contains Azure Storage Account Name and Key",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19160,6 +19294,7 @@ func schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref common.Referen
 						SchemaProps: spec.SchemaProps{
 							Description: "shareName is the azure Share Name",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19174,6 +19309,7 @@ func schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref common.Referen
 					"secretNamespace": {
 						SchemaProps: spec.SchemaProps{
 							Description: "secretNamespace is the namespace of the secret that contains Azure Storage Account Name and Key default is the same as the Pod",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19196,6 +19332,7 @@ func schema_k8sio_api_core_v1_AzureFileVolumeSource(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "secretName is the  name of secret that contains Azure Storage Account Name and Key",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19204,6 +19341,7 @@ func schema_k8sio_api_core_v1_AzureFileVolumeSource(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "shareName is the azure share Name",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19274,9 +19412,16 @@ func schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref common.ReferenceCall
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"driver": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self.lowerAscii()).value()", "rule": "!format.dns1123Label().validate(self.lowerAscii()).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "driver is the name of the driver to use for this volume. Required.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](63),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19285,6 +19430,7 @@ func schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref common.ReferenceCall
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19366,9 +19512,16 @@ func schema_k8sio_api_core_v1_CSIVolumeSource(ref common.ReferenceCallback) comm
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"driver": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self.lowerAscii()).value()", "rule": "!format.dns1123Label().validate(self.lowerAscii()).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "driver is the name of the CSI driver that handles this volume. Consult with your admin for the correct name as registered in the cluster.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](63),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19404,6 +19557,11 @@ func schema_k8sio_api_core_v1_CSIVolumeSource(ref common.ReferenceCallback) comm
 						},
 					},
 					"nodePublishSecretRef": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.name) && self.name.size() > 0"}, map[string]interface{}{"fieldPath": ".name", "messageExpression": "format.dns1123Subdomain().validate(self.name).value()", "rule": "self.?name.orValue(\"\").size() == 0 || !format.dns1123Subdomain().validate(self.name).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "nodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed.",
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
@@ -19486,6 +19644,7 @@ func schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref common.ReferenceC
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "monitors is Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -19528,6 +19687,7 @@ func schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref common.ReferenceC
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -19556,6 +19716,7 @@ func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback) c
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "monitors is Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -19598,6 +19759,7 @@ func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback) c
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -19622,6 +19784,7 @@ func schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref common.ReferenceC
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19666,6 +19829,7 @@ func schema_k8sio_api_core_v1_CinderVolumeSource(ref common.ReferenceCallback) c
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19685,6 +19849,11 @@ func schema_k8sio_api_core_v1_CinderVolumeSource(ref common.ReferenceCallback) c
 						},
 					},
 					"secretRef": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "message": "Required value", "rule": "has(self.name) && self.name.size() > 0"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "secretRef is optional: points to a secret object containing parameters used to connect to OpenStack.",
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
@@ -19707,6 +19876,11 @@ func schema_k8sio_api_core_v1_ClaimSource(ref common.ReferenceCallback) common.O
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"resourceClaimName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this pod.",
 							Type:        []string{"string"},
@@ -19714,12 +19888,22 @@ func schema_k8sio_api_core_v1_ClaimSource(ref common.ReferenceCallback) common.O
 						},
 					},
 					"resourceClaimTemplateName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this pod.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this pod. When this pod is deleted, the ResourceClaim will also be deleted. The pod name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "\"must specify one of: `resourceClaimName`, `resourceClaimTemplateName`", "rule": "has(self.resourceClaimName) || has(self.resourceClaimTemplateName)"}, map[string]interface{}{"message": "at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified", "rule": "!has(self.resourceClaimName) || !has(self.resourceClaimTemplateName)"}},
 				},
 			},
 		},
@@ -19754,15 +19938,28 @@ func schema_k8sio_api_core_v1_ClusterTrustBundleProjection(ref common.ReferenceC
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "self.contains(\":\") || !format.dns1123Subdomain().validate(self).hasValue()"}, map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self.substring(self.lastIndexOf(\":\") + 1)).value()", "rule": "!self.contains(\":\") || !format.dns1123Subdomain().validate(self.substring(self.lastIndexOf(\":\") + 1)).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Select a single ClusterTrustBundle by object name.  Mutually-exclusive with signerName and labelSelector.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"signerName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a fully qualified domain and path of the form 'example.com/signer-name'", "rule": "self.size() == 0 || self.split(\"/\").size() == 2"}, map[string]interface{}{"message": "domain part must have at most 253 bytes", "rule": "!self.contains(\"/\") || self.split(\"/\")[0].size() <= 253"}, map[string]interface{}{"messageExpression": "self.split(\"/\")[0].split(\".\").map(lbl, format.dns1123Label().validate(lbl).orValue([])).filter(x, x.size() > 0)[0]", "rule": "!self.contains(\"/\") || self.split(\"/\")[0].split(\".\").all(lbl, !format.dns1123Label().validate(lbl).hasValue())"}, map[string]interface{}{"message": "should be a domain with at least two segments separated by dots", "rule": "!self.contains(\"/\") || self.split(\"/\")[0].split(\".\").size() >= 2"}, map[string]interface{}{"messageExpression": "self.split(\"/\")[1].split(\".\").map(lbl, format.dns1123Subdomain().validate(lbl).orValue([])).filter(x, x.size() > 0)[0]", "rule": "!self.contains(\"/\") || self.split(\"/\")[1].split(\".\").all(lbl, !format.dns1123Subdomain().validate(lbl).hasValue())"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Select all ClusterTrustBundles that match this signer name. Mutually-exclusive with name.  The contents of all selected ClusterTrustBundles will be unified and deduplicated.",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](571),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19781,15 +19978,26 @@ func schema_k8sio_api_core_v1_ClusterTrustBundleProjection(ref common.ReferenceC
 						},
 					},
 					"path": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not start with \"..\"", "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must not contain \"..\"", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}, map[string]interface{}{"message": "must be a relative path", "rule": "self.size() == 0 || !self.startsWith(\"/\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Relative path from the volume root to write the bundle.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
 				Required: []string{"path"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "only one of name and signerName may be used", "rule": "!(has(self.name) && has(self.signerName))"}, map[string]interface{}{"fieldPath": ".labelSelector", "message": "labelSelector must be unset if name is specified", "rule": "has(self.labelSelector) ? !has(self.name) || has(self.signerName) : true"}, map[string]interface{}{"message": "either name or signerName must be specified", "rule": "has(self.name) || has(self.signerName)"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -20049,6 +20257,11 @@ func schema_k8sio_api_core_v1_ConfigMapEnvSource(ref common.ReferenceCallback) c
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.name) && self.name.size() > 0"}, map[string]interface{}{"fieldPath": ".name", "messageExpression": "format.dns1123Subdomain().validate(self.name).value()", "rule": "!has(self.name) || !format.dns1123Subdomain().validate(self.name).hasValue()"}},
+				},
+			},
 		},
 	}
 }
@@ -20059,6 +20272,21 @@ func schema_k8sio_api_core_v1_ConfigMapKeySelector(ref common.ReferenceCallback)
 			SchemaProps: spec.SchemaProps{
 				Description: "Selects a key from a ConfigMap.",
 				Type:        []string{"object"},
+				AllOf: []spec.Schema{
+					{
+						SchemaProps: spec.SchemaProps{
+							Properties: map[string]spec.Schema{
+								"name": {
+									VendorExtensible: spec.VendorExtensible{
+										Extensions: spec.Extensions{
+											"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
@@ -20068,9 +20296,17 @@ func schema_k8sio_api_core_v1_ConfigMapKeySelector(ref common.ReferenceCallback)
 						},
 					},
 					"key": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not start with '..'", "rule": "self == \"..\" || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must not be '.'", "rule": "self != \".\""}, map[string]interface{}{"message": "must not be '..'", "rule": "self != \"..\""}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The key to select.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](253),
+							Pattern:     "^[-._a-zA-Z0-9]+$",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -20281,6 +20517,9 @@ func schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref common.ReferenceCallback
 					"defaultMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "defaultMode is optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+							Default:     420,
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](511),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -20292,6 +20531,11 @@ func schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref common.ReferenceCallback
 							Format:      "",
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.name) && self.name.size() > 0"}},
 				},
 			},
 		},
@@ -20308,9 +20552,15 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "reason": "FieldValueInvalid", "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"}, map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of the container specified as a DNS_LABEL. Each container in a pod must have a unique name (DNS_LABEL). Cannot be updated.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -20318,6 +20568,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"image": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Container image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -20325,7 +20576,8 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"command": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -20345,7 +20597,8 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"args": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -20363,6 +20616,11 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 						},
 					},
 					"workingDir": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
 							Type:        []string{"string"},
@@ -20379,6 +20637,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "containerPort",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}, map[string]interface{}{"message": "container port names must be unique", "reason": "FieldValueDuplicate", "rule": "self.all(cp, cp.?name.orValue(\"\").size() == 0 || !self.exists(ocp, ocp.name == cp.name && !(ocp.?protocol == cp.?protocol && ocp.?containerPort == cp.?containerPort)))"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -20397,7 +20656,8 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"envFrom": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -20422,6 +20682,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "name",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -20438,6 +20699,11 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 						},
 					},
 					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 							Default:     map[string]interface{}{},
@@ -20479,6 +20745,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "mountPath",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -20519,45 +20786,112 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 						},
 					},
 					"livenessProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
-							Ref:         ref("k8s.io/api/core/v1.Probe"),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Properties: map[string]spec.Schema{
+											"successThreshold": {
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be 1 for livenessProbes", "rule": "self == 1"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Ref: ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"readinessProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}, map[string]interface{}{"fieldPath": ".terminationGracePeriodSeconds", "message": "must not be set for readinessProbes", "rule": "!has(self.terminationGracePeriodSeconds)"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"startupProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
-							Ref:         ref("k8s.io/api/core/v1.Probe"),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Properties: map[string]spec.Schema{
+											"successThreshold": {
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be 1 for startupProbes", "rule": "self == 1"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Ref: ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"lifecycle": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Actions that the management system should take in response to container lifecycle events. Cannot be updated.",
 							Ref:         ref("k8s.io/api/core/v1.Lifecycle"),
 						},
 					},
 					"terminationMessagePath": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Default:     "/dev/termination-log",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"terminationMessagePolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.\n\nPossible enum values:\n - `\"FallbackToLogsOnError\"` will read the most recent contents of the container logs for the container status message when the container exits with an error and the terminationMessagePath has no contents.\n - `\"File\"` is the default behavior and will set the container status message to the contents of the container's terminationMessagePath when the container exits.",
+							Default:     "File",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"FallbackToLogsOnError", "File"},
 						},
 					},
 					"imagePullPolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images\n\nPossible enum values:\n - `\"Always\"` means that kubelet always attempts to pull the latest image. Container will fail If the pull fails.\n - `\"IfNotPresent\"` means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.\n - `\"Never\"` means that kubelet never pulls an image, but only uses a local image. Container will fail if the image isn't present",
 							Type:        []string{"string"},
@@ -20574,6 +20908,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"stdin": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -20581,6 +20916,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"stdinOnce": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -20588,12 +20924,18 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 					"tty": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "image"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".volumeMounts", "message": "volumeMounts must not already exist in volumeDevices", "rule": "self.?volumeDevices.orValue([]).size() == 0 || self.?volumeMounts.orValue([]).all(vm, !self.volumeDevices.exists(vd, vd.name == vm.name))"}, map[string]interface{}{"fieldPath": ".volumeMounts", "message": "must not already exist as a path in volumeDevices", "rule": "self.?volumeDevices.orValue([]).size() == 0 || self.?volumeMounts.orValue([]).all(vm, !self.volumeDevices.exists(vd, vd.devicePath == vm.mountPath))"}, map[string]interface{}{"fieldPath": ".volumeMounts", "message": "Bidirectional mount propagation is available only to privileged containers", "reason": "FieldValueForbidden", "rule": "self.?securityContext.?privileged.orValue(false) || self.?volumeMounts.orValue([]).all(vm, vm.?mountPropagation.orValue(\"\") != \"Bidirectional\")"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -20649,8 +20991,14 @@ func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.portName().validate(self).value()", "rule": "!format.portName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -20658,6 +21006,8 @@ func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common
 					"hostPort": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.",
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](65535),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -20666,6 +21016,8 @@ func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of port to expose on the pod's IP address. This must be a valid port number, 0 < x < 65536.",
 							Default:     0,
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](65535),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -20704,16 +21056,21 @@ func schema_k8sio_api_core_v1_ContainerResizePolicy(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of the resource to which this resource resize policy applies. Supported values: cpu, memory.",
 							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Enum: []interface{}{
+								"cpu",
+								"memory",
+							},
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.",
+							Description: "Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.\n\nPossible enum values:\n - `\"NotRequired\"` 'NotRequired' means Kubernetes will try to resize the container without restarting it, if possible. Kubernetes may however choose to restart the container if it is unable to actuate resize without a restart. For e.g. the runtime doesn't support restart-free resizing.\n - `\"RestartContainer\"` 'RestartContainer' means Kubernetes will resize the container in-place by stopping and starting the container when new resources are applied. This is needed for legacy applications. For e.g. java apps using the -xmxN flag which are unable to use resized memory without restarting.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+							Enum:        []interface{}{"NotRequired", "RestartContainer"},
 						},
 					},
 				},
@@ -21060,20 +21417,45 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref common.ReferenceCallback
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"path": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not start with '..'", "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must not contain '..'", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}, map[string]interface{}{"message": "must be a relative path", "rule": "self.size() == 0 || !self.startsWith(\"/\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"fieldRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.",
-							Ref:         ref("k8s.io/api/core/v1.ObjectFieldSelector"),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Properties: map[string]spec.Schema{
+											"fieldPath": {
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "supported values: [metadata.name, metadata.namespace, metadata.labels, metadata.annotations, metadata.uid]", "rule": "self.endsWith(\"]\") || [\"metadata.name\",\"metadata.namespace\",\"metadata.labels\",\"metadata.annotations\",\"metadata.uid\"].exists(x, x == self)"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Ref: ref("k8s.io/api/core/v1.ObjectFieldSelector"),
 						},
 					},
 					"resourceFieldRef": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".containerName", "message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.containerName) && self.containerName.size() > 0"}, map[string]interface{}{"message": "supported values: [limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory, requests.ephemeral-storage]", "rule": "[\"limits.cpu\",\"limits.memory\",\"limits.ephemeral-storage\",\"requests.cpu\",\"requests.memory\",\"requests.ephemeral-storage\"].exists(x, x == self.resource) || [\"requests.hugepages-\", \"limits.hugepages-\"].exists(prefix, self.resource.startsWith(prefix))"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
 							Ref:         ref("k8s.io/api/core/v1.ResourceFieldSelector"),
@@ -21082,12 +21464,19 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref common.ReferenceCallback
 					"mode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](511),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 				},
 				Required: []string{"path"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "fieldRef and resourceFieldRef can not be specified simultaneously", "rule": "!has(self.fieldRef) || !has(self.resourceFieldRef)"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -21110,6 +21499,7 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref common.ReferenceCallba
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Items is a list of downward API volume file",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -21124,6 +21514,9 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref common.ReferenceCallba
 					"defaultMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: mode bits to use on created files by default. Must be a Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+							Default:     420,
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](511),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -21151,6 +21544,11 @@ func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback)
 						},
 					},
 					"sizeLimit": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "SizeLimit field must be a valid resource quantity", "rule": "isQuantity(self) && !quantity(self).isLessThan(quantity(0))"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
 							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
@@ -21448,8 +21846,14 @@ func schema_k8sio_api_core_v1_EnvFromSource(ref common.ReferenceCallback) common
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"prefix": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not start with '..'", "rule": "self == \"..\" || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must not be '.'", "rule": "self != \".\""}, map[string]interface{}{"message": "must not be '..'", "rule": "self != \"..\""}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+							Pattern:     "^[-._a-zA-Z][-._a-zA-Z0-9]*$",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -21468,6 +21872,11 @@ func schema_k8sio_api_core_v1_EnvFromSource(ref common.ReferenceCallback) common
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not have more than one field specified at a time", "rule": "has(self.configMapRef) ? !has(self.secretRef) : true"}, map[string]interface{}{"message": "must specify one of: `configMapRef` or `secretRef`", "rule": "has(self.configMapRef) || has(self.secretRef)"}},
+				},
+			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/core/v1.ConfigMapEnvSource", "k8s.io/api/core/v1.SecretEnvSource"},
@@ -21482,9 +21891,16 @@ func schema_k8sio_api_core_v1_EnvVar(ref common.ReferenceCallback) common.OpenAP
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not start with '..'", "rule": "self == \"..\" || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must not be '.'", "rule": "self != \".\""}, map[string]interface{}{"message": "must not be '..'", "rule": "self != \"..\""}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of the environment variable. Must be a C_IDENTIFIER.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							Pattern:     "^[-._a-zA-Z][-._a-zA-Z0-9]*$",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -21505,6 +21921,11 @@ func schema_k8sio_api_core_v1_EnvVar(ref common.ReferenceCallback) common.OpenAP
 				},
 				Required: []string{"name"},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".valueFrom", "message": "may not be specified when `value` is not empty", "rule": "has(self.value) ? !has(self.valueFrom) : true"}},
+				},
+			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/core/v1.EnvVarSource"},
@@ -21519,12 +21940,22 @@ func schema_k8sio_api_core_v1_EnvVarSource(ref common.ReferenceCallback) common.
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"fieldRef": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".fieldPath", "message": "error converting fieldPath: supported values: \"metadata.name\", \"metadata.namespace\", \"metadata.uid\", \"spec.nodeName\", \"spec.serviceAccountName\", \"status.hostIP\", \"status.hostIPs\", \"status.podIP\", \"status.podIPs\"", "rule": "self.?fieldPath.orValue(\"\").size() == 0 || self.fieldPath.contains('[') || [\"metadata.name\", \"metadata.namespace\", \"metadata.uid\", \"spec.nodeName\", \"spec.serviceAccountName\", \"status.hostIP\", \"status.hostIPs\", \"status.podIP\", \"status.podIPs\"].exists(x, x == self.fieldPath)"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.",
 							Ref:         ref("k8s.io/api/core/v1.ObjectFieldSelector"),
 						},
 					},
 					"resourceFieldRef": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.hostIPs, status.podIP, status.podIPs", "rule": "[\"metadata.name\",\"metadata.namespace\",\"metadata.uid\",\"spec.nodeName\",\"spec.serviceAccountName\",\"status.hostIP\",\"status.hostIPs\",\"status.podIP\",\"status.podIPs\"].exists(x, x == self.resource) || [\"requests.hugepages-\", \"limits.hugepages-\"].exists(prefix, self.resource.startsWith(prefix)"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.",
 							Ref:         ref("k8s.io/api/core/v1.ResourceFieldSelector"),
@@ -21544,6 +21975,11 @@ func schema_k8sio_api_core_v1_EnvVarSource(ref common.ReferenceCallback) common.
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "\"must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`", "rule": "has(self.fieldRef) || has(self.resourceFieldRef) || has(self.configMapKeyRef) || has(self.secretKeyRef)"}, map[string]interface{}{"message": "may not have more than one field specified at a time", "rule": "[has(self.fieldRef), has(self.resourceFieldRef), has(self.configMapKeyRef), has(self.secretKeyRef)].filter(x, x).size() <= 1"}},
+				},
+			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/core/v1.ConfigMapKeySelector", "k8s.io/api/core/v1.ObjectFieldSelector", "k8s.io/api/core/v1.ResourceFieldSelector", "k8s.io/api/core/v1.SecretKeySelector"},
@@ -21558,16 +21994,28 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "reason": "FieldValueInvalid", "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of the ephemeral container specified as a DNS_LABEL. This name must be unique among all containers, init containers and ephemeral containers.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"image": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not have leading or trailing whitespace", "rule": "self.trim() == self"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Container image name. More info: https://kubernetes.io/docs/concepts/containers/images",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -21595,7 +22043,8 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					"args": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21613,6 +22062,11 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 						},
 					},
 					"workingDir": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
 							Type:        []string{"string"},
@@ -21629,6 +22083,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "containerPort",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21647,7 +22102,8 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					"envFrom": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21672,6 +22128,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "name",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21688,6 +22145,11 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 						},
 					},
 					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "!has(self.claims) && !has(self.requests) && !has(self.limits)"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
 							Default:     map[string]interface{}{},
@@ -21697,7 +22159,8 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 					"resizePolicy": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21714,6 +22177,11 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 						},
 					},
 					"restartPolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Restart policy for the container to manage the restart behavior of each container within a pod. This may only be set for init containers. You cannot set this field on ephemeral containers.",
 							Type:        []string{"string"},
@@ -21729,11 +22197,46 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "mountPath",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers. Cannot be updated.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Properties: map[string]spec.Schema{
+																	"subPath": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "cannot be set for an Ephemeral Container", "reason": "FieldValueForbidden", "rule": "false"}},
+																			},
+																		},
+																	},
+																	"subPathExpr": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "cannot be set for an Ephemeral Container", "reason": "FieldValueForbidden", "rule": "false"}},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -21769,45 +22272,82 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 						},
 					},
 					"livenessProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "probes are not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes are not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"readinessProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "probes are not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes are not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"startupProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "probes are not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes are not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"lifecycle": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "lifecycle is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Lifecycle is not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Lifecycle"),
 						},
 					},
 					"terminationMessagePath": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Default:     "/dev/termination-log",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"terminationMessagePolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.\n\nPossible enum values:\n - `\"FallbackToLogsOnError\"` will read the most recent contents of the container logs for the container status message when the container exits with an error and the terminationMessagePath has no contents.\n - `\"File\"` is the default behavior and will set the container status message to the contents of the container's terminationMessagePath when the container exits.",
+							Default:     v1.TerminationMessageReadFile,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"FallbackToLogsOnError", "File"},
 						},
 					},
 					"imagePullPolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images\n\nPossible enum values:\n - `\"Always\"` means that kubelet always attempts to pull the latest image. Container will fail If the pull fails.\n - `\"IfNotPresent\"` means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.\n - `\"Never\"` means that kubelet never pulls an image, but only uses a local image. Container will fail if the image isn't present",
 							Type:        []string{"string"},
@@ -21850,7 +22390,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "image"},
 			},
 		},
 		Dependencies: []string{
@@ -21866,16 +22406,28 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "reason": "FieldValueInvalid", "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of the ephemeral container specified as a DNS_LABEL. This name must be unique among all containers, init containers and ephemeral containers.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"image": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not have leading or trailing whitespace", "rule": "self.trim() == self"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Container image name. More info: https://kubernetes.io/docs/concepts/containers/images",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -21903,7 +22455,8 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					"args": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21921,6 +22474,11 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 						},
 					},
 					"workingDir": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Container's working directory. If not specified, the container runtime's default will be used, which might be configured in the container image. Cannot be updated.",
 							Type:        []string{"string"},
@@ -21937,6 +22495,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "containerPort",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21955,7 +22514,8 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					"envFrom": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21980,6 +22540,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "name",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -21996,6 +22557,11 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 						},
 					},
 					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "!has(self.claims) && !has(self.requests) && !has(self.limits)"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
 							Default:     map[string]interface{}{},
@@ -22005,7 +22571,8 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 					"resizePolicy": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -22022,6 +22589,11 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 						},
 					},
 					"restartPolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "field is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Restart policy for the container to manage the restart behavior of each container within a pod. This may only be set for init containers. You cannot set this field on ephemeral containers.",
 							Type:        []string{"string"},
@@ -22037,11 +22609,46 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 								"x-kubernetes-list-type":       "map",
 								"x-kubernetes-patch-merge-key": "mountPath",
 								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-validations":     []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers. Cannot be updated.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Properties: map[string]spec.Schema{
+																	"subPath": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "cannot be set for an Ephemeral Container", "reason": "FieldValueForbidden", "rule": "false"}},
+																			},
+																		},
+																	},
+																	"subPathExpr": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "cannot be set for an Ephemeral Container", "reason": "FieldValueForbidden", "rule": "false"}},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -22077,45 +22684,82 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 						},
 					},
 					"livenessProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "probes are not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes are not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"readinessProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "probes are not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes are not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"startupProbe": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "probes are not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes are not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"lifecycle": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "lifecycle is not allowed for ephemeral containers", "reason": "FieldValueForbidden", "rule": "false"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Lifecycle is not allowed for ephemeral containers.",
 							Ref:         ref("k8s.io/api/core/v1.Lifecycle"),
 						},
 					},
 					"terminationMessagePath": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
+							Default:     "/dev/termination-log",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"terminationMessagePolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.\n\nPossible enum values:\n - `\"FallbackToLogsOnError\"` will read the most recent contents of the container logs for the container status message when the container exits with an error and the terminationMessagePath has no contents.\n - `\"File\"` is the default behavior and will set the container status message to the contents of the container's terminationMessagePath when the container exits.",
+							Default:     v1.TerminationMessageReadFile,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"FallbackToLogsOnError", "File"},
 						},
 					},
 					"imagePullPolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Field is immutable", "reason": "FieldValueForbidden", "rule": "self == oldSelf"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images\n\nPossible enum values:\n - `\"Always\"` means that kubelet always attempts to pull the latest image. Container will fail If the pull fails.\n - `\"IfNotPresent\"` means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.\n - `\"Never\"` means that kubelet never pulls an image, but only uses a local image. Container will fail if the image isn't present",
 							Type:        []string{"string"},
@@ -22151,7 +22795,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "image"},
 			},
 		},
 		Dependencies: []string{
@@ -22173,6 +22817,7 @@ func schema_k8sio_api_core_v1_EphemeralVolumeSource(ref common.ReferenceCallback
 						},
 					},
 				},
+				Required: []string{"volumeClaimTemplate"},
 			},
 		},
 		Dependencies: []string{
@@ -22433,6 +23078,7 @@ func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.Op
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Command is the command line to execute inside the container, the working directory for the command  is root ('/') in the container's filesystem. The command is simply exec'd, it is not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use a shell, you need to explicitly call out to that shell. Exit status of 0 is treated as live/healthy and non-zero is unhealthy.",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -22446,6 +23092,7 @@ func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.Op
 						},
 					},
 				},
+				Required: []string{"command"},
 			},
 		},
 	}
@@ -22481,6 +23128,8 @@ func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback) commo
 					"lun": {
 						SchemaProps: spec.SchemaProps{
 							Description: "lun is Optional: FC target lun number",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](255),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -22521,6 +23170,11 @@ func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback) commo
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".targetWWNs", "message": "must specify either targetWWNs or wwids, but not both", "reason": "FieldValueRequired", "rule": "self.?targetWWNs.orValue([]).size() > 0 || self.?wwids.orValue([]).size() > 0"}, map[string]interface{}{"fieldPath": ".targetWWNs", "message": "targetWWNs and wwids can not be specified simultaneously", "rule": "self.?targetWWNs.orValue([]).size() == 0 || self.?wwids.orValue([]).size() == 0"}, map[string]interface{}{"fieldPath": ".lun", "message": "lun is required if targetWWNs is specified", "reason": "FieldValueRequired", "rule": "self.?targetWWNs.orValue([]).size() == 0 || has(self.lun)"}},
+				},
+			},
 		},
 	}
 }
@@ -22536,6 +23190,7 @@ func schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref common.ReferenceCal
 						SchemaProps: spec.SchemaProps{
 							Description: "driver is the name of the driver to use for this volume.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22561,6 +23216,11 @@ func schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref common.ReferenceCal
 						},
 					},
 					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "kubernetes.io and k8s.io namespaces are reserved", "rule": "!self.exists(k, k.matches(\"[^/]*(kubernetes[.]io|k8s[.]io)([/].*)?$\"))"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "options is Optional: this field holds extra command options if any.",
 							Type:        []string{"object"},
@@ -22596,6 +23256,7 @@ func schema_k8sio_api_core_v1_FlexVolumeSource(ref common.ReferenceCallback) com
 						SchemaProps: spec.SchemaProps{
 							Description: "driver is the name of the driver to use for this volume.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22621,6 +23282,11 @@ func schema_k8sio_api_core_v1_FlexVolumeSource(ref common.ReferenceCallback) com
 						},
 					},
 					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "kubernetes.io and k8s.io namespaces are reserved", "rule": "!self.exists(k, k.matches(\"[^/]*(kubernetes[.]io|k8s[.]io)([/].*)?$\"))"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "options is Optional: this field holds extra command options if any.",
 							Type:        []string{"object"},
@@ -22653,6 +23319,11 @@ func schema_k8sio_api_core_v1_FlockerVolumeSource(ref common.ReferenceCallback) 
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"datasetName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not contain '/'", "rule": "!self.contains(\"/\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "datasetName is Name of the dataset stored as metadata -> name on the dataset for Flocker should be considered as deprecated",
 							Type:        []string{"string"},
@@ -22666,6 +23337,11 @@ func schema_k8sio_api_core_v1_FlockerVolumeSource(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "datasetName and datasetUUID can not be specified simultaneously", "rule": "has(self.datasetName) ? !has(self.datasetUUID) : true"}, map[string]interface{}{"message": "one of datasetUUID and datasetName is required", "reason": "FieldValueRequired", "rule": "has(self.datasetUUID) || has(self.datasetName)"}},
 				},
 			},
 		},
@@ -22683,6 +23359,7 @@ func schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref common.Reference
 						SchemaProps: spec.SchemaProps{
 							Description: "pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22697,6 +23374,8 @@ func schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref common.Reference
 					"partition": {
 						SchemaProps: spec.SchemaProps{
 							Description: "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](255),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -22725,6 +23404,8 @@ func schema_k8sio_api_core_v1_GRPCAction(ref common.ReferenceCallback) common.Op
 						SchemaProps: spec.SchemaProps{
 							Description: "Port number of the gRPC service. Number must be in the range 1 to 65535.",
 							Default:     0,
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](65535),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -22755,6 +23436,7 @@ func schema_k8sio_api_core_v1_GitRepoVolumeSource(ref common.ReferenceCallback) 
 						SchemaProps: spec.SchemaProps{
 							Description: "repository is the URL",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22767,6 +23449,11 @@ func schema_k8sio_api_core_v1_GitRepoVolumeSource(ref common.ReferenceCallback) 
 						},
 					},
 					"directory": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not contain '..'", "rule": "self.split('/').all(e, e != \"..\")"}, map[string]interface{}{"message": "must be a relative path", "rule": "!self.startsWith(\"/\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "directory is the target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.",
 							Type:        []string{"string"},
@@ -22791,6 +23478,7 @@ func schema_k8sio_api_core_v1_GlusterfsPersistentVolumeSource(ref common.Referen
 						SchemaProps: spec.SchemaProps{
 							Description: "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22799,6 +23487,7 @@ func schema_k8sio_api_core_v1_GlusterfsPersistentVolumeSource(ref common.Referen
 						SchemaProps: spec.SchemaProps{
 							Description: "path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22806,11 +23495,17 @@ func schema_k8sio_api_core_v1_GlusterfsPersistentVolumeSource(ref common.Referen
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"endpointsNamespace": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "format.dns1123Label().validate(self).hasValue()", "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"}, map[string]interface{}{"message": "if the endpointnamespace is set, it must be a valid namespace name", "rule": "self.size() > 0"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "endpointsNamespace is the namespace that contains Glusterfs endpoint. If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
 							Type:        []string{"string"},
@@ -22835,6 +23530,7 @@ func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22843,6 +23539,7 @@ func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22850,6 +23547,7 @@ func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -22871,13 +23569,22 @@ func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback) common
 					"path": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Path to access on the HTTP server.",
+							Default:     "/",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"port": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.portName().validate(self).value()", "rule": "type(self) != string || !format.portName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name or number of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](65535),
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -22891,6 +23598,8 @@ func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback) common
 					"scheme": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Scheme to use for connecting to the host. Defaults to HTTP.\n\nPossible enum values:\n - `\"HTTP\"` means that the scheme used will be http://\n - `\"HTTPS\"` means that the scheme used will be https://",
+							Default:     v1.URISchemeHTTP,
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"HTTP", "HTTPS"},
@@ -22935,6 +23644,7 @@ func schema_k8sio_api_core_v1_HTTPHeader(ref common.ReferenceCallback) common.Op
 						SchemaProps: spec.SchemaProps{
 							Description: "The header field name. This will be canonicalized upon output, so case-variant names will be understood as the same header.",
 							Default:     "",
+							Pattern:     "^[-A-Za-z0-9]+$",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22962,6 +23672,11 @@ func schema_k8sio_api_core_v1_HostAlias(ref common.ReferenceCallback) common.Ope
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"ip": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)", "rule": "isIP(self)"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "IP address of the host file entry.",
 							Type:        []string{"string"},
@@ -22976,7 +23691,22 @@ func schema_k8sio_api_core_v1_HostAlias(ref common.ReferenceCallback) common.Ope
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Hostnames for the above IP address.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -23022,9 +23752,15 @@ func schema_k8sio_api_core_v1_HostPathVolumeSource(ref common.ReferenceCallback)
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"path": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not contain '..'", "rule": "self.split('/').all(e, e != \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23032,6 +23768,7 @@ func schema_k8sio_api_core_v1_HostPathVolumeSource(ref common.ReferenceCallback)
 					"type": {
 						SchemaProps: spec.SchemaProps{
 							Description: "type for HostPath Volume Defaults to \"\" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath\n\nPossible enum values:\n - `\"\"` For backwards compatible, leave it empty if unset\n - `\"BlockDevice\"` A block device must exist at the given path\n - `\"CharDevice\"` A character device must exist at the given path\n - `\"Directory\"` A directory must exist at the given path\n - `\"DirectoryOrCreate\"` If nothing exists at the given path, an empty directory will be created there as needed with file mode 0755, having the same group and ownership with Kubelet.\n - `\"File\"` A file must exist at the given path\n - `\"FileOrCreate\"` If nothing exists at the given path, an empty file will be created there as needed with file mode 0644, having the same group and ownership with Kubelet.\n - `\"Socket\"` A UNIX socket must exist at the given path",
+							Default:     v1.HostPathUnset,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"", "BlockDevice", "CharDevice", "Directory", "DirectoryOrCreate", "File", "FileOrCreate", "Socket"},
@@ -23078,6 +23815,7 @@ func schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref common.ReferenceCa
 					"iscsiInterface": {
 						SchemaProps: spec.SchemaProps{
 							Description: "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
+							Default:     "default",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23163,14 +23901,21 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 						SchemaProps: spec.SchemaProps{
 							Description: "targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"iqn": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be valid format starting with iqn, eui, or naa", "rule": "self.size() == 0 || self.startsWith(\"iqn\") || self.startsWith(\"eui\") || self.startsWith(\"naa\")"}, map[string]interface{}{"message": "must be a valid format", "rule": "!self.startsWith(\"iqn\") || self.matches(\"iqn\\\\.\\\\d{4}-\\\\d{2}\\\\.([[:alnum:]-.]+)(:[^,;*&$|\\\\s]+)$\")"}, map[string]interface{}{"message": "must be a valid format", "rule": "!self.startsWith(\"eui\") || self.matches(\"^eui.[[:alnum:]]{16}$\")"}, map[string]interface{}{"message": "must be a valid format", "rule": "!self.startsWith(\"naa\") || self.matches(\"^naa.[[:alnum:]]{32}$\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "iqn is the target iSCSI Qualified Name.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23179,6 +23924,8 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 						SchemaProps: spec.SchemaProps{
 							Description: "lun represents iSCSI Target Lun number.",
 							Default:     0,
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](255),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -23186,6 +23933,7 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 					"iscsiInterface": {
 						SchemaProps: spec.SchemaProps{
 							Description: "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
+							Default:     "default",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23200,6 +23948,7 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -23227,6 +23976,7 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 					"chapAuthDiscovery": {
 						SchemaProps: spec.SchemaProps{
 							Description: "chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -23234,6 +23984,7 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 					"chapAuthSession": {
 						SchemaProps: spec.SchemaProps{
 							Description: "chapAuthSession defines whether support iSCSI Session CHAP authentication",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -23245,6 +23996,11 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 						},
 					},
 					"initiatorName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be valid format starting with iqn, eui, or naa", "rule": "self.startsWith(\"iqn\") || self.startsWith(\"eui\") || self.startsWith(\"naa\")"}, map[string]interface{}{"message": "must be a valid format", "rule": "!self.startsWith(\"iqn\") || self.matches(\"iqn\\\\.\\\\d{4}-\\\\d{2}\\\\.([[:alnum:]-.]+)(:[^,;*&$|\\\\s]+)$\")"}, map[string]interface{}{"message": "must be a valid format", "rule": "!self.startsWith(\"eui\") || self.matches(\"^eui.[[:alnum:]]{16}$\")"}, map[string]interface{}{"message": "must be a valid format", "rule": "!self.startsWith(\"naa\") || self.matches(\"^naa.[[:alnum:]]{32}$\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "initiatorName is the custom iSCSI Initiator Name. If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface <target portal>:<volume name> will be created for the connection.",
 							Type:        []string{"string"},
@@ -23253,6 +24009,11 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 					},
 				},
 				Required: []string{"targetPortal", "iqn", "lun"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".secretRef", "message": "Required value", "reason": "FieldValueRequired", "rule": "(self.?chapAuthDiscovery.orValue(false) || self.?chapAuthSession.orValue(false)) ? has(self.secretRef) : true"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -23271,14 +24032,21 @@ func schema_k8sio_api_core_v1_KeyToPath(ref common.ReferenceCallback) common.Ope
 						SchemaProps: spec.SchemaProps{
 							Description: "key is the key to project.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"path": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not start with \"..\"", "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must be a relative path", "rule": "self.size() == 0 || !self.startsWith(\"/\")"}, map[string]interface{}{"message": "must not contain \"..\"", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "path is the relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23286,6 +24054,8 @@ func schema_k8sio_api_core_v1_KeyToPath(ref common.ReferenceCallback) common.Ope
 					"mode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "mode is Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](511),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -23355,6 +24125,11 @@ func schema_k8sio_api_core_v1_LifecycleHandler(ref common.ReferenceCallback) com
 							Ref:         ref("k8s.io/api/core/v1.SleepAction"),
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must specify a handler type", "reason": "FieldValueRequired", "rule": "has(self.exec) || has(self.httpGet) || has(self.sleep) || has(self.tcpSocket)"}, map[string]interface{}{"message": "may not specify more than 1 handler type", "rule": "(has(self.exec)?1:0) + (has(self.httpGet)?1:0) + (has(self.sleep)?1:0) + (has(self.tcpSocket)?1:0) <= 1"}},
 				},
 			},
 		},
@@ -23758,9 +24533,15 @@ func schema_k8sio_api_core_v1_LocalVolumeSource(ref common.ReferenceCallback) co
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"path": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not contain '..'", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "path of the full path to the volume on the node. It can be either a directory or block device (disk, partition, ...).",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23820,6 +24601,7 @@ func schema_k8sio_api_core_v1_NFSVolumeSource(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -23828,6 +24610,8 @@ func schema_k8sio_api_core_v1_NFSVolumeSource(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							Pattern:     "^/",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -24481,7 +25265,8 @@ func schema_k8sio_api_core_v1_NodeSelector(ref common.ReferenceCallback) common.
 					"nodeSelectorTerms": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must have at least one node selector term", "reason": "FieldValueRequired", "rule": "self.size() > 0"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -24577,7 +25362,39 @@ func schema_k8sio_api_core_v1_NodeSelectorTerm(ref common.ReferenceCallback) com
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "A list of node selector requirements by node's labels.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Properties: map[string]spec.Schema{
+																	"key": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.named(\"qualifiedName\").value().validate(self).value()", "rule": "!format.named(\"qualifiedName\").value().validate(self).hasValue()"}},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".values", "message": "must be specified when `operator` is 'In' or 'NotIn'", "reason": "FieldValueRequired", "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() > 0 : true"}, map[string]interface{}{"fieldPath": ".values", "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'", "reason": "FieldValueForbidden", "rule": "self.operator == 'Exists' || self.operator == 'DoesNotExist' ? !has(self.values) || self.values.size() == 0 : true"}, map[string]interface{}{"fieldPath": ".values", "message": "must be specified single value when `operator` is 'Lt' or 'Gt'", "reason": "FieldValueRequired", "rule": "self.operator == 'Gt' || self.operator == 'Lt' ? has(self.values) && self.values.size() == 1 : true"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -24595,8 +25412,66 @@ func schema_k8sio_api_core_v1_NodeSelectorTerm(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "A list of node selector requirements by node's fields.",
-							Type:        []string{"array"},
+							Description: "A list of node selector requirements by node's fields. !TODO: Use variables for name format to use here, fortunately only one is valid so we use that",
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Properties: map[string]spec.Schema{
+																	"key": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "not a valid field selector key", "reason": "FieldValueInvalid", "rule": "[\"metadata.name\"].exists(n, n == self)"}},
+																			},
+																		},
+																	},
+																	"operator": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "not a valid selector operator", "reason": "FieldValueInvalid", "rule": "self == 'In' || self == 'NotIn'"}},
+																			},
+																		},
+																	},
+																	"values": {
+																		SchemaProps: spec.SchemaProps{
+																			AllOf: []spec.Schema{
+																				{
+																					SchemaProps: spec.SchemaProps{
+																						Items: &spec.SchemaOrArray{
+																							Schema: &spec.Schema{
+																								VendorExtensible: spec.VendorExtensible{
+																									Extensions: spec.Extensions{
+																										"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self).value()", "rule": "!format.named(\"dns1123Subdomain\").value().validate(self).hasValue()"}},
+																									},
+																								},
+																							},
+																						},
+																					},
+																				},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".values", "message": "must be only one value when `operator` is 'In' or 'NotIn' for node field selector", "reason": "FieldValueRequired", "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() == 1 : true"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -25009,20 +25884,28 @@ func schema_k8sio_api_core_v1_ObjectFieldSelector(ref common.ReferenceCallback) 
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Version of the schema the FieldPath is written in terms of, defaults to \"v1\".",
+							Default:     "v1",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"fieldPath": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "error converting fieldPath: field label does not support subscript", "rule": "!self.contains(\"[\") || !self.contains(\"]\") || [\"metadata.annotations\", \"metadata.labels\"].exists(x, self.startsWith(x + \"['\") && self.endsWith(\"']\"))"}, map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self.substring(22, self.size() - 2).lowerAscii()).value()", "rule": "!self.startsWith(\"metadata.annotations['\") || !self.endsWith(\"']\") || !format.qualifiedName().validate(self.substring(22, self.size() - 2).lowerAscii()).hasValue()"}, map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self.substring(17, self.size() - 2)).value()", "rule": "!self.startsWith(\"metadata.labels['\") || !self.endsWith(\"']\") ||!format.qualifiedName().validate(self.substring(17, self.size() - 2)).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Path of the field to select in the specified API version.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"fieldPath"},
+				Required: []string{"apiVersion", "fieldPath"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -25122,6 +26005,11 @@ func schema_k8sio_api_core_v1_PersistentVolume(ref common.ReferenceCallback) com
 						},
 					},
 					"metadata": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self.name).value()", "rule": "!has(self.name) || !format.named(\"dns1123Subdomain\").value().validate(self.name).hasValue()"}, map[string]interface{}{"fieldPath": ".namespace", "message": "not allowed on this type", "reason": "FieldValueForbidden", "rule": "!has(self.__namespace__)"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
@@ -25129,6 +26017,11 @@ func schema_k8sio_api_core_v1_PersistentVolume(ref common.ReferenceCallback) com
 						},
 					},
 					"spec": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".capacity", "message": "must specify a capacity", "reason": "FieldValueRequired", "rule": "has(self.capacity) && self.capacity.size() > 0"}, map[string]interface{}{"fieldPath": ".capacity", "message": "Supported values: [\"storage\"]", "reason": "FieldValueInvalid", "rule": "has(self.capacity) && has(self.capacity.storage) && self.capacity.size() == 1"}, map[string]interface{}{"fieldPath": ".storageClassName", "messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self.storageClassName).value()", "reason": "FieldValueInvalid", "rule": "!has(self.storageClassName) || self.storageClassName.size() == 0 || !format.named(\"dns1123Subdomain\").value().validate(self.storageClassName).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "spec defines a specification of a persistent volume owned by the cluster. Provisioned by an administrator. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes",
 							Default:     map[string]interface{}{},
@@ -25532,7 +26425,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimTemplate(ref common.Reference
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PersistentVolumeClaimTemplate is used to produce PersistentVolumeClaim objects as part of an EphemeralVolumeSource.",
+				Description: "PersistentVolumeClaimTemplate is used to produce PersistentVolumeClaim objects as part of an EphemeralVolumeSource. ?k8s:validation:cel[0]:rule>!self.metadata.exists(k, k != \"labels\" && k != \"annotations\") ?k8s:validation:cel[0]:message>pvc template metadata may only contain labels and annotations",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"metadata": {
@@ -25569,6 +26462,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimVolumeSource(ref common.Refer
 						SchemaProps: spec.SchemaProps{
 							Description: "claimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -25576,6 +26470,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimVolumeSource(ref common.Refer
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly Will force the ReadOnly setting in VolumeMounts. Default false.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -25795,7 +26690,23 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 					"capacity": {
 						SchemaProps: spec.SchemaProps{
 							Description: "capacity is the description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
-							Type:        []string{"object"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										AdditionalProperties: &spec.SchemaOrBool{
+											Allows: true,
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be greater than zero", "rule": "quantity(self).asApproximateFloat() > 0"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
@@ -25941,11 +26852,13 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 					"accessModes": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not use ReadWriteOncePod with other access modes", "reason": "FieldValueForbidden", "rule": "!self.exists(c, c == \"ReadWriteOncePod\") || self.size() == 1"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "accessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -26020,12 +26933,23 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 						},
 					},
 					"volumeAttributesClassName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "an empty string is disallowed", "reason": "FieldValueRequired", "rule": "self.size() > 0"}, map[string]interface{}{"messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self).value()", "reason": "FieldValueInvalid", "rule": "self.size() == 0 || !format.named(\"dns1123Subdomain\").value().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of VolumeAttributesClass to which this persistent volume belongs. Empty value is not allowed. When this field is not set, it indicates that this volume does not belong to any VolumeAttributesClass. This field is mutable and can be changed by the CSI driver after a volume has been updated successfully to a new class. For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound PersistentVolumeClaims during the binding process. This is an alpha field and requires enabling VolumeAttributesClass feature.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
+				},
+				Required: []string{"accessModes"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must specify a volume type", "reason": "FieldValueRequired", "rule": "has(self.gcePersistentDisk)\n|| has(self.awsElasticBlockStore)\n|| has(self.hostPath)\n|| has(self.glusterfs)\n|| has(self.nfs)\n|| has(self.rbd)\n|| has(self.iscsi)\n|| has(self.cinder)\n|| has(self.cephfs)\n|| has(self.fc)\n|| has(self.flocker)\n|| has(self.flexVolume)\n|| has(self.azureFile)\n|| has(self.vsphereVolume)\n|| has(self.quobyte)\n|| has(self.azureDisk)\n|| has(self.photonPersistentDisk)\n|| has(self.portworxVolume)\n|| has(self.scaleIO)\n|| has(self.local)\n|| has(self.storageos)\n|| has(self.csi)"}, map[string]interface{}{"fieldPath": ".persistentVolumeReclaimPolicy", "message": "may not be 'recycle' for a hostPath mount of '/'", "reason": "FieldValueForbidden", "rule": "!has(self.hostPath) || self.hostPath.path != \"/\" || self.persistentVolumeReclaimPolicy != \"Recycle\""}, map[string]interface{}{"fieldPath": ".csi", "message": "has to be specified when using volumeAttributesClassName", "reason": "FieldValueRequired", "rule": "has(self.csi) || !has(self.volumeAttributesClassName)"}, map[string]interface{}{"fieldPath": ".nodeAffinity", "message": "Local volume requires node affinity", "reason": "FieldValueRequired", "rule": "!has(self.local) || has(self.nodeAffinity)"}},
 				},
 			},
 		},
@@ -26088,6 +27012,7 @@ func schema_k8sio_api_core_v1_PhotonPersistentDiskVolumeSource(ref common.Refere
 						SchemaProps: spec.SchemaProps{
 							Description: "pdID is the ID that identifies Photon Controller persistent disk",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -26112,6 +27037,33 @@ func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback) common.OpenAPIDe
 			SchemaProps: spec.SchemaProps{
 				Description: "Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.",
 				Type:        []string{"object"},
+				AllOf: []spec.Schema{
+					{
+						SchemaProps: spec.SchemaProps{
+							Properties: map[string]spec.Schema{
+								"metadata": {
+									SchemaProps: spec.SchemaProps{
+										AllOf: []spec.Schema{
+											{
+												SchemaProps: spec.SchemaProps{
+													Properties: map[string]spec.Schema{
+														"annotations": {
+															VendorExtensible: spec.VendorExtensible{
+																Extensions: spec.Extensions{
+																	"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": "['controller.kubernetes.io/pod-deletion-cost']", "message": "must be a 32bit integer", "rule": "self[?\"controller.kubernetes.io/pod-deletion-cost\"].optMap(v, v.matches(\"^[1-9-]\\\\d*$|^0$\") && int(v) <= 2147483647 && int(v) >= -2147483648).orValue(true)"}},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -26135,10 +27087,85 @@ func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback) common.OpenAPIDe
 						},
 					},
 					"spec": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".serviceAccountName", "message": "may not set serviceAccountToken in a pod with serviceAccountName", "reason": "FieldValueForbidden", "rule": "has(self.serviceAccountName) || !has(self.volumes) || self.volumes.all(v, !has(v.projected) || v.projected.sources.all(s, !has(s.serviceAccountToken)))"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the pod. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/core/v1.PodSpec"),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Properties: map[string]spec.Schema{
+											"containers": {
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Items: &spec.SchemaOrArray{
+																	Schema: &spec.Schema{
+																		SchemaProps: spec.SchemaProps{
+																			AllOf: []spec.Schema{
+																				{
+																					SchemaProps: spec.SchemaProps{
+																						Properties: map[string]spec.Schema{
+																							"image": {
+																								VendorExtensible: spec.VendorExtensible{
+																									Extensions: spec.Extensions{
+																										"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not have leading or trailing whitespace", "rule": "self.trim() == self"}},
+																									},
+																								},
+																							},
+																						},
+																					},
+																				},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+											},
+											"initContainers": {
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Items: &spec.SchemaOrArray{
+																	Schema: &spec.Schema{
+																		SchemaProps: spec.SchemaProps{
+																			AllOf: []spec.Schema{
+																				{
+																					SchemaProps: spec.SchemaProps{
+																						Properties: map[string]spec.Schema{
+																							"image": {
+																								VendorExtensible: spec.VendorExtensible{
+																									Extensions: spec.Extensions{
+																										"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not have leading or trailing whitespace", "rule": "self.trim() == self"}},
+																									},
+																								},
+																							},
+																						},
+																					},
+																				},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Ref: ref("k8s.io/api/core/v1.PodSpec"),
 						},
 					},
 					"status": {
@@ -26148,6 +27175,11 @@ func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback) common.OpenAPIDe
 							Ref:         ref("k8s.io/api/core/v1.PodStatus"),
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".metadata.annotations", "message": "all seccomp profile annotations must be valid", "rule": "\tself.metadata.?annotations.orValue({}).all(k,\n\t\t!(k == \"seccomp.security.alpha.kubernetes.io/pod\" || k.startsWith(\"container.seccomp.security.alpha.kubernetes.io/\")) ||\n\t\t[\"runtime/default\", \"unconfined\", \"docker/default\"].exists(v, self.metadata.annotations[k] == v) ||\n\t\t(\n\t\t\tself.metadata.annotations[k].startsWith(\"localhost/\") &&\n\t\t\t!self.metadata.annotations[k].split('/').exists(x, x == \"..\") &&\n\t\t\tself.metadata.annotations[k].charAt(10) != \"/\"\n\t\t)\n\t )"}, map[string]interface{}{"fieldPath": ".metadata.annotations", "message": "seccomp type in annotation and field must match", "reason": "FieldValueForbidden", "rule": "!has(self.metadata.annotations) || [self.spec.?containers.orValue([]).map(c, {\"name\": c.name, \"type\": c.?securityContext.?seccompProfile.?type.orValue(\"\"), \"lhp\": c.?securityContext.?seccompProfile.?localhostProfile.orValue(\"\")}), self.spec.?initContainers.orValue([]).map(c, {\"name\": c.name, \"type\": c.?securityContext.?seccompProfile.?type.orValue(\"\"), \"lhp\": c.?securityContext.?seccompProfile.?localhostProfile.orValue(\"\")}), self.spec.?ephemeralContainers.orValue([]).map(c, {\"name\": c.name, \"type\": c.?securityContext.?seccompProfile.?type.orValue(\"\"), \"lhp\": c.?securityContext.?seccompProfile.?localhostProfile.orValue(\"\")})].all(containers, containers.all(c,\n\t\tc.type.size() == 0 ||\n\t\t!self.metadata.?annotations[?(\"container.seccomp.security.alpha.kubernetes.io/\" + c.name)].hasValue() ||\n\t[\"runtime/default\", \"unconfined\"].exists(x, x == c.type && x == self.metadata.annotations[\"container.seccomp.security.alpha.kubernetes.io/\" + c.name]) ||\n\t\t\"runtime/default\" == c.type && self.metadata.annotations[\"container.seccomp.security.alpha.kubernetes.io/\" + c.name] == \"docker/default\" ||\n\t\tc.lhp.size() > 0 && c.type == \"Localhost\" && self.metadata.annotations[\"container.seccomp.security.alpha.kubernetes.io/\" + c.name].startsWith(\"localhost/\") && self.metadata.annotations[\"container.seccomp.security.alpha.kubernetes.io/\" + c.name].endsWith(c.lhp)\n))"}, map[string]interface{}{"fieldPath": ".spec.securityContext.seccompProfile.type", "message": "seccomp type in annotation and field must match", "reason": "FieldValueForbidden", "rule": "\t\tself.?spec.?securityContext.?seccompProfile.optFlatMap(profile,\n\t\t\tself.?metadata.?annotations[?\"seccomp.security.alpha.kubernetes.io/pod\"].optMap(annotation,\n\t\t\t[\"runtime/default\", \"unconfined\"].exists(x, x == profile.type && x == annotation) ||\n\t\t\t\t\"runtime/default\" == profile.type && annotation == \"docker/default\" ||\n\t\t\t\tprofile.type == \"Localhost\" && annotation.startsWith(\"localhost/\") && annotation.endsWith(profile.localhostProfile)\n\t\t\t)\n\t\t).orValue(true)"}, map[string]interface{}{"fieldPath": ".metadata.annotations['kubernetes.io/config.mirror']", "message": "must set spec.nodeName if mirror pod annotation is set", "rule": "!self.metadata.?annotations.orValue({}).exists(k, k == \"kubernetes.io/config.mirror\") ||\nhas(self.spec.nodeName) && self.spec.nodeName.size() > 0"}, map[string]interface{}{"fieldPath": ".spec.volumes", "messageExpression": "self.spec.volumes.filter(v, has(v.ephemeral) && has(v.name) && format.dns1123Subdomain().validate(self.metadata.name + \"-\" + v.name).hasValue()).map(v, \"ephemeral PVC name \\\"\" + self.metadata.name +  \"-\" + v.name + \"\\\": is invalid\")", "rule": "self.spec.?volumes.orValue([]).all(v, !has(v.ephemeral) || !has(v.name) || !format.dns1123Subdomain().validate(self.metadata.name + \"-\" + v.name).hasValue())"}, map[string]interface{}{"fieldPath": ".metadata.namespace", "reason": "FieldValueRequired", "rule": "has(self.metadata.__namespace__) && self.metadata.__namespace__.size() > 0"}},
 				},
 			},
 		},
@@ -26230,7 +27262,22 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "namespaces specifies a static list of namespace names that the term applies to. The term is applied to the union of the namespaces listed in this field and the ones selected by namespaceSelector. null or empty namespaces list and null namespaceSelector means \"this pod's namespace\".",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -26243,9 +27290,15 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 						},
 					},
 					"topologyKey": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -26264,7 +27317,22 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -26284,7 +27352,22 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -26298,6 +27381,11 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 					},
 				},
 				Required: []string{"topologyKey"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "matchLabelKeys key must not be in mismatchLabelKeys", "rule": "!has(self.mismatchLabelKeys) || !has(self.matchLabelKeys) || self.matchLabelKeys.all(x, !self.mismatchLabelKeys.exists(y, y == x))"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -26493,7 +27581,23 @@ func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback) common.
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "A list of DNS name server IP addresses. This will be appended to the base nameservers generated from DNSPolicy. Duplicated nameservers will be removed.",
-							Type:        []string{"array"},
+							MaxItems:    ptr.To[int64](3),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)", "rule": "isIP(self)"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -26508,12 +27612,29 @@ func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback) common.
 					"searches": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type":   "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not have more than 2048 characters (including spaces) in the search list", "rule": "self.map(x, x.size()).sum() + self.size() - 1 <= 2048"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "A list of DNS search domains for host-name lookup. This will be appended to the base search paths generated from DNSPolicy. Duplicated search paths will be removed.",
-							Type:        []string{"array"},
+							MaxItems:    ptr.To[int64](32),
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self.substring(0, self.size() - (self.endsWith(\".\") ? 1 : 0))).value()", "rule": "!format.dns1123Subdomain().validate(self.substring(0, self.size() - (self.endsWith(\".\") ? 1 : 0))).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -26562,6 +27683,7 @@ func schema_k8sio_api_core_v1_PodDNSConfigOption(ref common.ReferenceCallback) c
 					"name": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Required.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -26573,6 +27695,7 @@ func schema_k8sio_api_core_v1_PodDNSConfigOption(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"name"},
 			},
 		},
 	}
@@ -26934,6 +28057,11 @@ func schema_k8sio_api_core_v1_PodReadinessGate(ref common.ReferenceCallback) com
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"conditionType": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "ConditionType refers to a condition in the pod's condition list with matching type.",
 							Default:     "",
@@ -26956,9 +28084,16 @@ func schema_k8sio_api_core_v1_PodResourceClaim(ref common.ReferenceCallback) com
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name uniquely identifies this resource claim inside the pod. This must be a DNS_LABEL.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](63),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -27016,6 +28151,11 @@ func schema_k8sio_api_core_v1_PodSchedulingGate(ref common.ReferenceCallback) co
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of the scheduling gate. Each scheduling gate must have a unique name field.",
 							Default:     "",
@@ -27052,6 +28192,8 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 					"runAsUser": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](2.147483647e+09),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -27059,6 +28201,8 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 					"runAsGroup": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](2.147483647e+09),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -27078,7 +28222,21 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													Minimum: ptr.To[float64](0),
+													Maximum: ptr.To[float64](2.147483647e+09),
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -27093,6 +28251,8 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 					"fsGroup": {
 						SchemaProps: spec.SchemaProps{
 							Description: "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw----\n\nIf unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](2.147483647e+09),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -27209,7 +28369,46 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													AllOf: []spec.Schema{
+														{
+															SchemaProps: spec.SchemaProps{
+																Properties: map[string]spec.Schema{
+																	"resizePolicy": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not be set for init containers", "rule": "false"}},
+																			},
+																		},
+																	},
+																	"restartPolicy": {
+																		VendorExtensible: spec.VendorExtensible{
+																			Extensions: spec.Extensions{
+																				"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "supported values: \"Always\"", "rule": "self == \"Always\""}},
+																			},
+																		},
+																	},
+																},
+															},
+														},
+													},
+												},
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".lifecycle", "message": "may not be set for init containers without restartPolicy=Always", "reason": "FieldValueForbidden", "rule": "!has(self.lifecycle) || self.?restartPolicy.orValue(\"\") == \"Always\""}, map[string]interface{}{"fieldPath": ".livenessProbe", "message": "may not be set for init containers without restartPolicy=Always", "reason": "FieldValueForbidden", "rule": "!has(self.livenessProbe) || self.?restartPolicy.orValue(\"\") == \"Always\""}, map[string]interface{}{"fieldPath": ".readinessProbe", "message": "may not be set for init containers without restartPolicy=Always", "reason": "FieldValueForbidden", "rule": "!has(self.readinessProbe) || self.?restartPolicy.orValue(\"\") == \"Always\""}, map[string]interface{}{"fieldPath": ".startupProbe", "message": "may not be set for init containers without restartPolicy=Always", "reason": "FieldValueForbidden", "rule": "!has(self.startupProbe) || self.?restartPolicy.orValue(\"\") == \"Always\""}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -27233,7 +28432,22 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".restartPolicy", "message": "may not be set for non-init containers", "reason": "FieldValueForbidden", "rule": "!has(self.restartPolicy)"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -27269,8 +28483,14 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"restartPolicy": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Required value", "reason": "FieldValueRequired", "rule": "self.size() > 0"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Restart policy for all containers within the pod. One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy\n\nPossible enum values:\n - `\"Always\"`\n - `\"Never\"`\n - `\"OnFailure\"`",
+							Default:     v1.RestartPolicyAlways,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Always", "Never", "OnFailure"},
@@ -27286,6 +28506,8 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					"activeDeadlineSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](2.147483647e+09),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -27293,6 +28515,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					"dnsPolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.\n\nPossible enum values:\n - `\"ClusterFirst\"` indicates that the pod should use cluster DNS first unless hostNetwork is true, if it is available, then fall back on the default (as determined by kubelet) DNS settings.\n - `\"ClusterFirstWithHostNet\"` indicates that the pod should use cluster DNS first, if it is available, then fall back on the default (as determined by kubelet) DNS settings.\n - `\"Default\"` indicates that the pod should use the default (as determined by kubelet) DNS settings.\n - `\"None\"` indicates that the pod should use empty DNS settings. DNS parameters such as nameservers and search paths should be defined via DNSConfig.",
+							Default:     v1.DNSClusterFirst,
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"ClusterFirst", "ClusterFirstWithHostNet", "Default", "None"},
@@ -27301,12 +28524,29 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					"nodeSelector": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-map-type": "atomic",
+								"x-kubernetes-map-type":    "atomic",
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "self.all(k, format.qualifiedName().validate(k).value().orValue([])).filter(x, x.size() > 0)[0]", "rule": "self.all(k, !format.qualifiedName().validate(k).hasValue())"}},
 							},
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
-							Type:        []string{"object"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										AdditionalProperties: &spec.SchemaOrBool{
+											Allows: true,
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.labelValue().validate(self).value()", "rule": "!format.labelValue().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
@@ -27320,6 +28560,11 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"serviceAccountName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "ServiceAccountName is the name of the ServiceAccount to use to run this pod. More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/",
 							Type:        []string{"string"},
@@ -27341,6 +28586,11 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"nodeName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "NodeName indicates in which node this pod is scheduled. If empty, this pod is a candidate for scheduling by the scheduler defined in schedulerName. Once this field is set, the kubelet for this node becomes responsible for the lifecycle of this pod. This field should not be used to express a desire for the pod to be scheduled on a specific node. https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename",
 							Type:        []string{"string"},
@@ -27406,6 +28656,11 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"hostname": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the hostname of the Pod If not specified, the pod's hostname will be set to a system-defined value.",
 							Type:        []string{"string"},
@@ -27413,6 +28668,11 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"subdomain": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "If specified, the fully qualified Pod hostname will be \"<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>\". If not specified, the pod will not have a domainname at all.",
 							Type:        []string{"string"},
@@ -27428,6 +28688,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					"schedulerName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
+							Default:     v1.DefaultSchedulerName,
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -27476,6 +28737,11 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"priorityClassName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "If specified, indicates the pod's priority. \"system-node-critical\" and \"system-cluster-critical\" are two special keywords which indicate the highest priorities with the former being the highest priority. Any other name must be defined by creating a PriorityClass object with that name. If not specified, the pod priority will be default or zero if there is no default.",
 							Type:        []string{"string"},
@@ -27515,6 +28781,11 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 						},
 					},
 					"runtimeClassName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class",
 							Type:        []string{"string"},
@@ -27645,6 +28916,11 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 				},
 				Required: []string{"containers"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".shareProcessNamespace", "message": "ShareProcessNamespace and HostPID cannot both be enabled", "rule": "!self.?shareProcessNamespace.orValue(false) || !self.?hostPID.orValue(false)"}, map[string]interface{}{"fieldPath": ".containers", "message": "`hostPort` must match `containerPort` when `hostNetwork` is true", "rule": "!self.?hostNetwork.orValue(false) || self.?containers.orValue([]).all(c, c.?ports.orValue([]).all(p, !has(p.hostPort) || !has(p.containerPort) || p.hostPort == p.containerPort))"}, map[string]interface{}{"fieldPath": ".hostNetwork", "message": "when `pod.Spec.HostUsers` is false", "reason": "FieldValueForbidden", "rule": "has(self.hostUsers) && !self.hostUsers ? !self.hostNetwork : true"}, map[string]interface{}{"fieldPath": ".hostPID", "message": "when `pod.Spec.HostUsers` is false", "reason": "FieldValueForbidden", "rule": "has(self.hostUsers) && !self.hostUsers ? !self.hostPID : true"}, map[string]interface{}{"fieldPath": ".hostIPC", "message": "when `pod.Spec.HostUsers` is false", "reason": "FieldValueForbidden", "rule": "has(self.hostUsers) && !self.hostUsers ? !self.hostIPC : true"}, map[string]interface{}{"fieldPath": ".containers", "message": "container lifecycle sleep seconds must be less than or equal to `terminationGracePeriodSeconds`", "rule": "!has(self.terminationGracePeriodSeconds) || self.containers.all(c, c.?lifecycle.?preStop.?sleep.?seconds.orValue(0) <= self.terminationGracePeriodSeconds && c.?lifecycle.?postStart.?sleep.?seconds.orValue(0) <= self.terminationGracePeriodSeconds)"}, map[string]interface{}{"fieldPath": ".dnsConfig", "message": "must provide `dnsConfig` when `dnsPolicy` is None", "reason": "FieldValueRequired", "rule": "!has(self.dnsPolicy) || self.dnsPolicy != \"None\" || has(self.dnsConfig)"}, map[string]interface{}{"fieldPath": ".dnsConfig.nameservers", "message": "must provide at least one DNS nameserver when `dnsPolicy` is None", "reason": "FieldValueRequired", "rule": "!has(self.dnsPolicy) || self.dnsPolicy != \"None\" || !has(self.dnsConfig) || (self.dnsConfig.?nameservers.optMap(x, x.size()).orValue(0) > 0)"}, map[string]interface{}{"fieldPath": ".initContainers", "message": "init container name must not match any container name", "reason": "FieldValueDuplicate", "rule": "self.?initContainers.orValue([]).all(ic, self.?containers.orValue([]).all(c, c.name != ic.name))"}, map[string]interface{}{"fieldPath": ".ephemeralContainers", "message": "ephemeral container name must not match any container name", "reason": "FieldValueDuplicate", "rule": "self.?ephemeralContainers.orValue([]).all(ec, self.?containers.orValue([]).all(c, c.name != ec.name))"}, map[string]interface{}{"fieldPath": ".ephemeralContainers", "message": "ephemeral container name must not match any init container name", "reason": "FieldValueDuplicate", "rule": "self.?ephemeralContainers.orValue([]).all(ec, self.?initContainers.orValue([]).all(ic, ic.name != ec.name))"}, map[string]interface{}{"fieldPath": ".ephemeralContainers", "message": "ephemeral container targetContainerName must match a container name", "reason": "FieldValueInvalid", "rule": "self.?ephemeralContainers.orValue([]).all(ec, ec.?targetContainerName.orValue(\"\").size() == 0 || self.containers.exists(c, c.name == ec.targetContainerName) || self.initContainers.exists(ic, ic.name == ec.targetContainerName))"}, map[string]interface{}{"fieldPath": ".containers", "message": "container volume mounts must be a volume name", "rule": "self.?containers.orValue([]).all(c, c.?volumeMounts.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))"}, map[string]interface{}{"fieldPath": ".initContainers", "message": "container volume mounts must be a volume name", "rule": "self.?initContainers.orValue([]).all(c, c.?volumeMounts.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))"}, map[string]interface{}{"fieldPath": ".ephemeralContainers", "message": "container volume mounts must be a volume name", "rule": "self.?ephemeralContainers.orValue([]).all(c, c.?volumeMounts.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))"}, map[string]interface{}{"fieldPath": ".containers", "message": "container volume devices must be a volume name", "rule": "self.?containers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))"}, map[string]interface{}{"fieldPath": ".initContainers", "message": "initContainer volume devices must be a volume name", "rule": "self.?initContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))"}, map[string]interface{}{"fieldPath": ".ephemeralContainers", "message": "ephemeralContainer volume devices must be a volume name", "rule": "self.?ephemeralContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))"}, map[string]interface{}{"fieldPath": ".containers", "message": "can only use volume source type of PersistentVolumeClaim or Ephemeral for block mode", "rule": "self.?containers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, !self.?volumes.orValue([]).exists(x, x.name == vm.name) || self.?volumes.orValue([]).exists(x, x.name == vm.name && (has(x.persistentVolumeClaim) || has(x.ephemeral)))))"}, map[string]interface{}{"fieldPath": ".initContainers", "message": "can only use volume source type of PersistentVolumeClaim or Ephemeral for block mode", "rule": "self.?initContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, !self.?volumes.orValue([]).exists(x, x.name == vm.name) || self.?volumes.orValue([]).exists(x, x.name == vm.name && (has(x.persistentVolumeClaim) || has(x.ephemeral)))))"}, map[string]interface{}{"fieldPath": ".ephemeralContainers", "message": "can only use volume source type of PersistentVolumeClaim or Ephemeral for block mode", "rule": "self.?ephemeralContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, !self.?volumes.orValue([]).exists(x, x.name == vm.name) || self.?volumes.orValue([]).exists(x, x.name == vm.name && (has(x.persistentVolumeClaim) || has(x.ephemeral)))))"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -28095,6 +29371,7 @@ func schema_k8sio_api_core_v1_PortworxVolumeSource(ref common.ReferenceCallback)
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeID uniquely identifies a Portworx volume",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28174,6 +29451,8 @@ func schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref common.ReferenceCallba
 						SchemaProps: spec.SchemaProps{
 							Description: "Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.",
 							Default:     0,
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](100),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28228,6 +29507,7 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 					"initialDelaySeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28235,6 +29515,8 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 					"timeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Default:     1,
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28242,6 +29524,8 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 					"periodSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
+							Default:     10,
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28249,6 +29533,8 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 					"successThreshold": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.",
+							Default:     1,
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28256,6 +29542,8 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 					"failureThreshold": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+							Default:     3,
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28263,10 +29551,17 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 					"terminationGracePeriodSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
+							Default:     v1.DefaultTerminationGracePeriodSeconds,
+							Minimum:     ptr.To[float64](1),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must specify a handler type", "reason": "FieldValueRequired", "rule": "has(self.exec) || has(self.httpGet) || has(self.tcpSocket) || has(self.grpc)"}, map[string]interface{}{"message": "may not specify more than 1 handler type", "rule": "(has(self.exec)?1:0) + (has(self.httpGet)?1:0) + (has(self.tcpSocket)?1:0) + (has(self.grpc)?1:0) <= 1"}},
 				},
 			},
 		},
@@ -28343,6 +29638,9 @@ func schema_k8sio_api_core_v1_ProjectedVolumeSource(ref common.ReferenceCallback
 					"defaultMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "defaultMode are the mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+							Default:     420,
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](511),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -28363,9 +29661,15 @@ func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback) 
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"registry": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a host:port pair or multiple pairs separated by commas", "rule": "self.size() == 0 || self.split(',').all(e, e.contains(':'))"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28374,6 +29678,7 @@ func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback) 
 						SchemaProps: spec.SchemaProps{
 							Description: "volume is a string that references an already created Quobyte volume by name.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28381,6 +29686,7 @@ func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback) 
 					"readOnly": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
+							Default:     false,
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -28402,6 +29708,7 @@ func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback) 
 					"tenant": {
 						SchemaProps: spec.SchemaProps{
 							Description: "tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin",
+							MaxLength:   ptr.To[int64](65),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28428,6 +29735,7 @@ func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCall
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "monitors is a collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -28444,6 +29752,7 @@ func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCall
 						SchemaProps: spec.SchemaProps{
 							Description: "image is the rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28458,6 +29767,7 @@ func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCall
 					"pool": {
 						SchemaProps: spec.SchemaProps{
 							Description: "pool is the rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+							Default:     "rbd",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28465,6 +29775,7 @@ func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCall
 					"user": {
 						SchemaProps: spec.SchemaProps{
 							Description: "user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+							Default:     "admin",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28472,6 +29783,7 @@ func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCall
 					"keyring": {
 						SchemaProps: spec.SchemaProps{
 							Description: "keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+							Default:     "/etc/ceph/keyring",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28513,6 +29825,7 @@ func schema_k8sio_api_core_v1_RBDVolumeSource(ref common.ReferenceCallback) comm
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "monitors is a collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+							MinItems:    ptr.To[int64](1),
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -28529,6 +29842,7 @@ func schema_k8sio_api_core_v1_RBDVolumeSource(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "image is the rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28960,6 +30274,7 @@ func schema_k8sio_api_core_v1_ResourceFieldSelector(ref common.ReferenceCallback
 						SchemaProps: spec.SchemaProps{
 							Description: "Required: resource to select",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28975,7 +30290,8 @@ func schema_k8sio_api_core_v1_ResourceFieldSelector(ref common.ReferenceCallback
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
-					"x-kubernetes-map-type": "atomic",
+					"x-kubernetes-map-type":    "atomic",
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "only divisor's values 1m and 1 are supported with the cpu resource", "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource == \"limits.cpu\" || self.resource == \"requests.cpu\") ||\n[\"1m\", \"1\"].exists(x, x == self.divisor)"}, map[string]interface{}{"message": "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource", "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource == \"limits.memory\" || self.resource == \"requests.memory\") ||\n[\"1\", \"1k\", \"1M\", \"1G\", \"1T\", \"1P\", \"1E\", \"1Ki\", \"1Mi\", \"1Gi\", \"1Ti\", \"1Pi\", \"1Ei\"].exists(x, x == self.divisor)"}, map[string]interface{}{"message": "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the local ephemeral storage resource", "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource == \"limits.ephemeral-storage\" || self.resource == \"requests.ephemeral-storage\") ||\n[\"1\", \"1k\", \"1M\", \"1G\", \"1T\", \"1P\", \"1E\", \"1Ki\", \"1Mi\", \"1Gi\", \"1Ti\", \"1Pi\", \"1Ei\"].exists(x, x == self.divisor)"}, map[string]interface{}{"message": "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the hugepages resource", "rule": "self.?divisor.orValue(\"\").size() == 0 || self.divisor == \"0\" || !(self.resource.startsWith(\"requests.hugepages-\") || self.resource.startsWith(\"limits.hugepages-\")) ||\n[\"1\", \"1k\", \"1M\", \"1G\", \"1T\", \"1P\", \"1E\", \"1Ki\", \"1Mi\", \"1Gi\", \"1Ti\", \"1Pi\", \"1Ei\"].exists(x, x == self.divisor)"}},
 				},
 			},
 		},
@@ -29194,7 +30510,23 @@ func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback)
 					"limits": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
-							Type:        []string{"object"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										AdditionalProperties: &spec.SchemaOrBool{
+											Allows: true,
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be greater than or equal to 0", "rule": "isQuantity(self) && quantity(self).asApproximateFloat() >= 0"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
@@ -29208,7 +30540,23 @@ func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback)
 					"requests": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
-							Type:        []string{"object"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										AdditionalProperties: &spec.SchemaOrBool{
+											Allows: true,
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be greater than or equal to 0", "rule": "isQuantity(self) && quantity(self).asApproximateFloat() >= 0"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
@@ -29241,6 +30589,11 @@ func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback)
 							},
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "limits and requests keys must be a standard resource type or fully qualified", "rule": "[self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,\n\t!format.qualifiedName().validate(k).hasValue()\n))"}, map[string]interface{}{"message": "limits and requests keys must be a standard resource for containers", "rule": "[self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,\n\t\tk.split('/').size() != 1 || ([\"cpu\",\"memory\",\"ephemeral-storage\"].exists(std, std == k) || k.startsWith(\"hugepages-\"))\n))"}, map[string]interface{}{"message": "limits and requests must follow extended resource name standard if not standard container name", "rule": "[self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,\n\t\tk.split('/').size() == 1 || !k.contains(\"/\") || k.startsWith(\"kubernetes.io/\") ||\n\t\t!k.startsWith(\"requests.\") && !format.qualifiedName().validate(\"requests.\" + k).hasValue()\n\t))"}, map[string]interface{}{"message": "HugePages require cpu or memory", "reason": "FieldValueForbidden", "rule": "self.?limits.orValue({}).exists(k, k == \"cpu\" || k == \"memory\") || self.?requests.orValue({}).exists(k, k == \"cpu\" || k == \"memory\") || !(\n\t\tself.?limits.orValue({}).exists(k, k.startsWith(\"hugepages-\")) ||\n\t\tself.?requests.orValue({}).exists(k, k.startsWith(\"hugepages-.\"))\n)"}},
 				},
 			},
 		},
@@ -29388,6 +30741,7 @@ func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) 
 						SchemaProps: spec.SchemaProps{
 							Description: "gateway is the host address of the ScaleIO API Gateway.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29396,6 +30750,7 @@ func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) 
 						SchemaProps: spec.SchemaProps{
 							Description: "system is the name of the storage system as configured in ScaleIO.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29430,6 +30785,7 @@ func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) 
 					"storageMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
+							Default:     "ThinProvisioned",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29437,6 +30793,8 @@ func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) 
 					"volumeName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeName is the name of a volume already created in the ScaleIO system that is associated with this volume source.",
+							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29444,6 +30802,7 @@ func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) 
 					"fsType": {
 						SchemaProps: spec.SchemaProps{
 							Description: "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\".",
+							Default:     "xfs",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29456,7 +30815,7 @@ func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"gateway", "system", "secretRef"},
+				Required: []string{"gateway", "system", "volumeName"},
 			},
 		},
 		Dependencies: []string{
@@ -29559,8 +30918,7 @@ func schema_k8sio_api_core_v1_SeccompProfile(ref common.ReferenceCallback) commo
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "SeccompProfile defines a pod/container's seccomp profile settings. Only one profile source may be set.",
-				Type:        []string{"object"},
+				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
@@ -29572,6 +30930,11 @@ func schema_k8sio_api_core_v1_SeccompProfile(ref common.ReferenceCallback) commo
 						},
 					},
 					"localhostProfile": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a relative path", "rule": "self.size() == 0 || !self.startsWith(\"/\")"}, map[string]interface{}{"message": "must not contain '..'", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "localhostProfile indicates a profile defined in a file on the node should be used. The profile must be preconfigured on the node to work. Must be a descending path, relative to the kubelet's configured seccomp profile location. Must be set if type is \"Localhost\". Must NOT be set for any other type.",
 							Type:        []string{"string"},
@@ -29580,18 +30943,6 @@ func schema_k8sio_api_core_v1_SeccompProfile(ref common.ReferenceCallback) commo
 					},
 				},
 				Required: []string{"type"},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"x-kubernetes-unions": []interface{}{
-						map[string]interface{}{
-							"discriminator": "type",
-							"fields-to-discriminateBy": map[string]interface{}{
-								"localhostProfile": "LocalhostProfile",
-							},
-						},
-					},
-				},
 			},
 		},
 	}
@@ -29701,6 +31052,11 @@ func schema_k8sio_api_core_v1_SecretEnvSource(ref common.ReferenceCallback) comm
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.name) && self.name.size() > 0"}, map[string]interface{}{"fieldPath": ".name", "messageExpression": "format.dns1123Subdomain().validate(self.name).value()", "rule": "!has(self.name) || !format.dns1123Subdomain().validate(self.name).hasValue()"}},
+				},
+			},
 		},
 	}
 }
@@ -29711,6 +31067,21 @@ func schema_k8sio_api_core_v1_SecretKeySelector(ref common.ReferenceCallback) co
 			SchemaProps: spec.SchemaProps{
 				Description: "SecretKeySelector selects a key of a Secret.",
 				Type:        []string{"object"},
+				AllOf: []spec.Schema{
+					{
+						SchemaProps: spec.SchemaProps{
+							Properties: map[string]spec.Schema{
+								"name": {
+									VendorExtensible: spec.VendorExtensible{
+										Extensions: spec.Extensions{
+											"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
@@ -29720,9 +31091,17 @@ func schema_k8sio_api_core_v1_SecretKeySelector(ref common.ReferenceCallback) co
 						},
 					},
 					"key": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not start with '..'", "rule": "self == \"..\" || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must not be '.'", "rule": "self != \".\""}, map[string]interface{}{"message": "must not be '..'", "rule": "self != \"..\""}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The key of the secret to select from.  Must be a valid secret key.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](253),
+							Pattern:     "^[-._a-zA-Z0-9]+$",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29839,6 +31218,11 @@ func schema_k8sio_api_core_v1_SecretProjection(ref common.ReferenceCallback) com
 					},
 				},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "message": "Required value", "reason": "FieldValueRequired", "rule": "self.?name.orValue(\"\").size() > 0"}},
+				},
+			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/core/v1.KeyToPath"},
@@ -29853,20 +31237,33 @@ func schema_k8sio_api_core_v1_SecretReference(ref common.ReferenceCallback) comm
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "name is unique within a namespace to reference a secret resource.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"namespace": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "namespace defines the space within which the secret name must be unique.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
+				Required: []string{"name", "namespace"},
 			},
 			VendorExtensible: spec.VendorExtensible{
 				Extensions: spec.Extensions{
@@ -29887,6 +31284,7 @@ func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback) c
 					"secretName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "secretName is the name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29913,6 +31311,8 @@ func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback) c
 					"defaultMode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "defaultMode is Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](511),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -29925,6 +31325,7 @@ func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"secretName"},
 			},
 		},
 		Dependencies: []string{
@@ -29967,6 +31368,8 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 					"runAsUser": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The UID to run the entrypoint of the container process. Defaults to user specified in image metadata if unspecified. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](2.147483647e+09),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -29974,6 +31377,8 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 					"runAsGroup": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The GID to run the entrypoint of the container process. Uses runtime default if unset. May also be set in PodSecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence. Note that this field cannot be set when spec.os.name is windows.",
+							Minimum:     ptr.To[float64](0),
+							Maximum:     ptr.To[float64](2.147483647e+09),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -30019,6 +31424,11 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 							Ref:         ref("k8s.io/api/core/v1.AppArmorProfile"),
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "cannot set `allowPrivilegeEscalation` to false and `privileged` to true", "rule": "has(self.allowPrivilegeEscalation) && !self.allowPrivilegeEscalation ? !self.?privileged.orValue(false) : true"}, map[string]interface{}{"message": "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN", "rule": "has(self.allowPrivilegeEscalation) && !self.allowPrivilegeEscalation ? !self.capabilities.add.exists(c, c == \"SYS_CAP_ADMIN\") : true"}},
 				},
 			},
 		},
@@ -30267,14 +31677,23 @@ func schema_k8sio_api_core_v1_ServiceAccountTokenProjection(ref common.Reference
 					"expirationSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "expirationSeconds is the requested duration of validity of the service account token. As the token approaches expiration, the kubelet volume plugin will proactively rotate the service account token. The kubelet will start trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours.Defaults to 1 hour and must be at least 10 minutes.",
+							Default:     3600,
+							Minimum:     ptr.To[float64](600),
+							Maximum:     ptr.To[float64](86400),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"path": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not start with \"..\"", "rule": "self.startsWith(\"../\") || !self.startsWith(\"..\")"}, map[string]interface{}{"message": "must not contain \"..\"", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}, map[string]interface{}{"message": "must be a relative path", "rule": "self.size() == 0 || !self.startsWith(\"/\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "path is the path relative to the mount point of the file to project the token into.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -30753,6 +32172,7 @@ func schema_k8sio_api_core_v1_SleepAction(ref common.ReferenceCallback) common.O
 						SchemaProps: spec.SchemaProps{
 							Description: "Seconds is the number of seconds to sleep.",
 							Default:     0,
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -30772,13 +32192,24 @@ func schema_k8sio_api_core_v1_StorageOSPersistentVolumeSource(ref common.Referen
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"volumeName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasVlaue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"volumeNamespace": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasVlaue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
 							Type:        []string{"string"},
@@ -30800,6 +32231,11 @@ func schema_k8sio_api_core_v1_StorageOSPersistentVolumeSource(ref common.Referen
 						},
 					},
 					"secretRef": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.name) && self.name.size() > 0"}, map[string]interface{}{"fieldPath": ".namespace", "message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.namespace) && self.namespace.size() > 0"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
 							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
@@ -30821,13 +32257,24 @@ func schema_k8sio_api_core_v1_StorageOSVolumeSource(ref common.ReferenceCallback
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"volumeName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasVlaue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"volumeNamespace": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasVlaue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
 							Type:        []string{"string"},
@@ -30849,6 +32296,11 @@ func schema_k8sio_api_core_v1_StorageOSVolumeSource(ref common.ReferenceCallback
 						},
 					},
 					"secretRef": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".name", "message": "Required value", "reason": "FieldValueRequired", "rule": "has(self.name) && self.name.size() > 0"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
@@ -30873,6 +32325,9 @@ func schema_k8sio_api_core_v1_Sysctl(ref common.ReferenceCallback) common.OpenAP
 						SchemaProps: spec.SchemaProps{
 							Description: "Name of a property to set",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](253),
+							Pattern:     "^([a-z0-9]([-_a-z0-9]*[a-z0-9])?[\\./])*[a-z0-9]([-_a-z0-9]*[a-z0-9])?$",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -30900,8 +32355,15 @@ func schema_k8sio_api_core_v1_TCPSocketAction(ref common.ReferenceCallback) comm
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"port": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.portName().validate(self).value()", "rule": "type(self) != string || !format.portName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Number or name of the port to access on the container. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME.",
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](65535),
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -30975,6 +32437,11 @@ func schema_k8sio_api_core_v1_Toleration(ref common.ReferenceCallback) common.Op
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"key": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.",
 							Type:        []string{"string"},
@@ -31011,6 +32478,11 @@ func schema_k8sio_api_core_v1_Toleration(ref common.ReferenceCallback) common.Op
 							Format:      "int64",
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".operator", "message": "operator must be Exists when `key` is empty, which means \"match all values and all keys\"", "rule": "(self.?key.orValue(\"\").size() > 0) || self.?operator.orValue(\"\") == 'Exists'"}, map[string]interface{}{"fieldPath": ".effect", "message": "must be 'NoExecute' when `tolerationSeconds` is set", "rule": "!has(self.tolerationSeconds) || self.effect == 'NoExecute'"}, map[string]interface{}{"fieldPath": ".operator", "messageExpression": "format.labelValue().validate(self.value).value()", "rule": "(has(self.operator) && self.operator != 'Equal' && self.operator != \"\") || !format.labelValue().validate(self.?value.orValue(\"\")).hasValue()"}, map[string]interface{}{"fieldPath": ".operator", "message": "value must be empty when `operator` is 'Exists'", "rule": "!has(self.operator) || self.operator != 'Exists' || self.?value.orValue(\"\").size() == 0"}},
 				},
 			},
 		},
@@ -31109,6 +32581,7 @@ func schema_k8sio_api_core_v1_TopologySpreadConstraint(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Description: "MaxSkew describes the degree to which pods may be unevenly distributed. When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference between the number of matching pods in the target topology and the global minimum. The global minimum is the minimum number of matching pods in an eligible domain or zero if the number of eligible domains is less than MinDomains. For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same labelSelector spread as 2/2/1: In this case, the global minimum is 1. | zone1 | zone2 | zone3 | |  P P  |  P P  |   P   | - if MaxSkew is 1, incoming pod can only be scheduled to zone3 to become 2/2/2; scheduling it onto zone1(zone2) would make the ActualSkew(3-1) on zone1(zone2) violate MaxSkew(1). - if MaxSkew is 2, incoming pod can be scheduled onto any zone. When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence to topologies that satisfy it. It's a required field. Default value is 1 and 0 is not allowed.",
 							Default:     0,
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -31117,6 +32590,7 @@ func schema_k8sio_api_core_v1_TopologySpreadConstraint(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Description: "TopologyKey is the key of node labels. Nodes that have a label with this key and identical values are considered to be in the same topology. We consider each <key, value> as a \"bucket\", and try to put balanced number of pods into each bucket. We define a domain as a particular instance of a topology. Also, we define an eligible domain as a domain whose nodes meet the requirements of nodeAffinityPolicy and nodeTaintsPolicy. e.g. If TopologyKey is \"kubernetes.io/hostname\", each Node is a domain of that topology. And, if TopologyKey is \"topology.kubernetes.io/zone\", each zone is a domain of that topology. It's a required field.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -31139,6 +32613,7 @@ func schema_k8sio_api_core_v1_TopologySpreadConstraint(ref common.ReferenceCallb
 					"minDomains": {
 						SchemaProps: spec.SchemaProps{
 							Description: "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.",
+							Minimum:     ptr.To[float64](0),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -31167,7 +32642,22 @@ func schema_k8sio_api_core_v1_TopologySpreadConstraint(ref common.ReferenceCallb
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "MatchLabelKeys is a set of pod label keys to select the pods over which spreading will be calculated. The keys are used to lookup values from the incoming pod labels, those key-value labels are ANDed with labelSelector to select the group of existing pods over which spreading will be calculated for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. MatchLabelKeys cannot be set when LabelSelector isn't set. Keys that don't exist in the incoming pod labels will be ignored. A null or empty list means only match against labelSelector.\n\nThis is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "!format.dns1123Label().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -31181,6 +32671,11 @@ func schema_k8sio_api_core_v1_TopologySpreadConstraint(ref common.ReferenceCallb
 					},
 				},
 				Required: []string{"maxSkew", "topologyKey", "whenUnsatisfiable"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "\"minDomains must be nil when whenUnsatisfiable is not DoNotSchedule\"", "rule": "self.?whenUnsatisfiable.orValue(\"\") == \"DoNotSchedule\" ? !has(self.minDomains) : true"}},
+				},
 			},
 		},
 		Dependencies: []string{
@@ -31277,13 +32772,19 @@ func schema_k8sio_api_core_v1_Volume(ref common.ReferenceCallback) common.OpenAP
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
+				Description: "Volume represents a named volume in a pod that may be accessed by any container in the pod. ?k8s:validation:cel[1]:rule>self.size() > has(self.name) ? 1 : 0 ?k8s:validation:cel[1]:message>must specify at least one volume type ?k8s:validation:cel[2]:rule>self.size() == has(self.name) ? 2 : 1 ?k8s:validation:cel[2]:message>may not specify more than one volume type",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Label().validate(self).value()", "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "name of the volume. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -31465,6 +32966,11 @@ func schema_k8sio_api_core_v1_Volume(ref common.ReferenceCallback) common.OpenAP
 				},
 				Required: []string{"name"},
 			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "Total length of <volume name>:<iscsi.targetPortal> must be under 64 characters if iscsi.initiatorName is specified.", "rule": "!has(self.iscsi) || !has(self.iscsi.initiatorName) || self.?name.orValue(\"\").size() + 1 + self.iscsi.targetPortal.size() <= 64"}},
+				},
+			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/core/v1.AWSElasticBlockStoreVolumeSource", "k8s.io/api/core/v1.AzureDiskVolumeSource", "k8s.io/api/core/v1.AzureFileVolumeSource", "k8s.io/api/core/v1.CSIVolumeSource", "k8s.io/api/core/v1.CephFSVolumeSource", "k8s.io/api/core/v1.CinderVolumeSource", "k8s.io/api/core/v1.ConfigMapVolumeSource", "k8s.io/api/core/v1.DownwardAPIVolumeSource", "k8s.io/api/core/v1.EmptyDirVolumeSource", "k8s.io/api/core/v1.EphemeralVolumeSource", "k8s.io/api/core/v1.FCVolumeSource", "k8s.io/api/core/v1.FlexVolumeSource", "k8s.io/api/core/v1.FlockerVolumeSource", "k8s.io/api/core/v1.GCEPersistentDiskVolumeSource", "k8s.io/api/core/v1.GitRepoVolumeSource", "k8s.io/api/core/v1.GlusterfsVolumeSource", "k8s.io/api/core/v1.HostPathVolumeSource", "k8s.io/api/core/v1.ISCSIVolumeSource", "k8s.io/api/core/v1.NFSVolumeSource", "k8s.io/api/core/v1.PersistentVolumeClaimVolumeSource", "k8s.io/api/core/v1.PhotonPersistentDiskVolumeSource", "k8s.io/api/core/v1.PortworxVolumeSource", "k8s.io/api/core/v1.ProjectedVolumeSource", "k8s.io/api/core/v1.QuobyteVolumeSource", "k8s.io/api/core/v1.RBDVolumeSource", "k8s.io/api/core/v1.ScaleIOVolumeSource", "k8s.io/api/core/v1.SecretVolumeSource", "k8s.io/api/core/v1.StorageOSVolumeSource", "k8s.io/api/core/v1.VsphereVirtualDiskVolumeSource"},
@@ -31482,14 +32988,21 @@ func schema_k8sio_api_core_v1_VolumeDevice(ref common.ReferenceCallback) common.
 						SchemaProps: spec.SchemaProps{
 							Description: "name must match the name of a persistentVolumeClaim in the pod",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"devicePath": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not contain '..'", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "devicePath is the path inside of the container that the device will be mapped to.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -31512,6 +33025,7 @@ func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.O
 						SchemaProps: spec.SchemaProps{
 							Description: "This must match the Name of a Volume.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -31534,11 +33048,17 @@ func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.O
 						SchemaProps: spec.SchemaProps{
 							Description: "Path within the container at which the volume should be mounted.  Must not contain ':'.",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"subPath": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a relative path", "rule": "self.size() == 0 || !self.startsWith(\"/\")"}, map[string]interface{}{"message": "must not contain '..'", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
 							Type:        []string{"string"},
@@ -31554,6 +33074,11 @@ func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.O
 						},
 					},
 					"subPathExpr": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must be a relative path", "rule": "self.size() == 0 || !self.startsWith(\"/\")"}, map[string]interface{}{"message": "must not contain '..'", "rule": "!self.split(\"/\").exists(x, x == \"..\")"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Expanded path within the volume from which the container's volume should be mounted. Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment. Defaults to \"\" (volume's root). SubPathExpr and SubPath are mutually exclusive.",
 							Type:        []string{"string"},
@@ -31562,6 +33087,11 @@ func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.O
 					},
 				},
 				Required: []string{"name", "mountPath"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".subPathExpr", "message": "subPathExpr and subPath are mutually exclusive", "rule": "!has(self.subPath) || !has(self.subPathExpr)"}, map[string]interface{}{"fieldPath": ".recursiveReadOnly", "message": "may only be specified when readOnly is true", "reason": "FieldValueForbidden", "rule": "![\"Enabled\", \"IfPossible\"].exists(v, v == self.?recursiveReadOnly.orValue(\"Disabled\")) || self.?readOnly.orValue(false)"}, map[string]interface{}{"fieldPath": ".recursiveReadOnly", "message": "may only be specified when mountPropagation is None or not specified", "reason": "FieldValueForbidden", "rule": "![\"Enabled\", \"IfPossible\"].exists(v, v == self.?recursiveReadOnly.orValue(\"Disabled\")) || self.?mountPropagation.orValue(\"None\") == \"None\""}},
+				},
 			},
 		},
 	}
@@ -31625,6 +33155,7 @@ func schema_k8sio_api_core_v1_VolumeNodeAffinity(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"required"},
 			},
 		},
 		Dependencies: []string{
@@ -31669,6 +33200,11 @@ func schema_k8sio_api_core_v1_VolumeProjection(ref common.ReferenceCallback) com
 							Ref:         ref("k8s.io/api/core/v1.ClusterTrustBundleProjection"),
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "may not specify more than 1 volume type", "reason": "FieldValueForbidden", "rule": "[has(self.secret), has(self.downwardAPI), has(self.configMap), has(self.serviceAccountToken), has(self.clusterTrustBundle)].filter(x, x).size() <= 1"}},
 				},
 			},
 		},
@@ -31920,6 +33456,7 @@ func schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref common.Referenc
 						SchemaProps: spec.SchemaProps{
 							Description: "volumePath is the path that identifies vSphere volume vmdk",
 							Default:     "",
+							MinLength:   ptr.To[int64](1),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -31963,6 +33500,8 @@ func schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref common.ReferenceCallba
 						SchemaProps: spec.SchemaProps{
 							Description: "weight associated with matching the corresponding podAffinityTerm, in the range 1-100.",
 							Default:     0,
+							Minimum:     ptr.To[float64](1),
+							Maximum:     ptr.To[float64](100),
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -31991,6 +33530,11 @@ func schema_k8sio_api_core_v1_WindowsSecurityContextOptions(ref common.Reference
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"gmsaCredentialSpecName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.dns1123Subdomain().validate(self).value()", "rule": "!format.dns1123Subdomain().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "GMSACredentialSpecName is the name of the GMSA credential spec to use.",
 							Type:        []string{"string"},
@@ -32000,13 +33544,22 @@ func schema_k8sio_api_core_v1_WindowsSecurityContextOptions(ref common.Reference
 					"gmsaCredentialSpec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](65536),
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"runAsUserName": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "must not contain control characters", "rule": "!self.matches(\"[[:cntrl:]]+\")"}, map[string]interface{}{"message": "runAsUserName cannot contain more than one backslash", "rule": "self.indexOf(\"\\\\\") == self.lastIndexOf(\"\\\\\")"}, map[string]interface{}{"message": "domain part of runAsUserName must be under 256 characters", "rule": "!self.contains(\"\\\\\") || self.size() - self.indexOf(\"\\\\\") - 1 <= 256"}, map[string]interface{}{"message": "runAsUserName's Domain doesn't match the NetBios nor the DNS format", "rule": "!self.contains(\"\\\\\") || self.substring(0, self.indexOf(\"\\\\\")).matches('^([^\\\\/:\\*\\?\"<>|\\.][^\\\\/:\\*\\?\"<>|]{0,14})|([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$')"}, map[string]interface{}{"message": "runAsUserName's User length must not be longer than 104 characters", "rule": "[self.indexOf(\"\\\\\"), self.size()].max() <= 104"}, map[string]interface{}{"message": "runAsUserName's User cannot be empty", "rule": "self.indexOf(\"\\\\\") != 0"}, map[string]interface{}{"message": "runAsUserName's User cannot contain only periods or spaces", "rule": "!self.matches('^[\\. ]+(\\\\\\\\.*)?$')"}, map[string]interface{}{"message": "runAsUserName's User cannot contain the following characters: \"/\\:;|=,+*?<>@[]", "rule": "self.matches('^[^\"/\\\\:;|=,\\+\\*\\?<>@\\[\\]]*(\\\\\\\\.*)?$')"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "The UserName in Windows to run the entrypoint of the container process. Defaults to the user specified in image metadata if unspecified. May also be set in PodSecurityContext. If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.",
+							MinLength:   ptr.To[int64](1),
+							MaxLength:   ptr.To[int64](256),
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -50648,8 +52201,8 @@ func schema_pkg_apis_apiextensions_v1_JSON(ref common.ReferenceCallback) common.
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
-				Type:        v1.JSON{}.OpenAPISchemaType(),
-				Format:      v1.JSON{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSON{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSON{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -51062,8 +52615,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrArray(ref common.Referenc
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps or an array of JSONSchemaProps. Mainly here for serialization purposes.",
-				Type:        v1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrArray{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -51074,8 +52627,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrBool(ref common.Reference
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrBool represents JSONSchemaProps or a boolean value. Defaults to true for the boolean property.",
-				Type:        v1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrBool{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -51086,8 +52639,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaPropsOrStringArray(ref common.Re
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSONSchemaPropsOrStringArray represents a JSONSchemaProps or a string array.",
-				Type:        v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
-				Format:      v1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
+				Type:        apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaType(),
+				Format:      apiextensionsv1.JSONSchemaPropsOrStringArray{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -53777,7 +55330,23 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 					"matchLabels": {
 						SchemaProps: spec.SchemaProps{
 							Description: "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-							Type:        []string{"object"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										AdditionalProperties: &spec.SchemaOrBool{
+											Allows: true,
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.labelValue().validate(self).value()", "rule": "!format.labelValue().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
@@ -53830,6 +55399,11 @@ func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallba
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"key": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.qualifiedName().validate(self).value()", "rule": "!format.qualifiedName().validate(self).hasValue()"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "key is the label key that the selector applies to.",
 							Default:     "",
@@ -53853,7 +55427,22 @@ func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallba
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-							Type:        []string{"array"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.labelValue().validate(self).value()", "rule": "!format.labelValue().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -53867,6 +55456,11 @@ func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallba
 					},
 				},
 				Required: []string{"key", "operator"},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-validations": []interface{}{map[string]interface{}{"fieldPath": ".values", "message": "must be specified when `operator` is 'In' or 'NotIn'", "reason": "FieldValueRequired", "rule": "self.operator == \"In\" || self.operator == \"NotIn\" ? has(self.values) && self.values.size() > 0 : true"}, map[string]interface{}{"fieldPath": ".values", "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'", "reason": "FieldValueForbidden", "rule": "self.operator == \"Exists\" || self.operator == \"DoesNotExist\" ? !has(self.values) || self.values.size() == 0 : true"}},
+				},
 			},
 		},
 	}
@@ -54210,9 +55804,30 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 						},
 					},
 					"labels": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "label keys must be qualified names", "rule": "self.all(k, !format.qualifiedName().validate(k).hasValue())"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
-							Type:        []string{"object"},
+							AllOf: []spec.Schema{
+								{
+									SchemaProps: spec.SchemaProps{
+										AdditionalProperties: &spec.SchemaOrBool{
+											Allows: true,
+											Schema: &spec.Schema{
+												VendorExtensible: spec.VendorExtensible{
+													Extensions: spec.Extensions{
+														"x-kubernetes-validations": []interface{}{map[string]interface{}{"messageExpression": "format.labelValue().validate(self).value()", "rule": "!format.labelValue().validate(self).hasValue()"}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
@@ -54226,6 +55841,11 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 						},
 					},
 					"annotations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-validations": []interface{}{map[string]interface{}{"message": "annotation keys must be qualified names", "rule": "self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"}},
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
 							Type:        []string{"object"},

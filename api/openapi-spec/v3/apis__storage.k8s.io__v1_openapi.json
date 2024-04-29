@@ -11,6 +11,8 @@
           "partition": {
             "description": "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty).",
             "format": "int32",
+            "maximum": 255,
+            "minimum": 0,
             "type": "integer"
           },
           "readOnly": {
@@ -20,6 +22,7 @@
           "volumeID": {
             "default": "",
             "description": "volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -32,28 +35,34 @@
         "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
         "properties": {
           "cachingMode": {
+            "default": "ReadWrite",
             "description": "cachingMode is the Host Caching mode: None, Read Only, Read Write.",
             "type": "string"
           },
           "diskName": {
             "default": "",
             "description": "diskName is the Name of the data disk in the blob storage",
+            "minLength": 1,
             "type": "string"
           },
           "diskURI": {
             "default": "",
             "description": "diskURI is the URI of data disk in the blob storage",
+            "minLength": 1,
             "type": "string"
           },
           "fsType": {
+            "default": "ext4",
             "description": "fsType is Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
             "type": "string"
           },
           "kind": {
+            "default": "Shared",
             "description": "kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
             "type": "boolean"
           }
@@ -62,7 +71,17 @@
           "diskName",
           "diskURI"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "supported values: /subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}",
+            "rule": "has(self.kind) && self.kind == \"Managed\" ? self.?diskURI.orValue(\"\").indexOf(\"/subscriptions/\") == 0 : true"
+          },
+          {
+            "message": "supported values: https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd",
+            "rule": "has(self.kind) && self.kind != \"Managed\" ? self.?diskURI.orValue(\"\").indexOf(\"https://\") == 0 : true"
+          }
+        ]
       },
       "io.k8s.api.core.v1.AzureFilePersistentVolumeSource": {
         "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
@@ -74,15 +93,18 @@
           "secretName": {
             "default": "",
             "description": "secretName is the name of secret that contains Azure Storage Account Name and Key",
+            "minLength": 1,
             "type": "string"
           },
           "secretNamespace": {
             "description": "secretNamespace is the namespace of the secret that contains Azure Storage Account Name and Key default is the same as the Pod",
+            "minLength": 1,
             "type": "string"
           },
           "shareName": {
             "default": "",
             "description": "shareName is the azure Share Name",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -114,7 +136,15 @@
           "driver": {
             "default": "",
             "description": "driver is the name of the driver to use for this volume. Required.",
-            "type": "string"
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self.lowerAscii()).value()",
+                "rule": "!format.dns1123Label().validate(self.lowerAscii()).hasValue()"
+              }
+            ]
           },
           "fsType": {
             "description": "fsType to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\".",
@@ -159,6 +189,7 @@
           "volumeHandle": {
             "default": "",
             "description": "volumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -177,6 +208,7 @@
               "default": "",
               "type": "string"
             },
+            "minItems": 1,
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
@@ -185,6 +217,7 @@
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly is Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it",
             "type": "boolean"
           },
@@ -232,6 +265,7 @@
           "volumeID": {
             "default": "",
             "description": "volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -250,6 +284,8 @@
           "lun": {
             "description": "lun is Optional: FC target lun number",
             "format": "int32",
+            "maximum": 255,
+            "minimum": 0,
             "type": "integer"
           },
           "readOnly": {
@@ -275,7 +311,26 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".targetWWNs",
+            "message": "must specify either targetWWNs or wwids, but not both",
+            "reason": "FieldValueRequired",
+            "rule": "self.?targetWWNs.orValue([]).size() > 0 || self.?wwids.orValue([]).size() > 0"
+          },
+          {
+            "fieldPath": ".targetWWNs",
+            "message": "targetWWNs and wwids can not be specified simultaneously",
+            "rule": "self.?targetWWNs.orValue([]).size() == 0 || self.?wwids.orValue([]).size() == 0"
+          },
+          {
+            "fieldPath": ".lun",
+            "message": "lun is required if targetWWNs is specified",
+            "reason": "FieldValueRequired",
+            "rule": "self.?targetWWNs.orValue([]).size() == 0 || has(self.lun)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.FlexPersistentVolumeSource": {
         "description": "FlexPersistentVolumeSource represents a generic persistent volume resource that is provisioned/attached using an exec based plugin.",
@@ -283,6 +338,7 @@
           "driver": {
             "default": "",
             "description": "driver is the name of the driver to use for this volume.",
+            "minLength": 1,
             "type": "string"
           },
           "fsType": {
@@ -295,7 +351,13 @@
               "type": "string"
             },
             "description": "options is Optional: this field holds extra command options if any.",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "kubernetes.io and k8s.io namespaces are reserved",
+                "rule": "!self.exists(k, k.matches(\"[^/]*(kubernetes[.]io|k8s[.]io)([/].*)?$\"))"
+              }
+            ]
           },
           "readOnly": {
             "description": "readOnly is Optional: defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
@@ -320,14 +382,31 @@
         "properties": {
           "datasetName": {
             "description": "datasetName is Name of the dataset stored as metadata -> name on the dataset for Flocker should be considered as deprecated",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not contain '/'",
+                "rule": "!self.contains(\"/\")"
+              }
+            ]
           },
           "datasetUUID": {
             "description": "datasetUUID is the UUID of the dataset. This is unique identifier of a Flocker dataset",
             "type": "string"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "datasetName and datasetUUID can not be specified simultaneously",
+            "rule": "has(self.datasetName) ? !has(self.datasetUUID) : true"
+          },
+          {
+            "message": "one of datasetUUID and datasetName is required",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.datasetUUID) || has(self.datasetName)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.GCEPersistentDiskVolumeSource": {
         "description": "Represents a Persistent Disk resource in Google Compute Engine.\n\nA GCE PD must exist before mounting to a container. The disk must also be in the same GCE project and zone as the kubelet. A GCE PD can only be mounted as read/write once or read-only many times. GCE PDs support ownership management and SELinux relabeling.",
@@ -339,11 +418,14 @@
           "partition": {
             "description": "partition is the partition in the volume that you want to mount. If omitted, the default is to mount by volume name. Examples: For volume /dev/sda1, you specify the partition as \"1\". Similarly, the volume partition for /dev/sda is \"0\" (or you can leave the property empty). More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
             "format": "int32",
+            "maximum": 255,
+            "minimum": 0,
             "type": "integer"
           },
           "pdName": {
             "default": "",
             "description": "pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+            "minLength": 1,
             "type": "string"
           },
           "readOnly": {
@@ -362,18 +444,31 @@
           "endpoints": {
             "default": "",
             "description": "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+            "minLength": 1,
             "type": "string"
           },
           "endpointsNamespace": {
             "description": "endpointsNamespace is the namespace that contains Glusterfs endpoint. If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "format.dns1123Label().validate(self).hasValue()",
+                "rule": "self.size() == 0 || !format.dns1123Label().validate(self).hasValue()"
+              },
+              {
+                "message": "if the endpointnamespace is set, it must be a valid namespace name",
+                "rule": "self.size() > 0"
+              }
+            ]
           },
           "path": {
             "default": "",
             "description": "path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+            "minLength": 1,
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
             "type": "boolean"
           }
@@ -390,9 +485,17 @@
           "path": {
             "default": "",
             "description": "path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must not contain '..'",
+                "rule": "self.split('/').all(e, e != \"..\")"
+              }
+            ]
           },
           "type": {
+            "default": "",
             "description": "type for HostPath Volume Defaults to \"\" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
             "type": "string"
           }
@@ -427,6 +530,7 @@
             "type": "string"
           },
           "iscsiInterface": {
+            "default": "default",
             "description": "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
             "type": "string"
           },
@@ -494,6 +598,8 @@
           "path": {
             "default": "",
             "description": "path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+            "minLength": 1,
+            "pattern": "^/",
             "type": "string"
           },
           "readOnly": {
@@ -503,6 +609,7 @@
           "server": {
             "default": "",
             "description": "server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -526,7 +633,14 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "must have at least one node selector term",
+                "reason": "FieldValueRequired",
+                "rule": "self.size() > 0"
+              }
+            ]
           }
         },
         "required": [
@@ -568,6 +682,46 @@
         "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
         "properties": {
           "matchExpressions": {
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "key": {
+                          "x-kubernetes-validations": [
+                            {
+                              "messageExpression": "format.named(\"qualifiedName\").value().validate(self).value()",
+                              "rule": "!format.named(\"qualifiedName\").value().validate(self).hasValue()"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be specified when `operator` is 'In' or 'NotIn'",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() > 0 : true"
+                    },
+                    {
+                      "fieldPath": ".values",
+                      "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'",
+                      "reason": "FieldValueForbidden",
+                      "rule": "self.operator == 'Exists' || self.operator == 'DoesNotExist' ? !has(self.values) || self.values.size() == 0 : true"
+                    },
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be specified single value when `operator` is 'Lt' or 'Gt'",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'Gt' || self.operator == 'Lt' ? has(self.values) && self.values.size() == 1 : true"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "A list of node selector requirements by node's labels.",
             "items": {
               "allOf": [
@@ -581,7 +735,59 @@
             "x-kubernetes-list-type": "atomic"
           },
           "matchFields": {
-            "description": "A list of node selector requirements by node's fields.",
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "key": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "not a valid field selector key",
+                              "reason": "FieldValueInvalid",
+                              "rule": "[\"metadata.name\"].exists(n, n == self)"
+                            }
+                          ]
+                        },
+                        "operator": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "not a valid selector operator",
+                              "reason": "FieldValueInvalid",
+                              "rule": "self == 'In' || self == 'NotIn'"
+                            }
+                          ]
+                        },
+                        "values": {
+                          "allOf": [
+                            {
+                              "items": {
+                                "x-kubernetes-validations": [
+                                  {
+                                    "messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self).value()",
+                                    "rule": "!format.named(\"dns1123Subdomain\").value().validate(self).hasValue()"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be only one value when `operator` is 'In' or 'NotIn' for node field selector",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() == 1 : true"
+                    }
+                  ]
+                }
+              }
+            ],
+            "description": "A list of node selector requirements by node's fields. !TODO: Use variables for name format to use here, fortunately only one is valid so we use that",
             "items": {
               "allOf": [
                 {
@@ -641,8 +847,16 @@
               "default": "",
               "type": "string"
             },
+            "minItems": 1,
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "may not use ReadWriteOncePod with other access modes",
+                "reason": "FieldValueForbidden",
+                "rule": "!self.exists(c, c == \"ReadWriteOncePod\") || self.size() == 1"
+              }
+            ]
           },
           "awsElasticBlockStore": {
             "allOf": [
@@ -672,6 +886,18 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "must be greater than zero",
+                      "rule": "quantity(self).asApproximateFloat() > 0"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "capacity is the description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
             "type": "object"
           },
@@ -855,7 +1081,19 @@
           },
           "volumeAttributesClassName": {
             "description": "Name of VolumeAttributesClass to which this persistent volume belongs. Empty value is not allowed. When this field is not set, it indicates that this volume does not belong to any VolumeAttributesClass. This field is mutable and can be changed by the CSI driver after a volume has been updated successfully to a new class. For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound PersistentVolumeClaims during the binding process. This is an alpha field and requires enabling VolumeAttributesClass feature.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "an empty string is disallowed",
+                "reason": "FieldValueRequired",
+                "rule": "self.size() > 0"
+              },
+              {
+                "messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self).value()",
+                "reason": "FieldValueInvalid",
+                "rule": "self.size() == 0 || !format.named(\"dns1123Subdomain\").value().validate(self).hasValue()"
+              }
+            ]
           },
           "volumeMode": {
             "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec.",
@@ -870,7 +1108,29 @@
             "description": "vsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
           }
         },
-        "type": "object"
+        "required": [
+          "accessModes"
+        ],
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "message": "must specify a volume type",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.gcePersistentDisk)\n|| has(self.awsElasticBlockStore)\n|| has(self.hostPath)\n|| has(self.glusterfs)\n|| has(self.nfs)\n|| has(self.rbd)\n|| has(self.iscsi)\n|| has(self.cinder)\n|| has(self.cephfs)\n|| has(self.fc)\n|| has(self.flocker)\n|| has(self.flexVolume)\n|| has(self.azureFile)\n|| has(self.vsphereVolume)\n|| has(self.quobyte)\n|| has(self.azureDisk)\n|| has(self.photonPersistentDisk)\n|| has(self.portworxVolume)\n|| has(self.scaleIO)\n|| has(self.local)\n|| has(self.storageos)\n|| has(self.csi)"
+          },
+          {
+            "fieldPath": ".persistentVolumeReclaimPolicy",
+            "message": "may not be 'recycle' for a hostPath mount of '/'",
+            "reason": "FieldValueForbidden",
+            "rule": "!has(self.hostPath) || self.hostPath.path != \"/\" || self.persistentVolumeReclaimPolicy != \"Recycle\""
+          },
+          {
+            "fieldPath": ".csi",
+            "message": "has to be specified when using volumeAttributesClassName",
+            "reason": "FieldValueRequired",
+            "rule": "has(self.csi) || !has(self.volumeAttributesClassName)"
+          }
+        ]
       },
       "io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource": {
         "description": "Represents a Photon Controller persistent disk resource.",
@@ -882,6 +1142,7 @@
           "pdID": {
             "default": "",
             "description": "pdID is the ID that identifies Photon Controller persistent disk",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -904,6 +1165,7 @@
           "volumeID": {
             "default": "",
             "description": "volumeID uniquely identifies a Portworx volume",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -920,16 +1182,25 @@
             "type": "string"
           },
           "readOnly": {
+            "default": false,
             "description": "readOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
             "type": "boolean"
           },
           "registry": {
             "default": "",
             "description": "registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "message": "must be a host:port pair or multiple pairs separated by commas",
+                "rule": "self.size() == 0 || self.split(',').all(e, e.contains(':'))"
+              }
+            ]
           },
           "tenant": {
             "description": "tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin",
+            "maxLength": 65,
             "type": "string"
           },
           "user": {
@@ -939,6 +1210,7 @@
           "volume": {
             "default": "",
             "description": "volume is a string that references an already created Quobyte volume by name.",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -958,9 +1230,11 @@
           "image": {
             "default": "",
             "description": "image is the rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
+            "minLength": 1,
             "type": "string"
           },
           "keyring": {
+            "default": "/etc/ceph/keyring",
             "description": "keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -970,10 +1244,12 @@
               "default": "",
               "type": "string"
             },
+            "minItems": 1,
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "pool": {
+            "default": "rbd",
             "description": "pool is the rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -990,6 +1266,7 @@
             "description": "secretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
           },
           "user": {
+            "default": "admin",
             "description": "user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           }
@@ -1062,13 +1339,31 @@
         "properties": {
           "name": {
             "description": "name is unique within a namespace to reference a secret resource.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Subdomain().validate(self).value()",
+                "rule": "!format.dns1123Subdomain().validate(self).hasValue()"
+              }
+            ]
           },
           "namespace": {
             "description": "namespace defines the space within which the secret name must be unique.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasValue()"
+              }
+            ]
           }
         },
+        "required": [
+          "name",
+          "namespace"
+        ],
         "type": "object",
         "x-kubernetes-map-type": "atomic"
       },
@@ -1089,15 +1384,42 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ObjectReference"
               }
             ],
-            "description": "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted."
+            "description": "secretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.",
+            "x-kubernetes-validations": [
+              {
+                "fieldPath": ".name",
+                "message": "Required value",
+                "reason": "FieldValueRequired",
+                "rule": "has(self.name) && self.name.size() > 0"
+              },
+              {
+                "fieldPath": ".namespace",
+                "message": "Required value",
+                "reason": "FieldValueRequired",
+                "rule": "has(self.namespace) && self.namespace.size() > 0"
+              }
+            ]
           },
           "volumeName": {
             "description": "volumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.",
-            "type": "string"
+            "minLength": 1,
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasVlaue()"
+              }
+            ]
           },
           "volumeNamespace": {
             "description": "volumeNamespace specifies the scope of the volume within StorageOS.  If no namespace is specified then the Pod's namespace will be used.  This allows the Kubernetes name scoping to be mirrored within StorageOS for tighter integration. Set VolumeName to any name to override the default behaviour. Set to \"default\" if you are not using namespaces within StorageOS. Namespaces that do not pre-exist within StorageOS will be created.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.dns1123Label().validate(self).value()",
+                "rule": "!format.dns1123Label().validate(self).hasVlaue()"
+              }
+            ]
           }
         },
         "type": "object"
@@ -1158,6 +1480,9 @@
             "description": "required specifies hard node constraints that must be met."
           }
         },
+        "required": [
+          "required"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource": {
@@ -1178,6 +1503,7 @@
           "volumePath": {
             "default": "",
             "description": "volumePath is the path that identifies vSphere volume vmdk",
+            "minLength": 1,
             "type": "string"
           }
         },
@@ -2429,6 +2755,18 @@
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
             "type": "object"
           }
@@ -2442,7 +2780,13 @@
           "key": {
             "default": "",
             "description": "key is the label key that the selector applies to.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.qualifiedName().validate(self).value()",
+                "rule": "!format.qualifiedName().validate(self).hasValue()"
+              }
+            ]
           },
           "operator": {
             "default": "",
@@ -2450,6 +2794,18 @@
             "type": "string"
           },
           "values": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
               "default": "",
@@ -2463,7 +2819,21 @@
           "key",
           "operator"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".values",
+            "message": "must be specified when `operator` is 'In' or 'NotIn'",
+            "reason": "FieldValueRequired",
+            "rule": "self.operator == \"In\" || self.operator == \"NotIn\" ? has(self.values) && self.values.size() > 0 : true"
+          },
+          {
+            "fieldPath": ".values",
+            "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'",
+            "reason": "FieldValueForbidden",
+            "rule": "self.operator == \"Exists\" || self.operator == \"DoesNotExist\" ? !has(self.values) || self.values.size() == 0 : true"
+          }
+        ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta": {
         "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
@@ -2539,7 +2909,13 @@
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "annotation keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
+              }
+            ]
           },
           "creationTimestamp": {
             "allOf": [
@@ -2586,8 +2962,26 @@
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "label keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k).hasValue())"
+              }
+            ]
           },
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",

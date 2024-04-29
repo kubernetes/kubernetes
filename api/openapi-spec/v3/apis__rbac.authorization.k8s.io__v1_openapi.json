@@ -994,6 +994,18 @@
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
             "type": "object"
           }
@@ -1007,7 +1019,13 @@
           "key": {
             "default": "",
             "description": "key is the label key that the selector applies to.",
-            "type": "string"
+            "type": "string",
+            "x-kubernetes-validations": [
+              {
+                "messageExpression": "format.qualifiedName().validate(self).value()",
+                "rule": "!format.qualifiedName().validate(self).hasValue()"
+              }
+            ]
           },
           "operator": {
             "default": "",
@@ -1015,6 +1033,18 @@
             "type": "string"
           },
           "values": {
+            "allOf": [
+              {
+                "items": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
               "default": "",
@@ -1028,7 +1058,21 @@
           "key",
           "operator"
         ],
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-validations": [
+          {
+            "fieldPath": ".values",
+            "message": "must be specified when `operator` is 'In' or 'NotIn'",
+            "reason": "FieldValueRequired",
+            "rule": "self.operator == \"In\" || self.operator == \"NotIn\" ? has(self.values) && self.values.size() > 0 : true"
+          },
+          {
+            "fieldPath": ".values",
+            "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'",
+            "reason": "FieldValueForbidden",
+            "rule": "self.operator == \"Exists\" || self.operator == \"DoesNotExist\" ? !has(self.values) || self.values.size() == 0 : true"
+          }
+        ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta": {
         "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
@@ -1104,7 +1148,13 @@
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "annotation keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
+              }
+            ]
           },
           "creationTimestamp": {
             "allOf": [
@@ -1151,8 +1201,26 @@
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "label keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k).hasValue())"
+              }
+            ]
           },
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",

@@ -15,7 +15,14 @@
               "default": {}
             },
             "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "x-kubernetes-list-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "must have at least one node selector term",
+                "reason": "FieldValueRequired",
+                "rule": "self.size() > 0"
+              }
+            ]
           }
         },
         "required": [
@@ -57,6 +64,46 @@
         "description": "A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.",
         "properties": {
           "matchExpressions": {
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "key": {
+                          "x-kubernetes-validations": [
+                            {
+                              "messageExpression": "format.named(\"qualifiedName\").value().validate(self).value()",
+                              "rule": "!format.named(\"qualifiedName\").value().validate(self).hasValue()"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be specified when `operator` is 'In' or 'NotIn'",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() > 0 : true"
+                    },
+                    {
+                      "fieldPath": ".values",
+                      "message": "may not be specified when `operator` is 'Exists' or 'DoesNotExist'",
+                      "reason": "FieldValueForbidden",
+                      "rule": "self.operator == 'Exists' || self.operator == 'DoesNotExist' ? !has(self.values) || self.values.size() == 0 : true"
+                    },
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be specified single value when `operator` is 'Lt' or 'Gt'",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'Gt' || self.operator == 'Lt' ? has(self.values) && self.values.size() == 1 : true"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "A list of node selector requirements by node's labels.",
             "items": {
               "allOf": [
@@ -70,7 +117,59 @@
             "x-kubernetes-list-type": "atomic"
           },
           "matchFields": {
-            "description": "A list of node selector requirements by node's fields.",
+            "allOf": [
+              {
+                "items": {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "key": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "not a valid field selector key",
+                              "reason": "FieldValueInvalid",
+                              "rule": "[\"metadata.name\"].exists(n, n == self)"
+                            }
+                          ]
+                        },
+                        "operator": {
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "not a valid selector operator",
+                              "reason": "FieldValueInvalid",
+                              "rule": "self == 'In' || self == 'NotIn'"
+                            }
+                          ]
+                        },
+                        "values": {
+                          "allOf": [
+                            {
+                              "items": {
+                                "x-kubernetes-validations": [
+                                  {
+                                    "messageExpression": "format.named(\"dns1123Subdomain\").value().validate(self).value()",
+                                    "rule": "!format.named(\"dns1123Subdomain\").value().validate(self).hasValue()"
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "x-kubernetes-validations": [
+                    {
+                      "fieldPath": ".values",
+                      "message": "must be only one value when `operator` is 'In' or 'NotIn' for node field selector",
+                      "reason": "FieldValueRequired",
+                      "rule": "self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() == 1 : true"
+                    }
+                  ]
+                }
+              }
+            ],
+            "description": "A list of node selector requirements by node's fields. !TODO: Use variables for name format to use here, fortunately only one is valid so we use that",
             "items": {
               "allOf": [
                 {
@@ -1944,7 +2043,13 @@
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "annotation keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())"
+              }
+            ]
           },
           "creationTimestamp": {
             "allOf": [
@@ -1991,8 +2096,26 @@
               "default": "",
               "type": "string"
             },
+            "allOf": [
+              {
+                "additionalProperties": {
+                  "x-kubernetes-validations": [
+                    {
+                      "messageExpression": "format.labelValue().validate(self).value()",
+                      "rule": "!format.labelValue().validate(self).hasValue()"
+                    }
+                  ]
+                }
+              }
+            ],
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
-            "type": "object"
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "label keys must be qualified names",
+                "rule": "self.all(k, !format.qualifiedName().validate(k).hasValue())"
+              }
+            ]
           },
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
