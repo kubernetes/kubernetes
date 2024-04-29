@@ -168,6 +168,9 @@ const (
 // represented by the .status.containerStatuses and .status.initContainerStatuses
 // fields in the Pod status, respectively. Containers completed with success
 // (exit code 0) are excluded from the requirement check.
+// +k8s:validation:cel[0]:rule>self.?operator.orValue("") != "In" || !self.?values.orValue([]).exists(v, v == 0)
+// +k8s:validation:cel[0]:message>values must not be 0 for the In operator
+// +k8s:validation:cel[0]:fieldPath>.values
 type PodFailurePolicyOnExitCodesRequirement struct {
 	// Restricts the check for exit codes to the container with the
 	// specified name. When null, the rule applies to all containers.
@@ -196,6 +199,10 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// and must not contain duplicates. Value '0' cannot be used for the In operator.
 	// At least one element is required. At most 255 elements are allowed.
 	// +listType=set
+	// +k8s:validation:minItems=1
+	// +k8s:validation:maxItems=255
+	// +k8s:validation:cel[0]:rule>self.isSorted()
+	// +k8s:validation:cel[0]:message>must be ordered
 	Values []int32 `json:"values" protobuf:"varint,3,rep,name=values"`
 }
 
@@ -204,16 +211,23 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 type PodFailurePolicyOnPodConditionsPattern struct {
 	// Specifies the required Pod condition type. To match a pod condition
 	// it is required that specified type equals the pod condition type.
+	// +k8s:validation:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	Type corev1.PodConditionType `json:"type" protobuf:"bytes,1,req,name=type"`
 
 	// Specifies the required Pod condition status. To match a pod condition
 	// it is required that the specified status equals the pod condition status.
 	// Defaults to True.
+	// +k8s:validation:enum=["False", "True", "Unknown"]
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,req,name=status"`
 }
 
 // PodFailurePolicyRule describes how a pod failure is handled when the requirements are met.
 // One of onExitCodes and onPodConditions, but not both, can be used in each rule.
+// +k8s:validation:cel[0]:rule>!has(self.onExitCodes) || !has(self.onPodConditions)
+// +k8s:validation:cel[0]:message>specifying both OnExitCodes and OnPodConditions is not supported
+// +k8s:validation:cel[1]:rule>has(self.onExitCodes) || has(self.onPodConditions)
+// +k8s:validation:cel[1]:message>specifying one of OnExitCodes and OnPodConditions is required
 type PodFailurePolicyRule struct {
 	// Specifies the action taken on a pod failure when the requirements are satisfied.
 	// Possible values are:
@@ -241,6 +255,7 @@ type PodFailurePolicyRule struct {
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	// +listType=atomic
 	// +optional
+	// +k8s:validation:maxItems=20
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions" protobuf:"bytes,3,opt,name=onPodConditions"`
 }
 
@@ -252,6 +267,7 @@ type PodFailurePolicy struct {
 	// counter of pod failures is incremented and it is checked against
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
+	// +k8s:validation:maxItems=20
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -264,11 +280,16 @@ type SuccessPolicy struct {
 	// Additionally, these rules are evaluated in order; Once the Job meets one of the rules,
 	// other rules are ignored. At most 20 elements are allowed.
 	// +listType=atomic
+	// +k8s:validation:minItems=1
+	// +k8s:validation:maxItems=20
 	Rules []SuccessPolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
 // SuccessPolicyRule describes rule for declaring a Job as succeeded.
 // Each rule must have at least one of the "succeededIndexes" or "succeededCount" specified.
+// +k8s:validation:cel[0]:rule>has(self.succeededIndexes) || has(self.succeededCount)
+// +k8s:validation:cel[0]:message>at least one of succeededCount or succeededIndexes must be specified
+// +k8s:validation:cel[0]:reason>FieldValueRequired
 type SuccessPolicyRule struct {
 	// succeededIndexes specifies the set of indexes
 	// which need to be contained in the actual set of the succeeded indexes for the Job.
@@ -284,6 +305,10 @@ type SuccessPolicyRule struct {
 	// and is never evaluated at any time.
 	//
 	// +optional
+	// +k8s:validation:maxLength=65536
+	// +k8s:validation:pattern>^$|(\d+(-\d+)?)(,\d+(-\d+)?)*$
+	// +k8s:validation:cel[0]:rule>!self.matches("^(\\d+(-\\d+)?)(,\\d+(-\\d+)?)*$") || self.split(",").all(range, optional.of(range.split("-")).optMap(spl, (spl.size() == 2 ? int(spl[0]) < int(spl[1]) : true)).value())
+	// +k8s:validation:cel[0]:message>non-increasing order, must be a list of intervals where the first number is less than the second
 	SucceededIndexes *string `json:"succeededIndexes,omitempty" protobuf:"bytes,1,opt,name=succeededIndexes"`
 
 	// succeededCount specifies the minimal required size of the actual set of the succeeded indexes
@@ -297,10 +322,62 @@ type SuccessPolicyRule struct {
 	// When specified it needs to be a positive integer.
 	//
 	// +optional
+	// +k8s:validation:minimum=0
 	SucceededCount *int32 `json:"succeededCount,omitempty" protobuf:"varint,2,opt,name=succeededCount"`
 }
 
 // JobSpec describes how the job execution will look like.
+// +k8s:validation:cel[0]:rule>!has(self.maxFailedIndexes) || has(self.backoffLimitPerIndex)
+// +k8s:validation:cel[0]:message>when maxFailedIndexes is specified
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.backoffLimitPerIndex
+// +k8s:validation:cel[1]:rule>!has(self.completionMode) || self.completionMode != "Indexed" || has(self.completions)
+// +k8s:validation:cel[1]:message>when completion mode is Indexed
+// +k8s:validation:cel[1]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:fieldPath>.completions
+// +k8s:validation:cel[2]:rule>!has(self.completionMode) || !has(self.parallelism) || self.completionMode != "Indexed" || self.parallelism <= 100000
+// +k8s:validation:cel[2]:message>must be less than or equal to 100000 when completion mode is Indexed
+// +k8s:validation:cel[2]:fieldPath>.parallelism
+// +k8s:validation:cel[3]:rule>!has(self.completions) || !has(self.completionMode) || !has(self.maxFailedIndexes) || self.completionMode != "Indexed" || self.maxFailedIndexes <= self.completions
+// +k8s:validation:cel[3]:message>must be less than or equal to completions
+// +k8s:validation:cel[3]:fieldPath>.maxFailedIndexes
+// +k8s:validation:cel[4]:rule>!has(self.maxFailedIndexes) || !has(self.completionMode) || self.completionMode != "Indexed" || self.maxFailedIndexes <= 100000
+// +k8s:validation:cel[4]:message>must be less than or equal to 100000
+// +k8s:validation:cel[4]:fieldPath>.maxFailedIndexes
+// +k8s:validation:cel[5]:rule>has(self.completions) && self.completions > 100000 && has(self.backoffLimitPerIndex) ? has(self.maxFailedIndexes) : true
+// +k8s:validation:cel[5]:message>must be specified when completions is above 100000 and backoffLimitPerIndex is set
+// +k8s:validation:cel[5]:reason>FieldValueRequired
+// +k8s:validation:cel[5]:fieldPath>.maxFailedIndexes
+// +k8s:validation:cel[6]:rule>has(self.completions) && self.completions > 100000 && has(self.backoffLimitPerIndex) && has(self.parallelism) ? self.parallelism <= 10000 : true
+// +k8s:validation:cel[6]:message>must be less than or equal to 10000 when completions are above 100000 and used with backoff limit per index
+// +k8s:validation:cel[6]:fieldPath>.parallelism
+// +k8s:validation:cel[7]:rule>has(self.completions) && self.completions > 100000 && has(self.backoffLimitPerIndex) && has(self.maxFailedIndexes) ? self.maxFailedIndexes <= 10000 : true
+// +k8s:validation:cel[7]:message>must be less than or equal to 10000 when completions are above 100000 and used with backoff limit per index
+// +k8s:validation:cel[7]:fieldPath>.maxFailedIndexes
+// +k8s:validation:cel[8]:rule>self.?completionMode.orValue("NonIndexed") != "Indexed" ? !has(self.backoffLimitPerIndex) : true
+// +k8s:validation:cel[8]:message>requires indexed completion mode
+// +k8s:validation:cel[8]:fieldPath>.backoffLimitPerIndex
+// +k8s:validation:cel[9]:rule>self.?completionMode.orValue("NonIndexed") != "Indexed" ? !has(self.maxFailedIndexes) : true
+// +k8s:validation:cel[9]:message>requires indexed completion mode
+// +k8s:validation:cel[9]:fieldPath>.maxFailedIndexes
+// +k8s:validation:cel[10]:rule>self.?podFailurePolicy.?rules.orValue([]).all(r, r.action != "FailIndex" || has(self.backoffLimitPerIndex))
+// +k8s:validation:cel[10]:message>FailIndex rule action requires the backoffLimitPerIndex to be set
+// +k8s:validation:cel[10]:fieldPath>.podFailurePolicy.rules
+// +k8s:validation:cel[11]:rule>!has(self.successPolicy) || self.?completionMode.orValue("NonIndexed") == "Indexed"
+// +k8s:validation:cel[11]:message>requires indexed completion mode
+// +k8s:validation:cel[11]:fieldPath>.successPolicy
+// +k8s:validation:cel[12]:rule>!has(self.podReplacementPolicy) || !has(self.podFailurePolicy) || self.podReplacementPolicy == "Failed"
+// +k8s:validation:cel[12]:message>must be "Failed" when podFailurePolicy is used
+// +k8s:validation:cel[12]:fieldPath>.podReplacementPolicy
+// +k8s:validation:cel[13]:rule>!has(self.podFailurePolicy) || self.?template.?spec.?restartPolicy.orValue("") == "Never"
+// +k8s:validation:cel[13]:message>only "Never" is supported when podFailurePolicy is specified
+// +k8s:validation:cel[13]:fieldPath>.template.spec.restartPolicy
+// +k8s:validation:cel[14]:rule>self.?podFailurePolicy.?rules.orValue([]).all(r, !has(r.onExitCodes) || !has(r.onExitCodes.containerName) || self.?template.?spec.?containers.orValue([]).exists(c, c.name == r.onExitCodes.containerName) || self.?template.?spec.?initContainers.orValue([]).exists(c, c.name == r.onExitCodes.containerName))
+// +k8s:validation:cel[14]:message>must be one of the container or initContainer names in the pod template"
+// +k8s:validation:cel[14]:fieldPath>.podFailurePolicy.rules
+// +k8s:validation:cel[15]:rule>!has(self.successPolicy) || self.successPolicy.?rules.orValue([]).all(r, !has(r.succeededCount) || r.succeededCount <= self.?completions.orValue(0))
+// +k8s:validation:cel[15]:message>successPolicy.rules.succeededCount must be less than or equal to spec.completions
+// +k8s:validation:cel[15]:fieldPath>.successPolicy.rules
 type JobSpec struct {
 
 	// Specifies the maximum desired number of pods the job should
@@ -309,6 +386,7 @@ type JobSpec struct {
 	// i.e. when the work left to do is less than max parallelism.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
+	// +k8s:validation:minimum=0
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// Specifies the desired number of successfully finished pods the
@@ -318,6 +396,7 @@ type JobSpec struct {
 	// pod signals the success of the job.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
+	// +k8s:validation:minimum=0
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
 	// Specifies the duration in seconds relative to the startTime that the job
@@ -326,6 +405,7 @@ type JobSpec struct {
 	// update), this timer will effectively be stopped and reset when the Job is
 	// resumed again.
 	// +optional
+	// +k8s:validation:minimum=0
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
 
 	// Specifies the policy of handling failed pods. In particular, it allows to
@@ -355,6 +435,7 @@ type JobSpec struct {
 	// Specifies the number of retries before marking this job failed.
 	// Defaults to 6
 	// +optional
+	// +k8s:validation:minimum=0
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,7,opt,name=backoffLimit"`
 
 	// Specifies the limit for the number of retries within an
@@ -366,6 +447,7 @@ type JobSpec struct {
 	// This field is beta-level. It can be used when the `JobBackoffLimitPerIndex`
 	// feature gate is enabled (enabled by default).
 	// +optional
+	// +k8s:validation:minimum=0
 	BackoffLimitPerIndex *int32 `json:"backoffLimitPerIndex,omitempty" protobuf:"varint,12,opt,name=backoffLimitPerIndex"`
 
 	// Specifies the maximal number of failed indexes before marking the Job as
@@ -379,6 +461,7 @@ type JobSpec struct {
 	// This field is beta-level. It can be used when the `JobBackoffLimitPerIndex`
 	// feature gate is enabled (enabled by default).
 	// +optional
+	// +k8s:validation:minimum=0
 	MaxFailedIndexes *int32 `json:"maxFailedIndexes,omitempty" protobuf:"varint,13,opt,name=maxFailedIndexes"`
 
 	// TODO enabled it when https://github.com/kubernetes/kubernetes/issues/28486 has been fixed
@@ -408,6 +491,11 @@ type JobSpec struct {
 	// Describes the pod that will be created when executing a job.
 	// The only allowed template.spec.restartPolicy values are "Never" or "OnFailure".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
+	// +k8s:validation:properties:spec:properties:restartPolicy:enum=["OnFailure", "Never"]
+	// +k8s:validation:properties:spec:cel[0]:rule>self.?restartPolicy.orValue("").size() > 0
+	// +k8s:validation:properties:spec:cel[0]:message>valid values: "OnFailure", "Never"
+	// +k8s:validation:properties:spec:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:properties:spec:cel[0]:fieldPath>.spec.restartPolicy
 	Template corev1.PodTemplateSpec `json:"template" protobuf:"bytes,6,opt,name=template"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
@@ -418,6 +506,7 @@ type JobSpec struct {
 	// the Job won't be automatically deleted. If this field is set to zero,
 	// the Job becomes eligible to be deleted immediately after it finishes.
 	// +optional
+	// +k8s:validation:minimum=0
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 
 	// completionMode specifies how Pod completions are tracked. It can be
@@ -482,6 +571,13 @@ type JobSpec struct {
 	// This field is alpha-level. The job controller accepts setting the field
 	// when the feature gate JobManagedBy is enabled (disabled by default).
 	// +optional
+	// +k8s:validation:maxLength=63
+	// +k8s:validation:cel[0]:rule>self.indexOf("/") > 0 && self.indexOf("/") == self.lastIndexOf("/")
+	// +k8s:validation:cel[0]:message>must be a domain-prefixed path (such as "acme.io/foo")
+	// +k8s:validation:cel[1]:rule>!self.contains("/") || !format.dns1123Subdomain().validate(self.substring(0, self.indexOf("/"))).hasValue()
+	// +k8s:validation:cel[1]:messageExpression>format.dns1123Subdomain().validate(self.substring(0, self.indexOf("/"))).value()
+	// +k8s:validation:cel[2]:rule>!self.contains("/") || self.substring(self.indexOf("/") + 1, self.size()).matches("[A-Za-z0-9/\\-._~%!$&'()*+,;=:]+")
+	// +k8s:validation:cel[2]:messageExpression>Invalid path (regex used for validation is '[A-Za-z0-9/\-._~%!$&'()*+,;=:]+')
 	ManagedBy *string `json:"managedBy,omitempty" protobuf:"bytes,15,opt,name=managedBy"`
 }
 
@@ -683,6 +779,10 @@ type JobTemplateSpec struct {
 	// Specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
+	// +k8s:validation:properties:selector:cel[0]:rule>false
+	// +k8s:validation:properties:selector:cel[0]:message>`selector` will be auto-generated
+	// +k8s:validation:properties:manualSelector:cel[0]:rule>!self
+	// +k8s:validation:properties:manualSelector:cel[0]:message>supported values: nil, false
 	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 

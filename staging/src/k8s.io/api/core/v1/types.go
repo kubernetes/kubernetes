@@ -33,10 +33,19 @@ const (
 )
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
+// +k8s:validation:cel[0]:rule>!has(self.iscsi) || !has(self.iscsi.initiatorName) || self.?name.orValue("").size() + 1 + self.iscsi.targetPortal.size() <= 64
+// +k8s:validation:cel[0]:message>Total length of <volume name>:<iscsi.targetPortal> must be under 64 characters if iscsi.initiatorName is specified.
+// ?k8s:validation:cel[1]:rule>self.size() > has(self.name) ? 1 : 0
+// ?k8s:validation:cel[1]:message>must specify at least one volume type
+// ?k8s:validation:cel[2]:rule>self.size() == has(self.name) ? 2 : 1
+// ?k8s:validation:cel[2]:message>may not specify more than one volume type
 type Volume struct {
 	// name of the volume.
 	// Must be a DNS_LABEL and unique within the pod.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || !format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// volumeSource represents the location and type of the mounted volume.
 	// If not specified, the Volume is implied to be an EmptyDir.
@@ -190,10 +199,12 @@ type VolumeSource struct {
 type PersistentVolumeClaimVolumeSource struct {
 	// claimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+	// +k8s:validation:minLength=1
 	ClaimName string `json:"claimName" protobuf:"bytes,1,opt,name=claimName"`
 	// readOnly Will force the ReadOnly setting in VolumeMounts.
 	// Default false.
 	// +optional
+	// +default=false
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 }
 
@@ -292,6 +303,10 @@ const (
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
+// Desired rule to fix issue checking capacity > 0 constraint with proper
+// error message/field paths
+// -k8s:validation:allOf[0]:properties:capacity:additionalProperties:cel[0]:rule>quantity(self).isGreaterThan(0)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -304,12 +319,31 @@ type PersistentVolume struct {
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
+	// +k8s:validation:cel[0]:rule>!has(self.name) || !format.named("dns1123Subdomain").value().validate(self.name).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.named("dns1123Subdomain").value().validate(self.name).value()
+	// +k8s:validation:cel[0]:fieldPath>.name
+	// +k8s:validation:cel[1]:rule>!has(self.__namespace__)
+	// +k8s:validation:cel[1]:message>not allowed on this type
+	// +k8s:validation:cel[1]:fieldPath>.namespace
+	// +k8s:validation:cel[1]:reason>FieldValueForbidden
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec defines a specification of a persistent volume owned by the cluster.
 	// Provisioned by an administrator.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes
 	// +optional
+	// +k8s:validation:cel[0]:rule>has(self.capacity) && self.capacity.size() > 0
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:cel[0]:fieldPath>.capacity
+	// +k8s:validation:cel[0]:message>must specify a capacity
+	// +k8s:validation:cel[1]:rule>has(self.capacity) && has(self.capacity.storage) && self.capacity.size() == 1
+	// +k8s:validation:cel[1]:reason>FieldValueInvalid
+	// +k8s:validation:cel[1]:fieldPath>.capacity
+	// +k8s:validation:cel[1]:message>Supported values: ["storage"]
+	// +k8s:validation:cel[2]:rule>!has(self.storageClassName) || self.storageClassName.size() == 0 || !format.named("dns1123Subdomain").value().validate(self.storageClassName).hasValue()
+	// +k8s:validation:cel[2]:reason>FieldValueInvalid
+	// +k8s:validation:cel[2]:fieldPath>.storageClassName
+	// +k8s:validation:cel[2]:messageExpression>format.named("dns1123Subdomain").value().validate(self.storageClassName).value()
 	Spec PersistentVolumeSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// status represents the current information/status for the persistent volume.
@@ -320,18 +354,65 @@ type PersistentVolume struct {
 	Status PersistentVolumeStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// CEL Rules needed to be placed here (rather than directly on PersistentVolumeSource)
+// due to embedded types not sharing their validations with their parent types.
+// (bug in kube-openapi?)
+
 // PersistentVolumeSpec is the specification of a persistent volume.
+//
+// +k8s:validation:cel[0]:rule>    has(self.gcePersistentDisk)
+// +k8s:validation:cel[0]:rule> || has(self.awsElasticBlockStore)
+// +k8s:validation:cel[0]:rule> || has(self.hostPath)
+// +k8s:validation:cel[0]:rule> || has(self.glusterfs)
+// +k8s:validation:cel[0]:rule> || has(self.nfs)
+// +k8s:validation:cel[0]:rule> || has(self.rbd)
+// +k8s:validation:cel[0]:rule> || has(self.iscsi)
+// +k8s:validation:cel[0]:rule> || has(self.cinder)
+// +k8s:validation:cel[0]:rule> || has(self.cephfs)
+// +k8s:validation:cel[0]:rule> || has(self.fc)
+// +k8s:validation:cel[0]:rule> || has(self.flocker)
+// +k8s:validation:cel[0]:rule> || has(self.flexVolume)
+// +k8s:validation:cel[0]:rule> || has(self.azureFile)
+// +k8s:validation:cel[0]:rule> || has(self.vsphereVolume)
+// +k8s:validation:cel[0]:rule> || has(self.quobyte)
+// +k8s:validation:cel[0]:rule> || has(self.azureDisk)
+// +k8s:validation:cel[0]:rule> || has(self.photonPersistentDisk)
+// +k8s:validation:cel[0]:rule> || has(self.portworxVolume)
+// +k8s:validation:cel[0]:rule> || has(self.scaleIO)
+// +k8s:validation:cel[0]:rule> || has(self.local)
+// +k8s:validation:cel[0]:rule> || has(self.storageos)
+// +k8s:validation:cel[0]:rule> || has(self.csi)
+// +k8s:validation:cel[0]:message>must specify a volume type
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:rule>!has(self.hostPath) || self.hostPath.path != "/" || self.persistentVolumeReclaimPolicy != "Recycle"
+// +k8s:validation:cel[1]:fieldPath>.persistentVolumeReclaimPolicy
+// +k8s:validation:cel[1]:message>may not be 'recycle' for a hostPath mount of '/'
+// +k8s:validation:cel[1]:reason>FieldValueForbidden
+// +k8s:validation:cel[2]:rule>has(self.csi) || !has(self.volumeAttributesClassName)
+// +k8s:validation:cel[2]:message>has to be specified when using volumeAttributesClassName
+// +k8s:validation:cel[2]:reason>FieldValueRequired
+// +k8s:validation:cel[2]:fieldPath>.csi
+// +k8s:validation:cel[3]:rule>!has(self.local) || has(self.nodeAffinity)
+// +k8s:validation:cel[3]:message>Local volume requires node affinity
+// +k8s:validation:cel[3]:reason>FieldValueRequired
+// +k8s:validation:cel[3]:fieldPath>.nodeAffinity
 type PersistentVolumeSpec struct {
 	// capacity is the description of the persistent volume's resources and capacity.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
 	// +optional
+	// +k8s:validation:additionalProperties:cel[0]:rule>quantity(self).asApproximateFloat() > 0
+	// +k8s:validation:additionalProperties:cel[0]:message>must be greater than zero
 	Capacity ResourceList `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 	// persistentVolumeSource is the actual volume backing the persistent volume.
 	PersistentVolumeSource `json:",inline" protobuf:"bytes,2,opt,name=persistentVolumeSource"`
 	// accessModes contains all ways the volume can be mounted.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
-	// +optional
+	// +required
 	// +listType=atomic
+	// +k8s:validation:minItems=1
+	// +k8s:validation:cel[0]:rule>!self.exists(c, c == "ReadWriteOncePod") || self.size() == 1
+	// +k8s:validation:cel[0]:message>may not use ReadWriteOncePod with other access modes
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	AccessModes []PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,3,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
 	// Expected to be non-nil when bound.
@@ -374,12 +455,19 @@ type PersistentVolumeSpec struct {
 	// This is an alpha field and requires enabling VolumeAttributesClass feature.
 	// +featureGate=VolumeAttributesClass
 	// +optional
+	// +k8s:validation:cel[0]:rule> self.size() > 0
+	// +k8s:validation:cel[0]:message> an empty string is disallowed
+	// +k8s:validation:cel[0]:reason> FieldValueRequired
+	// +k8s:validation:cel[1]:rule>self.size() == 0 || !format.named("dns1123Subdomain").value().validate(self).hasValue()
+	// +k8s:validation:cel[1]:messageExpression>format.named("dns1123Subdomain").value().validate(self).value()
+	// +k8s:validation:cel[1]:reason>FieldValueInvalid
 	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty" protobuf:"bytes,10,opt,name=volumeAttributesClassName"`
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 type VolumeNodeAffinity struct {
 	// required specifies hard node constraints that must be met.
+	// +required
 	Required *NodeSelector `json:"required,omitempty" protobuf:"bytes,1,opt,name=required"`
 }
 
@@ -853,11 +941,16 @@ type HostPathVolumeSource struct {
 	// path of the directory on the host.
 	// If the path is a symlink, it will follow the link to the real path.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+	// +required
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.split('/').all(e, e != "..")
+	// +k8s:validation:cel[0]:message>must not contain '..'
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 	// type for HostPath Volume
 	// Defaults to ""
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.HostPathUnset)
 	Type *HostPathType `json:"type,omitempty" protobuf:"bytes,2,opt,name=type"`
 }
 
@@ -877,6 +970,8 @@ type EmptyDirVolumeSource struct {
 	// The default is nil which means that the limit is undefined.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
 	// +optional
+	// +k8s:validation:cel[0]:rule>isQuantity(self) && !quantity(self).isLessThan(quantity(0))
+	// +k8s:validation:cel[0]:message>SizeLimit field must be a valid resource quantity
 	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,2,opt,name=sizeLimit"`
 }
 
@@ -885,16 +980,19 @@ type EmptyDirVolumeSource struct {
 type GlusterfsVolumeSource struct {
 	// endpoints is the endpoint name that details Glusterfs topology.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+	// +k8s:validation:minLength=1
 	EndpointsName string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
 
 	// path is the Glusterfs volume path.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+	// +k8s:validation:minLength=1
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
 
 	// readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
 	// Defaults to false.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	// +optional
+	// +default=false
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
@@ -903,22 +1001,29 @@ type GlusterfsVolumeSource struct {
 type GlusterfsPersistentVolumeSource struct {
 	// endpoints is the endpoint name that details Glusterfs topology.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+	// +k8s:validation:minLength=1
 	EndpointsName string `json:"endpoints" protobuf:"bytes,1,opt,name=endpoints"`
 
 	// path is the Glusterfs volume path.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
+	// +k8s:validation:minLength=1
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
 
 	// readOnly here will force the Glusterfs volume to be mounted with read-only permissions.
 	// Defaults to false.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	// +optional
+	// +default=false
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 
 	// endpointsNamespace is the namespace that contains Glusterfs endpoint.
 	// If this field is empty, the EndpointNamespace defaults to the same namespace as the bound PVC.
 	// More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || !format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:message>format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[1]:rule>self.size() > 0
+	// +k8s:validation:cel[1]:message>if the endpointnamespace is set, it must be a valid namespace name
 	EndpointsNamespace *string `json:"endpointsNamespace,omitempty" protobuf:"bytes,4,opt,name=endpointsNamespace"`
 }
 
@@ -928,9 +1033,11 @@ type RBDVolumeSource struct {
 	// monitors is a collection of Ceph monitors.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +listType=atomic
+	// +k8s:validation:minItems=1
 	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// image is the rados image name.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	// +k8s:validation:minLength=1
 	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -973,9 +1080,11 @@ type RBDPersistentVolumeSource struct {
 	// monitors is a collection of Ceph monitors.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +listType=atomic
+	// +k8s:validation:minItems=1
 	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// image is the rados image name.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+	// +k8s:validation:minLength=1
 	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -988,16 +1097,19 @@ type RBDPersistentVolumeSource struct {
 	// Default is rbd.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="rbd"
 	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
 	// user is the rados user name.
 	// Default is admin.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="admin"
 	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
 	// keyring is the path to key ring for RBDUser.
 	// Default is /etc/ceph/keyring.
 	// More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
 	// +optional
+	// +default="/etc/ceph/keyring"
 	Keyring string `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
 	// secretRef is name of the authentication secret for RBDUser. If provided
 	// overrides keyring.
@@ -1019,6 +1131,7 @@ type RBDPersistentVolumeSource struct {
 type CinderVolumeSource struct {
 	// volumeID used to identify the volume in cinder.
 	// More info: https://examples.k8s.io/mysql-cinder-pd/README.md
+	// +k8s:validation:minLength=1
 	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
 	// fsType is the filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1034,6 +1147,9 @@ type CinderVolumeSource struct {
 	// secretRef is optional: points to a secret object containing parameters used to connect
 	// to OpenStack.
 	// +optional
+	// +k8s:validation:cel[0]:rule>has(self.name) && self.name.size() > 0
+	// +k8s:validation:cel[0]:message="Required value"
+	// +k8s:validation:cel[0]:fieldPath>.name
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,4,opt,name=secretRef"`
 }
 
@@ -1044,6 +1160,7 @@ type CinderVolumeSource struct {
 type CinderPersistentVolumeSource struct {
 	// volumeID used to identify the volume in cinder.
 	// More info: https://examples.k8s.io/mysql-cinder-pd/README.md
+	// +k8s:validation:minLength=1
 	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
 	// fsType Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1068,6 +1185,7 @@ type CephFSVolumeSource struct {
 	// monitors is Required: Monitors is a collection of Ceph monitors
 	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
 	// +listType=atomic
+	// +k8s:validation:minItems=1
 	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
 	// +optional
@@ -1088,6 +1206,7 @@ type CephFSVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
 	// +optional
+	// +default=false
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 }
 
@@ -1096,10 +1215,16 @@ type CephFSVolumeSource struct {
 // +structType=atomic
 type SecretReference struct {
 	// name is unique within a namespace to reference a secret resource.
-	// +optional
+	// +required
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	// namespace defines the space within which the secret name must be unique.
-	// +optional
+	// +required
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
 }
 
@@ -1109,6 +1234,7 @@ type CephFSPersistentVolumeSource struct {
 	// monitors is Required: Monitors is a collection of Ceph monitors
 	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
 	// +listType=atomic
+	// +k8s:validation:minItems=1
 	Monitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
 	// path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
 	// +optional
@@ -1129,16 +1255,24 @@ type CephFSPersistentVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
 	// +optional
+	// +default=false
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
 // One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
+// +k8s:validation:cel[0]:rule>has(self.datasetName) ? !has(self.datasetUUID) : true
+// +k8s:validation:cel[0]:message>datasetName and datasetUUID can not be specified simultaneously
+// +k8s:validation:cel[1]:rule>has(self.datasetUUID) || has(self.datasetName)
+// +k8s:validation:cel[1]:message>one of datasetUUID and datasetName is required
+// +k8s:validation:cel[1]:reason>FieldValueRequired
 type FlockerVolumeSource struct {
 	// datasetName is Name of the dataset stored as metadata -> name on the dataset for Flocker
 	// should be considered as deprecated
 	// +optional
+	// +k8s:validation:cel[0]:rule>!self.contains("/")
+	// +k8s:validation:cel[0]:message>must not contain '/'
 	DatasetName string `json:"datasetName,omitempty" protobuf:"bytes,1,opt,name=datasetName"`
 	// datasetUUID is the UUID of the dataset. This is unique identifier of a Flocker dataset
 	// +optional
@@ -1177,6 +1311,7 @@ const (
 type GCEPersistentDiskVolumeSource struct {
 	// pdName is unique name of the PD resource in GCE. Used to identify the disk in GCE.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
+	// +k8s:validation:minLength=1
 	PDName string `json:"pdName" protobuf:"bytes,1,opt,name=pdName"`
 	// fsType is filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -1191,6 +1326,8 @@ type GCEPersistentDiskVolumeSource struct {
 	// Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=255
 	Partition int32 `json:"partition,omitempty" protobuf:"varint,3,opt,name=partition"`
 	// readOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
@@ -1205,14 +1342,19 @@ type QuobyteVolumeSource struct {
 	// registry represents a single or multiple Quobyte Registry services
 	// specified as a string as host:port pair (multiple entries are separated with commas)
 	// which acts as the central registry for volumes
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || self.split(',').all(e, e.contains(':'))
+	// +k8s:validation:cel[0]:message>must be a host:port pair or multiple pairs separated by commas
 	Registry string `json:"registry" protobuf:"bytes,1,opt,name=registry"`
 
 	// volume is a string that references an already created Quobyte volume by name.
+	// +k8s:validation:minLength=1
 	Volume string `json:"volume" protobuf:"bytes,2,opt,name=volume"`
 
 	// readOnly here will force the Quobyte volume to be mounted with read-only permissions.
 	// Defaults to false.
 	// +optional
+	// +default=false
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 
 	// user to map volume access to
@@ -1228,6 +1370,7 @@ type QuobyteVolumeSource struct {
 	// tenant owning the given Quobyte volume in the Backend
 	// Used with dynamically provisioned Quobyte volumes, value is set by the plugin
 	// +optional
+	// +k8s:validation:maxLength=65
 	Tenant string `json:"tenant,omitempty" protobuf:"bytes,6,opt,name=tenant"`
 }
 
@@ -1235,6 +1378,7 @@ type QuobyteVolumeSource struct {
 // provisioned/attached using an exec based plugin.
 type FlexPersistentVolumeSource struct {
 	// driver is the name of the driver to use for this volume.
+	// +k8s:validation:minLength=1
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
 	// fsType is the Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1254,6 +1398,8 @@ type FlexPersistentVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
 	// options is Optional: this field holds extra command options if any.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!self.exists(k, k.matches("[^/]*(kubernetes[.]io|k8s[.]io)([/].*)?$"))
+	// +k8s:validation:cel[0]:message>kubernetes.io and k8s.io namespaces are reserved
 	Options map[string]string `json:"options,omitempty" protobuf:"bytes,5,rep,name=options"`
 }
 
@@ -1261,6 +1407,7 @@ type FlexPersistentVolumeSource struct {
 // provisioned/attached using an exec based plugin.
 type FlexVolumeSource struct {
 	// driver is the name of the driver to use for this volume.
+	// +k8s:validation:minLength=1
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
 	// fsType is the filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1280,6 +1427,8 @@ type FlexVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
 	// options is Optional: this field holds extra command options if any.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!self.exists(k, k.matches("[^/]*(kubernetes[.]io|k8s[.]io)([/].*)?$"))
+	// +k8s:validation:cel[0]:message>kubernetes.io and k8s.io namespaces are reserved
 	Options map[string]string `json:"options,omitempty" protobuf:"bytes,5,rep,name=options"`
 }
 
@@ -1292,6 +1441,7 @@ type FlexVolumeSource struct {
 type AWSElasticBlockStoreVolumeSource struct {
 	// volumeID is unique ID of the persistent disk resource in AWS (Amazon EBS volume).
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
+	// +k8s:validation:minLength=1
 	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -1305,6 +1455,8 @@ type AWSElasticBlockStoreVolumeSource struct {
 	// Examples: For volume /dev/sda1, you specify the partition as "1".
 	// Similarly, the volume partition for /dev/sda is "0" (or you can leave the property empty).
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=255
 	Partition int32 `json:"partition,omitempty" protobuf:"varint,3,opt,name=partition"`
 	// readOnly value true will force the readOnly setting in VolumeMounts.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore
@@ -1321,6 +1473,7 @@ type AWSElasticBlockStoreVolumeSource struct {
 // into the Pod's container.
 type GitRepoVolumeSource struct {
 	// repository is the URL
+	// +k8s:validation:minLength=1
 	Repository string `json:"repository" protobuf:"bytes,1,opt,name=repository"`
 	// revision is the commit hash for the specified revision.
 	// +optional
@@ -1330,6 +1483,10 @@ type GitRepoVolumeSource struct {
 	// git repository.  Otherwise, if specified, the volume will contain the git repository in
 	// the subdirectory with the given name.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.split('/').all(e, e != "..")
+	// +k8s:validation:cel[0]:message>must not contain '..'
+	// +k8s:validation:cel[1]:rule>!self.startsWith("/")
+	// +k8s:validation:cel[1]:message>must be a relative path
 	Directory string `json:"directory,omitempty" protobuf:"bytes,3,opt,name=directory"`
 }
 
@@ -1341,7 +1498,8 @@ type GitRepoVolumeSource struct {
 type SecretVolumeSource struct {
 	// secretName is the name of the secret in the pod's namespace to use.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#secret
-	// +optional
+	// +required
+	// +k8s:validation:minLength=1
 	SecretName string `json:"secretName,omitempty" protobuf:"bytes,1,opt,name=secretName"`
 	// items If unspecified, each key-value pair in the Data field of the referenced
 	// Secret will be projected into the volume as a file whose name is the
@@ -1361,6 +1519,9 @@ type SecretVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=511
+	// +k8s:validation:default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"bytes,3,opt,name=defaultMode"`
 	// optional field specify whether the Secret or its keys must be defined
 	// +optional
@@ -1377,6 +1538,10 @@ const (
 // projected volume as files using the keys in the Data field as the file names.
 // Note that this is identical to a secret volume source without the default
 // mode.
+// +k8s:validation:cel[0]:rule>self.?name.orValue("").size() > 0
+// +k8s:validation:cel[0]:message>Required value
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.name
 type SecretProjection struct {
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// items if unspecified, each key-value pair in the Data field of the referenced
@@ -1399,10 +1564,13 @@ type SecretProjection struct {
 type NFSVolumeSource struct {
 	// server is the hostname or IP address of the NFS server.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+	// +k8s:validation:minLength=1
 	Server string `json:"server" protobuf:"bytes,1,opt,name=server"`
 
 	// path that is exported by the NFS server.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
+	// +k8s:validation:minLength=1
+	// +k8s:validation:pattern="^/"
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
 
 	// readOnly here will force the NFS export to be mounted with read-only permissions.
@@ -1415,17 +1583,34 @@ type NFSVolumeSource struct {
 // Represents an ISCSI disk.
 // ISCSI volumes can only be mounted as read/write once.
 // ISCSI volumes support ownership management and SELinux relabeling.
+// +k8s:validation:cel[0]:rule>(self.?chapAuthDiscovery.orValue(false) || self.?chapAuthSession.orValue(false)) ? has(self.secretRef) : true
+// +k8s:validation:cel[0]:message>Required value
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.secretRef
 type ISCSIVolumeSource struct {
 	// targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
+	// +k8s:validation:minLength=1
 	TargetPortal string `json:"targetPortal" protobuf:"bytes,1,opt,name=targetPortal"`
 	// iqn is the target iSCSI Qualified Name.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || self.startsWith("iqn") || self.startsWith("eui") || self.startsWith("naa")
+	// +k8s:validation:cel[0]:message>must be valid format starting with iqn, eui, or naa
+	// +k8s:validation:cel[1]:rule>!self.startsWith("iqn") || self.matches("iqn\\.\\d{4}-\\d{2}\\.([[:alnum:]-.]+)(:[^,;*&$|\\s]+)$")
+	// +k8s:validation:cel[1]:message>must be a valid format
+	// +k8s:validation:cel[2]:rule>!self.startsWith("eui") || self.matches("^eui.[[:alnum:]]{16}$")
+	// +k8s:validation:cel[2]:message>must be a valid format
+	// +k8s:validation:cel[3]:rule>!self.startsWith("naa") || self.matches("^naa.[[:alnum:]]{32}$")
+	// +k8s:validation:cel[3]:message>must be a valid format
 	IQN string `json:"iqn" protobuf:"bytes,2,opt,name=iqn"`
 	// lun represents iSCSI Target Lun number.
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=255
 	Lun int32 `json:"lun" protobuf:"varint,3,opt,name=lun"`
 	// iscsiInterface is the interface Name that uses an iSCSI transport.
 	// Defaults to 'default' (tcp).
 	// +optional
+	// +default="default"
 	ISCSIInterface string `json:"iscsiInterface,omitempty" protobuf:"bytes,4,opt,name=iscsiInterface"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -1437,6 +1622,7 @@ type ISCSIVolumeSource struct {
 	// readOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
 	// +optional
+	// +default=false
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 	// portals is the iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
 	// is other than default (typically TCP ports 860 and 3260).
@@ -1445,9 +1631,11 @@ type ISCSIVolumeSource struct {
 	Portals []string `json:"portals,omitempty" protobuf:"bytes,7,opt,name=portals"`
 	// chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
 	// +optional
+	// +default=false
 	DiscoveryCHAPAuth bool `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
 	// chapAuthSession defines whether support iSCSI Session CHAP authentication
 	// +optional
+	// +default=false
 	SessionCHAPAuth bool `json:"chapAuthSession,omitempty" protobuf:"varint,11,opt,name=chapAuthSession"`
 	// secretRef is the CHAP Secret for iSCSI target and initiator authentication
 	// +optional
@@ -1456,6 +1644,14 @@ type ISCSIVolumeSource struct {
 	// If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
 	// <target portal>:<volume name> will be created for the connection.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.startsWith("iqn") || self.startsWith("eui") || self.startsWith("naa")
+	// +k8s:validation:cel[0]:message>must be valid format starting with iqn, eui, or naa
+	// +k8s:validation:cel[1]:rule>!self.startsWith("iqn") || self.matches("iqn\\.\\d{4}-\\d{2}\\.([[:alnum:]-.]+)(:[^,;*&$|\\s]+)$")
+	// +k8s:validation:cel[1]:message>must be a valid format
+	// +k8s:validation:cel[2]:rule>!self.startsWith("eui") || self.matches("^eui.[[:alnum:]]{16}$")
+	// +k8s:validation:cel[2]:message>must be a valid format
+	// +k8s:validation:cel[3]:rule>!self.startsWith("naa") || self.matches("^naa.[[:alnum:]]{32}$")
+	// +k8s:validation:cel[3]:message>must be a valid format
 	InitiatorName *string `json:"initiatorName,omitempty" protobuf:"bytes,12,opt,name=initiatorName"`
 }
 
@@ -1473,6 +1669,7 @@ type ISCSIPersistentVolumeSource struct {
 	// iscsiInterface is the interface Name that uses an iSCSI transport.
 	// Defaults to 'default' (tcp).
 	// +optional
+	// +default="default"
 	ISCSIInterface string `json:"iscsiInterface,omitempty" protobuf:"bytes,4,opt,name=iscsiInterface"`
 	// fsType is the filesystem type of the volume that you want to mount.
 	// Tip: Ensure that the filesystem type is supported by the host operating system.
@@ -1509,6 +1706,17 @@ type ISCSIPersistentVolumeSource struct {
 // Represents a Fibre Channel volume.
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
+// +k8s:validation:cel[0]:rule>self.?targetWWNs.orValue([]).size() > 0 || self.?wwids.orValue([]).size() > 0
+// +k8s:validation:cel[0]:message>must specify either targetWWNs or wwids, but not both
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.targetWWNs
+// +k8s:validation:cel[1]:rule>self.?targetWWNs.orValue([]).size() == 0 || self.?wwids.orValue([]).size() == 0
+// +k8s:validation:cel[1]:message>targetWWNs and wwids can not be specified simultaneously
+// +k8s:validation:cel[1]:fieldPath>.targetWWNs
+// +k8s:validation:cel[2]:rule>self.?targetWWNs.orValue([]).size() == 0 || has(self.lun)
+// +k8s:validation:cel[2]:message>lun is required if targetWWNs is specified
+// +k8s:validation:cel[2]:fieldPath>.lun
+// +k8s:validation:cel[2]:reason>FieldValueRequired
 type FCVolumeSource struct {
 	// targetWWNs is Optional: FC target worldwide names (WWNs)
 	// +optional
@@ -1516,6 +1724,8 @@ type FCVolumeSource struct {
 	TargetWWNs []string `json:"targetWWNs,omitempty" protobuf:"bytes,1,rep,name=targetWWNs"`
 	// lun is Optional: FC target lun number
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=255
 	Lun *int32 `json:"lun,omitempty" protobuf:"varint,2,opt,name=lun"`
 	// fsType is the filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1537,8 +1747,10 @@ type FCVolumeSource struct {
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 type AzureFileVolumeSource struct {
 	// secretName is the  name of secret that contains Azure Storage Account Name and Key
+	// +k8s:validation:minLength=1
 	SecretName string `json:"secretName" protobuf:"bytes,1,opt,name=secretName"`
 	// shareName is the azure share Name
+	// +k8s:validation:minLength=1
 	ShareName string `json:"shareName" protobuf:"bytes,2,opt,name=shareName"`
 	// readOnly defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1549,8 +1761,10 @@ type AzureFileVolumeSource struct {
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 type AzureFilePersistentVolumeSource struct {
 	// secretName is the name of secret that contains Azure Storage Account Name and Key
+	// +k8s:validation:minLength=1
 	SecretName string `json:"secretName" protobuf:"bytes,1,opt,name=secretName"`
 	// shareName is the azure Share Name
+	// +k8s:validation:minLength=1
 	ShareName string `json:"shareName" protobuf:"bytes,2,opt,name=shareName"`
 	// readOnly defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1559,12 +1773,14 @@ type AzureFilePersistentVolumeSource struct {
 	// secretNamespace is the namespace of the secret that contains Azure Storage Account Name and Key
 	// default is the same as the Pod
 	// +optional
+	// +k8s:validation:minLength=1
 	SecretNamespace *string `json:"secretNamespace" protobuf:"bytes,4,opt,name=secretNamespace"`
 }
 
 // Represents a vSphere volume resource.
 type VsphereVirtualDiskVolumeSource struct {
 	// volumePath is the path that identifies vSphere volume vmdk
+	// +k8s:validation:minLength=1
 	VolumePath string `json:"volumePath" protobuf:"bytes,1,opt,name=volumePath"`
 	// fsType is filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1582,6 +1798,7 @@ type VsphereVirtualDiskVolumeSource struct {
 // Represents a Photon Controller persistent disk resource.
 type PhotonPersistentDiskVolumeSource struct {
 	// pdID is the ID that identifies Photon Controller persistent disk
+	// +k8s:validation:minLength=1
 	PdID string `json:"pdID" protobuf:"bytes,1,opt,name=pdID"`
 	// fsType is the filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1606,30 +1823,41 @@ const (
 )
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+// +k8s:validation:cel[0]:rule>has(self.kind) && self.kind == "Managed" ? self.?diskURI.orValue("").indexOf("/subscriptions/") == 0 : true
+// +k8s:validation:cel[0]:message>supported values: /subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}
+// +k8s:validation:cel[1]:rule>has(self.kind) && self.kind != "Managed" ? self.?diskURI.orValue("").indexOf("https://") == 0 : true
+// +k8s:validation:cel[1]:message>supported values: https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd
 type AzureDiskVolumeSource struct {
 	// diskName is the Name of the data disk in the blob storage
+	// +k8s:validation:minLength=1
 	DiskName string `json:"diskName" protobuf:"bytes,1,opt,name=diskName"`
 	// diskURI is the URI of data disk in the blob storage
+	// +k8s:validation:minLength=1
 	DataDiskURI string `json:"diskURI" protobuf:"bytes,2,opt,name=diskURI"`
 	// cachingMode is the Host Caching mode: None, Read Only, Read Write.
 	// +optional
+	// +default="ReadWrite"
 	CachingMode *AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,3,opt,name=cachingMode,casttype=AzureDataDiskCachingMode"`
 	// fsType is Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
+	// +default="ext4"
 	FSType *string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
 	// readOnly Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
+	// +default=false
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 	// kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+	// +default="Shared"
 	Kind *AzureDataDiskKind `json:"kind,omitempty" protobuf:"bytes,6,opt,name=kind,casttype=AzureDataDiskKind"`
 }
 
 // PortworxVolumeSource represents a Portworx volume resource.
 type PortworxVolumeSource struct {
 	// volumeID uniquely identifies a Portworx volume
+	// +k8s:validation:minLength=1
 	VolumeID string `json:"volumeID" protobuf:"bytes,1,opt,name=volumeID"`
 	// fSType represents the filesystem type to mount
 	// Must be a filesystem type supported by the host operating system.
@@ -1644,12 +1872,15 @@ type PortworxVolumeSource struct {
 // ScaleIOVolumeSource represents a persistent ScaleIO volume
 type ScaleIOVolumeSource struct {
 	// gateway is the host address of the ScaleIO API Gateway.
+	// +k8s:validation:minLength=1
 	Gateway string `json:"gateway" protobuf:"bytes,1,opt,name=gateway"`
 	// system is the name of the storage system as configured in ScaleIO.
+	// +k8s:validation:minLength=1
 	System string `json:"system" protobuf:"bytes,2,opt,name=system"`
 	// secretRef references to the secret for ScaleIO user and other
 	// sensitive information. If this is not provided, Login operation will fail.
-	SecretRef *LocalObjectReference `json:"secretRef" protobuf:"bytes,3,opt,name=secretRef"`
+	// +optional
+	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,3,opt,name=secretRef"`
 	// sslEnabled Flag enable/disable SSL communication with Gateway, default false
 	// +optional
 	SSLEnabled bool `json:"sslEnabled,omitempty" protobuf:"varint,4,opt,name=sslEnabled"`
@@ -1662,15 +1893,19 @@ type ScaleIOVolumeSource struct {
 	// storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// Default is ThinProvisioned.
 	// +optional
+	// +default="ThinProvisioned"
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// volumeName is the name of a volume already created in the ScaleIO system
 	// that is associated with this volume source.
-	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,8,opt,name=volumeName"`
+	// +k8s:validation:minLength=1
+	// +required
+	VolumeName string `json:"volumeName" protobuf:"bytes,8,opt,name=volumeName"`
 	// fsType is the filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs".
 	// Default is "xfs".
 	// +optional
+	// +default="xfs"
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
 	// readOnly Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1719,6 +1954,9 @@ type ScaleIOPersistentVolumeSource struct {
 type StorageOSVolumeSource struct {
 	// volumeName is the human-readable name of the StorageOS volume.  Volume
 	// names are only unique within a namespace.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasVlaue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,1,opt,name=volumeName"`
 	// volumeNamespace specifies the scope of the volume within StorageOS.  If no
 	// namespace is specified then the Pod's namespace will be used.  This allows the
@@ -1727,6 +1965,8 @@ type StorageOSVolumeSource struct {
 	// Set to "default" if you are not using namespaces within StorageOS.
 	// Namespaces that do not pre-exist within StorageOS will be created.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasVlaue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	VolumeNamespace string `json:"volumeNamespace,omitempty" protobuf:"bytes,2,opt,name=volumeNamespace"`
 	// fsType is the filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1740,6 +1980,10 @@ type StorageOSVolumeSource struct {
 	// secretRef specifies the secret to use for obtaining the StorageOS API
 	// credentials.  If not specified, default values will be attempted.
 	// +optional
+	// +k8s:validation:cel[0]:rule>has(self.name) && self.name.size() > 0
+	// +k8s:validation:cel[0]:message="Required value"
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:cel[0]:fieldPath>.name
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
 }
 
@@ -1747,6 +1991,9 @@ type StorageOSVolumeSource struct {
 type StorageOSPersistentVolumeSource struct {
 	// volumeName is the human-readable name of the StorageOS volume.  Volume
 	// names are only unique within a namespace.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasVlaue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,1,opt,name=volumeName"`
 	// volumeNamespace specifies the scope of the volume within StorageOS.  If no
 	// namespace is specified then the Pod's namespace will be used.  This allows the
@@ -1755,6 +2002,8 @@ type StorageOSPersistentVolumeSource struct {
 	// Set to "default" if you are not using namespaces within StorageOS.
 	// Namespaces that do not pre-exist within StorageOS will be created.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasVlaue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	VolumeNamespace string `json:"volumeNamespace,omitempty" protobuf:"bytes,2,opt,name=volumeNamespace"`
 	// fsType is the filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
@@ -1768,6 +2017,14 @@ type StorageOSPersistentVolumeSource struct {
 	// secretRef specifies the secret to use for obtaining the StorageOS API
 	// credentials.  If not specified, default values will be attempted.
 	// +optional
+	// +k8s:validation:cel[0]:rule>has(self.name) && self.name.size() > 0
+	// +k8s:validation:cel[0]:message="Required value"
+	// +k8s:validation:cel[0]:fieldPath>.name
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:cel[1]:rule>has(self.namespace) && self.namespace.size() > 0
+	// +k8s:validation:cel[1]:message="Required value"
+	// +k8s:validation:cel[1]:fieldPath>.namespace
+	// +k8s:validation:cel[1]:reason>FieldValueRequired
 	SecretRef *ObjectReference `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
 }
 
@@ -1777,6 +2034,9 @@ type StorageOSPersistentVolumeSource struct {
 // volume as files using the keys in the Data field as the file names, unless
 // the items element is populated with specific mappings of keys to paths.
 // ConfigMap volumes support ownership management and SELinux relabeling.
+// +k8s:validation:cel[0]:rule>has(self.name) && self.name.size() > 0
+// +k8s:validation:cel[0]:message="Required value"
+// +k8s:validation:cel[0]:reason>FieldValueRequired
 type ConfigMapVolumeSource struct {
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// items if unspecified, each key-value pair in the Data field of the referenced
@@ -1797,6 +2057,9 @@ type ConfigMapVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=511
+	// +default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 	// optional specify whether the ConfigMap or its keys must be defined
 	// +optional
@@ -1849,25 +2112,59 @@ type ServiceAccountTokenProjection struct {
 	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
 	// and must be at least 10 minutes.
 	// +optional
+	// +default=3600
+	// +k8s:validation:Minimum=600
+	// +k8s:validation:Maximum=86400
 	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
 	// path is the path relative to the mount point of the file to project the
 	// token into.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.startsWith("../") || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>must not start with ".."
+	// +k8s:validation:cel[1]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[1]:message>must not contain ".."
+	// +k8s:validation:cel[2]:rule>self.size() == 0 || !self.startsWith("/")
+	// +k8s:validation:cel[2]:message>must be a relative path
 	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
 }
 
 // ClusterTrustBundleProjection describes how to select a set of
 // ClusterTrustBundle objects and project their contents into the pod
 // filesystem.
+// +k8s:validation:cel[0]:rule>!(has(self.name) && has(self.signerName))
+// +k8s:validation:cel[0]:message>only one of name and signerName may be used
+// +k8s:validation:cel[1]:rule>has(self.labelSelector) ? !has(self.name) || has(self.signerName) : true
+// +k8s:validation:cel[1]:message>labelSelector must be unset if name is specified
+// +k8s:validation:cel[1]:fieldPath>.labelSelector
+// +k8s:validation:cel[2]:rule>has(self.name) || has(self.signerName)
+// +k8s:validation:cel[2]:message>either name or signerName must be specified
 type ClusterTrustBundleProjection struct {
 	// Select a single ClusterTrustBundle by object name.  Mutually-exclusive
 	// with signerName and labelSelector.
 	// +optional
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.contains(":") || !format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
+	// +k8s:validation:cel[1]:rule>!self.contains(":") || !format.dns1123Subdomain().validate(self.substring(self.lastIndexOf(":") + 1)).hasValue()
+	// +k8s:validation:cel[1]:messageExpression>format.dns1123Subdomain().validate(self.substring(self.lastIndexOf(":") + 1)).value()
 	Name *string `json:"name,omitempty" protobuf:"bytes,1,rep,name=name"`
 
 	// Select all ClusterTrustBundles that match this signer name.
 	// Mutually-exclusive with name.  The contents of all selected
 	// ClusterTrustBundles will be unified and deduplicated.
 	// +optional
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=571
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || self.split("/").size() == 2
+	// +k8s:validation:cel[0]:message>must be a fully qualified domain and path of the form 'example.com/signer-name'
+	// +k8s:validation:cel[1]:rule>!self.contains("/") || self.split("/")[0].size() <= 253
+	// +k8s:validation:cel[1]:message>domain part must have at most 253 bytes
+	// +k8s:validation:cel[2]:rule>!self.contains("/") || self.split("/")[0].split(".").all(lbl, !format.dns1123Label().validate(lbl).hasValue())
+	// +k8s:validation:cel[2]:messageExpression>self.split("/")[0].split(".").map(lbl, format.dns1123Label().validate(lbl).orValue([])).filter(x, x.size() > 0)[0]
+	// +k8s:validation:cel[3]:rule>!self.contains("/") || self.split("/")[0].split(".").size() >= 2
+	// +k8s:validation:cel[3]:message>should be a domain with at least two segments separated by dots
+	// +k8s:validation:cel[4]:rule>!self.contains("/") || self.split("/")[1].split(".").all(lbl, !format.dns1123Subdomain().validate(lbl).hasValue())
+	// +k8s:validation:cel[4]:messageExpression>self.split("/")[1].split(".").map(lbl, format.dns1123Subdomain().validate(lbl).orValue([])).filter(x, x.size() > 0)[0]
 	SignerName *string `json:"signerName,omitempty" protobuf:"bytes,2,rep,name=signerName"`
 
 	// Select all ClusterTrustBundles that match this label selector.  Only has
@@ -1886,6 +2183,13 @@ type ClusterTrustBundleProjection struct {
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,5,opt,name=optional"`
 
 	// Relative path from the volume root to write the bundle.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.startsWith("../") || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>must not start with ".."
+	// +k8s:validation:cel[1]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[1]:message>must not contain ".."
+	// +k8s:validation:cel[2]:rule>self.size() == 0 || !self.startsWith("/")
+	// +k8s:validation:cel[2]:message>must be a relative path
 	Path string `json:"path" protobuf:"bytes,4,rep,name=path"`
 }
 
@@ -1902,10 +2206,16 @@ type ProjectedVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=511
+	// +default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
 
 // Projection that may be projected along with other supported volume types
+// +k8s:validation:cel[0]:rule>[has(self.secret), has(self.downwardAPI), has(self.configMap), has(self.serviceAccountToken), has(self.clusterTrustBundle)].filter(x, x).size() <= 1
+// +k8s:validation:cel[0]:message>may not specify more than 1 volume type
+// +k8s:validation:cel[0]:reason>FieldValueForbidden
 type VolumeProjection struct {
 	// all types below are the supported types for projection into the same volume
 
@@ -1948,12 +2258,20 @@ const (
 // Maps a string key to a path within a volume.
 type KeyToPath struct {
 	// key is the key to project.
+	// +k8s:validation:minLength=1
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 
 	// path is the relative path of the file to map the key to.
 	// May not be an absolute path.
 	// May not contain the path element '..'.
 	// May not start with the string '..'.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.startsWith("../") || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>must not start with ".."
+	// +k8s:validation:cel[1]:rule>self.size() == 0 || !self.startsWith("/")
+	// +k8s:validation:cel[1]:message>must be a relative path
+	// +k8s:validation:cel[2]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[2]:message>must not contain ".."
 	Path string `json:"path" protobuf:"bytes,2,opt,name=path"`
 	// mode is Optional: mode bits used to set permissions on this file.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
@@ -1962,6 +2280,8 @@ type KeyToPath struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=511
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
 }
 
@@ -1969,6 +2289,9 @@ type KeyToPath struct {
 type LocalVolumeSource struct {
 	// path of the full path to the volume on the node.
 	// It can be either a directory or block device (disk, partition, ...).
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[0]:message>must not contain '..'
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 
 	// fsType is the filesystem type to mount.
@@ -1983,11 +2306,16 @@ type LocalVolumeSource struct {
 type CSIPersistentVolumeSource struct {
 	// driver is the name of the driver to use for this volume.
 	// Required.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=63
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self.lowerAscii()).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self.lowerAscii()).value()
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
 
 	// volumeHandle is the unique volume name returned by the CSI volume
 	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
 	// Required.
+	// +k8s:validation:minLength=1
 	VolumeHandle string `json:"volumeHandle" protobuf:"bytes,2,opt,name=volumeHandle"`
 
 	// readOnly value to pass to ControllerPublishVolumeRequest.
@@ -2049,6 +2377,10 @@ type CSIPersistentVolumeSource struct {
 type CSIVolumeSource struct {
 	// driver is the name of the CSI driver that handles this volume.
 	// Consult with your admin for the correct name as registered in the cluster.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=63
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self.lowerAscii()).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self.lowerAscii()).value()
 	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
 
 	// readOnly specifies a read-only configuration for the volume.
@@ -2073,6 +2405,13 @@ type CSIVolumeSource struct {
 	// This field is optional, and  may be empty if no secret is required. If the
 	// secret object contains more than one secret, all secret references are passed.
 	// +optional
+	// +k8s:validation:cel[0]:rule>has(self.name) && self.name.size() > 0
+	// +k8s:validation:cel[0]:message="Required value"
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:cel[0]:fieldPath>.name
+	// +k8s:validation:cel[1]:rule>self.?name.orValue("").size() == 0 || !format.dns1123Subdomain().validate(self.name).hasValue()
+	// +k8s:validation:cel[1]:messageExpression>format.dns1123Subdomain().validate(self.name).value()
+	// +k8s:validation:cel[1]:fieldPath>.name
 	NodePublishSecretRef *LocalObjectReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,5,opt,name=nodePublishSecretRef"`
 }
 
@@ -2099,6 +2438,7 @@ type EphemeralVolumeSource struct {
 	// to the PVC after it has been created.
 	//
 	// Required, must not be nil.
+	// +required
 	VolumeClaimTemplate *PersistentVolumeClaimTemplate `json:"volumeClaimTemplate,omitempty" protobuf:"bytes,1,opt,name=volumeClaimTemplate"`
 
 	// ReadOnly is tombstoned to show why 2 is a reserved protobuf tag.
@@ -2107,6 +2447,8 @@ type EphemeralVolumeSource struct {
 
 // PersistentVolumeClaimTemplate is used to produce
 // PersistentVolumeClaim objects as part of an EphemeralVolumeSource.
+// ?k8s:validation:cel[0]:rule>!self.metadata.exists(k, k != "labels" && k != "annotations")
+// ?k8s:validation:cel[0]:message>pvc template metadata may only contain labels and annotations
 type PersistentVolumeClaimTemplate struct {
 	// May contain labels and annotations that will be copied into the PVC
 	// when creating it. No other fields are allowed and will be rejected during
@@ -2128,15 +2470,22 @@ type ContainerPort struct {
 	// named port in a pod must have a unique name. Name for the port that can be
 	// referred to by services.
 	// +optional
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!format.portName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.portName().validate(self).value()
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	// Number of port to expose on the host.
 	// If specified, this must be a valid port number, 0 < x < 65536.
 	// If HostNetwork is specified, this must match ContainerPort.
 	// Most containers do not need this.
 	// +optional
+	// +k8s:validation:minimum=1
+	// +k8s:validation:maximum=65535
 	HostPort int32 `json:"hostPort,omitempty" protobuf:"varint,2,opt,name=hostPort"`
 	// Number of port to expose on the pod's IP address.
 	// This must be a valid port number, 0 < x < 65536.
+	// +k8s:validation:minimum=1
+	// +k8s:validation:maximum=65535
 	ContainerPort int32 `json:"containerPort" protobuf:"varint,3,opt,name=containerPort"`
 	// Protocol for port. Must be UDP, TCP, or SCTP.
 	// Defaults to "TCP".
@@ -2149,8 +2498,20 @@ type ContainerPort struct {
 }
 
 // VolumeMount describes a mounting of a Volume within a container.
+// +k8s:validation:cel[0]:rule>!has(self.subPath) || !has(self.subPathExpr)
+// +k8s:validation:cel[0]:message>subPathExpr and subPath are mutually exclusive
+// +k8s:validation:cel[0]:fieldPath>.subPathExpr
+// +k8s:validation:cel[1]:rule>!["Enabled", "IfPossible"].exists(v, v == self.?recursiveReadOnly.orValue("Disabled")) || self.?readOnly.orValue(false)
+// +k8s:validation:cel[1]:message>may only be specified when readOnly is true
+// +k8s:validation:cel[1]:fieldPath>.recursiveReadOnly
+// +k8s:validation:cel[1]:reason>FieldValueForbidden
+// +k8s:validation:cel[2]:rule>!["Enabled", "IfPossible"].exists(v, v == self.?recursiveReadOnly.orValue("Disabled")) || self.?mountPropagation.orValue("None") == "None"
+// +k8s:validation:cel[2]:message>may only be specified when mountPropagation is None or not specified
+// +k8s:validation:cel[2]:fieldPath>.recursiveReadOnly
+// +k8s:validation:cel[2]:reason>FieldValueForbidden
 type VolumeMount struct {
 	// This must match the Name of a Volume.
+	// +k8s:validation:minLength=1
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Mounted read-only if true, read-write otherwise (false or unspecified).
 	// Defaults to false.
@@ -2178,10 +2539,15 @@ type VolumeMount struct {
 	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,7,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
 	// Path within the container at which the volume should be mounted.  Must
 	// not contain ':'.
+	// +k8s:validation:minLength=1
 	MountPath string `json:"mountPath" protobuf:"bytes,3,opt,name=mountPath"`
 	// Path within the volume from which the container's volume should be mounted.
 	// Defaults to "" (volume's root).
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || !self.startsWith("/")
+	// +k8s:validation:cel[0]:message>must be a relative path
+	// +k8s:validation:cel[1]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[1]:message>must not contain '..'
 	SubPath string `json:"subPath,omitempty" protobuf:"bytes,4,opt,name=subPath"`
 	// mountPropagation determines how mounts are propagated from the host
 	// to container and the other way around.
@@ -2196,6 +2562,10 @@ type VolumeMount struct {
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || !self.startsWith("/")
+	// +k8s:validation:cel[0]:message>must be a relative path
+	// +k8s:validation:cel[1]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[1]:message>must not contain '..'
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
 }
 
@@ -2240,14 +2610,29 @@ const (
 // volumeDevice describes a mapping of a raw block device within a container.
 type VolumeDevice struct {
 	// name must match the name of a persistentVolumeClaim in the pod
+	// +k8s:validation:minLength=1
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// devicePath is the path inside of the container that the device will be mapped to.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[0]:message>must not contain '..'
 	DevicePath string `json:"devicePath" protobuf:"bytes,2,opt,name=devicePath"`
 }
 
 // EnvVar represents an environment variable present in a Container.
+// +k8s:validation:cel[0]:rule>has(self.value) ? !has(self.valueFrom) : true
+// +k8s:validation:cel[0]:message>may not be specified when `value` is not empty
+// +k8s:validation:cel[0]:fieldPath>.valueFrom
 type EnvVar struct {
 	// Name of the environment variable. Must be a C_IDENTIFIER.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:pattern>^[-._a-zA-Z][-._a-zA-Z0-9]*$
+	// +k8s:validation:cel[0]:rule>self == ".." || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>may not start with '..'
+	// +k8s:validation:cel[1]:rule>self != "."
+	// +k8s:validation:cel[1]:message>must not be '.'
+	// +k8s:validation:cel[2]:rule>self != ".."
+	// +k8s:validation:cel[2]:message>must not be '..'
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// Optional: no more than one of the following may be specified.
@@ -2269,14 +2654,23 @@ type EnvVar struct {
 }
 
 // EnvVarSource represents a source for the value of an EnvVar.
+// +k8s:validation:cel[0]:rule>has(self.fieldRef) || has(self.resourceFieldRef) || has(self.configMapKeyRef) || has(self.secretKeyRef)
+// +k8s:validation:cel[0]:message>"must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`
+// +k8s:validation:cel[1]:rule>[has(self.fieldRef), has(self.resourceFieldRef), has(self.configMapKeyRef), has(self.secretKeyRef)].filter(x, x).size() <= 1
+// +k8s:validation:cel[1]:message>may not have more than one field specified at a time
 type EnvVarSource struct {
 	// Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
 	// spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.?fieldPath.orValue("").size() == 0 || self.fieldPath.contains('[') || ["metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"].exists(x, x == self.fieldPath)
+	// +k8s:validation:cel[0]:message>error converting fieldPath: supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"
+	// +k8s:validation:cel[0]:fieldPath>.fieldPath
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,1,opt,name=fieldRef"`
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
 	// +optional
+	// +k8s:validation:cel[0]:rule>["metadata.name","metadata.namespace","metadata.uid","spec.nodeName","spec.serviceAccountName","status.hostIP","status.hostIPs","status.podIP","status.podIPs"].exists(x, x == self.resource) || ["requests.hugepages-", "limits.hugepages-"].exists(prefix, self.resource.startsWith(prefix)
+	// +k8s:validation:cel[0]:message>supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.hostIPs, status.podIP, status.podIPs
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,2,opt,name=resourceFieldRef"`
 	// Selects a key of a ConfigMap.
 	// +optional
@@ -2290,19 +2684,41 @@ type EnvVarSource struct {
 // +structType=atomic
 type ObjectFieldSelector struct {
 	// Version of the schema the FieldPath is written in terms of, defaults to "v1".
-	// +optional
+	// +required
+	// +k8s:validation:minLength=1
+	// +default="v1"
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
 	// Path of the field to select in the specified API version.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!self.contains("[") || !self.contains("]") || ["metadata.annotations", "metadata.labels"].exists(x, self.startsWith(x + "['") && self.endsWith("']"))
+	// +k8s:validation:cel[0]:message>error converting fieldPath: field label does not support subscript
+	// +k8s:validation:cel[1]:rule>!self.startsWith("metadata.annotations['") || !self.endsWith("']") || !format.qualifiedName().validate(self.substring(22, self.size() - 2).lowerAscii()).hasValue()
+	// +k8s:validation:cel[1]:messageExpression>format.qualifiedName().validate(self.substring(22, self.size() - 2).lowerAscii()).value()
+	// +k8s:validation:cel[2]:rule>!self.startsWith("metadata.labels['") || !self.endsWith("']") ||!format.qualifiedName().validate(self.substring(17, self.size() - 2)).hasValue()
+	// +k8s:validation:cel[2]:messageExpression>format.qualifiedName().validate(self.substring(17, self.size() - 2)).value()
 	FieldPath string `json:"fieldPath" protobuf:"bytes,2,opt,name=fieldPath"`
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format
 // +structType=atomic
+// +k8s:validation:cel[0]:rule> self.?divisor.orValue("").size() == 0 || self.divisor == "0" || !(self.resource == "limits.cpu" || self.resource == "requests.cpu") ||
+// +k8s:validation:cel[0]:rule> ["1m", "1"].exists(x, x == self.divisor)
+// +k8s:validation:cel[0]:message>only divisor's values 1m and 1 are supported with the cpu resource
+// +k8s:validation:cel[1]:rule> self.?divisor.orValue("").size() == 0 || self.divisor == "0" || !(self.resource == "limits.memory" || self.resource == "requests.memory") ||
+// +k8s:validation:cel[1]:rule> ["1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei"].exists(x, x == self.divisor)
+// +k8s:validation:cel[1]:message>only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the memory resource
+// +k8s:validation:cel[2]:rule> self.?divisor.orValue("").size() == 0 || self.divisor == "0" || !(self.resource == "limits.ephemeral-storage" || self.resource == "requests.ephemeral-storage") ||
+// +k8s:validation:cel[2]:rule> ["1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei"].exists(x, x == self.divisor)
+// +k8s:validation:cel[2]:message>only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the local ephemeral storage resource
+// +k8s:validation:cel[3]:rule> self.?divisor.orValue("").size() == 0 || self.divisor == "0" || !(self.resource.startsWith("requests.hugepages-") || self.resource.startsWith("limits.hugepages-")) ||
+// +k8s:validation:cel[3]:rule> ["1", "1k", "1M", "1G", "1T", "1P", "1E", "1Ki", "1Mi", "1Gi", "1Ti", "1Pi", "1Ei"].exists(x, x == self.divisor)
+// +k8s:validation:cel[3]:message>only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the hugepages resource
 type ResourceFieldSelector struct {
 	// Container name: required for volumes, optional for env vars
 	// +optional
 	ContainerName string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
 	// Required: resource to select
+	// +k8s:validation:minLength=1
 	Resource string `json:"resource" protobuf:"bytes,2,opt,name=resource"`
 	// Specifies the output format of the exposed resources, defaults to "1"
 	// +optional
@@ -2311,10 +2727,21 @@ type ResourceFieldSelector struct {
 
 // Selects a key from a ConfigMap.
 // +structType=atomic
+// +k8s:validation:properties:name:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+// +k8s:validation:properties:name:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 type ConfigMapKeySelector struct {
 	// The ConfigMap to select from.
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// The key to select.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=253
+	// +k8s:validation:pattern>^[-._a-zA-Z0-9]+$
+	// +k8s:validation:cel[0]:rule>self == ".." || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>may not start with '..'
+	// +k8s:validation:cel[1]:rule>self != "."
+	// +k8s:validation:cel[1]:message>must not be '.'
+	// +k8s:validation:cel[2]:rule>self != ".."
+	// +k8s:validation:cel[2]:message>must not be '..'
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
 	// Specify whether the ConfigMap or its key must be defined
 	// +optional
@@ -2323,10 +2750,21 @@ type ConfigMapKeySelector struct {
 
 // SecretKeySelector selects a key of a Secret.
 // +structType=atomic
+// +k8s:validation:properties:name:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+// +k8s:validation:properties:name:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 type SecretKeySelector struct {
 	// The name of the secret in the pod's namespace to select from.
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
 	// The key of the secret to select from.  Must be a valid secret key.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=253
+	// +k8s:validation:pattern>^[-._a-zA-Z0-9]+$
+	// +k8s:validation:cel[0]:rule>self == ".." || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>may not start with '..'
+	// +k8s:validation:cel[1]:rule>self != "."
+	// +k8s:validation:cel[1]:message>must not be '.'
+	// +k8s:validation:cel[2]:rule>self != ".."
+	// +k8s:validation:cel[2]:message>must not be '..'
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
 	// Specify whether the Secret or its key must be defined
 	// +optional
@@ -2334,9 +2772,20 @@ type SecretKeySelector struct {
 }
 
 // EnvFromSource represents the source of a set of ConfigMaps
+// +k8s:validation:cel[0]:rule>has(self.configMapRef) ? !has(self.secretRef) : true
+// +k8s:validation:cel[0]:message>may not have more than one field specified at a time
+// +k8s:validation:cel[1]:rule>has(self.configMapRef) || has(self.secretRef)
+// +k8s:validation:cel[1]:message>must specify one of: `configMapRef` or `secretRef`
 type EnvFromSource struct {
 	// An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.
 	// +optional
+	// +k8s:validation:pattern>^[-._a-zA-Z][-._a-zA-Z0-9]*$
+	// +k8s:validation:cel[0]:rule>self == ".." || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>may not start with '..'
+	// +k8s:validation:cel[1]:rule>self != "."
+	// +k8s:validation:cel[1]:message>must not be '.'
+	// +k8s:validation:cel[2]:rule>self != ".."
+	// +k8s:validation:cel[2]:message>must not be '..'
 	Prefix string `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
 	// The ConfigMap to select from
 	// +optional
@@ -2351,6 +2800,13 @@ type EnvFromSource struct {
 //
 // The contents of the target ConfigMap's Data field will represent the
 // key-value pairs as environment variables.
+// +k8s:validation:cel[0]:rule>has(self.name) && self.name.size() > 0
+// +k8s:validation:cel[0]:message="Required value"
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.name
+// +k8s:validation:cel[1]:rule>!has(self.name) || !format.dns1123Subdomain().validate(self.name).hasValue()
+// +k8s:validation:cel[1]:messageExpression>format.dns1123Subdomain().validate(self.name).value()
+// +k8s:validation:cel[1]:fieldPath>.name
 type ConfigMapEnvSource struct {
 	// The ConfigMap to select from.
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
@@ -2364,6 +2820,13 @@ type ConfigMapEnvSource struct {
 //
 // The contents of the target Secret's Data field will represent the
 // key-value pairs as environment variables.
+// +k8s:validation:cel[0]:rule>has(self.name) && self.name.size() > 0
+// +k8s:validation:cel[0]:message="Required value"
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.name
+// +k8s:validation:cel[1]:rule>!has(self.name) || !format.dns1123Subdomain().validate(self.name).hasValue()
+// +k8s:validation:cel[1]:messageExpression>format.dns1123Subdomain().validate(self.name).value()
+// +k8s:validation:cel[1]:fieldPath>.name
 type SecretEnvSource struct {
 	// The Secret to select from.
 	LocalObjectReference `json:",inline" protobuf:"bytes,1,opt,name=localObjectReference"`
@@ -2376,6 +2839,7 @@ type SecretEnvSource struct {
 type HTTPHeader struct {
 	// The header field name.
 	// This will be canonicalized upon output, so case-variant names will be understood as the same header.
+	// +k8s:validation:pattern>^[-A-Za-z0-9]+$
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// The header field value
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
@@ -2385,10 +2849,16 @@ type HTTPHeader struct {
 type HTTPGetAction struct {
 	// Path to access on the HTTP server.
 	// +optional
+	// +k8s:validation:minLength=1
+	// +default="/"
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 	// Name or number of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
+	// +k8s:validation:minimum=1
+	// +k8s:validation:maximum=65535
+	// +k8s:validation:cel[0]:rule>type(self) != string || !format.portName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.portName().validate(self).value()
 	Port intstr.IntOrString `json:"port" protobuf:"bytes,2,opt,name=port"`
 	// Host name to connect to, defaults to the pod IP. You probably want to set
 	// "Host" in httpHeaders instead.
@@ -2397,6 +2867,8 @@ type HTTPGetAction struct {
 	// Scheme to use for connecting to the host.
 	// Defaults to HTTP.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.URISchemeHTTP)
+	// +k8s:validation:minLength=1
 	Scheme URIScheme `json:"scheme,omitempty" protobuf:"bytes,4,opt,name=scheme,casttype=URIScheme"`
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
@@ -2420,6 +2892,10 @@ type TCPSocketAction struct {
 	// Number or name of the port to access on the container.
 	// Number must be in the range 1 to 65535.
 	// Name must be an IANA_SVC_NAME.
+	// +k8s:validation:minimum=1
+	// +k8s:validation:maximum=65535
+	// +k8s:validation:cel[0]:rule>type(self) != string || !format.portName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.portName().validate(self).value()
 	Port intstr.IntOrString `json:"port" protobuf:"bytes,1,opt,name=port"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	// +optional
@@ -2428,6 +2904,8 @@ type TCPSocketAction struct {
 
 type GRPCAction struct {
 	// Port number of the gRPC service. Number must be in the range 1 to 65535.
+	// +k8s:validation:minimum=1
+	// +k8s:validation:maximum=65535
 	Port int32 `json:"port" protobuf:"bytes,1,opt,name=port"`
 
 	// Service is the name of the service to place in the gRPC HealthCheckRequest
@@ -2446,42 +2924,58 @@ type ExecAction struct {
 	// not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
 	// a shell, you need to explicitly call out to that shell.
 	// Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
-	// +optional
+	// +required
 	// +listType=atomic
+	// +k8s:validation:minItems=1
 	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
 }
 
 // SleepAction describes a "sleep" action.
 type SleepAction struct {
 	// Seconds is the number of seconds to sleep.
+	// +k8s:validation:minimum=0
 	Seconds int64 `json:"seconds" protobuf:"bytes,1,opt,name=seconds"`
 }
 
 // Probe describes a health check to be performed against a container to determine whether it is
 // alive or ready to receive traffic.
+// +k8s:validation:cel[0]:rule>has(self.exec) || has(self.httpGet) || has(self.tcpSocket) || has(self.grpc)
+// +k8s:validation:cel[0]:message>must specify a handler type
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:rule>(has(self.exec)?1:0) + (has(self.httpGet)?1:0) + (has(self.tcpSocket)?1:0) + (has(self.grpc)?1:0) <= 1
+// +k8s:validation:cel[1]:message>may not specify more than 1 handler type
 type Probe struct {
 	// The action taken to determine the health of a container
 	ProbeHandler `json:",inline" protobuf:"bytes,1,opt,name=handler"`
 	// Number of seconds after the container has started before liveness probes are initiated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
+	// +k8s:validation:minimum=0
 	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
 	// Number of seconds after which the probe times out.
 	// Defaults to 1 second. Minimum value is 1.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
+	// +k8s:validation:minimum=0
+	// +default=1
 	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
 	// How often (in seconds) to perform the probe.
 	// Default to 10 seconds. Minimum value is 1.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +default=10
 	PeriodSeconds int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +default=1
 	SuccessThreshold int32 `json:"successThreshold,omitempty" protobuf:"varint,5,opt,name=successThreshold"`
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// Defaults to 3. Minimum value is 1.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +default=3
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
 	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
 	// The grace period is the duration in seconds after the processes running in the pod are sent
@@ -2494,6 +2988,8 @@ type Probe struct {
 	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 	// Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
 	// +optional
+	// +k8s:validation:minimum=1
+	// +default=ref(k8s.io/api/core/v1.DefaultTerminationGracePeriodSeconds)
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,7,opt,name=terminationGracePeriodSeconds"`
 }
 
@@ -2511,6 +3007,7 @@ const (
 )
 
 // ResourceResizeRestartPolicy specifies how to handle container resource resize.
+// +enum
 type ResourceResizeRestartPolicy string
 
 // These are the valid resource resize restart policy values:
@@ -2531,6 +3028,7 @@ const (
 type ContainerResizePolicy struct {
 	// Name of the resource to which this resource resize policy applies.
 	// Supported values: cpu, memory.
+	// +k8s:validation:enum=["cpu","memory"]
 	ResourceName ResourceName `json:"resourceName" protobuf:"bytes,1,opt,name=resourceName,casttype=ResourceName"`
 	// Restart policy to apply when specified resource is resized.
 	// If not specified, it defaults to NotRequired.
@@ -2578,16 +3076,39 @@ type Capabilities struct {
 }
 
 // ResourceRequirements describes the compute resource requirements.
+// +k8s:validation:cel[0]:rule> [self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,
+// +k8s:validation:cel[0]:rule> 	!format.qualifiedName().validate(k).hasValue()
+// +k8s:validation:cel[0]:rule> ))
+// +k8s:validation:cel[0]:message> limits and requests keys must be a standard resource type or fully qualified
+// +k8s:validation:cel[1]:rule> [self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,
+// +k8s:validation:cel[1]:rule>		k.split('/').size() != 1 || (["cpu","memory","ephemeral-storage"].exists(std, std == k) || k.startsWith("hugepages-"))
+// +k8s:validation:cel[1]:rule> ))
+// +k8s:validation:cel[1]:message> limits and requests keys must be a standard resource for containers
+// +k8s:validation:cel[2]:rule> [self.?limits.orValue({}).map(k, k), self.?requests.orValue({}).map(k, k)].all(ks, ks.all(k,
+// +k8s:validation:cel[2]:rule>		k.split('/').size() == 1 || !k.contains("/") || k.startsWith("kubernetes.io/") ||
+// +k8s:validation:cel[2]:rule>		!k.startsWith("requests.") && !format.qualifiedName().validate("requests." + k).hasValue()
+// +k8s:validation:cel[2]:rule>	))
+// +k8s:validation:cel[2]:message> limits and requests must follow extended resource name standard if not standard container name
+// +k8s:validation:cel[3]:rule> self.?limits.orValue({}).exists(k, k == "cpu" || k == "memory") || self.?requests.orValue({}).exists(k, k == "cpu" || k == "memory") || !(
+// +k8s:validation:cel[3]:rule>		self.?limits.orValue({}).exists(k, k.startsWith("hugepages-")) ||
+// +k8s:validation:cel[3]:rule>		self.?requests.orValue({}).exists(k, k.startsWith("hugepages-."))
+// +k8s:validation:cel[3]:rule> )
+// +k8s:validation:cel[3]:message>HugePages require cpu or memory
+// +k8s:validation:cel[3]:reason>FieldValueForbidden
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
+	// +k8s:validation:additionalProperties:cel[0]:rule>isQuantity(self) && quantity(self).asApproximateFloat() >= 0
+	// +k8s:validation:additionalProperties:cel[0]:message>must be greater than or equal to 0
 	Limits ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
 	// Requests describes the minimum amount of compute resources required.
 	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
 	// otherwise to an implementation-defined value. Requests cannot exceed Limits.
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
+	// +k8s:validation:additionalProperties:cel[0]:rule>isQuantity(self) && quantity(self).asApproximateFloat() >= 0
+	// +k8s:validation:additionalProperties:cel[0]:message>must be greater than or equal to 0
 	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
 	// Claims lists the names of resources, defined in spec.resourceClaims,
 	// that are used by this container.
@@ -2639,16 +3160,35 @@ const (
 )
 
 // A single application container that you want to run within a pod.
+// +k8s:validation:cel[0]:rule>self.?volumeDevices.orValue([]).size() == 0 || self.?volumeMounts.orValue([]).all(vm, !self.volumeDevices.exists(vd, vd.name == vm.name))
+// +k8s:validation:cel[0]:message>volumeMounts must not already exist in volumeDevices
+// +k8s:validation:cel[0]:fieldPath>.volumeMounts
+// +k8s:validation:cel[1]:rule>self.?volumeDevices.orValue([]).size() == 0 || self.?volumeMounts.orValue([]).all(vm, !self.volumeDevices.exists(vd, vd.devicePath == vm.mountPath))
+// +k8s:validation:cel[1]:message>must not already exist as a path in volumeDevices
+// +k8s:validation:cel[1]:fieldPath>.volumeMounts
+// +k8s:validation:cel[2]:rule>self.?securityContext.?privileged.orValue(false) || self.?volumeMounts.orValue([]).all(vm, vm.?mountPropagation.orValue("") != "Bidirectional")
+// +k8s:validation:cel[2]:message>Bidirectional mount propagation is available only to privileged containers
+// +k8s:validation:cel[2]:fieldPath>.volumeMounts
+// +k8s:validation:cel[2]:reason>FieldValueForbidden
 type Container struct {
 	// Name of the container specified as a DNS_LABEL.
 	// Each container in a pod must have a unique name (DNS_LABEL).
 	// Cannot be updated.
+	// +required
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || !format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
+	// +k8s:validation:cel[0]:reason>FieldValueInvalid
+	// +k8s:validation:cel[1]:rule>self == oldSelf
+	// +k8s:validation:cel[1]:message>Field is immutable
+	// +k8s:validation:cel[1]:reason>FieldValueForbidden
+	// +k8s:validation:minLength=1
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Container image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
 	// This field is optional to allow higher level config management to default or override
 	// container images in workload controllers like Deployments and StatefulSets.
-	// +optional
+	// +required
+	// +k8s:validation:minLength=1
 	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
 	// Entrypoint array. Not executed within a shell.
 	// The container image's ENTRYPOINT is used if this is not provided.
@@ -2660,6 +3200,9 @@ type Container struct {
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
 	// Arguments to the entrypoint.
 	// The container image's CMD is used if this is not provided.
@@ -2671,12 +3214,18 @@ type Container struct {
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 	// Container's working directory.
 	// If not specified, the container runtime's default will be used, which
 	// might be configured in the container image.
 	// Cannot be updated.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	WorkingDir string `json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
 	// List of ports to expose from the container. Not specifying a port here
 	// DOES NOT prevent that port from being exposed. Any port which is
@@ -2691,6 +3240,12 @@ type Container struct {
 	// +listType=map
 	// +listMapKey=containerPort
 	// +listMapKey=protocol
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:cel[1]:rule>self.all(cp, cp.?name.orValue("").size() == 0 || !self.exists(ocp, ocp.name == cp.name && !(ocp.?protocol == cp.?protocol && ocp.?containerPort == cp.?containerPort)))
+	// +k8s:validation:cel[1]:message>container port names must be unique
+	// +k8s:validation:cel[1]:reason>FieldValueDuplicate
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
@@ -2700,6 +3255,9 @@ type Container struct {
 	// Cannot be updated.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// List of environment variables to set in the container.
 	// Cannot be updated.
@@ -2708,11 +3266,17 @@ type Container struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Compute Resources required by this container.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Resources resize policy for the container.
 	// +featureGate=InPlacePodVerticalScaling
@@ -2744,6 +3308,9 @@ type Container struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=mountPath
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
 	// +patchMergeKey=devicePath
@@ -2757,12 +3324,23 @@ type Container struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:properties:successThreshold:cel[0]:rule>self == 1
+	// +k8s:validation:properties:successThreshold:cel[0]:message>must be 1 for livenessProbes
 	LivenessProbe *Probe `json:"livenessProbe,omitempty" protobuf:"bytes,10,opt,name=livenessProbe"`
 	// Periodic probe of container service readiness.
 	// Container will be removed from service endpoints if the probe fails.
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:cel[1]:rule>!has(self.terminationGracePeriodSeconds)
+	// +k8s:validation:cel[1]:message>must not be set for readinessProbes
+	// +k8s:validation:cel[1]:fieldPath>.terminationGracePeriodSeconds
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty" protobuf:"bytes,11,opt,name=readinessProbe"`
 	// StartupProbe indicates that the Pod has successfully initialized.
 	// If specified, no other probes are executed until this completes successfully.
@@ -2772,10 +3350,18 @@ type Container struct {
 	// This cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:properties:successThreshold:cel[0]:rule>self == 1
+	// +k8s:validation:properties:successThreshold:cel[0]:message>must be 1 for startupProbes
 	StartupProbe *Probe `json:"startupProbe,omitempty" protobuf:"bytes,22,opt,name=startupProbe"`
 	// Actions that the management system should take in response to container lifecycle events.
 	// Cannot be updated.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Lifecycle *Lifecycle `json:"lifecycle,omitempty" protobuf:"bytes,12,opt,name=lifecycle"`
 	// Optional: Path at which the file to which the container's termination message
 	// will be written is mounted into the container's filesystem.
@@ -2785,6 +3371,10 @@ type Container struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
+	// +default="/dev/termination-log"
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
 	// Indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
@@ -2794,6 +3384,10 @@ type Container struct {
 	// Defaults to File.
 	// Cannot be updated.
 	// +optional
+	// +default="File"
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
@@ -2801,6 +3395,9 @@ type Container struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty" protobuf:"bytes,14,opt,name=imagePullPolicy,casttype=PullPolicy"`
 	// SecurityContext defines the security options the container should be run with.
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
@@ -2815,6 +3412,7 @@ type Container struct {
 	// is not set, reads from stdin in the container will always result in EOF.
 	// Default is false.
 	// +optional
+	// +default=false
 	Stdin bool `json:"stdin,omitempty" protobuf:"varint,16,opt,name=stdin"`
 	// Whether the container runtime should close the stdin channel after it has been opened by
 	// a single attach. When stdin is true the stdin stream will remain open across multiple attach
@@ -2824,10 +3422,12 @@ type Container struct {
 	// flag is false, a container processes that reads from stdin will never receive an EOF.
 	// Default is false
 	// +optional
+	// +default=false
 	StdinOnce bool `json:"stdinOnce,omitempty" protobuf:"varint,17,opt,name=stdinOnce"`
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	// +optional
+	// +default=false
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
 }
 
@@ -2851,6 +3451,11 @@ type ProbeHandler struct {
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
 // hook. One and only one of the fields, except TCPSocket must be specified.
+// +k8s:validation:cel[0]:rule>has(self.exec) || has(self.httpGet) || has(self.sleep) || has(self.tcpSocket)
+// +k8s:validation:cel[0]:message>must specify a handler type
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:rule>(has(self.exec)?1:0) + (has(self.httpGet)?1:0) + (has(self.sleep)?1:0) + (has(self.tcpSocket)?1:0) <= 1
+// +k8s:validation:cel[1]:message>may not specify more than 1 handler type
 type LifecycleHandler struct {
 	// Exec specifies the action to take.
 	// +optional
@@ -3215,6 +3820,9 @@ const (
 type NodeSelector struct {
 	// Required. A list of node selector terms. The terms are ORed.
 	// +listType=atomic
+	// +k8s:validation:cel[0]:rule>self.size() > 0
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:cel[0]:message>must have at least one node selector term
 	NodeSelectorTerms []NodeSelectorTerm `json:"nodeSelectorTerms" protobuf:"bytes,1,rep,name=nodeSelectorTerms"`
 }
 
@@ -3226,10 +3834,37 @@ type NodeSelectorTerm struct {
 	// A list of node selector requirements by node's labels.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:items:cel[0]:rule>self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() > 0 : true
+	// +k8s:validation:items:cel[0]:message>must be specified when `operator` is 'In' or 'NotIn'
+	// +k8s:validation:items:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:items:cel[0]:fieldPath>.values
+	// +k8s:validation:items:cel[1]:rule>self.operator == 'Exists' || self.operator == 'DoesNotExist' ? !has(self.values) || self.values.size() == 0 : true
+	// +k8s:validation:items:cel[1]:message>may not be specified when `operator` is 'Exists' or 'DoesNotExist'
+	// +k8s:validation:items:cel[1]:reason>FieldValueForbidden
+	// +k8s:validation:items:cel[1]:fieldPath>.values
+	// +k8s:validation:items:cel[2]:rule>self.operator == 'Gt' || self.operator == 'Lt' ? has(self.values) && self.values.size() == 1 : true
+	// +k8s:validation:items:cel[2]:message>must be specified single value when `operator` is 'Lt' or 'Gt'
+	// +k8s:validation:items:cel[2]:reason>FieldValueRequired
+	// +k8s:validation:items:cel[2]:fieldPath>.values
+	// +k8s:validation:items:properties:key:cel[0]:rule>!format.named("qualifiedName").value().validate(self).hasValue()
+	// +k8s:validation:items:properties:key:cel[0]:messageExpression>format.named("qualifiedName").value().validate(self).value()
 	MatchExpressions []NodeSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
 	// A list of node selector requirements by node's fields.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:items:cel[0]:rule>self.operator == 'In' || self.operator == 'NotIn' ? has(self.values) && self.values.size() == 1 : true
+	// +k8s:validation:items:cel[0]:message>must be only one value when `operator` is 'In' or 'NotIn' for node field selector
+	// +k8s:validation:items:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:items:cel[0]:fieldPath>.values
+	// +k8s:validation:items:properties:operator:cel[0]:rule>self == 'In' || self == 'NotIn'
+	// +k8s:validation:items:properties:operator:cel[0]:message>not a valid selector operator
+	// +k8s:validation:items:properties:operator:cel[0]:reason>FieldValueInvalid
+	// +k8s:validation:items:properties:key:cel[0]:rule>["metadata.name"].exists(n, n == self)
+	// +k8s:validation:items:properties:key:cel[0]:message>not a valid field selector key
+	// +k8s:validation:items:properties:key:cel[0]:reason>FieldValueInvalid
+	//!TODO: Use variables for name format to use here, fortunately only one is valid so we use that
+	// +k8s:validation:items:properties:values:items:cel[0]:rule>!format.named("dns1123Subdomain").value().validate(self).hasValue()
+	// +k8s:validation:items:properties:values:items:cel[0]:messageExpression>format.named("dns1123Subdomain").value().validate(self).value()
 	MatchFields []NodeSelectorRequirement `json:"matchFields,omitempty" protobuf:"bytes,2,rep,name=matchFields"`
 }
 
@@ -3382,6 +4017,8 @@ type PodAntiAffinity struct {
 type WeightedPodAffinityTerm struct {
 	// weight associated with matching the corresponding podAffinityTerm,
 	// in the range 1-100.
+	// +k8s:validation:Minimum=1
+	// +k8s:validation:Maximum=100
 	Weight int32 `json:"weight" protobuf:"varint,1,opt,name=weight"`
 	// Required. A pod affinity term, associated with the corresponding weight.
 	PodAffinityTerm PodAffinityTerm `json:"podAffinityTerm" protobuf:"bytes,2,opt,name=podAffinityTerm"`
@@ -3393,6 +4030,8 @@ type WeightedPodAffinityTerm struct {
 // where co-located is defined as running on a node whose value of
 // the label with key <topologyKey> matches that of any node on which
 // a pod of the set of pods is running
+// +k8s:validation:cel[0]:rule>!has(self.mismatchLabelKeys) || !has(self.matchLabelKeys) || self.matchLabelKeys.all(x, !self.mismatchLabelKeys.exists(y, y == x))
+// +k8s:validation:cel[0]:message>matchLabelKeys key must not be in mismatchLabelKeys
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// If it's null, this PodAffinityTerm matches with no Pods.
@@ -3404,12 +4043,17 @@ type PodAffinityTerm struct {
 	// null or empty namespaces list and null namespaceSelector means "this pod's namespace".
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:items:cel[0]:rule>!format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:items:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,2,rep,name=namespaces"`
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
 	// whose value of the label with key topologyKey matches that of any node on which any of the
 	// selected pods is running.
 	// Empty topologyKey is not allowed.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	TopologyKey string `json:"topologyKey" protobuf:"bytes,3,opt,name=topologyKey"`
 	// A label query over the set of namespaces that the term applies to.
 	// The term is applied to the union of the namespaces selected by this field
@@ -3429,6 +4073,8 @@ type PodAffinityTerm struct {
 	// This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
 	// +listType=atomic
 	// +optional
+	// +k8s:validation:items:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:items:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	MatchLabelKeys []string `json:"matchLabelKeys,omitempty" protobuf:"bytes,5,opt,name=matchLabelKeys"`
 	// MismatchLabelKeys is a set of pod label keys to select which pods will
 	// be taken into consideration. The keys are used to lookup values from the
@@ -3441,6 +4087,8 @@ type PodAffinityTerm struct {
 	// This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
 	// +listType=atomic
 	// +optional
+	// +k8s:validation:items:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:items:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	MismatchLabelKeys []string `json:"mismatchLabelKeys,omitempty" protobuf:"bytes,6,opt,name=mismatchLabelKeys"`
 }
 
@@ -3480,6 +4128,8 @@ type NodeAffinity struct {
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 type PreferredSchedulingTerm struct {
 	// Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.
+	// +k8s:validation:minimum=1
+	// +k8s:validation:maximum=100
 	Weight int32 `json:"weight" protobuf:"varint,1,opt,name=weight"`
 	// A node selector term, associated with the corresponding weight.
 	Preference NodeSelectorTerm `json:"preference" protobuf:"bytes,2,opt,name=preference"`
@@ -3529,10 +4179,24 @@ const (
 
 // The pod this Toleration is attached to tolerates any taint that matches
 // the triple <key,value,effect> using the matching operator <operator>.
+// +k8s:validation:cel[0]:rule>(self.?key.orValue("").size() > 0) || self.?operator.orValue("") == 'Exists'
+// +k8s:validation:cel[0]:message>operator must be Exists when `key` is empty, which means "match all values and all keys"
+// +k8s:validation:cel[0]:fieldPath>.operator
+// +k8s:validation:cel[1]:rule>!has(self.tolerationSeconds) || self.effect == 'NoExecute'
+// +k8s:validation:cel[1]:message>must be 'NoExecute' when `tolerationSeconds` is set
+// +k8s:validation:cel[1]:fieldPath>.effect
+// +k8s:validation:cel[2]:rule>(has(self.operator) && self.operator != 'Equal' && self.operator != "") || !format.labelValue().validate(self.?value.orValue("")).hasValue()
+// +k8s:validation:cel[2]:messageExpression>format.labelValue().validate(self.value).value()
+// +k8s:validation:cel[2]:fieldPath>.operator
+// +k8s:validation:cel[3]:rule>!has(self.operator) || self.operator != 'Exists' || self.?value.orValue("").size() == 0
+// +k8s:validation:cel[3]:message>value must be empty when `operator` is 'Exists'
+// +k8s:validation:cel[3]:fieldPath>.operator
 type Toleration struct {
 	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
 	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
 	// Operator represents a key's relationship to the value.
 	// Valid operators are Exists and Equal. Defaults to Equal.
@@ -3568,10 +4232,84 @@ const (
 // PodReadinessGate contains the reference to a pod condition
 type PodReadinessGate struct {
 	// ConditionType refers to a condition in the pod's condition list with matching type.
+	// +k8s:validation:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	ConditionType PodConditionType `json:"conditionType" protobuf:"bytes,1,opt,name=conditionType,casttype=PodConditionType"`
 }
 
 // PodSpec is a description of a pod.
+// +k8s:validation:cel[0]:rule>!self.?shareProcessNamespace.orValue(false) || !self.?hostPID.orValue(false)
+// +k8s:validation:cel[0]:message>ShareProcessNamespace and HostPID cannot both be enabled
+// +k8s:validation:cel[0]:fieldPath>.shareProcessNamespace
+// +k8s:validation:cel[1]:rule>!self.?hostNetwork.orValue(false) || self.?containers.orValue([]).all(c, c.?ports.orValue([]).all(p, !has(p.hostPort) || !has(p.containerPort) || p.hostPort == p.containerPort))
+// +k8s:validation:cel[1]:message>`hostPort` must match `containerPort` when `hostNetwork` is true
+// +k8s:validation:cel[1]:fieldPath>.containers
+// +k8s:validation:cel[2]:rule>has(self.hostUsers) && !self.hostUsers ? !self.hostNetwork : true
+// +k8s:validation:cel[2]:message>when `pod.Spec.HostUsers` is false
+// +k8s:validation:cel[2]:fieldPath>.hostNetwork
+// +k8s:validation:cel[2]:reason>FieldValueForbidden
+// +k8s:validation:cel[3]:rule>has(self.hostUsers) && !self.hostUsers ? !self.hostPID : true
+// +k8s:validation:cel[3]:message>when `pod.Spec.HostUsers` is false
+// +k8s:validation:cel[3]:fieldPath>.hostPID
+// +k8s:validation:cel[3]:reason>FieldValueForbidden
+// +k8s:validation:cel[4]:rule>has(self.hostUsers) && !self.hostUsers ? !self.hostIPC : true
+// +k8s:validation:cel[4]:message>when `pod.Spec.HostUsers` is false
+// +k8s:validation:cel[4]:fieldPath>.hostIPC
+// +k8s:validation:cel[4]:reason>FieldValueForbidden
+// +k8s:validation:cel[5]:rule>!has(self.terminationGracePeriodSeconds) || self.containers.all(c, c.?lifecycle.?preStop.?sleep.?seconds.orValue(0) <= self.terminationGracePeriodSeconds && c.?lifecycle.?postStart.?sleep.?seconds.orValue(0) <= self.terminationGracePeriodSeconds)
+// +k8s:validation:cel[5]:message>container lifecycle sleep seconds must be less than or equal to `terminationGracePeriodSeconds`
+// +k8s:validation:cel[5]:fieldPath>.containers
+// +k8s:validation:cel[6]:rule>!has(self.dnsPolicy) || self.dnsPolicy != "None" || has(self.dnsConfig)
+// +k8s:validation:cel[6]:message>must provide `dnsConfig` when `dnsPolicy` is None
+// +k8s:validation:cel[6]:reason>FieldValueRequired
+// +k8s:validation:cel[6]:fieldPath>.dnsConfig
+// +k8s:validation:cel[7]:rule>!has(self.dnsPolicy) || self.dnsPolicy != "None" || !has(self.dnsConfig) || (self.dnsConfig.?nameservers.optMap(x, x.size()).orValue(0) > 0)
+// +k8s:validation:cel[7]:message>must provide at least one DNS nameserver when `dnsPolicy` is None
+// +k8s:validation:cel[7]:fieldPath>.dnsConfig.nameservers
+// +k8s:validation:cel[7]:reason>FieldValueRequired
+// +k8s:validation:cel[8]:rule>self.?initContainers.orValue([]).all(ic, self.?containers.orValue([]).all(c, c.name != ic.name))
+// +k8s:validation:cel[8]:message>init container name must not match any container name
+// +k8s:validation:cel[8]:fieldPath>.initContainers
+// +k8s:validation:cel[8]:reason>FieldValueDuplicate
+// +k8s:validation:cel[9]:rule>self.?ephemeralContainers.orValue([]).all(ec, self.?containers.orValue([]).all(c, c.name != ec.name))
+// +k8s:validation:cel[9]:message>ephemeral container name must not match any container name
+// +k8s:validation:cel[9]:fieldPath>.ephemeralContainers
+// +k8s:validation:cel[9]:reason>FieldValueDuplicate
+// +k8s:validation:cel[10]:rule>self.?ephemeralContainers.orValue([]).all(ec, self.?initContainers.orValue([]).all(ic, ic.name != ec.name))
+// +k8s:validation:cel[10]:message>ephemeral container name must not match any init container name
+// +k8s:validation:cel[10]:fieldPath>.ephemeralContainers
+// +k8s:validation:cel[10]:reason>FieldValueDuplicate
+// +k8s:validation:cel[11]:rule>self.?ephemeralContainers.orValue([]).all(ec, ec.?targetContainerName.orValue("").size() == 0 || self.containers.exists(c, c.name == ec.targetContainerName) || self.initContainers.exists(ic, ic.name == ec.targetContainerName))
+// +k8s:validation:cel[11]:message>ephemeral container targetContainerName must match a container name
+// +k8s:validation:cel[11]:fieldPath>.ephemeralContainers
+// +k8s:validation:cel[11]:reason>FieldValueInvalid
+// +k8s:validation:cel[12]:rule>self.?containers.orValue([]).all(c, c.?volumeMounts.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))
+// +k8s:validation:cel[12]:message>container volume mounts must be a volume name
+// +k8s:validation:cel[12]:fieldPath>.containers
+// +k8s:validation:cel[13]:rule>self.?initContainers.orValue([]).all(c, c.?volumeMounts.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))
+// +k8s:validation:cel[13]:message>container volume mounts must be a volume name
+// +k8s:validation:cel[13]:fieldPath>.initContainers
+// +k8s:validation:cel[14]:rule>self.?ephemeralContainers.orValue([]).all(c, c.?volumeMounts.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))
+// +k8s:validation:cel[14]:message>container volume mounts must be a volume name
+// +k8s:validation:cel[14]:fieldPath>.ephemeralContainers
+// +k8s:validation:cel[15]:rule>self.?containers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))
+// +k8s:validation:cel[15]:message>container volume devices must be a volume name
+// +k8s:validation:cel[15]:fieldPath>.containers
+// +k8s:validation:cel[16]:rule>self.?initContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))
+// +k8s:validation:cel[16]:message>initContainer volume devices must be a volume name
+// +k8s:validation:cel[16]:fieldPath>.initContainers
+// +k8s:validation:cel[17]:rule>self.?ephemeralContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, self.?volumes.orValue([]).exists(x, x.name == vm.name)))
+// +k8s:validation:cel[17]:message>ephemeralContainer volume devices must be a volume name
+// +k8s:validation:cel[17]:fieldPath>.ephemeralContainers
+// +k8s:validation:cel[18]:rule>self.?containers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, !self.?volumes.orValue([]).exists(x, x.name == vm.name) || self.?volumes.orValue([]).exists(x, x.name == vm.name && (has(x.persistentVolumeClaim) || has(x.ephemeral)))))
+// +k8s:validation:cel[18]:message>can only use volume source type of PersistentVolumeClaim or Ephemeral for block mode
+// +k8s:validation:cel[18]:fieldPath>.containers
+// +k8s:validation:cel[19]:rule>self.?initContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, !self.?volumes.orValue([]).exists(x, x.name == vm.name) || self.?volumes.orValue([]).exists(x, x.name == vm.name && (has(x.persistentVolumeClaim) || has(x.ephemeral)))))
+// +k8s:validation:cel[19]:message>can only use volume source type of PersistentVolumeClaim or Ephemeral for block mode
+// +k8s:validation:cel[19]:fieldPath>.initContainers
+// +k8s:validation:cel[20]:rule>self.?ephemeralContainers.orValue([]).all(c, c.?volumeDevices.orValue([]).all(vm, !self.?volumes.orValue([]).exists(x, x.name == vm.name) || self.?volumes.orValue([]).exists(x, x.name == vm.name && (has(x.persistentVolumeClaim) || has(x.ephemeral)))))
+// +k8s:validation:cel[20]:message>can only use volume source type of PersistentVolumeClaim or Ephemeral for block mode
+// +k8s:validation:cel[20]:fieldPath>.ephemeralContainers
 type PodSpec struct {
 	// List of volumes that can be mounted by containers belonging to the pod.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes
@@ -3598,6 +4336,26 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:validation:items:properties:restartPolicy:cel[0]:rule>self == "Always"
+	// +k8s:validation:items:properties:restartPolicy:cel[0]:message>supported values: "Always"
+	// +k8s:validation:items:properties:resizePolicy:cel[0]:rule>false
+	// +k8s:validation:items:properties:resizePolicy:cel[0]:message>must not be set for init containers
+	// +k8s:validation:items:cel[0]:rule>!has(self.lifecycle) || self.?restartPolicy.orValue("") == "Always"
+	// +k8s:validation:items:cel[0]:message>may not be set for init containers without restartPolicy=Always
+	// +k8s:validation:items:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:items:cel[0]:fieldPath>.lifecycle
+	// +k8s:validation:items:cel[1]:rule>!has(self.livenessProbe) || self.?restartPolicy.orValue("") == "Always"
+	// +k8s:validation:items:cel[1]:message>may not be set for init containers without restartPolicy=Always
+	// +k8s:validation:items:cel[1]:reason>FieldValueForbidden
+	// +k8s:validation:items:cel[1]:fieldPath>.livenessProbe
+	// +k8s:validation:items:cel[2]:rule>!has(self.readinessProbe) || self.?restartPolicy.orValue("") == "Always"
+	// +k8s:validation:items:cel[2]:message>may not be set for init containers without restartPolicy=Always
+	// +k8s:validation:items:cel[2]:reason>FieldValueForbidden
+	// +k8s:validation:items:cel[2]:fieldPath>.readinessProbe
+	// +k8s:validation:items:cel[3]:rule>!has(self.startupProbe) || self.?restartPolicy.orValue("") == "Always"
+	// +k8s:validation:items:cel[3]:message>may not be set for init containers without restartPolicy=Always
+	// +k8s:validation:items:cel[3]:reason>FieldValueForbidden
+	// +k8s:validation:items:cel[3]:fieldPath>.startupProbe
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// List of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
@@ -3607,6 +4365,10 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:validation:items:cel[0]:rule>!has(self.restartPolicy)
+	// +k8s:validation:items:cel[0]:message>may not be set for non-init containers
+	// +k8s:validation:items:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:items:cel[0]:fieldPath>.restartPolicy
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
 	// List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
@@ -3623,6 +4385,10 @@ type PodSpec struct {
 	// Default to Always.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.size() > 0
+	// +k8s:validation:cel[0]:message>Required value
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +default=ref(k8s.io/api/core/v1.RestartPolicyAlways)
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
 	// Value must be non-negative integer. The value zero indicates stop immediately via
@@ -3638,6 +4404,8 @@ type PodSpec struct {
 	// StartTime before the system will actively try to mark it failed and kill associated containers.
 	// Value must be a positive integer.
 	// +optional
+	// +k8s:validation:minimum=1
+	// +k8s:validation:maximum=2147483647
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// Set DNS policy for the pod.
 	// Defaults to "ClusterFirst".
@@ -3646,17 +4414,24 @@ type PodSpec struct {
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.DNSClusterFirst)
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
 	// +optional
 	// +mapType=atomic
+	// +k8s:validation:additionalProperties:cel[0]:rule>!format.labelValue().validate(self).hasValue()
+	// +k8s:validation:additionalProperties:cel[0]:messageExpression>format.labelValue().validate(self).value()
+	// +k8s:validation:cel[0]:rule>self.all(k, !format.qualifiedName().validate(k).hasValue())
+	// +k8s:validation:cel[0]:messageExpression>self.all(k, format.qualifiedName().validate(k).value().orValue([])).filter(x, x.size() > 0)[0]
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	ServiceAccountName string `json:"serviceAccountName,omitempty" protobuf:"bytes,8,opt,name=serviceAccountName"`
 	// DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
 	// Deprecated: Use serviceAccountName instead.
@@ -3673,6 +4448,8 @@ type PodSpec struct {
 	// This field should not be used to express a desire for the pod to be scheduled on a specific node.
 	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
 	// Host networking requested for this pod. Use the host's network namespace.
 	// If this option is set, the ports that will be used must be specified.
@@ -3714,10 +4491,14 @@ type PodSpec struct {
 	// Specifies the hostname of the Pod
 	// If not specified, the pod's hostname will be set to a system-defined value.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,16,opt,name=hostname"`
 	// If specified, the fully qualified Pod hostname will be "<hostname>.<subdomain>.<pod namespace>.svc.<cluster domain>".
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
 	// If specified, the pod's scheduling constraints
 	// +optional
@@ -3725,6 +4506,7 @@ type PodSpec struct {
 	// If specified, the pod will be dispatched by specified scheduler.
 	// If not specified, the pod will be dispatched by default scheduler.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.DefaultSchedulerName)
 	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,19,opt,name=schedulerName"`
 	// If specified, the pod's tolerations.
 	// +optional
@@ -3745,6 +4527,8 @@ type PodSpec struct {
 	// If not specified, the pod priority will be default or zero if there is no
 	// default.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	PriorityClassName string `json:"priorityClassName,omitempty" protobuf:"bytes,24,opt,name=priorityClassName"`
 	// The priority value. Various system components use this field to find the
 	// priority of the pod. When Priority Admission Controller is enabled, it
@@ -3771,6 +4555,8 @@ type PodSpec struct {
 	// empty definition that uses the default runtime handler.
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
@@ -3891,6 +4677,10 @@ type PodSpec struct {
 type PodResourceClaim struct {
 	// Name uniquely identifies this resource claim inside the pod.
 	// This must be a DNS_LABEL.
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=63
+	// +k8s:validation:cel[0]:rule>!format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
 	// Source describes where to find the ResourceClaim.
@@ -3901,9 +4691,15 @@ type PodResourceClaim struct {
 //
 // Exactly one of these fields should be set.  Consumers of this type must
 // treat an empty object as if it has an unknown value.
+// +k8s:validation:cel[0]:rule>has(self.resourceClaimName) || has(self.resourceClaimTemplateName)
+// +k8s:validation:cel[0]:message>"must specify one of: `resourceClaimName`, `resourceClaimTemplateName`
+// +k8s:validation:cel[1]:rule>!has(self.resourceClaimName) || !has(self.resourceClaimTemplateName)
+// +k8s:validation:cel[1]:message>at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified
 type ClaimSource struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,1,opt,name=resourceClaimName"`
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -3918,6 +4714,8 @@ type ClaimSource struct {
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimTemplateName"`
 }
 
@@ -3961,6 +4759,8 @@ type PodOS struct {
 type PodSchedulingGate struct {
 	// Name of the scheduling gate.
 	// Each scheduling gate must have a unique name field.
+	// +k8s:validation:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -3988,6 +4788,8 @@ const (
 )
 
 // TopologySpreadConstraint specifies how to spread matching pods among the given topology.
+// +k8s:validation:cel[0]:rule>self.?whenUnsatisfiable.orValue("") == "DoNotSchedule" ? !has(self.minDomains) : true
+// +k8s:validation:cel[0]:message>"minDomains must be nil when whenUnsatisfiable is not DoNotSchedule"
 type TopologySpreadConstraint struct {
 	// MaxSkew describes the degree to which pods may be unevenly distributed.
 	// When `whenUnsatisfiable=DoNotSchedule`, it is the maximum permitted difference
@@ -4009,6 +4811,7 @@ type TopologySpreadConstraint struct {
 	// When `whenUnsatisfiable=ScheduleAnyway`, it is used to give higher precedence
 	// to topologies that satisfy it.
 	// It's a required field. Default value is 1 and 0 is not allowed.
+	// +k8s:validation:minimum=0
 	MaxSkew int32 `json:"maxSkew" protobuf:"varint,1,opt,name=maxSkew"`
 	// TopologyKey is the key of node labels. Nodes that have a label with this key
 	// and identical values are considered to be in the same topology.
@@ -4020,6 +4823,7 @@ type TopologySpreadConstraint struct {
 	// e.g. If TopologyKey is "kubernetes.io/hostname", each Node is a domain of that topology.
 	// And, if TopologyKey is "topology.kubernetes.io/zone", each zone is a domain of that topology.
 	// It's a required field.
+	// +k8s:validation:minLength=1
 	TopologyKey string `json:"topologyKey" protobuf:"bytes,2,opt,name=topologyKey"`
 	// WhenUnsatisfiable indicates how to deal with a pod if it doesn't satisfy
 	// the spread constraint.
@@ -4071,6 +4875,7 @@ type TopologySpreadConstraint struct {
 	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
 	// it will violate MaxSkew.
 	// +optional
+	// +k8s:validation:minimum=0
 	MinDomains *int32 `json:"minDomains,omitempty" protobuf:"varint,5,opt,name=minDomains"`
 	// NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
 	// when calculating pod topology spread skew. Options are:
@@ -4103,6 +4908,8 @@ type TopologySpreadConstraint struct {
 	// This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
 	// +listType=atomic
 	// +optional
+	// +k8s:validation:items:cel[0]:rule>!format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:items:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
 	MatchLabelKeys []string `json:"matchLabelKeys,omitempty" protobuf:"bytes,8,opt,name=matchLabelKeys"`
 }
 
@@ -4114,10 +4921,14 @@ const (
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 type HostAlias struct {
+	// +k8s:validation:cel[0]:rule>isIP(self)
+	// +k8s:validation:cel[0]:message>must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)
 	// IP address of the host file entry.
 	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 	// Hostnames for the above IP address.
 	// +listType=atomic
+	// +k8s:validation:items:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:items:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	Hostnames []string `json:"hostnames,omitempty" protobuf:"bytes,2,rep,name=hostnames"`
 }
 
@@ -4163,6 +4974,8 @@ type PodSecurityContext struct {
 	// for that container.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=2147483647
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,2,opt,name=runAsUser"`
 	// The GID to run the entrypoint of the container process.
 	// Uses runtime default if unset.
@@ -4171,6 +4984,8 @@ type PodSecurityContext struct {
 	// for that container.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=2147483647
 	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,6,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
@@ -4189,6 +5004,8 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:items:minimum=0
+	// +k8s:validation:items:maximum=2147483647
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,4,rep,name=supplementalGroups"`
 	// A special supplemental group that applies to all containers in a pod.
 	// Some volume types allow the Kubelet to change the ownership of that volume
@@ -4201,6 +5018,8 @@ type PodSecurityContext struct {
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=2147483647
 	FSGroup *int64 `json:"fsGroup,omitempty" protobuf:"varint,5,opt,name=fsGroup"`
 	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported
 	// sysctls (by the container runtime) might fail to launch.
@@ -4229,7 +5048,14 @@ type PodSecurityContext struct {
 
 // SeccompProfile defines a pod/container's seccomp profile settings.
 // Only one profile source may be set.
-// +union
+// +k8s:validation:cel[0]:rule>self.type != "Localhost" || has(self.localhostProfile)
+// +k8s:validation:cel[0]:message>must be set when seccomp type is Localhost
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.localhostProfile
+// +k8s:validation:cel[1]:rule>self.type == "Localhost" || !has(self.localhostProfile)
+// +k8s:validation:cel[1]:message>can only be set when seccomp type is Localhost
+// +k8s:validation:cel[1]:fieldPath>.localhostProfile
+
 type SeccompProfile struct {
 	// type indicates which kind of seccomp profile will be applied.
 	// Valid options are:
@@ -4237,13 +5063,16 @@ type SeccompProfile struct {
 	// Localhost - a profile defined in a file on the node should be used.
 	// RuntimeDefault - the container runtime default profile should be used.
 	// Unconfined - no profile should be applied.
-	// +unionDiscriminator
 	Type SeccompProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SeccompProfileType"`
 	// localhostProfile indicates a profile defined in a file on the node should be used.
 	// The profile must be preconfigured on the node to work.
 	// Must be a descending path, relative to the kubelet's configured seccomp profile location.
 	// Must be set if type is "Localhost". Must NOT be set for any other type.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || !self.startsWith("/")
+	// +k8s:validation:cel[0]:message>must be a relative path
+	// +k8s:validation:cel[1]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[1]:message>must not contain '..'
 	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
 }
 
@@ -4262,14 +5091,23 @@ const (
 )
 
 // AppArmorProfile defines a pod or container's AppArmor settings.
-// +union
+// +k8s:validation:cel[0]:rule>self.type != "Localhost" || has(self.localhostProfile) && self.localhostProfile.trim().size() > 0
+// +k8s:validation:cel[0]:message>must be set when AppArmor type is Localhost
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[0]:fieldPath>.localhostProfile
+// +k8s:validation:cel[1]:rule>self.type != "Localhost" || !has(self.localhostProfile) || self.localhostProfile.trim() == self.localhostProfile
+// +k8s:validation:cel[1]:message>must not be padded with whitespace
+// +k8s:validation:cel[1]:reason>FieldValueInvalid
+// +k8s:validation:cel[1]:fieldPath>.localhostProfile
+// +k8s:validation:cel[2]:rule>self.type == "Localhost" || !has(self.localhostProfile)
+// +k8s:validation:cel[2]:message>can only be set when AppArmor type is Localhost
+// +k8s:validation:cel[2]:fieldPath>.localhostProfile
 type AppArmorProfile struct {
 	// type indicates which kind of AppArmor profile will be applied.
 	// Valid options are:
 	//   Localhost - a profile pre-loaded on the node.
 	//   RuntimeDefault - the container runtime's default profile.
 	//   Unconfined - no AppArmor enforcement.
-	// +unionDiscriminator
 	Type AppArmorProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=AppArmorProfileType"`
 
 	// localhostProfile indicates a profile loaded on the node that should be used.
@@ -4277,6 +5115,7 @@ type AppArmorProfile struct {
 	// Must match the loaded name of the profile.
 	// Must be set if and only if type is "Localhost".
 	// +optional
+	// +k8s:validation:maxLength=4095
 	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
 }
 
@@ -4314,12 +5153,20 @@ type PodDNSConfig struct {
 	// Duplicated nameservers will be removed.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:maxItems=3
+	// +k8s:validation:items:cel[0]:rule>isIP(self)
+	// +k8s:validation:items:cel[0]:message>must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)
 	Nameservers []string `json:"nameservers,omitempty" protobuf:"bytes,1,rep,name=nameservers"`
 	// A list of DNS search domains for host-name lookup.
 	// This will be appended to the base search paths generated from DNSPolicy.
 	// Duplicated search paths will be removed.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:maxItems=32
+	// +k8s:validation:cel[0]:rule>self.map(x, x.size()).sum() + self.size() - 1 <= 2048
+	// +k8s:validation:cel[0]:message>must not have more than 2048 characters (including spaces) in the search list
+	// +k8s:validation:items:cel[0]:rule>!format.dns1123Subdomain().validate(self.substring(0, self.size() - (self.endsWith(".") ? 1 : 0))).hasValue()
+	// +k8s:validation:items:cel[0]:messageExpression>format.dns1123Subdomain().validate(self.substring(0, self.size() - (self.endsWith(".") ? 1 : 0))).value()
 	Searches []string `json:"searches,omitempty" protobuf:"bytes,2,rep,name=searches"`
 	// A list of DNS resolver options.
 	// This will be merged with the base options generated from DNSPolicy.
@@ -4333,6 +5180,8 @@ type PodDNSConfig struct {
 // PodDNSConfigOption defines DNS resolver options of a pod.
 type PodDNSConfigOption struct {
 	// Required.
+	// +k8s:validation:minLength=1
+	// +required
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	// +optional
 	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
@@ -4357,9 +5206,17 @@ type HostIP struct {
 type EphemeralContainerCommon struct {
 	// Name of the ephemeral container specified as a DNS_LABEL.
 	// This name must be unique among all containers, init containers and ephemeral containers.
+	// +k8s:validation:cel[0]:rule>self.size() == 0 || !format.dns1123Label().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Label().validate(self).value()
+	// +k8s:validation:cel[0]:reason>FieldValueInvalid
+	// +k8s:validation:minLength=1
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Container image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
+	// +required
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.trim() == self
+	// +k8s:validation:cel[0]:message>must not have leading or trailing whitespace
 	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
 	// Entrypoint array. Not executed within a shell.
 	// The image's ENTRYPOINT is used if this is not provided.
@@ -4382,12 +5239,18 @@ type EphemeralContainerCommon struct {
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 	// Container's working directory.
 	// If not specified, the container runtime's default will be used, which
 	// might be configured in the container image.
 	// Cannot be updated.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	WorkingDir string `json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
 	// Ports are not allowed for ephemeral containers.
 	// +optional
@@ -4396,6 +5259,9 @@ type EphemeralContainerCommon struct {
 	// +listType=map
 	// +listMapKey=containerPort
 	// +listMapKey=protocol
+	// +k8s:validation:cel[0]:rule>false
+	// +k8s:validation:cel[0]:message>field is not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Ports []ContainerPort `json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`
 	// List of sources to populate environment variables in the container.
 	// The keys defined within a source must be a C_IDENTIFIER. All invalid keys
@@ -4405,6 +5271,9 @@ type EphemeralContainerCommon struct {
 	// Cannot be updated.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 	// List of environment variables to set in the container.
 	// Cannot be updated.
@@ -4413,15 +5282,24 @@ type EphemeralContainerCommon struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Env []EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
 	// Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
 	// already allocated to the pod.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!has(self.claims) && !has(self.requests) && !has(self.limits)
+	// +k8s:validation:cel[0]:message>field is not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// Resources resize policy for the container.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:cel[0]:rule>false
+	// +k8s:validation:cel[0]:message>field is not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
 	// Restart policy for the container to manage the restart behavior of each
 	// container within a pod.
@@ -4429,6 +5307,9 @@ type EphemeralContainerCommon struct {
 	// ephemeral containers.
 	// +featureGate=SidecarContainers
 	// +optional
+	// +k8s:validation:cel[0]:rule>false
+	// +k8s:validation:cel[0]:message>field is not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	RestartPolicy *ContainerRestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,24,opt,name=restartPolicy,casttype=ContainerRestartPolicy"`
 	// Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
 	// Cannot be updated.
@@ -4437,6 +5318,15 @@ type EphemeralContainerCommon struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=mountPath
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:items:properties:subPath:cel[0]:rule>false
+	// +k8s:validation:items:properties:subPath:cel[0]:message>cannot be set for an Ephemeral Container
+	// +k8s:validation:items:properties:subPath:cel[0]:reason>FieldValueForbidden
+	// +k8s:validation:items:properties:subPathExpr:cel[0]:rule>false
+	// +k8s:validation:items:properties:subPathExpr:cel[0]:message>cannot be set for an Ephemeral Container
+	// +k8s:validation:items:properties:subPathExpr:cel[0]:reason>FieldValueForbidden
 	VolumeMounts []VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
 	// volumeDevices is the list of block devices to be used by the container.
 	// +patchMergeKey=devicePath
@@ -4447,15 +5337,27 @@ type EphemeralContainerCommon struct {
 	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
 	// Probes are not allowed for ephemeral containers.
 	// +optional
+	// +k8s:validation:cel[0]:rule>false
+	// +k8s:validation:cel[0]:message>probes are not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	LivenessProbe *Probe `json:"livenessProbe,omitempty" protobuf:"bytes,10,opt,name=livenessProbe"`
 	// Probes are not allowed for ephemeral containers.
 	// +optional
+	// +k8s:validation:cel[0]:rule>false
+	// +k8s:validation:cel[0]:message>probes are not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	ReadinessProbe *Probe `json:"readinessProbe,omitempty" protobuf:"bytes,11,opt,name=readinessProbe"`
 	// Probes are not allowed for ephemeral containers.
 	// +optional
+	// +k8s:validation:cel[0]:rule>false
+	// +k8s:validation:cel[0]:message>probes are not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	StartupProbe *Probe `json:"startupProbe,omitempty" protobuf:"bytes,22,opt,name=startupProbe"`
 	// Lifecycle is not allowed for ephemeral containers.
 	// +optional
+	// +k8s:validation:cel[0]:rule>false
+	// +k8s:validation:cel[0]:message>lifecycle is not allowed for ephemeral containers
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Lifecycle *Lifecycle `json:"lifecycle,omitempty" protobuf:"bytes,12,opt,name=lifecycle"`
 	// Optional: Path at which the file to which the container's termination message
 	// will be written is mounted into the container's filesystem.
@@ -4465,6 +5367,10 @@ type EphemeralContainerCommon struct {
 	// Defaults to /dev/termination-log.
 	// Cannot be updated.
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
+	// +default="/dev/termination-log"
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" protobuf:"bytes,13,opt,name=terminationMessagePath"`
 	// Indicate how the termination message should be populated. File will use the contents of
 	// terminationMessagePath to populate the container status message on both success and failure.
@@ -4474,6 +5380,10 @@ type EphemeralContainerCommon struct {
 	// Defaults to File.
 	// Cannot be updated.
 	// +optional
+	// +default=ref(k8s.io/api/core/v1.TerminationMessageReadFile)
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	TerminationMessagePolicy TerminationMessagePolicy `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,20,opt,name=terminationMessagePolicy,casttype=TerminationMessagePolicy"`
 	// Image pull policy.
 	// One of Always, Never, IfNotPresent.
@@ -4481,6 +5391,9 @@ type EphemeralContainerCommon struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/containers/images#updating-images
 	// +optional
+	// +k8s:validation:cel[0]:rule>self == oldSelf
+	// +k8s:validation:cel[0]:message>Field is immutable
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty" protobuf:"bytes,14,opt,name=imagePullPolicy,casttype=PullPolicy"`
 	// Optional: SecurityContext defines the security options the ephemeral container should be run with.
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
@@ -4684,9 +5597,49 @@ type PodStatusResult struct {
 // +genclient
 // +genclient:method=UpdateEphemeralContainers,verb=update,subresource=ephemeralcontainers
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
+// +k8s:validation:cel[0]:rule>	self.metadata.?annotations.orValue({}).all(k,
+// +k8s:validation:cel[0]:rule>		!(k == "seccomp.security.alpha.kubernetes.io/pod" || k.startsWith("container.seccomp.security.alpha.kubernetes.io/")) ||
+// +k8s:validation:cel[0]:rule>		["runtime/default", "unconfined", "docker/default"].exists(v, self.metadata.annotations[k] == v) ||
+// +k8s:validation:cel[0]:rule>		(
+// +k8s:validation:cel[0]:rule>			self.metadata.annotations[k].startsWith("localhost/") &&
+// +k8s:validation:cel[0]:rule>			!self.metadata.annotations[k].split('/').exists(x, x == "..") &&
+// +k8s:validation:cel[0]:rule>			self.metadata.annotations[k].charAt(10) != "/"
+// +k8s:validation:cel[0]:rule>		)
+// +k8s:validation:cel[0]:rule>	 )
+// +k8s:validation:cel[0]:message>all seccomp profile annotations must be valid
+// +k8s:validation:cel[0]:fieldPath>.metadata.annotations
+// +k8s:validation:cel[1]:rule> !has(self.metadata.annotations) || [self.spec.?containers.orValue([]).map(c, {"name": c.name, "type": c.?securityContext.?seccompProfile.?type.orValue(""), "lhp": c.?securityContext.?seccompProfile.?localhostProfile.orValue("")}), self.spec.?initContainers.orValue([]).map(c, {"name": c.name, "type": c.?securityContext.?seccompProfile.?type.orValue(""), "lhp": c.?securityContext.?seccompProfile.?localhostProfile.orValue("")}), self.spec.?ephemeralContainers.orValue([]).map(c, {"name": c.name, "type": c.?securityContext.?seccompProfile.?type.orValue(""), "lhp": c.?securityContext.?seccompProfile.?localhostProfile.orValue("")})].all(containers, containers.all(c,
+// +k8s:validation:cel[1]:rule>		c.type.size() == 0 ||
+// +k8s:validation:cel[1]:rule>		!self.metadata.?annotations[?("container.seccomp.security.alpha.kubernetes.io/" + c.name)].hasValue() ||
+// +k8s:validation:cel[1]:rule> 	["runtime/default", "unconfined"].exists(x, x == c.type && x == self.metadata.annotations["container.seccomp.security.alpha.kubernetes.io/" + c.name]) ||
+// +k8s:validation:cel[1]:rule>		"runtime/default" == c.type && self.metadata.annotations["container.seccomp.security.alpha.kubernetes.io/" + c.name] == "docker/default" ||
+// +k8s:validation:cel[1]:rule>		c.lhp.size() > 0 && c.type == "Localhost" && self.metadata.annotations["container.seccomp.security.alpha.kubernetes.io/" + c.name].startsWith("localhost/") && self.metadata.annotations["container.seccomp.security.alpha.kubernetes.io/" + c.name].endsWith(c.lhp)
+// +k8s:validation:cel[1]:rule> ))
+// +k8s:validation:cel[1]:reason>FieldValueForbidden
+// +k8s:validation:cel[1]:message> seccomp type in annotation and field must match
+// +k8s:validation:cel[1]:fieldPath>.metadata.annotations
+// +k8s:validation:cel[2]:rule>		self.?spec.?securityContext.?seccompProfile.optFlatMap(profile,
+// +k8s:validation:cel[2]:rule>			self.?metadata.?annotations[?"seccomp.security.alpha.kubernetes.io/pod"].optMap(annotation,
+// +k8s:validation:cel[2]:rule> 			["runtime/default", "unconfined"].exists(x, x == profile.type && x == annotation) ||
+// +k8s:validation:cel[2]:rule>				"runtime/default" == profile.type && annotation == "docker/default" ||
+// +k8s:validation:cel[2]:rule>				profile.type == "Localhost" && annotation.startsWith("localhost/") && annotation.endsWith(profile.localhostProfile)
+// +k8s:validation:cel[2]:rule>			)
+// +k8s:validation:cel[2]:rule>		).orValue(true)
+// +k8s:validation:cel[2]:message> seccomp type in annotation and field must match
+// +k8s:validation:cel[2]:fieldPath>.spec.securityContext.seccompProfile.type
+// +k8s:validation:cel[2]:reason>FieldValueForbidden
+// +k8s:validation:cel[3]:rule>  !self.metadata.?annotations.orValue({}).exists(k, k == "kubernetes.io/config.mirror") ||
+// +k8s:validation:cel[3]:rule>  has(self.spec.nodeName) && self.spec.nodeName.size() > 0
+// +k8s:validation:cel[3]:message>must set spec.nodeName if mirror pod annotation is set
+// +k8s:validation:cel[3]:fieldPath>.metadata.annotations['kubernetes.io/config.mirror']
+// +k8s:validation:cel[4]:rule> self.spec.?volumes.orValue([]).all(v, !has(v.ephemeral) || !has(v.name) || !format.dns1123Subdomain().validate(self.metadata.name + "-" + v.name).hasValue())
+// +k8s:validation:cel[4]:messageExpression>self.spec.volumes.filter(v, has(v.ephemeral) && has(v.name) && format.dns1123Subdomain().validate(self.metadata.name + "-" + v.name).hasValue()).map(v, "ephemeral PVC name \"" + self.metadata.name +  "-" + v.name + "\": is invalid")
+// +k8s:validation:cel[4]:fieldPath>.spec.volumes
+// +k8s:validation:properties:metadata:properties:annotations:cel[0]:rule>self[?"controller.kubernetes.io/pod-deletion-cost"].optMap(v, v.matches("^[1-9-]\\d*$|^0$") && int(v) <= 2147483647 && int(v) >= -2147483648).orValue(true)
+// +k8s:validation:properties:metadata:properties:annotations:cel[0]:message>must be a 32bit integer
+// +k8s:validation:properties:metadata:properties:annotations:cel[0]:fieldPath>['controller.kubernetes.io/pod-deletion-cost']
 type Pod struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -4697,6 +5650,14 @@ type Pod struct {
 	// Specification of the desired behavior of the pod.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
+	// +k8s:validation:properties:containers:items:properties:image:cel[0]:rule>self.trim() == self
+	// +k8s:validation:properties:containers:items:properties:image:cel[0]:message>must not have leading or trailing whitespace
+	// +k8s:validation:properties:initContainers:items:properties:image:cel[0]:rule>self.trim() == self
+	// +k8s:validation:properties:initContainers:items:properties:image:cel[0]:message>must not have leading or trailing whitespace
+	// +k8s:validation:cel[0]:rule>has(self.serviceAccountName) || !has(self.volumes) || self.volumes.all(v, !has(v.projected) || v.projected.sources.all(s, !has(s.serviceAccountToken)))
+	// +k8s:validation:cel[0]:message>may not set serviceAccountToken in a pod with serviceAccountName
+	// +k8s:validation:cel[0]:fieldPath>.serviceAccountName
+	// +k8s:validation:cel[0]:reason>FieldValueForbidden
 	Spec PodSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Most recently observed status of the pod.
@@ -7212,6 +8173,7 @@ type DownwardAPIVolumeSource struct {
 	// Items is a list of downward API volume file
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:minItems=1
 	Items []DownwardAPIVolumeFile `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
 	// Optional: mode bits to use on created files by default. Must be a
 	// Optional: mode bits used to set permissions on created files by default.
@@ -7222,6 +8184,9 @@ type DownwardAPIVolumeSource struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=511
+	// +default=420
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
 
@@ -7230,15 +8195,33 @@ const (
 )
 
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
+// +k8s:validation:cel[0]:rule>!has(self.fieldRef) || !has(self.resourceFieldRef)
+// +k8s:validation:cel[0]:message>fieldRef and resourceFieldRef can not be specified simultaneously
 type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	// +k8s:validation:minLength=1
+	// +k8s:validation:cel[0]:rule>self.startsWith("../") || !self.startsWith("..")
+	// +k8s:validation:cel[0]:message>must not start with '..'
+	// +k8s:validation:cel[1]:rule>!self.split("/").exists(x, x == "..")
+	// +k8s:validation:cel[1]:message>must not contain '..'
+	// +k8s:validation:cel[2]:rule>self.size() == 0 || !self.startsWith("/")
+	// +k8s:validation:cel[2]:message>must be a relative path
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
 	// Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
 	// +optional
+
+	// +k8s:validation:properties:fieldPath:cel[0]:rule>self.endsWith("]") || ["metadata.name","metadata.namespace","metadata.labels","metadata.annotations","metadata.uid"].exists(x, x == self)
+	// +k8s:validation:properties:fieldPath:cel[0]:message>supported values: [metadata.name, metadata.namespace, metadata.labels, metadata.annotations, metadata.uid]
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,2,opt,name=fieldRef"`
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	// +optional
+	// +k8s:validation:cel[0]:rule>has(self.containerName) && self.containerName.size() > 0
+	// +k8s:validation:cel[0]:message="Required value"
+	// +k8s:validation:cel[0]:reason>FieldValueRequired
+	// +k8s:validation:cel[0]:fieldPath>.containerName
+	// +k8s:validation:cel[1]:rule>["limits.cpu","limits.memory","limits.ephemeral-storage","requests.cpu","requests.memory","requests.ephemeral-storage"].exists(x, x == self.resource) || ["requests.hugepages-", "limits.hugepages-"].exists(prefix, self.resource.startsWith(prefix))
+	// +k8s:validation:cel[1]:message>supported values: [limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory, requests.ephemeral-storage]
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
 	// Optional: mode bits used to set permissions on this file, must be an octal value
 	// between 0000 and 0777 or a decimal value between 0 and 511.
@@ -7247,6 +8230,8 @@ type DownwardAPIVolumeFile struct {
 	// This might be in conflict with other options that affect the file
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=511
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,4,opt,name=mode"`
 }
 
@@ -7263,6 +8248,10 @@ type DownwardAPIProjection struct {
 // SecurityContext holds security configuration that will be applied to a container.
 // Some fields are present in both SecurityContext and PodSecurityContext.  When both
 // are set, the values in SecurityContext take precedence.
+// +k8s:validation:cel[0]:rule>has(self.allowPrivilegeEscalation) && !self.allowPrivilegeEscalation ? !self.?privileged.orValue(false) : true
+// +k8s:validation:cel[0]:message="cannot set `allowPrivilegeEscalation` to false and `privileged` to true"
+// +k8s:validation:cel[1]:rule>has(self.allowPrivilegeEscalation) && !self.allowPrivilegeEscalation ? !self.capabilities.add.exists(c, c == "SYS_CAP_ADMIN") : true
+// +k8s:validation:cel[1]:message>cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN
 type SecurityContext struct {
 	// The capabilities to add/drop when running containers.
 	// Defaults to the default set of capabilities granted by the container runtime.
@@ -7294,6 +8283,8 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=2147483647
 	RunAsUser *int64 `json:"runAsUser,omitempty" protobuf:"varint,4,opt,name=runAsUser"`
 	// The GID to run the entrypoint of the container process.
 	// Uses runtime default if unset.
@@ -7301,6 +8292,8 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:validation:minimum=0
+	// +k8s:validation:maximum=2147483647
 	RunAsGroup *int64 `json:"runAsGroup,omitempty" protobuf:"varint,8,opt,name=runAsGroup"`
 	// Indicates that the container must run as a non-root user.
 	// If true, the Kubelet will validate the image at runtime to ensure that it
@@ -7379,12 +8372,16 @@ type SELinuxOptions struct {
 type WindowsSecurityContextOptions struct {
 	// GMSACredentialSpecName is the name of the GMSA credential spec to use.
 	// +optional
+	// +k8s:validation:cel[0]:rule>!format.dns1123Subdomain().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.dns1123Subdomain().validate(self).value()
 	GMSACredentialSpecName *string `json:"gmsaCredentialSpecName,omitempty" protobuf:"bytes,1,opt,name=gmsaCredentialSpecName"`
 
 	// GMSACredentialSpec is where the GMSA admission webhook
 	// (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
 	// GMSA credential spec named by the GMSACredentialSpecName field.
 	// +optional
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=65536
 	GMSACredentialSpec *string `json:"gmsaCredentialSpec,omitempty" protobuf:"bytes,2,opt,name=gmsaCredentialSpec"`
 
 	// The UserName in Windows to run the entrypoint of the container process.
@@ -7392,6 +8389,24 @@ type WindowsSecurityContextOptions struct {
 	// May also be set in PodSecurityContext. If set in both SecurityContext and
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=256
+	// +k8s:validation:cel[0]:rule>!self.matches("[[:cntrl:]]+")
+	// +k8s:validation:cel[0]:message>must not contain control characters
+	// +k8s:validation:cel[1]:rule>self.indexOf("\\") == self.lastIndexOf("\\")
+	// +k8s:validation:cel[1]:message>runAsUserName cannot contain more than one backslash
+	// +k8s:validation:cel[2]:rule>!self.contains("\\") || self.size() - self.indexOf("\\") - 1 <= 256
+	// +k8s:validation:cel[2]:message>domain part of runAsUserName must be under 256 characters
+	// +k8s:validation:cel[3]:rule>!self.contains("\\") || self.substring(0, self.indexOf("\\")).matches('^([^\\/:\*\?"<>|\.][^\\/:\*\?"<>|]{0,14})|([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$')
+	// +k8s:validation:cel[3]:message>runAsUserName's Domain doesn't match the NetBios nor the DNS format
+	// +k8s:validation:cel[4]:rule>[self.indexOf("\\"), self.size()].max() <= 104
+	// +k8s:validation:cel[4]:message>runAsUserName's User length must not be longer than 104 characters
+	// +k8s:validation:cel[5]:rule>self.indexOf("\\") != 0
+	// +k8s:validation:cel[5]:message>runAsUserName's User cannot be empty
+	// +k8s:validation:cel[6]:rule>!self.matches('^[\. ]+(\\\\.*)?$')
+	// +k8s:validation:cel[6]:message>runAsUserName's User cannot contain only periods or spaces
+	// +k8s:validation:cel[7]:rule>self.matches('^[^"/\\:;|=,\+\*\?<>@\[\]]*(\\\\.*)?$')
+	// +k8s:validation:cel[7]:message>runAsUserName's User cannot contain the following characters: "/\:;|=,+*?<>@[]
 	RunAsUserName *string `json:"runAsUserName,omitempty" protobuf:"bytes,3,opt,name=runAsUserName"`
 
 	// HostProcess determines if a container should be run as a 'Host Process' container.
@@ -7432,6 +8447,9 @@ const (
 // Sysctl defines a kernel parameter to be set
 type Sysctl struct {
 	// Name of a property to set
+	// +k8s:validation:minLength=1
+	// +k8s:validation:maxLength=253
+	// +k8s:validation:pattern>^([a-z0-9]([-_a-z0-9]*[a-z0-9])?[\./])*[a-z0-9]([-_a-z0-9]*[a-z0-9])?$
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Value of a property to set
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`

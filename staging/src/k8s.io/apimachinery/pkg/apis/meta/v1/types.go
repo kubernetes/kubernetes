@@ -220,6 +220,10 @@ type ObjectMeta struct {
 	// and services.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
 	// +optional
+	// +k8s:validation:additionalProperties:cel[0]:rule>!format.labelValue().validate(self).hasValue()
+	// +k8s:validation:additionalProperties:cel[0]:messageExpression>format.labelValue().validate(self).value()
+	// +k8s:validation:cel[0]:rule>self.all(k, !format.qualifiedName().validate(k).hasValue())
+	// +k8s:validation:cel[0]:message>label keys must be qualified names
 	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,11,rep,name=labels"`
 
 	// Annotations is an unstructured key value map stored with a resource that may be
@@ -227,6 +231,8 @@ type ObjectMeta struct {
 	// queryable and should be preserved when modifying objects.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations
 	// +optional
+	// +k8s:validation:cel[0]:rule>self.all(k, !format.qualifiedName().validate(k.lowerAscii()).hasValue())
+	// +k8s:validation:cel[0]:message>annotation keys must be qualified names
 	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,12,rep,name=annotations"`
 
 	// List of objects depended by this object. If ALL objects in the list have
@@ -1244,6 +1250,8 @@ type LabelSelector struct {
 	// map is equivalent to an element of matchExpressions, whose key field is "key", the
 	// operator is "In", and the values array contains only "value". The requirements are ANDed.
 	// +optional
+	// +k8s:validation:additionalProperties:cel[0]:rule>!format.labelValue().validate(self).hasValue()
+	// +k8s:validation:additionalProperties:cel[0]:messageExpression>format.labelValue().validate(self).value()
 	MatchLabels map[string]string `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
 	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
 	// +optional
@@ -1253,8 +1261,18 @@ type LabelSelector struct {
 
 // A label selector requirement is a selector that contains values, a key, and an operator that
 // relates the key and values.
+// +k8s:validation:cel[0]:rule>self.operator == "In" || self.operator == "NotIn" ? has(self.values) && self.values.size() > 0 : true
+// +k8s:validation:cel[0]:message>must be specified when `operator` is 'In' or 'NotIn'
+// +k8s:validation:cel[0]:fieldPath>.values
+// +k8s:validation:cel[0]:reason>FieldValueRequired
+// +k8s:validation:cel[1]:rule>self.operator == "Exists" || self.operator == "DoesNotExist" ? !has(self.values) || self.values.size() == 0 : true
+// +k8s:validation:cel[1]:message>may not be specified when `operator` is 'Exists' or 'DoesNotExist'
+// +k8s:validation:cel[1]:fieldPath>.values
+// +k8s:validation:cel[1]:reason>FieldValueForbidden
 type LabelSelectorRequirement struct {
 	// key is the label key that the selector applies to.
+	// +k8s:validation:cel[0]:rule>!format.qualifiedName().validate(self).hasValue()
+	// +k8s:validation:cel[0]:messageExpression>format.qualifiedName().validate(self).value()
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
 	// operator represents a key's relationship to a set of values.
 	// Valid operators are In, NotIn, Exists and DoesNotExist.
@@ -1265,6 +1283,8 @@ type LabelSelectorRequirement struct {
 	// merge patch.
 	// +optional
 	// +listType=atomic
+	// +k8s:validation:items:cel[0]:rule>!format.labelValue().validate(self).hasValue()
+	// +k8s:validation:items:cel[0]:messageExpression>format.labelValue().validate(self).value()
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
