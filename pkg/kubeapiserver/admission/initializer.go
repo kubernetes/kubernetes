@@ -32,40 +32,25 @@ type WantsCloudConfig interface {
 
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
-	cloudConfig                []byte
-	quotaConfiguration         quota.Configuration
-	excludedAdmissionResources []schema.GroupResource
+	CloudConfig                []byte
+	QuotaConfiguration         quota.Configuration
+	ExcludedAdmissionResources []schema.GroupResource
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
-
-// NewPluginInitializer constructs new instance of PluginInitializer
-// TODO: switch these parameters to use the builder pattern or just make them
-// all public, this construction method is pointless boilerplate.
-func NewPluginInitializer(
-	cloudConfig []byte,
-	quotaConfiguration quota.Configuration,
-	excludedAdmissionResources []schema.GroupResource,
-) *PluginInitializer {
-	return &PluginInitializer{
-		cloudConfig:                cloudConfig,
-		quotaConfiguration:         quotaConfiguration,
-		excludedAdmissionResources: excludedAdmissionResources,
-	}
-}
 
 // Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
 func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 	if wants, ok := plugin.(WantsCloudConfig); ok {
-		wants.SetCloudConfig(i.cloudConfig)
+		wants.SetCloudConfig(i.CloudConfig)
 	}
 
 	if wants, ok := plugin.(initializer.WantsQuotaConfiguration); ok {
-		wants.SetQuotaConfiguration(i.quotaConfiguration)
+		wants.SetQuotaConfiguration(i.QuotaConfiguration)
 	}
 
 	if wants, ok := plugin.(initializer.WantsExcludedAdmissionResources); ok {
-		wants.SetExcludedAdmissionResources(i.excludedAdmissionResources)
+		wants.SetExcludedAdmissionResources(i.ExcludedAdmissionResources)
 	}
 }

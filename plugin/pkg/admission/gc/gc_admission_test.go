@@ -139,7 +139,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
 	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil, restMapper)
 
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil)
+	pluginInitializer := &kubeadmission.PluginInitializer{}
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)

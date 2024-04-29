@@ -54,11 +54,11 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
 		}
 	}
-	kubePluginInitializer := NewPluginInitializer(
-		cloudConfig,
-		quotainstall.NewQuotaConfigurationForAdmission(),
-		exclusion.Excluded(),
-	)
+	kubePluginInitializer := PluginInitializer{
+		CloudConfig:                cloudConfig,
+		QuotaConfiguration:         quotainstall.NewQuotaConfigurationForAdmission(),
+		ExcludedAdmissionResources: exclusion.Excluded(),
+	}
 
-	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, nil
+	return []admission.PluginInitializer{webhookPluginInitializer, &kubePluginInitializer}, nil
 }

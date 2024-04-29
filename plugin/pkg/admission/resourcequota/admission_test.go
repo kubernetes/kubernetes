@@ -115,7 +115,7 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 
 	initializers := admission.PluginInitializers{
 		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, stopCh, nil),
-		kubeapiserveradmission.NewPluginInitializer(nil, quotaConfiguration, nil),
+		&kubeapiserveradmission.PluginInitializer{QuotaConfiguration: quotaConfiguration},
 	}
 	initializers.Initialize(handler)
 

@@ -48,7 +48,7 @@ func (p *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
-	initializer := NewPluginInitializer(cloudConfig, nil, nil)
+	initializer := PluginInitializer{CloudConfig: cloudConfig}
 	wantsCloudConfigAdmission := &WantsCloudConfigAdmissionPlugin{}
 	initializer.Initialize(wantsCloudConfigAdmission)
 
@@ -75,7 +75,7 @@ func (p *WantsQuotaConfigurationAdmissionPlugin) SetQuotaConfiguration(config qu
 
 func TestQuotaConfigurationAdmissionPlugin(t *testing.T) {
 	config := doNothingQuotaConfiguration{}
-	initializer := NewPluginInitializer(nil, config, nil)
+	initializer := PluginInitializer{QuotaConfiguration: config}
 	wantsQuotaConfigurationAdmission := &WantsQuotaConfigurationAdmissionPlugin{}
 	initializer.Initialize(wantsQuotaConfigurationAdmission)
 
