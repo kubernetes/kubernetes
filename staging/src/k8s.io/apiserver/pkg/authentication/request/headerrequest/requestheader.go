@@ -17,9 +17,7 @@ limitations under the License.
 package headerrequest
 
 import (
-	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,7 +25,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilcert "k8s.io/client-go/util/cert"
 )
 
 // StringSliceProvider is a way to get a string slice value.  It is heavily used for authentication headers among other places.
@@ -104,48 +101,6 @@ func trimHeaders(headerNames ...string) ([]string, error) {
 	}
 
 	return ret, nil
-}
-
-func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string, groupHeaders []string, extraHeaderPrefixes []string) (authenticator.Request, error) {
-	if len(clientCA) == 0 {
-		return nil, fmt.Errorf("missing clientCA file")
-	}
-
-	// Wrap with an x509 verifier
-	caData, err := ioutil.ReadFile(clientCA)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %v", clientCA, err)
-	}
-	opts := x509request.DefaultVerifyOptions()
-	opts.Roots = x509.NewCertPool()
-	certs, err := utilcert.ParseCertsPEM(caData)
-	if err != nil {
-		return nil, fmt.Errorf("error loading certs from  %s: %v", clientCA, err)
-	}
-	for _, cert := range certs {
-		opts.Roots.AddCert(cert)
-	}
-
-	trimmedNameHeaders, err := trimHeaders(nameHeaders...)
-	if err != nil {
-		return nil, err
-	}
-	trimmedGroupHeaders, err := trimHeaders(groupHeaders...)
-	if err != nil {
-		return nil, err
-	}
-	trimmedExtraHeaderPrefixes, err := trimHeaders(extraHeaderPrefixes...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDynamicVerifyOptionsSecure(
-		x509request.StaticVerifierFn(opts),
-		StaticStringSlice(proxyClientNames),
-		StaticStringSlice(trimmedNameHeaders),
-		StaticStringSlice(trimmedGroupHeaders),
-		StaticStringSlice(trimmedExtraHeaderPrefixes),
-	), nil
 }
 
 func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
