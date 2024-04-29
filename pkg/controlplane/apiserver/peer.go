@@ -1,0 +1,89 @@
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package apiserver
+
+import (
+	"fmt"
+	"time"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/reconcilers"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storageversion"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
+	clientgoinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/transport"
+	"k8s.io/klog/v2"
+	api "k8s.io/kubernetes/pkg/apis/core"
+)
+
+const (
+	// DefaultPeerEndpointReconcileInterval is the default amount of time for how often
+	// the peer endpoint leases are reconciled.
+	DefaultPeerEndpointReconcileInterval = 10 * time.Second
+	// DefaultPeerEndpointReconcilerTTL is the default TTL timeout for peer endpoint
+	// leases on the storage layer
+	DefaultPeerEndpointReconcilerTTL = 15 * time.Second
+)
+
+func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, svm storageversion.Manager,
+	proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerAdvertiseAddress reconcilers.PeerAdvertiseAddress,
+	apiServerID string, reconciler reconcilers.PeerEndpointLeaseReconciler, serializer runtime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
+	if proxyClientCertFile == "" {
+		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
+	}
+	if proxyClientKeyFile == "" {
+		return nil, fmt.Errorf("error building peer proxy handler, proxy-key-file not specified")
+	}
+	// create proxy client config
+	clientConfig := &transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure:   false,
+			CertFile:   proxyClientCertFile,
+			KeyFile:    proxyClientKeyFile,
+			CAFile:     peerCAFile,
+			ServerName: "kubernetes.default.svc",
+		}}
+
+	// build proxy transport
+	proxyRoundTripper, transportBuildingError := transport.New(clientConfig)
+	if transportBuildingError != nil {
+		klog.Error(transportBuildingError.Error())
+		return nil, transportBuildingError
+	}
+	return utilpeerproxy.NewPeerProxyHandler(
+		versionedInformer,
+		svm,
+		proxyRoundTripper,
+		apiServerID,
+		reconciler,
+		serializer,
+	), nil
+}
+
+// CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop
+// The peer endpoint leases are used to find network locations of apiservers for peer proxy
+func CreatePeerEndpointLeaseReconciler(c genericapiserver.Config, storageFactory serverstorage.StorageFactory) (reconcilers.PeerEndpointLeaseReconciler, error) {
+	ttl := DefaultPeerEndpointReconcilerTTL
+	config, err := storageFactory.NewConfig(api.Resource("apiServerPeerIPInfo"))
+	if err != nil {
+		return nil, fmt.Errorf("error creating storage factory config: %w", err)
+	}
+	reconciler, err := reconcilers.NewPeerEndpointLeaseReconciler(config, "/peerserverleases/", ttl)
+	return reconciler, err
+}

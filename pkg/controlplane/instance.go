@@ -54,7 +54,6 @@ import (
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -67,14 +66,10 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
-	clientgoinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
-	"k8s.io/client-go/transport"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -156,16 +151,6 @@ var (
 type Extra struct {
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	KubeletClientConfig      kubeletclient.KubeletClientConfig
-
-	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
-	// that can not be served locally
-	PeerProxy utilpeerproxy.Interface
-	// PeerEndpointLeaseReconciler updates the peer endpoint leases
-	PeerEndpointLeaseReconciler peerreconcilers.PeerEndpointLeaseReconciler
-	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
-	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
-	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
-	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
 
 	// Values to build the IP addresses used by discovery
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
@@ -290,6 +275,12 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
+	if c.ControlPlane.PeerEndpointReconcileInterval == 0 && c.EndpointReconcilerConfig.Interval != 0 {
+		// default this to the endpoint reconciler value before the generic
+		// controlplane completion can kick in
+		c.ControlPlane.PeerEndpointReconcileInterval = c.EndpointReconcilerConfig.Interval
+	}
+
 	cfg := completedConfig{
 		c.ControlPlane.Complete(),
 		&c.Extra,
@@ -508,11 +499,11 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-		peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.ControlPlane.Generic.PublicAddress, publicServicePort)
+		peeraddress := getPeerAddress(c.ControlPlane.Extra.PeerAdvertiseAddress, c.ControlPlane.Generic.PublicAddress, publicServicePort)
 		peerEndpointCtrl := peerreconcilers.New(
 			c.ControlPlane.Generic.APIServerID,
 			peeraddress,
-			c.Extra.PeerEndpointLeaseReconciler,
+			c.ControlPlane.Extra.PeerEndpointLeaseReconciler,
 			c.Extra.EndpointReconcilerConfig.Interval,
 			client)
 		if err != nil {
@@ -529,9 +520,9 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				return nil
 			})
 		// Add PostStartHooks for Unknown Version Proxy filter.
-		if c.Extra.PeerProxy != nil {
+		if c.ControlPlane.Extra.PeerProxy != nil {
 			m.GenericAPIServer.AddPostStartHookOrDie("unknown-version-proxy-filter", func(context genericapiserver.PostStartHookContext) error {
-				err := c.Extra.PeerProxy.WaitForCacheSync(context.StopCh)
+				err := c.ControlPlane.Extra.PeerProxy.WaitForCacheSync(context.StopCh)
 				return err
 			})
 		}
@@ -579,7 +570,7 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			leaseName := m.GenericAPIServer.APIServerID
 			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
 
-			peeraddress := getPeerAddress(c.Extra.PeerAdvertiseAddress, c.ControlPlane.Generic.PublicAddress, publicServicePort)
+			peeraddress := getPeerAddress(c.ControlPlane.Extra.PeerAdvertiseAddress, c.ControlPlane.Generic.PublicAddress, publicServicePort)
 			// must replace ':,[]' in [ip:port] to be able to store this as a valid label value
 			controller := lease.NewController(
 				clock.RealClock{},
@@ -780,53 +771,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.EnableResources(legacyBetaEnabledByDefaultResources...)
 
 	return ret
-}
-
-// CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop
-// The peer endpoint leases are used to find network locations of apiservers for peer proxy
-func CreatePeerEndpointLeaseReconciler(c genericapiserver.Config, storageFactory serverstorage.StorageFactory) (peerreconcilers.PeerEndpointLeaseReconciler, error) {
-	ttl := DefaultEndpointReconcilerTTL
-	config, err := storageFactory.NewConfig(api.Resource("apiServerPeerIPInfo"))
-	if err != nil {
-		return nil, fmt.Errorf("error creating storage factory config: %w", err)
-	}
-	reconciler, err := peerreconcilers.NewPeerEndpointLeaseReconciler(config, "/peerserverleases/", ttl)
-	return reconciler, err
-}
-
-func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, svm storageversion.Manager,
-	proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress,
-	apiServerID string, reconciler peerreconcilers.PeerEndpointLeaseReconciler, serializer kruntime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
-	if proxyClientCertFile == "" {
-		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
-	}
-	if proxyClientKeyFile == "" {
-		return nil, fmt.Errorf("error building peer proxy handler, proxy-key-file not specified")
-	}
-	// create proxy client config
-	clientConfig := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure:   false,
-			CertFile:   proxyClientCertFile,
-			KeyFile:    proxyClientKeyFile,
-			CAFile:     peerCAFile,
-			ServerName: "kubernetes.default.svc",
-		}}
-
-	// build proxy transport
-	proxyRoundTripper, transportBuildingError := transport.New(clientConfig)
-	if transportBuildingError != nil {
-		klog.Error(transportBuildingError.Error())
-		return nil, transportBuildingError
-	}
-	return utilpeerproxy.NewPeerProxyHandler(
-		versionedInformer,
-		svm,
-		proxyRoundTripper,
-		apiServerID,
-		reconciler,
-		serializer,
-	), nil
 }
 
 // utility function to get the apiserver address that is used by peer apiservers to proxy

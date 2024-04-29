@@ -31,12 +31,14 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
+	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/version"
@@ -66,6 +68,18 @@ type Extra struct {
 
 	EnableLogsSupport bool
 	ProxyTransport    *http.Transport
+
+	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
+	// that can not be served locally
+	PeerProxy utilpeerproxy.Interface
+	// PeerEndpointReconcileInterval defines how often the endpoint leases are reconciled in etcd.
+	PeerEndpointReconcileInterval time.Duration
+	// PeerEndpointLeaseReconciler updates the peer endpoint leases
+	PeerEndpointLeaseReconciler peerreconcilers.PeerEndpointLeaseReconciler
+	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
+	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
+	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
+	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
