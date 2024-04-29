@@ -133,7 +133,10 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		VersionedInformers:        c.VersionedInformers,
 	}
 
-	client := kubernetes.NewForConfigOrDie(s.GenericAPIServer.LoopbackClientConfig)
+	client, err := kubernetes.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
 	if len(c.SystemNamespaces) > 0 {
 		s.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			go systemnamespaces.NewController(c.SystemNamespaces, client, s.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.StopCh)
