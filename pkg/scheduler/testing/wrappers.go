@@ -1154,6 +1154,11 @@ func MakeClaimParameters() *ClaimParametersWrapper {
 	return &ClaimParametersWrapper{}
 }
 
+// FromClaimParameters creates a ResourceClaimParameters wrapper from an existing object.
+func FromClaimParameters(other *resourcev1alpha2.ResourceClaimParameters) *ClaimParametersWrapper {
+	return &ClaimParametersWrapper{*other.DeepCopy()}
+}
+
 func (wrapper *ClaimParametersWrapper) Obj() *resourcev1alpha2.ResourceClaimParameters {
 	return &wrapper.ResourceClaimParameters
 }
@@ -1207,6 +1212,11 @@ type ClassParametersWrapper struct {
 
 func MakeClassParameters() *ClassParametersWrapper {
 	return &ClassParametersWrapper{}
+}
+
+// FromClassParameters creates a ResourceClassParameters wrapper from an existing object.
+func FromClassParameters(other *resourcev1alpha2.ResourceClassParameters) *ClassParametersWrapper {
+	return &ClassParametersWrapper{*other.DeepCopy()}
 }
 
 func (wrapper *ClassParametersWrapper) Obj() *resourcev1alpha2.ResourceClassParameters {
