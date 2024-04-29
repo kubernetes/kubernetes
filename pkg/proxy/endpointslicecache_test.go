@@ -610,7 +610,6 @@ func TestEndpointSliceCacheClearedCorrectly(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
-			fp.hostname = testHostname
 
 			for _, epSlice := range tc.currEndpointSlices {
 				fp.addEndpointSlice(epSlice)
@@ -648,7 +647,6 @@ func TestSameServiceEndpointSliceCacheClearedCorrectly(t *testing.T) {
 	}
 
 	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
-	fp.hostname = testHostname
 
 	for _, epSlice := range currEndpointSlices {
 		fp.addEndpointSlice(epSlice)

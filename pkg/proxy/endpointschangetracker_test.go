@@ -1037,7 +1037,6 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	for tci, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
-			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
 			// the fp.previousEndpointsMap is as we expect.

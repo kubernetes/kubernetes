@@ -621,20 +621,16 @@ type FakeProxier struct {
 	serviceChanges   *ServiceChangeTracker
 	svcPortMap       ServicePortMap
 	endpointsMap     EndpointsMap
-	hostname         string
 }
 
 func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
+	ect := NewEndpointsChangeTracker(testHostname, nil, ipFamily, nil, nil)
+	ect.trackerStartTime = t
 	return &FakeProxier{
-		svcPortMap:     make(ServicePortMap),
-		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
-		endpointsMap:   make(EndpointsMap),
-		endpointsChanges: &EndpointsChangeTracker{
-			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
-			trackerStartTime:          t,
-			processEndpointsMapChange: nil,
-			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, nil),
-		},
+		svcPortMap:       make(ServicePortMap),
+		serviceChanges:   NewServiceChangeTracker(nil, ipFamily, nil, nil),
+		endpointsMap:     make(EndpointsMap),
+		endpointsChanges: ect,
 	}
 }
 
