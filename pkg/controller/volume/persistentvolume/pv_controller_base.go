@@ -89,8 +89,8 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		claimQueue:                    workqueue.NewNamed("claims"),
-		volumeQueue:                   workqueue.NewNamed("volumes"),
+		claimQueue:                    workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "claims"}),
+		volumeQueue:                   workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "volumes"}),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}

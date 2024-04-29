@@ -122,7 +122,7 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		ignoredResources: ignoredResources,
 		registry:         quotaRegistry,
 
-		queue:      workqueue.NewNamed("admission_quota_controller"),
+		queue:      workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "admission_quota_controller"}),
 		work:       map[string][]*admissionWaiter{},
 		dirtyWork:  map[string][]*admissionWaiter{},
 		inProgress: sets.String{},
