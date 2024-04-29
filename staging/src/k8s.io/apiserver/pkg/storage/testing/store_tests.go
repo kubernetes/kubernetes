@@ -1631,7 +1631,9 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		}
 	}
 	options := storage.ListOptions{
-		ResourceVersion: "0",
+		// Limit is ignored when ResourceVersion is set to 0.
+		// Set it to consistent read.
+		ResourceVersion: "",
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
@@ -1654,7 +1656,8 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	// no limit, should get two items
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
@@ -1677,7 +1680,8 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	// limit, should get two more pages
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(1, continueFromSecondItem),
 		Recursive:       true,
 	}
@@ -1699,7 +1703,8 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
@@ -1815,7 +1820,9 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		}
 	}
 	options := storage.ListOptions{
-		ResourceVersion: "0",
+		// Limit is ignored when ResourceVersion is set to 0.
+		// Set it to consistent read.
+		ResourceVersion: "",
 		Predicate:       pred(2, ""),
 		Recursive:       true,
 	}
@@ -1845,7 +1852,8 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	// both read counters should be incremented for the singular calls they make in this case
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(2, cont),
 		Recursive:       true,
 	}
@@ -2407,7 +2415,7 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	err := store.GuaranteedUpdate(ctx, key, updatedPod, false, nil,
 		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 			pod := obj.(*example.Pod)
-			pod.Name = "foo-2"
+			pod.Generation = 2
 			return pod, nil
 		}),
 		nil,
@@ -2424,7 +2432,7 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	err = store.GuaranteedUpdate(ctx, key, updatedPod2, false, nil,
 		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 			pod := obj.(*example.Pod)
-			if pod.Name != "foo-2" {
+			if pod.Generation != 2 {
 				if sawConflict {
 					t.Fatalf("unexpected second conflict")
 				}
@@ -2432,7 +2440,7 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 				// simulated stale object - return a conflict
 				return nil, apierrors.NewConflict(example.SchemeGroupVersion.WithResource("pods").GroupResource(), "name", errors.New("foo"))
 			}
-			pod.Name = "foo-3"
+			pod.Generation = 3
 			return pod, nil
 		}),
 		originalPod,
@@ -2440,8 +2448,8 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if updatedPod2.Name != "foo-3" {
-		t.Errorf("unexpected pod name: %q", updatedPod2.Name)
+	if updatedPod2.Generation != 3 {
+		t.Errorf("unexpected pod generation: %q", updatedPod2.Generation)
 	}
 
 	// Third, update using a current version as the suggestion.
@@ -2452,14 +2460,8 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	err = store.GuaranteedUpdate(ctx, key, updatedPod3, false, nil,
 		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 			pod := obj.(*example.Pod)
-			if pod.Name != updatedPod2.Name || pod.ResourceVersion != updatedPod2.ResourceVersion {
-				t.Errorf(
-					"unexpected live object (name=%s, rv=%s), expected name=%s, rv=%s",
-					pod.Name,
-					pod.ResourceVersion,
-					updatedPod2.Name,
-					updatedPod2.ResourceVersion,
-				)
+			if pod.Generation != updatedPod2.Generation || pod.ResourceVersion != updatedPod2.ResourceVersion {
+				t.Logf("stale object (rv=%s), expected rv=%s", pod.ResourceVersion, updatedPod2.ResourceVersion)
 			}
 			attempts++
 			return nil, fmt.Errorf("validation or admission error")
@@ -2469,8 +2471,10 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	if err == nil {
 		t.Fatalf("expected error, got none")
 	}
-	if attempts != 1 {
-		t.Errorf("expected 1 attempt, got %d", attempts)
+	// Implementations of the storage interface are allowed to ignore the suggestion,
+	// in which case two attempts are possible.
+	if attempts > 2 {
+		t.Errorf("update function should have been called at most twice, called %d", attempts)
 	}
 }
 
