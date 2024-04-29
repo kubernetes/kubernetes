@@ -149,12 +149,32 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
-	stopCh := make(chan struct{})
+	stopCtx, cancel := context.WithCancel(context.Background())
+
+	// prevent goroutine leakage from client-go transport package
+	restoreFn := func() func() {
+		// the initial value of the 'ControllerStopCtx' variable in the
+		// client-go transport package is set to 'wait.NeverStopCtx'. Here,
+		// we rely on the initial value to determine if a test has
+		// already modified the value of 'ControllerStopCtx'.
+		if clientgotransport.ControllerStopCtx != wait.NeverStopCtx {
+			return func() {}
+		}
+
+		original := clientgotransport.ControllerStopCtx
+		clientgotransport.ControllerStopCtx = stopCtx
+		return func() {
+			clientgotransport.ControllerStopCtx = original
+		}
+	}()
+
 	var errCh chan error
 	tearDown := func() {
-		// Closing stopCh is stopping apiserver and cleaning up
+		defer restoreFn()
+
+		// Canceling stopCtx is stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
-		close(stopCh)
+		cancel()
 
 		// If the apiserver was started, let's wait for it to
 		// shutdown clearly.
@@ -292,12 +312,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
 		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-			// TODO: set up a general clean up for testserver
-			if clientgotransport.DialerStopCh == wait.NeverStop {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-				t.Cleanup(cancel)
-				clientgotransport.DialerStopCh = ctx.Done()
-			}
 			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
 		}
 	}
@@ -367,7 +381,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		} else if err := prepared.Run(stopCh); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}(stopCtx.Done())
 
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {

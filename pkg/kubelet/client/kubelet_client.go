@@ -120,6 +120,7 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 			// transport.loadTLSFiles would set this to true because we are only using files
 			// it is clearer to set it explicitly here so we remember that this is happening
 			ReloadTLSFiles: true,
+			ReloadCAFile:   true,
 		},
 	}
 	if !cfg.HasCA() {

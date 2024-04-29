@@ -35,6 +35,7 @@ import (
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -68,8 +69,27 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatalf("Couldn't create temp dir: %v", err)
 	}
 
+	// prevent goroutine leakage from client-go transport package
+	restoreFn := func() func() {
+		// the initial value of the 'ControllerStopCtx' variable in the
+		// client-go transport package is set to 'wait.NeverStopCtx'. Here,
+		// we rely on the initial value to determine if a test has
+		// already modified the value of 'ControllerStopCtx'.
+		if clientgotransport.ControllerStopCtx != wait.NeverStopCtx {
+			return func() {}
+		}
+
+		original := clientgotransport.ControllerStopCtx
+		clientgotransport.ControllerStopCtx = ctx
+		return func() {
+			clientgotransport.ControllerStopCtx = original
+		}
+	}()
+
 	var errCh chan error
 	tearDownFn := func() {
+		defer restoreFn()
+
 		// Calling cancel function is stopping apiserver and cleaning up
 		// after itself, including shutting down its storage layer.
 		cancel()
