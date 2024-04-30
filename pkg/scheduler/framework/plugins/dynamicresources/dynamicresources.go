@@ -731,7 +731,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	// before moving DRA to beta.
 	if podScheduling.Spec.SelectedNode != "" {
 		for _, claimStatus := range podScheduling.Status.ResourceClaims {
-			if sliceContains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
+			if slices.Contains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
 				logger.V(5).Info("PodSchedulingContext has unsuitable selected node, schedule immediately", "pod", klog.KObj(pod), "selectedNode", podScheduling.Spec.SelectedNode, "podResourceName", claimStatus.Name)
 				return framework.Queue, nil
 			}
@@ -763,15 +763,6 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 func podSchedulingHasClaimInfo(podScheduling *resourcev1alpha2.PodSchedulingContext, podResourceName string) bool {
 	for _, claimStatus := range podScheduling.Status.ResourceClaims {
 		if claimStatus.Name == podResourceName {
-			return true
-		}
-	}
-	return false
-}
-
-func sliceContains(hay []string, needle string) bool {
-	for _, item := range hay {
-		if item == needle {
 			return true
 		}
 	}
@@ -1330,20 +1321,11 @@ func haveAllPotentialNodes(schedulingCtx *resourcev1alpha2.PodSchedulingContext,
 		return false
 	}
 	for _, node := range nodes {
-		if !haveNode(schedulingCtx.Spec.PotentialNodes, node.Node().Name) {
+		if !slices.Contains(schedulingCtx.Spec.PotentialNodes, node.Node().Name) {
 			return false
 		}
 	}
 	return true
-}
-
-func haveNode(nodeNames []string, nodeName string) bool {
-	for _, n := range nodeNames {
-		if n == nodeName {
-			return true
-		}
-	}
-	return false
 }
 
 // Reserve reserves claims for the pod.
@@ -1402,7 +1384,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		// scheduler will pick it forever even when it cannot satisfy
 		// the claim.
 		if state.podSchedulingState.schedulingCtx == nil ||
-			!containsNode(state.podSchedulingState.schedulingCtx.Spec.PotentialNodes, nodeName) {
+			!slices.Contains(state.podSchedulingState.schedulingCtx.Spec.PotentialNodes, nodeName) {
 			potentialNodes := []string{nodeName}
 			state.podSchedulingState.potentialNodes = &potentialNodes
 			logger.V(5).Info("asking for information about single potential node", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
@@ -1476,15 +1458,6 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	// irreversible, so it better should come last. On the other hand,
 	// triggering both in parallel might be faster.
 	return statusPending(logger, "waiting for resource driver to provide information", "pod", klog.KObj(pod))
-}
-
-func containsNode(hay []string, needle string) bool {
-	for _, node := range hay {
-		if node == needle {
-			return true
-		}
-	}
-	return false
 }
 
 // Unreserve clears the ReservedFor field for all claims.
