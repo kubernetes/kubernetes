@@ -207,6 +207,42 @@ func TestEncode(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "unsupported marshaler",
+			in:   &textMarshalerObject{},
+			assertOnWriter: func() (io.Writer, func(*testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					if b.Len() != 0 {
+						t.Errorf("expected no bytes to be written, got %d", b.Len())
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize *cbor.textMarshalerObject: *cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
+		{
+			name: "unsupported marshaler within unstructured content",
+			in: &unstructured.Unstructured{
+				Object: map[string]interface{}{"": textMarshalerObject{}},
+			},
+			assertOnWriter: func() (io.Writer, func(*testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					if b.Len() != 0 {
+						t.Errorf("expected no bytes to be written, got %d", b.Len())
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize map[string]interface {}: cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := NewSerializer(nil, nil)
@@ -625,6 +661,19 @@ func TestDecode(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:        "into unsupported marshaler",
+			data:        []byte("\xa0"),
+			into:        &textMarshalerObject{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Version: "v", Kind: "k"}}},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "k"},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize *cbor.textMarshalerObject: *cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newSerializer(tc.metaFactory, tc.creater, tc.typer, tc.options...)
@@ -641,6 +690,20 @@ func TestDecode(t *testing.T) {
 			}
 		})
 	}
+}
+
+type textMarshalerObject struct{}
+
+func (p textMarshalerObject) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (textMarshalerObject) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+func (textMarshalerObject) MarshalText() ([]byte, error) {
+	return nil, nil
 }
 
 func TestMetaFactoryInterpret(t *testing.T) {
