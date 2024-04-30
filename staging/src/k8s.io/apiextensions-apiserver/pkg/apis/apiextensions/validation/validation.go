@@ -569,11 +569,6 @@ func hasValidConversionReviewVersionOrEmpty(versions []string) bool {
 	return false
 }
 
-// ValidateCustomResourceConversion statically validates
-func ValidateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, fldPath *field.Path, opts validationOptions) field.ErrorList {
-	return validateCustomResourceConversion(conversion, true, fldPath, opts)
-}
-
 func validateCustomResourceConversion(conversion *apiextensions.CustomResourceConversion, requireRecognizedVersion bool, fldPath *field.Path, opts validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if conversion == nil {
