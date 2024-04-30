@@ -17,10 +17,11 @@ limitations under the License.
 package record
 
 import (
-	"os"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+	goleak.VerifyTestMain(m)
 }

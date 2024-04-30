@@ -203,8 +203,8 @@ func NewBroadcaster(opts ...BroadcasterOption) EventBroadcaster {
 	// - The context was nil.
 	// - The context was context.Background() to begin with.
 	//
-	// Both cases get checked here.
-	haveCtxCancelation := ctx.Done() == nil
+	// Both cases get checked here: we have cancelation if (and only if) there is a channel.
+	haveCtxCancelation := ctx.Done() != nil
 
 	eventBroadcaster.cancelationCtx, eventBroadcaster.cancel = context.WithCancel(ctx)
 
