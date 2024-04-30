@@ -727,6 +727,7 @@ func TestEventfNoNamespace(t *testing.T) {
 
 	for index, item := range table {
 		clock.Step(1 * time.Second)
+		//nolint:logcheck // Intentionally using StartLogging here to get notified.
 		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)

@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
-	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -64,7 +63,7 @@ func newController(ctx context.Context, batchPeriod time.Duration) (*fake.Client
 
 	// The event processing pipeline is normally started via Run() method.
 	// However, since we don't start it in unit tests, we explicitly start it here.
-	esController.eventBroadcaster.StartLogging(klog.Infof)
+	esController.eventBroadcaster.StartStructuredLogging(0)
 	esController.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	esController.endpointsSynced = alwaysReady

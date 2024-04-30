@@ -184,8 +184,6 @@ func (a *EventRecorderAdapter) WithLogger(logger klog.Logger) internalevents.Eve
 }
 
 // Creates a new event broadcaster.
-//
-//logcheck:context
 func NewBroadcaster(opts ...BroadcasterOption) EventBroadcaster {
 	c := config{
 		sleepDuration: defaultSleepDuration,
@@ -227,10 +225,12 @@ func NewBroadcaster(opts ...BroadcasterOption) EventBroadcaster {
 	return eventBroadcaster
 }
 
+//logcheck:context // NewBroadcaster(WithSleepDuration(...), WithContext(...)) should be used instead in code which supports contextual logging.
 func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
 	return NewBroadcaster(WithSleepDuration(sleepDuration))
 }
 
+//logcheck:context // NewBroadcaster(WithCorrelatorOptions(..), WithContext(...)) should be used instead in code which supports contextual logging.
 func NewBroadcasterWithCorrelatorOptions(options CorrelatorOptions) EventBroadcaster {
 	return NewBroadcaster(WithCorrelatorOptions(options))
 }

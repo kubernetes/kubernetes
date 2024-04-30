@@ -582,6 +582,10 @@ func TestTransformingInformer(t *testing.T) {
 }
 
 func TestTransformingInformerRace(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
 
@@ -640,8 +644,7 @@ func TestTransformingInformerRace(t *testing.T) {
 		podTransformer,
 	)
 
-	stopCh := make(chan struct{})
-	go controller.Run(stopCh)
+	go controller.Run(ctx)
 
 	checkEvents(numObjs)
 
@@ -655,7 +658,7 @@ func TestTransformingInformerRace(t *testing.T) {
 			key := fmt.Sprintf("namespace/pod-%d", index)
 			for {
 				select {
-				case <-stopCh:
+				case <-ctx.Done():
 					return
 				default:
 				}
@@ -677,7 +680,7 @@ func TestTransformingInformerRace(t *testing.T) {
 	// Let resyncs to happen for some time.
 	time.Sleep(time.Second)
 
-	close(stopCh)
+	cancel()
 	wg.Wait()
 	close(errors)
 	for err := range errors {

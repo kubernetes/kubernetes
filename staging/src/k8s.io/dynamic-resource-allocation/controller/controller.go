@@ -190,19 +190,7 @@ func New(
 	claimNameLookup := resourceclaim.NewNameLookup(kubeClient)
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	go func() {
-		<-ctx.Done()
-		eventBroadcaster.Shutdown()
-	}()
-	// TODO: use contextual logging in eventBroadcaster once it
-	// supports it. There is a StartStructuredLogging API, but it
-	// uses the global klog, which is worse than redirecting an unstructured
-	// string into our logger, in particular during testing.
-	eventBroadcaster.StartLogging(func(format string, args ...interface{}) {
-		helper, logger := logger.WithCallStackHelper()
-		helper()
-		logger.V(2).Info(fmt.Sprintf(format, args...))
-	})
+	eventBroadcaster.StartStructuredLogging(2)
 	eventBroadcaster.StartRecordingToSink(&corev1types.EventSinkImpl{Interface: kubeClient.CoreV1().Events(v1.NamespaceAll)})
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme,
 		v1.EventSource{Component: fmt.Sprintf("resource driver %s", name)})
