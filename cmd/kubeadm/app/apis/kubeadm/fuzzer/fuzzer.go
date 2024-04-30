@@ -26,6 +26,7 @@ import (
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -97,6 +98,8 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	obj.Proxy.Disabled = false
+	obj.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
+	obj.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
