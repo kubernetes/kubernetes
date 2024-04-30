@@ -100,15 +100,19 @@ func (s *serializer) Identifier() runtime.Identifier {
 }
 
 func (s *serializer) Encode(obj runtime.Object, w io.Writer) error {
-	if _, err := w.Write(selfDescribedCBOR); err != nil {
+	var v interface{} = obj
+	if u, ok := obj.(runtime.Unstructured); ok {
+		v = u.UnstructuredContent()
+	}
+
+	if err := modes.CheckUnsupportedMarshalers(v); err != nil {
 		return err
 	}
 
-	e := modes.Encode.NewEncoder(w)
-	if u, ok := obj.(runtime.Unstructured); ok {
-		return e.Encode(u.UnstructuredContent())
+	if _, err := w.Write(selfDescribedCBOR); err != nil {
+		return err
 	}
-	return e.Encode(obj)
+	return modes.Encode.NewEncoder(w).Encode(v)
 }
 
 // gvkWithDefaults returns group kind and version defaulting from provided default
@@ -147,6 +151,12 @@ func (s *serializer) unmarshal(data []byte, into interface{}) (strict, lax error
 	if u, ok := into.(runtime.Unstructured); ok {
 		var content map[string]interface{}
 		defer func() {
+			if lax != nil {
+				// Don't waste effort setting unstructured content if the unmarshal
+				// has already failed.
+				return
+			}
+
 			switch u := u.(type) {
 			case *unstructured.UnstructuredList:
 				// UnstructuredList's implementation of SetUnstructuredContent
@@ -218,6 +228,10 @@ func (s *serializer) unmarshal(data []byte, into interface{}) (strict, lax error
 			}
 		}()
 		into = &content
+	}
+
+	if err := modes.CheckUnsupportedMarshalers(into); err != nil {
+		return nil, err
 	}
 
 	if !s.options.strict {
