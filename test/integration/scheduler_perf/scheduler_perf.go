@@ -641,6 +641,30 @@ func initTestOutput(tb testing.TB) io.Writer {
 	return output
 }
 
+type cleanupKeyType struct{}
+
+var cleanupKey = cleanupKeyType{}
+
+// shouldCleanup returns true if a function should clean up resource in the
+// apiserver when the test is done. This is true for unit tests (etcd and
+// apiserver get reused) and false for benchmarks (each benchmark starts with a
+// clean state, so cleaning up just wastes time).
+//
+// The default if not explicitly set in the context is true.
+func shouldCleanup(ctx context.Context) bool {
+	val := ctx.Value(cleanupKey)
+	if enabled, ok := val.(bool); ok {
+		return enabled
+	}
+	return true
+}
+
+// withCleanup sets whether cleaning up resources in the apiserver
+// should be done. The default is true.
+func withCleanup(tCtx ktesting.TContext, enabled bool) ktesting.TContext {
+	return ktesting.WithValue(tCtx, cleanupKey, enabled)
+}
+
 var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
 
 // RunBenchmarkPerfScheduling runs the scheduler performance tests.
@@ -692,10 +716,15 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 					tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
 					for feature, flag := range tc.FeatureGates {
-						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
+						featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)
 					}
 					informerFactory, tCtx := setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, tc.FeatureGates, outOfTreePluginRegistry)
-					results := runWorkload(tCtx, tc, w, informerFactory, false)
+
+					// No need to clean up, each benchmark testcase starts with an empty
+					// etcd database.
+					tCtx = withCleanup(tCtx, false)
+
+					results := runWorkload(tCtx, tc, w, informerFactory)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
 
 					if len(results) > 0 {
@@ -799,7 +828,7 @@ func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureG
 	return mustSetupCluster(tCtx, cfg, featureGates, outOfTreePluginRegistry)
 }
 
-func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory, cleanup bool) []DataItem {
+func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory) []DataItem {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -811,6 +840,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 			b.ReportMetric(duration.Seconds(), "runtime_seconds")
 		})
 	}
+	cleanup := shouldCleanup(tCtx)
 
 	// Disable error checking of the sampling interval length in the
 	// throughput collector by default. When running benchmarks, report

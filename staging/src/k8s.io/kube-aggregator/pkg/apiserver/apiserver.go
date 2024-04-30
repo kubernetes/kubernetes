@@ -77,11 +77,6 @@ const (
 
 // ExtraConfig represents APIServices-specific configuration
 type ExtraConfig struct {
-	// PeerCAFile is the ca bundle used by this kube-apiserver to verify peer apiservers'
-	// serving certs when routing a request to the peer in the case the request can not be served
-	// locally due to version skew.
-	PeerCAFile string
-
 	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
 	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
 	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
@@ -120,7 +115,7 @@ type CompletedConfig struct {
 }
 
 type runnable interface {
-	Run(stopCh <-chan struct{}) error
+	RunWithContext(ctx context.Context) error
 }
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
@@ -343,6 +338,42 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		s.discoveryAggregationController = NewDiscoveryManager(
+			// Use aggregator as the source name to avoid overwriting native/CRD
+			// groups
+			s.GenericAPIServer.AggregatedDiscoveryGroupManager.WithSource(aggregated.AggregatorSource),
+		)
+
+		// Setup discovery endpoint
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
+			// Discovery aggregation depends on the apiservice registration controller
+			// having the full list of APIServices already synced
+			select {
+			case <-context.StopCh:
+				return nil
+			// Context cancelled, should abort/clean goroutines
+			case <-apiServiceRegistrationControllerInitiated:
+			}
+
+			// Run discovery manager's worker to watch for new/removed/updated
+			// APIServices to the discovery document can be updated at runtime
+			// When discovery is ready, all APIServices will be present, with APIServices
+			// that have not successfully synced discovery to be present but marked as Stale.
+			discoverySyncedCh := make(chan struct{})
+			go s.discoveryAggregationController.Run(context.StopCh, discoverySyncedCh)
+
+			select {
+			case <-context.StopCh:
+				return nil
+			// Context cancelled, should abort/clean goroutines
+			case <-discoverySyncedCh:
+				// API services successfully sync
+			}
+			return nil
+		})
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
 		// Spawn a goroutine in aggregator apiserver to update storage version for
@@ -414,22 +445,6 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		})
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-		s.discoveryAggregationController = NewDiscoveryManager(
-			// Use aggregator as the source name to avoid overwriting native/CRD
-			// groups
-			s.GenericAPIServer.AggregatedDiscoveryGroupManager.WithSource(aggregated.AggregatorSource),
-		)
-
-		// Setup discovery endpoint
-		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
-			// Run discovery manager's worker to watch for new/removed/updated
-			// APIServices to the discovery document can be updated at runtime
-			go s.discoveryAggregationController.Run(context.StopCh)
-			return nil
-		})
-	}
-
 	prepared := s.GenericAPIServer.PrepareRun()
 
 	// delay OpenAPI setup until the delegate had a chance to setup their OpenAPI handlers
@@ -464,8 +479,8 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
 }
 
-func (s preparedAPIAggregator) Run(stopCh <-chan struct{}) error {
-	return s.runnable.Run(stopCh)
+func (s preparedAPIAggregator) Run(ctx context.Context) error {
+	return s.runnable.RunWithContext(ctx)
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.

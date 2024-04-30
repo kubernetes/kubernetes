@@ -94,13 +94,26 @@ func (t *TimeOrMetaDuration) UnmarshalJSON(b []byte) error {
 
 // FormatOptions contains options for the different logging formats.
 type FormatOptions struct {
+	// [Alpha] Text contains options for logging format "text".
+	// Only available when the LoggingAlphaOptions feature gate is enabled.
+	Text TextOptions `json:"text,omitempty"`
 	// [Alpha] JSON contains options for logging format "json".
 	// Only available when the LoggingAlphaOptions feature gate is enabled.
 	JSON JSONOptions `json:"json,omitempty"`
 }
 
+// TextOptions contains options for logging format "text".
+type TextOptions struct {
+	OutputRoutingOptions `json:",inline"`
+}
+
 // JSONOptions contains options for logging format "json".
 type JSONOptions struct {
+	OutputRoutingOptions `json:",inline"`
+}
+
+// OutputRoutingOptions contains options that are supported by both "text" and "json".
+type OutputRoutingOptions struct {
 	// [Alpha] SplitStream redirects error messages to stderr while
 	// info messages go to stdout, with buffering. The default is to write
 	// both to stdout, without buffering. Only available when

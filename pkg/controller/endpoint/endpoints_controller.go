@@ -70,9 +70,9 @@ const (
 )
 
 // NewEndpointController returns a new *Controller.
-func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
+func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
-	broadcaster := record.NewBroadcaster()
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
 
 	e := &Controller{
@@ -164,7 +164,7 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	// Start events processing pipeline.
-	e.eventBroadcaster.StartStructuredLogging(0)
+	e.eventBroadcaster.StartStructuredLogging(3)
 	e.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: e.client.CoreV1().Events("")})
 	defer e.eventBroadcaster.Shutdown()
 

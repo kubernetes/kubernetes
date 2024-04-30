@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -47,7 +46,6 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
@@ -106,7 +104,7 @@ type AttachDetachController interface {
 
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
-	logger klog.Logger,
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
@@ -115,12 +113,14 @@ func NewAttachDetachController(
 	csiNodeInformer storageinformersv1.CSINodeInformer,
 	csiDriverInformer storageinformersv1.CSIDriverInformer,
 	volumeAttachmentInformer storageinformersv1.VolumeAttachmentInformer,
-	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
+	disableForceDetachOnTimeout bool,
 	timerConfig TimerConfig) (AttachDetachController, error) {
+
+	logger := klog.FromContext(ctx)
 
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
@@ -133,7 +133,6 @@ func NewAttachDetachController(
 		podIndexer:  podInformer.Informer().GetIndexer(),
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
 		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
 	}
 
@@ -150,7 +149,7 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("could not initialize volume plugins for Attach/Detach Controller: %w", err)
 	}
 
-	adc.broadcaster = record.NewBroadcaster()
+	adc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
 	recorder := adc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
@@ -171,6 +170,7 @@ func NewAttachDetachController(
 		timerConfig.ReconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
 		disableReconciliationSync,
+		disableForceDetachOnTimeout,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
@@ -274,9 +274,6 @@ type attachDetachController struct {
 	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
 	volumeAttachmentSynced kcache.InformerSynced
 
-	// cloud provider used by volume host
-	cloud cloudprovider.Interface
-
 	// volumePluginMgr used to initialize and fetch volume plugins
 	volumePluginMgr volume.VolumePluginMgr
 
@@ -330,7 +327,7 @@ func (adc *attachDetachController) Run(ctx context.Context) {
 	defer adc.pvcQueue.ShutDown()
 
 	// Start events processing pipeline.
-	adc.broadcaster.StartStructuredLogging(0)
+	adc.broadcaster.StartStructuredLogging(3)
 	adc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: adc.kubeClient.CoreV1().Events("")})
 	defer adc.broadcaster.Shutdown()
 
@@ -376,7 +373,6 @@ func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
-		volumesInUse := sets.New(node.Status.VolumesInUse...)
 
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			uniqueName := attachedVolume.Name
@@ -390,12 +386,8 @@ func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger
 				logger.Error(err, "Failed to mark the volume as attached")
 				continue
 			}
-			inUse := volumesInUse.Has(uniqueName)
-			err = adc.actualStateOfWorld.SetVolumeMountedByNode(logger, uniqueName, nodeName, inUse)
-			if err != nil {
-				logger.Error(err, "Failed to set volume mounted by node")
-			}
 		}
+		adc.actualStateOfWorld.SetVolumesMountedByNode(logger, node.Status.VolumesInUse, nodeName)
 		adc.addNodeToDswp(node, types.NodeName(node.Name))
 	}
 	err = adc.processVolumeAttachments(logger)
@@ -674,24 +666,7 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 func (adc *attachDetachController) processVolumesInUse(
 	logger klog.Logger, nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
 	logger.V(4).Info("processVolumesInUse for node", "node", klog.KRef("", string(nodeName)))
-	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
-		mounted := false
-		for _, volumeInUse := range volumesInUse {
-			if attachedVolume.VolumeName == volumeInUse {
-				mounted = true
-				break
-			}
-		}
-		err := adc.actualStateOfWorld.SetVolumeMountedByNode(logger, attachedVolume.VolumeName, nodeName, mounted)
-		if err != nil {
-			logger.Info(
-				"SetVolumeMountedByNode returned an error",
-				"node", klog.KRef("", string(nodeName)),
-				"volumeName", attachedVolume.VolumeName,
-				"mounted", mounted,
-				"err", err)
-		}
-	}
+	adc.actualStateOfWorld.SetVolumesMountedByNode(logger, volumesInUse, nodeName)
 }
 
 // Process Volume-Attachment objects.
@@ -828,10 +803,6 @@ func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volu
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
-func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
-	return adc.cloud
-}
-
 func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
@@ -883,15 +854,9 @@ func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
 	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; exists {
-		keepTerminatedPodVolumes := false
-
-		if t, ok := node.Annotations[volumeutil.KeepTerminatedPodVolumesAnnotation]; ok {
-			keepTerminatedPodVolumes = t == "true"
-		}
-
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
+		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
 }
 

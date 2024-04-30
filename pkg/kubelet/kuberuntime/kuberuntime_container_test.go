@@ -78,8 +78,9 @@ func TestRemoveContainer(t *testing.T) {
 		pattern = strings.Replace(pattern, "\\", "\\\\", -1)
 		return regexp.MustCompile(pattern).MatchString(path)
 	}
-	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
-	expectedContainerLogPathRotated := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
+	podLogsDirectory := "/var/log/pods"
+	expectedContainerLogPath := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogPathRotated := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
 	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
 
 	fakeOS.Create(expectedContainerLogPath)
@@ -236,7 +237,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 // TestToKubeContainerStatusWithResources tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}

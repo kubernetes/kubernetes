@@ -54,21 +54,18 @@ const (
 	// SeccompLocalhostProfileNamePrefix is the prefix for specifying profiles loaded from the node's disk.
 	SeccompLocalhostProfileNamePrefix = "localhost/"
 
-	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
-	AppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
-	// AppArmorBetaDefaultProfileAnnotationKey is the annotation key specifying the default AppArmor profile.
-	AppArmorBetaDefaultProfileAnnotationKey = "apparmor.security.beta.kubernetes.io/defaultProfileName"
-	// AppArmorBetaAllowedProfilesAnnotationKey is the annotation key specifying the allowed AppArmor profiles.
-	AppArmorBetaAllowedProfilesAnnotationKey = "apparmor.security.beta.kubernetes.io/allowedProfileNames"
+	// DeprecatedAppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// Deprecated: use a pod or container security context `appArmorProfile` field instead.
+	DeprecatedAppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 
-	// AppArmorBetaProfileRuntimeDefault is the profile specifying the runtime default.
-	AppArmorBetaProfileRuntimeDefault = "runtime/default"
+	// DeprecatedAppArmorBetaProfileRuntimeDefault is the profile specifying the runtime default.
+	DeprecatedAppArmorBetaProfileRuntimeDefault = "runtime/default"
 
-	// AppArmorBetaProfileNamePrefix is the prefix for specifying profiles loaded on the node.
-	AppArmorBetaProfileNamePrefix = "localhost/"
+	// DeprecatedAppArmorBetaProfileNamePrefix is the prefix for specifying profiles loaded on the node.
+	DeprecatedAppArmorBetaProfileNamePrefix = "localhost/"
 
-	// AppArmorBetaProfileNameUnconfined is the Unconfined AppArmor profile
-	AppArmorBetaProfileNameUnconfined = "unconfined"
+	// DeprecatedAppArmorBetaProfileNameUnconfined is the Unconfined AppArmor profile
+	DeprecatedAppArmorBetaProfileNameUnconfined = "unconfined"
 
 	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
 	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.

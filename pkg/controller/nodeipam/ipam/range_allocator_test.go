@@ -17,7 +17,6 @@ limitations under the License.
 package ipam
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -26,9 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -275,13 +274,13 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 	}
 
 	// test function
-	logger, _ := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			// Initialize the range allocator.
 			fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
-			nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
-			_, err := NewCIDRRangeAllocator(logger, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
+			nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
+			_, err := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
 			if err == nil && tc.ctrlCreateFail {
 				t.Fatalf("creating range allocator was expected to fail, but it did not")
 			}
@@ -510,12 +509,12 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 	}
 
 	// test function
-	logger, ctx := ktesting.NewTestContext(t)
+	_, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc testCase) {
 		fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
-		nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
+		nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
 		// Initialize the range allocator.
-		allocator, err := NewCIDRRangeAllocator(logger, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
+		allocator, err := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
 		if err != nil {
 			t.Errorf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 			return
@@ -527,7 +526,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 		}
 		rangeAllocator.nodesSynced = test.AlwaysReady
 		rangeAllocator.recorder = testutil.NewFakeRecorder()
-		go allocator.Run(ctx)
+		go allocator.Run(tCtx)
 
 		// this is a bit of white box testing
 		// pre allocate the cidrs as per the test
@@ -548,7 +547,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			if node.Spec.PodCIDRs == nil {
 				updateCount++
 			}
-			if err := allocator.AllocateOrOccupyCIDR(logger, node); err != nil {
+			if err := allocator.AllocateOrOccupyCIDR(tCtx, node); err != nil {
 				t.Errorf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 			}
 		}
@@ -611,10 +610,10 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			},
 		},
 	}
-	logger, ctx := ktesting.NewTestContext(t)
+	_, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc testCase) {
 		// Initialize the range allocator.
-		allocator, err := NewCIDRRangeAllocator(logger, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		allocator, err := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
 		if err != nil {
 			t.Logf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 		}
@@ -625,7 +624,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 		}
 		rangeAllocator.nodesSynced = test.AlwaysReady
 		rangeAllocator.recorder = testutil.NewFakeRecorder()
-		go allocator.Run(ctx)
+		go allocator.Run(tCtx)
 
 		// this is a bit of white box testing
 		for setIdx, allocatedList := range tc.allocatedCIDRs {
@@ -640,7 +639,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 				}
 			}
 		}
-		if err := allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0]); err == nil {
+		if err := allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0]); err == nil {
 			t.Errorf("%v: unexpected success in AllocateOrOccupyCIDR: %v", tc.description, err)
 		}
 		// We don't expect any updates, so just sleep for some time
@@ -756,10 +755,10 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			},
 		},
 	}
-	logger, ctx := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc releaseTestCase) {
 		// Initialize the range allocator.
-		allocator, _ := NewCIDRRangeAllocator(logger, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		allocator, _ := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
 		rangeAllocator, ok := allocator.(*rangeAllocator)
 		if !ok {
 			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
@@ -767,7 +766,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 		}
 		rangeAllocator.nodesSynced = test.AlwaysReady
 		rangeAllocator.recorder = testutil.NewFakeRecorder()
-		go allocator.Run(ctx)
+		go allocator.Run(tCtx)
 
 		// this is a bit of white box testing
 		for setIdx, allocatedList := range tc.allocatedCIDRs {
@@ -783,7 +782,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			}
 		}
 
-		err := allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0])
+		err := allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0])
 		if len(tc.expectedAllocatedCIDRFirstRound) != 0 {
 			if err != nil {
 				t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
@@ -813,7 +812,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				t.Fatalf("%v: unexpected error in ReleaseCIDR: %v", tc.description, err)
 			}
 		}
-		if err = allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0]); err != nil {
+		if err = allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0]); err != nil {
 			t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 		}
 		if err := test.WaitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {

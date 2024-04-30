@@ -31,9 +31,6 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
 
-	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
-
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
@@ -45,6 +42,8 @@ import (
 	"k8s.io/apiserver/pkg/cel/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
@@ -369,8 +368,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			continue
 		}
 		if evalResult != types.True {
+			currentFldPath := fldPath
 			if len(compiled.NormalizedRuleFieldPath) > 0 {
-				fldPath = fldPath.Child(compiled.NormalizedRuleFieldPath)
+				currentFldPath = currentFldPath.Child(compiled.NormalizedRuleFieldPath)
 			}
 
 			addErr := func(e *field.Error) {
@@ -385,22 +385,22 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 				messageExpression, newRemainingBudget, msgErr := evalMessageExpression(ctx, compiled.MessageExpression, rule.MessageExpression, activation, remainingBudget)
 				if msgErr != nil {
 					if msgErr.Type == cel.ErrorTypeInternal {
-						addErr(field.InternalError(fldPath, msgErr))
+						addErr(field.InternalError(currentFldPath, msgErr))
 						return errs, -1
 					} else if msgErr.Type == cel.ErrorTypeInvalid {
-						addErr(field.Invalid(fldPath, sts.Type, msgErr.Error()))
+						addErr(field.Invalid(currentFldPath, sts.Type, msgErr.Error()))
 						return errs, -1
 					} else {
 						klog.V(2).ErrorS(msgErr, "messageExpression evaluation failed")
-						addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+						addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 						remainingBudget = newRemainingBudget
 					}
 				} else {
-					addErr(fieldErrorForReason(fldPath, sts.Type, messageExpression, rule.Reason))
+					addErr(fieldErrorForReason(currentFldPath, sts.Type, messageExpression, rule.Reason))
 					remainingBudget = newRemainingBudget
 				}
 			} else {
-				addErr(fieldErrorForReason(fldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
+				addErr(fieldErrorForReason(currentFldPath, sts.Type, ruleMessageOrDefault(rule), rule.Reason))
 			}
 		}
 	}
@@ -440,9 +440,30 @@ func unescapeSingleQuote(s string) (string, error) {
 	return unescaped, err
 }
 
+type validFieldPathOptions struct {
+	allowArrayNotation bool
+}
+
+// ValidFieldPathOption provides vararg options for ValidFieldPath.
+type ValidFieldPathOption func(*validFieldPathOptions)
+
+// WithFieldPathAllowArrayNotation sets of array annotation ('[<index or map key>]') is allowed
+// in field paths.
+// Defaults to true
+func WithFieldPathAllowArrayNotation(allow bool) ValidFieldPathOption {
+	return func(options *validFieldPathOptions) {
+		options.allowArrayNotation = allow
+	}
+}
+
 // ValidFieldPath validates that jsonPath is a valid JSON Path containing only field and map accessors
 // that are valid for the given schema, and returns a field.Path representation of the validated jsonPath or an error.
-func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath *field.Path, err error) {
+func ValidFieldPath(jsonPath string, schema *schema.Structural, options ...ValidFieldPathOption) (validFieldPath *field.Path, foundSchema *schema.Structural, err error) {
+	opts := &validFieldPathOptions{allowArrayNotation: true}
+	for _, opt := range options {
+		opt(opts)
+	}
+
 	appendToPath := func(name string, isNamed bool) error {
 		if !isNamed {
 			validFieldPath = validFieldPath.Key(name)
@@ -503,16 +524,19 @@ func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath 
 		tok = scanner.Text()
 		switch tok {
 		case "[":
+			if !opts.allowArrayNotation {
+				return nil, nil, fmt.Errorf("array notation is not allowed")
+			}
 			if !scanner.Scan() {
-				return nil, fmt.Errorf("unexpected end of JSON path")
+				return nil, nil, fmt.Errorf("unexpected end of JSON path")
 			}
 			tok = scanner.Text()
 			if len(tok) < 2 || tok[0] != '\'' || tok[len(tok)-1] != '\'' {
-				return nil, fmt.Errorf("expected single quoted string but got %s", tok)
+				return nil, nil, fmt.Errorf("expected single quoted string but got %s", tok)
 			}
 			unescaped, err := unescapeSingleQuote(tok[1 : len(tok)-1])
 			if err != nil {
-				return nil, fmt.Errorf("invalid string literal: %v", err)
+				return nil, nil, fmt.Errorf("invalid string literal: %w", err)
 			}
 
 			if schema.Properties != nil {
@@ -520,21 +544,21 @@ func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath 
 			} else if schema.AdditionalProperties != nil {
 				isNamed = false
 			} else {
-				return nil, fmt.Errorf("does not refer to a valid field")
+				return nil, nil, fmt.Errorf("does not refer to a valid field")
 			}
 			if err := appendToPath(unescaped, isNamed); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if !scanner.Scan() {
-				return nil, fmt.Errorf("unexpected end of JSON path")
+				return nil, nil, fmt.Errorf("unexpected end of JSON path")
 			}
 			tok = scanner.Text()
 			if tok != "]" {
-				return nil, fmt.Errorf("expected ] but got %s", tok)
+				return nil, nil, fmt.Errorf("expected ] but got %s", tok)
 			}
 		case ".":
 			if !scanner.Scan() {
-				return nil, fmt.Errorf("unexpected end of JSON path")
+				return nil, nil, fmt.Errorf("unexpected end of JSON path")
 			}
 			tok = scanner.Text()
 			if schema.Properties != nil {
@@ -542,16 +566,17 @@ func ValidFieldPath(jsonPath string, schema *schema.Structural) (validFieldPath 
 			} else if schema.AdditionalProperties != nil {
 				isNamed = false
 			} else {
-				return nil, fmt.Errorf("does not refer to a valid field")
+				return nil, nil, fmt.Errorf("does not refer to a valid field")
 			}
 			if err := appendToPath(tok, isNamed); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		default:
-			return nil, fmt.Errorf("expected [ or . but got: %s", tok)
+			return nil, nil, fmt.Errorf("expected [ or . but got: %s", tok)
 		}
 	}
-	return validFieldPath, nil
+
+	return validFieldPath, schema, nil
 }
 
 func fieldErrorForReason(fldPath *field.Path, value interface{}, detail string, reason *apiextensions.FieldValueErrorReason) *field.Error {

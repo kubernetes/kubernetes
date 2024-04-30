@@ -57,6 +57,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiextensionsv1.ExternalDocumentationApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("JSONSchemaProps"):
 		return &apiextensionsv1.JSONSchemaPropsApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("SelectableField"):
+		return &apiextensionsv1.SelectableFieldApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ServiceReference"):
 		return &apiextensionsv1.ServiceReferenceApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ValidationRule"):
@@ -93,6 +95,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiextensionsv1beta1.ExternalDocumentationApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("JSONSchemaProps"):
 		return &apiextensionsv1beta1.JSONSchemaPropsApplyConfiguration{}
+	case v1beta1.SchemeGroupVersion.WithKind("SelectableField"):
+		return &apiextensionsv1beta1.SelectableFieldApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ServiceReference"):
 		return &apiextensionsv1beta1.ServiceReferenceApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ValidationRule"):

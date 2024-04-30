@@ -7,8 +7,12 @@ package imports
 import (
 	"context"
 	"fmt"
+	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 
+	"golang.org/x/mod/module"
 	"golang.org/x/tools/internal/gopathwalk"
 )
 
@@ -39,6 +43,8 @@ const (
 	exportsLoaded
 )
 
+// directoryPackageInfo holds (possibly incomplete) information about packages
+// contained in a given directory.
 type directoryPackageInfo struct {
 	// status indicates the extent to which this struct has been filled in.
 	status directoryPackageStatus
@@ -63,7 +69,10 @@ type directoryPackageInfo struct {
 	packageName string // the package name, as declared in the source.
 
 	// Set when status >= exportsLoaded.
-
+	// TODO(rfindley): it's hard to see this, but exports depend implicitly on
+	// the default build context GOOS and GOARCH.
+	//
+	// We can make this explicit, and key exports by GOOS, GOARCH.
 	exports []string
 }
 
@@ -79,7 +88,7 @@ func (info *directoryPackageInfo) reachedStatus(target directoryPackageStatus) (
 	return true, nil
 }
 
-// dirInfoCache is a concurrency safe map for storing information about
+// DirInfoCache is a concurrency-safe map for storing information about
 // directories that may contain packages.
 //
 // The information in this cache is built incrementally. Entries are initialized in scan.
@@ -92,13 +101,18 @@ func (info *directoryPackageInfo) reachedStatus(target directoryPackageStatus) (
 // The information in the cache is not expected to change for the cache's
 // lifetime, so there is no protection against competing writes. Users should
 // take care not to hold the cache across changes to the underlying files.
-//
-// TODO(suzmue): consider other concurrency strategies and data structures (RWLocks, sync.Map, etc)
-type dirInfoCache struct {
+type DirInfoCache struct {
 	mu sync.Mutex
 	// dirs stores information about packages in directories, keyed by absolute path.
 	dirs      map[string]*directoryPackageInfo
 	listeners map[*int]cacheListener
+}
+
+func NewDirInfoCache() *DirInfoCache {
+	return &DirInfoCache{
+		dirs:      make(map[string]*directoryPackageInfo),
+		listeners: make(map[*int]cacheListener),
+	}
 }
 
 type cacheListener func(directoryPackageInfo)
@@ -106,7 +120,7 @@ type cacheListener func(directoryPackageInfo)
 // ScanAndListen calls listener on all the items in the cache, and on anything
 // newly added. The returned stop function waits for all in-flight callbacks to
 // finish and blocks new ones.
-func (d *dirInfoCache) ScanAndListen(ctx context.Context, listener cacheListener) func() {
+func (d *DirInfoCache) ScanAndListen(ctx context.Context, listener cacheListener) func() {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// Flushing out all the callbacks is tricky without knowing how many there
@@ -162,8 +176,10 @@ func (d *dirInfoCache) ScanAndListen(ctx context.Context, listener cacheListener
 }
 
 // Store stores the package info for dir.
-func (d *dirInfoCache) Store(dir string, info directoryPackageInfo) {
+func (d *DirInfoCache) Store(dir string, info directoryPackageInfo) {
 	d.mu.Lock()
+	// TODO(rfindley, golang/go#59216): should we overwrite an existing entry?
+	// That seems incorrect as the cache should be idempotent.
 	_, old := d.dirs[dir]
 	d.dirs[dir] = &info
 	var listeners []cacheListener
@@ -180,7 +196,7 @@ func (d *dirInfoCache) Store(dir string, info directoryPackageInfo) {
 }
 
 // Load returns a copy of the directoryPackageInfo for absolute directory dir.
-func (d *dirInfoCache) Load(dir string) (directoryPackageInfo, bool) {
+func (d *DirInfoCache) Load(dir string) (directoryPackageInfo, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	info, ok := d.dirs[dir]
@@ -191,7 +207,7 @@ func (d *dirInfoCache) Load(dir string) (directoryPackageInfo, bool) {
 }
 
 // Keys returns the keys currently present in d.
-func (d *dirInfoCache) Keys() (keys []string) {
+func (d *DirInfoCache) Keys() (keys []string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for key := range d.dirs {
@@ -200,7 +216,7 @@ func (d *dirInfoCache) Keys() (keys []string) {
 	return keys
 }
 
-func (d *dirInfoCache) CachePackageName(info directoryPackageInfo) (string, error) {
+func (d *DirInfoCache) CachePackageName(info directoryPackageInfo) (string, error) {
 	if loaded, err := info.reachedStatus(nameLoaded); loaded {
 		return info.packageName, err
 	}
@@ -213,7 +229,7 @@ func (d *dirInfoCache) CachePackageName(info directoryPackageInfo) (string, erro
 	return info.packageName, info.err
 }
 
-func (d *dirInfoCache) CacheExports(ctx context.Context, env *ProcessEnv, info directoryPackageInfo) (string, []string, error) {
+func (d *DirInfoCache) CacheExports(ctx context.Context, env *ProcessEnv, info directoryPackageInfo) (string, []string, error) {
 	if reached, _ := info.reachedStatus(exportsLoaded); reached {
 		return info.packageName, info.exports, info.err
 	}
@@ -233,4 +249,82 @@ func (d *dirInfoCache) CacheExports(ctx context.Context, env *ProcessEnv, info d
 	}
 	d.Store(info.dir, info)
 	return info.packageName, info.exports, info.err
+}
+
+// ScanModuleCache walks the given directory, which must be a GOMODCACHE value,
+// for directory package information, storing the results in cache.
+func ScanModuleCache(dir string, cache *DirInfoCache, logf func(string, ...any)) {
+	// Note(rfindley): it's hard to see, but this function attempts to implement
+	// just the side effects on cache of calling PrimeCache with a ProcessEnv
+	// that has the given dir as its GOMODCACHE.
+	//
+	// Teasing out the control flow, we see that we can avoid any handling of
+	// vendor/ and can infer module info entirely from the path, simplifying the
+	// logic here.
+
+	root := gopathwalk.Root{
+		Path: filepath.Clean(dir),
+		Type: gopathwalk.RootModuleCache,
+	}
+
+	directoryInfo := func(root gopathwalk.Root, dir string) directoryPackageInfo {
+		// This is a copy of ModuleResolver.scanDirForPackage, trimmed down to
+		// logic that applies to a module cache directory.
+
+		subdir := ""
+		if dir != root.Path {
+			subdir = dir[len(root.Path)+len("/"):]
+		}
+
+		matches := modCacheRegexp.FindStringSubmatch(subdir)
+		if len(matches) == 0 {
+			return directoryPackageInfo{
+				status: directoryScanned,
+				err:    fmt.Errorf("invalid module cache path: %v", subdir),
+			}
+		}
+		modPath, err := module.UnescapePath(filepath.ToSlash(matches[1]))
+		if err != nil {
+			if logf != nil {
+				logf("decoding module cache path %q: %v", subdir, err)
+			}
+			return directoryPackageInfo{
+				status: directoryScanned,
+				err:    fmt.Errorf("decoding module cache path %q: %v", subdir, err),
+			}
+		}
+		importPath := path.Join(modPath, filepath.ToSlash(matches[3]))
+		index := strings.Index(dir, matches[1]+"@"+matches[2])
+		modDir := filepath.Join(dir[:index], matches[1]+"@"+matches[2])
+		modName := readModName(filepath.Join(modDir, "go.mod"))
+		return directoryPackageInfo{
+			status:                 directoryScanned,
+			dir:                    dir,
+			rootType:               root.Type,
+			nonCanonicalImportPath: importPath,
+			moduleDir:              modDir,
+			moduleName:             modName,
+		}
+	}
+
+	add := func(root gopathwalk.Root, dir string) {
+		info := directoryInfo(root, dir)
+		cache.Store(info.dir, info)
+	}
+
+	skip := func(_ gopathwalk.Root, dir string) bool {
+		// Skip directories that have already been scanned.
+		//
+		// Note that gopathwalk only adds "package" directories, which must contain
+		// a .go file, and all such package directories in the module cache are
+		// immutable. So if we can load a dir, it can be skipped.
+		info, ok := cache.Load(dir)
+		if !ok {
+			return false
+		}
+		packageScanned, _ := info.reachedStatus(directoryScanned)
+		return packageScanned
+	}
+
+	gopathwalk.WalkSkip([]gopathwalk.Root{root}, add, skip, gopathwalk.Options{Logf: logf, ModulesEnabled: true})
 }

@@ -1202,8 +1202,7 @@ message Container {
     ContainerMetadata metadata = 3;
     // Spec of the image.
     ImageSpec image = 4;
-    // Reference to the image in use. For most runtimes, this should be an
-    // image ID.
+    // Digested reference to the image in use.
     string image_ref = 5;
     // State of the container.
     ContainerState state = 6;
@@ -1216,6 +1215,16 @@ message Container {
     // MUST be identical to that of the corresponding ContainerConfig used to
     // instantiate this Container.
     map<string, string> annotations = 9;
+    // Reference to the unique identifier of the image, on the node, as
+    // returned in the image service apis.
+    //
+    // Note: The image_ref above has been historically used by container
+    // runtimes to reference images by digest. The image_ref has been also used
+    // in the kubelet image garbage collection, which does not work with
+    // digests at all. To separate and avoid possible misusage, we now
+    // introduce the image_id field, which should always refer to a unique
+    // image identifier on the node.
+    string image_id = 10;
 }
 
 message ListContainersResponse {
@@ -1248,8 +1257,7 @@ message ContainerStatus {
     int32 exit_code = 7;
     // Spec of the image.
     ImageSpec image = 8;
-    // Reference to the image in use. For most runtimes, this should be an
-    // image ID
+    // Digested reference to the image in use.
     string image_ref = 9;
     // Brief CamelCase string explaining why container is in its current state.
     // Must be set to "OOMKilled" for containers terminated by cgroup-based Out-of-Memory killer.
@@ -1270,6 +1278,14 @@ message ContainerStatus {
     string log_path = 15;
     // Resource limits configuration of the container.
     ContainerResources resources = 16;
+    // Reference to the unique identifier of the image, on the node, as
+    // returned in the image service apis.
+    //
+    // Note: The image_ref above has been historically used by container
+    // runtimes to reference images by digest. To separate and avoid possible
+    // misusage, we now introduce the image_id field, which should always refer
+    // to a unique image identifier on the node.
+    string image_id = 17;
 }
 
 message ContainerStatusResponse {

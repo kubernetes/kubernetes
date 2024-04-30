@@ -35,7 +35,6 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -215,10 +214,6 @@ func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Sp
 	}
 
 	return plugin.NewUnmounter(spec.Name(), podUID)
-}
-
-func (kvh *kubeletVolumeHost) GetCloudProvider() cloudprovider.Interface {
-	return kvh.kubelet.cloud
 }
 
 func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {

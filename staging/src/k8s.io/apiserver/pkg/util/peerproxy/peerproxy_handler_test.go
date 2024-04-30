@@ -207,8 +207,8 @@ func TestPeerProxy(t *testing.T) {
 
 			if tt.reconcilerConfig.do {
 				// need to enable feature flags first
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
 
 				reconciler.UpdateLease(tt.reconcilerConfig.serverId,
 					tt.reconcilerConfig.publicIP,

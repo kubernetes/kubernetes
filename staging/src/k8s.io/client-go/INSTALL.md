@@ -79,14 +79,8 @@ go get k8s.io/client-go@v0.20.4
 ### Go modules disabled
 
 If you get a message like `cannot use path@version syntax in GOPATH mode`,
-you likely do not have go modules enabled.
-
-Dependency management tools are built into go 1.11+ in the form of 
-[go modules](https://github.com/golang/go/wiki/Modules).
-These are used by the main Kubernetes repo (>= `v1.15.0`) and 
-`client-go` (>= `kubernetes-1.15.0`) to manage dependencies.
-If you are using go 1.11 or 1.12 and are working with a project located within `$GOPATH`,
-you must opt into using go modules:
+you likely do not have go modules enabled.  This should be on by default in all
+supported versions of Go.
 
 ```sh
 export GO111MODULE=on

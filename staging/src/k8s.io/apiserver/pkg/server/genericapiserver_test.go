@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	netutils "k8s.io/utils/net"
@@ -317,17 +318,16 @@ func TestInstallAPIGroups(t *testing.T) {
 }
 
 func TestPrepareRun(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	s, config, assert := newMaster(t)
 
 	assert.NotNil(config.OpenAPIConfig)
 
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
-	done := make(chan struct{})
-	defer close(done)
 
 	s.PrepareRun()
-	s.RunPostStartHooks(done)
+	s.RunPostStartHooks(ctx)
 
 	// openapi is installed in PrepareRun
 	resp, err := http.Get(server.URL + "/openapi/v2")
@@ -353,9 +353,10 @@ func TestPrepareRun(t *testing.T) {
 }
 
 func TestUpdateOpenAPISpec(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	s, _, assert := newMaster(t)
 	s.PrepareRun()
-	s.RunPostStartHooks(make(chan struct{}))
+	s.RunPostStartHooks(ctx)
 
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()

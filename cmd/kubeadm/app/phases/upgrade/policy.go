@@ -168,7 +168,7 @@ func detectUnstableVersionError(newK8sVersion *version.Version, newK8sVersionStr
 }
 
 // detectTooOldKubelets errors out if the kubelet versions are so old that an unsupported skew would happen if the cluster was upgraded
-func detectTooOldKubelets(newK8sVersion *version.Version, kubeletVersions map[string]uint16) error {
+func detectTooOldKubelets(newK8sVersion *version.Version, kubeletVersions map[string][]string) error {
 	var tooOldKubeletVersions []string
 	for versionStr := range kubeletVersions {
 

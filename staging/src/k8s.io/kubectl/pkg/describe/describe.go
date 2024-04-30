@@ -829,7 +829,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 				w.Write(LEVEL_0, "LocalhostProfile:\t%s\n", *pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
 			}
 		}
-		// remove when .IP field is depreciated
+		// remove when .IP field is deprecated
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
 		describePodIPs(pod, w, "")
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
@@ -3745,7 +3745,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		w.Write(LEVEL_0, "  Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
 		w.Write(LEVEL_0, "  Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
-		// remove when .PodCIDR is depreciated
+		// remove when .PodCIDR is deprecated
 		if len(node.Spec.PodCIDR) > 0 {
 			w.Write(LEVEL_0, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
 		}
@@ -4471,6 +4471,7 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 		for k, v := range configMap.Data {
 			w.Write(LEVEL_0, "%s:\n----\n", k)
 			w.Write(LEVEL_0, "%s\n", string(v))
+			w.Write(LEVEL_0, "\n")
 		}
 		w.Write(LEVEL_0, "\nBinaryData\n====\n")
 		for k, v := range configMap.BinaryData {
@@ -4576,7 +4577,11 @@ func printNetworkPolicySpecIngressFrom(npirs []networkingv1.NetworkPolicyIngress
 				} else {
 					proto = corev1.ProtocolTCP
 				}
-				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+				if port.EndPort == nil {
+					w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+				} else {
+					w.Write(LEVEL_0, "%s%s: %s-%d/%s\n", initialIndent, "To Port Range", port.Port, *port.EndPort, proto)
+				}
 			}
 		}
 		if len(npir.From) == 0 {
@@ -4620,7 +4625,11 @@ func printNetworkPolicySpecEgressTo(npers []networkingv1.NetworkPolicyEgressRule
 				} else {
 					proto = corev1.ProtocolTCP
 				}
-				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+				if port.EndPort == nil {
+					w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+				} else {
+					w.Write(LEVEL_0, "%s%s: %s-%d/%s\n", initialIndent, "To Port Range", port.Port, *port.EndPort, proto)
+				}
 			}
 		}
 		if len(nper.To) == 0 {

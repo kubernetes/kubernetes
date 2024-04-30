@@ -86,16 +86,13 @@ func TestGetsSelfAttributes(t *testing.T) {
 		},
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
+	tCtx := ktesting.Init(t)
 	var respMu sync.RWMutex
 	response := &user.DefaultInfo{
 		Name: "stub",
 	}
 
-	kubeClient, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
@@ -104,8 +101,8 @@ func TestGetsSelfAttributes(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
-			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
-			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 				respMu.RLock()
 				defer respMu.RUnlock()
 				return &authenticator.Response{User: response}, true, nil
@@ -122,7 +119,7 @@ func TestGetsSelfAttributes(t *testing.T) {
 
 			res, err := kubeClient.AuthenticationV1alpha1().
 				SelfSubjectReviews().
-				Create(ctx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+				Create(tCtx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -149,7 +146,7 @@ func TestGetsSelfAttributes(t *testing.T) {
 
 			res2, err := kubeClient.AuthenticationV1beta1().
 				SelfSubjectReviews().
-				Create(ctx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
+				Create(tCtx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -208,11 +205,8 @@ func TestGetsSelfAttributesError(t *testing.T) {
 	toggle := &atomic.Value{}
 	toggle.Store(true)
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	kubeClient, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
 			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
@@ -221,8 +215,8 @@ func TestGetsSelfAttributesError(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
-			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
-			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 				if toggle.Load().(bool) {
 					return &authenticator.Response{
 						User: &user.DefaultInfo{
@@ -244,7 +238,7 @@ func TestGetsSelfAttributesError(t *testing.T) {
 
 		_, err := kubeClient.AuthenticationV1alpha1().
 			SelfSubjectReviews().
-			Create(ctx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+			Create(tCtx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
 		if err == nil {
 			t.Fatalf("expected error: %v, got nil", err)
 		}
@@ -260,7 +254,7 @@ func TestGetsSelfAttributesError(t *testing.T) {
 
 		_, err := kubeClient.AuthenticationV1beta1().
 			SelfSubjectReviews().
-			Create(ctx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
+			Create(tCtx, &authenticationv1beta1.SelfSubjectReview{}, metav1.CreateOptions{})
 		if err == nil {
 			t.Fatalf("expected error: %v, got nil", err)
 		}

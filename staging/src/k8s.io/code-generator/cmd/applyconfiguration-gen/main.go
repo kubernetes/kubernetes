@@ -14,39 +14,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// typebuilder-gen is a tool for auto-generating apply builder functions.
+// applyconfiguration-gen is a tool for auto-generating apply builder functions.
 package main
 
 import (
 	"flag"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
-
-	generatorargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
+	"k8s.io/code-generator/cmd/applyconfiguration-gen/args"
 	"k8s.io/code-generator/cmd/applyconfiguration-gen/generators"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/klog/v2"
 )
 
 func main() {
 	klog.InitFlags(nil)
-	genericArgs, customArgs := generatorargs.NewDefaults()
-	genericArgs.AddFlags(pflag.CommandLine)
-	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of applyconfiguration-gen
+	args := args.New()
+	args.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of applyconfiguration-gen
 	if err := flag.Set("logtostderr", "true"); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	if err := generatorargs.Validate(genericArgs); err != nil {
+	if err := args.Validate(); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
 
+	myTargets := func(context *generator.Context) []generator.Target {
+		return generators.GetTargets(context, args)
+	}
+
 	// Run it.
-	if err := genericArgs.Execute(
+	if err := gengo.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
-		generators.Packages,
+		myTargets,
+		gengo.StdBuildTag,
+		pflag.Args(),
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

@@ -744,11 +744,14 @@ func TestValidateMixedArguments(t *testing.T) {
 		{[]string{"--foo=bar"}, true},
 		{[]string{"--config=hello"}, true},
 		{[]string{"--config=hello", "--ignore-preflight-errors=all"}, true},
+		// Expected to succeed, --config is mixed with skip-* flags only or no other flags
 		{[]string{"--config=hello", "--skip-token-print=true"}, true},
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--skip-token-print"}, true},
 		// Expected to fail, --config is mixed with the --foo flag
 		{[]string{"--config=hello", "--ignore-preflight-errors=baz", "--foo=bar"}, false},
 		{[]string{"--config=hello", "--foo=bar"}, false},
+		// Expected to fail, --config is mixed with the upgrade related flag
+		{[]string{"--config=hello", "--allow-experimental-upgrades"}, false},
 	}
 
 	var cfgPath string
@@ -760,6 +763,7 @@ func TestValidateMixedArguments(t *testing.T) {
 		}
 		f.String("foo", "", "flag bound to config object")
 		f.StringSliceVar(&ignorePreflightErrors, "ignore-preflight-errors", ignorePreflightErrors, "flag not bound to config object")
+		f.Bool("allow-experimental-upgrades", true, "upgrade flags for plan and apply command")
 		f.Bool("skip-token-print", false, "flag not bound to config object")
 		f.StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 		if err := f.Parse(rt.args); err != nil {

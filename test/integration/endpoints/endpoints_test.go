@@ -17,7 +17,6 @@ limitations under the License.
 package endpoints
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -33,6 +32,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestEndpointUpdates(t *testing.T) {
@@ -47,7 +47,9 @@ func TestEndpointUpdates(t *testing.T) {
 
 	informers := informers.NewSharedInformerFactory(client, 0)
 
+	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -55,10 +57,8 @@ func TestEndpointUpdates(t *testing.T) {
 		0)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informers.Start(ctx.Done())
-	go epController.Run(ctx, 1)
+	informers.Start(tCtx.Done())
+	go epController.Run(tCtx, 1)
 
 	// Create namespace
 	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-updates", t)
@@ -82,7 +82,7 @@ func TestEndpointUpdates(t *testing.T) {
 		},
 	}
 
-	createdPod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	createdPod, err := client.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 	}
@@ -92,14 +92,14 @@ func TestEndpointUpdates(t *testing.T) {
 		Phase:  v1.PodRunning,
 		PodIPs: []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
 	}
-	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, createdPod, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, createdPod, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
 	}
 
 	// Create a service associated to the pod
 	svc := newService(ns.Name, "foo1")
-	svc1, err := client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{})
+	svc1, err := client.CoreV1().Services(ns.Name).Create(tCtx, svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
 	}
@@ -107,7 +107,7 @@ func TestEndpointUpdates(t *testing.T) {
 	// Obtain ResourceVersion of the new endpoint created
 	var resVersion string
 	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(tCtx, svc.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
@@ -120,7 +120,7 @@ func TestEndpointUpdates(t *testing.T) {
 
 	// Force recomputation on the endpoint controller
 	svc1.SetAnnotations(map[string]string{"foo": "bar"})
-	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc1, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(tCtx, svc1, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update service %s: %v", svc1.Name, err)
 	}
@@ -130,13 +130,13 @@ func TestEndpointUpdates(t *testing.T) {
 	// was recomputed before asserting, since we only have 1 worker
 	// in the endpoint controller
 	svc2 := newService(ns.Name, "foo2")
-	_, err = client.CoreV1().Services(ns.Name).Create(ctx, svc2, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Create(tCtx, svc2, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
 	}
 
 	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc2.Name, metav1.GetOptions{})
+		_, err := client.CoreV1().Endpoints(ns.Name).Get(tCtx, svc2.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
@@ -148,7 +148,7 @@ func TestEndpointUpdates(t *testing.T) {
 
 	// the endpoint controller should not update the endpoint created for the original
 	// service since nothing has changed, the resource version has to be the same
-	endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+	endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(tCtx, svc.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error fetching endpoints: %v", err)
 	}
@@ -173,7 +173,9 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 
 	informers := informers.NewSharedInformerFactory(client, 0)
 
+	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -181,10 +183,8 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 		0)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informers.Start(ctx.Done())
-	go epController.Run(ctx, 1)
+	informers.Start(tCtx.Done())
+	go epController.Run(tCtx, 1)
 
 	// Create namespace
 	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-updates", t)
@@ -208,7 +208,7 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 		},
 	}
 
-	createdPod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	createdPod, err := client.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 	}
@@ -218,20 +218,20 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 		Phase:  v1.PodRunning,
 		PodIPs: []v1.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
 	}
-	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, createdPod, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, createdPod, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
 	}
 
 	// Create an ExternalName service associated to the pod
 	svc := newExternalNameService(ns.Name, "foo1")
-	svc1, err := client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{})
+	svc1, err := client.CoreV1().Services(ns.Name).Create(tCtx, svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
 	}
 
 	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
-		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(tCtx, svc.Name, metav1.GetOptions{})
 		if err == nil {
 			t.Errorf("expected no endpoints for externalName service, got: %v", endpoints)
 			return true, nil
@@ -244,13 +244,13 @@ func TestExternalNameToClusterIPTransition(t *testing.T) {
 
 	// update service to ClusterIP type and verify endpoint was created
 	svc1.Spec.Type = v1.ServiceTypeClusterIP
-	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc1, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(tCtx, svc1, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update service %s: %v", svc1.Name, err)
 	}
 
 	if err := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		ep, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc1.Name, metav1.GetOptions{})
+		ep, err := client.CoreV1().Endpoints(ns.Name).Get(tCtx, svc1.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Logf("no endpoints found, error: %v", err)
 			return false, nil
@@ -282,7 +282,9 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 
 	informers := informers.NewSharedInformerFactory(client, 0)
 
+	tCtx := ktesting.Init(t)
 	epController := endpoint.NewEndpointController(
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -290,10 +292,8 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 		0)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informers.Start(ctx.Done())
-	go epController.Run(ctx, 1)
+	informers.Start(tCtx.Done())
+	go epController.Run(tCtx, 1)
 
 	// Create namespace
 	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-terminating", t)
@@ -337,13 +337,13 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 		},
 	}
 
-	createdPod, err := client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	createdPod, err := client.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 	}
 
 	createdPod.Status = pod.Status
-	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, createdPod, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, createdPod, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
 	}
@@ -366,14 +366,14 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 			},
 		},
 	}
-	_, err = client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Create(tCtx, svc, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create service %s: %v", svc.Name, err)
 	}
 
 	// poll until associated Endpoints to the previously created Service exists
 	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
-		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(tCtx, svc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -392,7 +392,7 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 		t.Fatalf("endpoints not found: %v", err)
 	}
 
-	err = client.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	err = client.CoreV1().Pods(ns.Name).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("error deleting test pod: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 	if err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 		// Ensure that the recently deleted Pod exists but with a deletion timestamp. If the Pod does not exist,
 		// we should fail the test since it is no longer validating against a terminating pod.
-		pod, err := client.CoreV1().Pods(ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+		pod, err := client.CoreV1().Pods(ns.Name).Get(tCtx, pod.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return false, fmt.Errorf("expected Pod %q to exist with deletion timestamp but was not found: %v", pod.Name, err)
 		}
@@ -413,7 +413,7 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 			return false, errors.New("pod did not have deletion timestamp set")
 		}
 
-		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(ctx, svc.Name, metav1.GetOptions{})
+		endpoints, err := client.CoreV1().Endpoints(ns.Name).Get(tCtx, svc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}

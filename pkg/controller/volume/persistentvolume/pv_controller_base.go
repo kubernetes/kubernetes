@@ -40,7 +40,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
@@ -65,7 +64,6 @@ type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
 	VolumePlugins             []vol.VolumePlugin
-	Cloud                     cloudprovider.Interface
 	ClusterName               string
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
@@ -77,7 +75,7 @@ type ControllerParameters struct {
 
 // NewController creates a new PersistentVolume controller
 func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolumeController, error) {
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 
 	controller := &PersistentVolumeController{
@@ -87,13 +85,12 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		eventBroadcaster:              eventBroadcaster,
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
-		cloud:                         p.Cloud,
 		enableDynamicProvisioning:     p.EnableDynamicProvisioning,
 		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		claimQueue:                    workqueue.NewNamed("claims"),
-		volumeQueue:                   workqueue.NewNamed("volumes"),
+		claimQueue:                    workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "claims"}),
+		volumeQueue:                   workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "volumes"}),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}
@@ -305,7 +302,7 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	defer ctrl.volumeQueue.ShutDown()
 
 	// Start events processing pipeline.
-	ctrl.eventBroadcaster.StartStructuredLogging(0)
+	ctrl.eventBroadcaster.StartStructuredLogging(3)
 	ctrl.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ctrl.kubeClient.CoreV1().Events("")})
 	defer ctrl.eventBroadcaster.Shutdown()
 

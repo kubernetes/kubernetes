@@ -23,10 +23,11 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 
 source "${CODEGEN_PKG}/kube_codegen.sh"
 
+THIS_PKG="k8s.io/kube-aggregator"
+
 kube::codegen::gen_helpers \
-    --input-pkg-root k8s.io/kube-aggregator/pkg/apis \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
 
 if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
     report_filename="${API_KNOWN_VIOLATIONS_DIR}/aggregator_violation_exceptions.list"
@@ -36,18 +37,18 @@ if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
 fi
 
 kube::codegen::gen_openapi \
-    --input-pkg-root k8s.io/kube-aggregator/pkg/apis \
-    --output-pkg-root k8s.io/kube-aggregator/pkg/generated \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+    --output-dir "${SCRIPT_ROOT}/pkg/generated/openapi" \
+    --output-pkg "${THIS_PKG}/pkg/generated/openapi" \
     --report-filename "${report_filename:-"/dev/null"}" \
     ${update_report:+"${update_report}"} \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
 
 kube::codegen::gen_client \
     --with-watch \
-    --input-pkg-root k8s.io/kube-aggregator/pkg/apis \
-    --output-pkg-root k8s.io/kube-aggregator/pkg/client \
-    --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-    --clientset-name clientset_generated \
-    --versioned-name clientset \
-    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+    --output-dir "${SCRIPT_ROOT}/pkg/client" \
+    --output-pkg "${THIS_PKG}/pkg/client" \
+    --clientset-name "clientset_generated" \
+    --versioned-name "clientset" \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"

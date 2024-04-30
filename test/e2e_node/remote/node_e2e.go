@@ -130,7 +130,7 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 // kubelet on Fedora CoreOS distribution
 func setKubeletSELinuxLabels(host, workspace string) error {
 	cmd := getSSHCommand(" && ",
-		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "kubelet")),
+		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t kubelet_exec_t %s", filepath.Join(workspace, "kubelet")),
 		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "e2e_node.test")),
 		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "ginkgo")),
 		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "mounter")),

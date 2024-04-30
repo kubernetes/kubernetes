@@ -80,7 +80,6 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 	} else {
 		f = *v.failPolicy
 	}
-
 	if v.celMatcher != nil {
 		matchResults := v.celMatcher.Match(ctx, versionedAttr, versionedParams, authz)
 		if matchResults.Error != nil {

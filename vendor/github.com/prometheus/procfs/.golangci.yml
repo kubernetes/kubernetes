@@ -2,6 +2,7 @@
 linters:
   enable:
   - godot
+  - misspell
   - revive
 
 linter-settings:
@@ -10,3 +11,5 @@ linter-settings:
     exclude:
     # Ignore "See: URL"
     - 'See:'
+  misspell:
+    locale: US

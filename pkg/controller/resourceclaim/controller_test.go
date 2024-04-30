@@ -294,6 +294,31 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
+			name:   "clear-reserved-delayed-allocation-structured",
+			pods:   []*v1.Pod{},
+			key:    claimKey(testClaimReserved),
+			claims: []*resourcev1alpha2.ResourceClaim{structuredParameters(testClaimReserved)},
+			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
+				claim := testClaimAllocated.DeepCopy()
+				claim.Finalizers = []string{}
+				claim.Status.Allocation = nil
+				return []resourcev1alpha2.ResourceClaim{*claim}
+			}(),
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name: "dont-clear-reserved-delayed-allocation-structured",
+			pods: []*v1.Pod{testPodWithResource},
+			key:  claimKey(testClaimReserved),
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := structuredParameters(testClaimReserved)
+				claim = reserveClaim(claim, otherTestPod)
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			expectedClaims:  []resourcev1alpha2.ResourceClaim{*structuredParameters(testClaimReserved)},
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
 			name: "clear-reserved-immediate-allocation",
 			pods: []*v1.Pod{},
 			key:  claimKey(testClaimReserved),
@@ -305,6 +330,62 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
 				claim := testClaimAllocated.DeepCopy()
 				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
+				return []resourcev1alpha2.ResourceClaim{*claim}
+			}(),
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name: "clear-reserved-immediate-allocation-structured",
+			pods: []*v1.Pod{},
+			key:  claimKey(testClaimReserved),
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := structuredParameters(testClaimReserved.DeepCopy())
+				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
+				claim := structuredParameters(testClaimAllocated.DeepCopy())
+				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
+				return []resourcev1alpha2.ResourceClaim{*claim}
+			}(),
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name: "clear-reserved-immediate-allocation-structured-deleted",
+			pods: []*v1.Pod{},
+			key:  claimKey(testClaimReserved),
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := structuredParameters(testClaimReserved.DeepCopy())
+				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
+				claim.DeletionTimestamp = &metav1.Time{}
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
+				claim := structuredParameters(testClaimAllocated.DeepCopy())
+				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
+				claim.DeletionTimestamp = &metav1.Time{}
+				claim.Finalizers = []string{}
+				claim.Status.Allocation = nil
+				return []resourcev1alpha2.ResourceClaim{*claim}
+			}(),
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name: "immediate-allocation-structured-deleted",
+			pods: []*v1.Pod{},
+			key:  claimKey(testClaimReserved),
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := structuredParameters(testClaimAllocated.DeepCopy())
+				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
+				claim.DeletionTimestamp = &metav1.Time{}
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
+				claim := structuredParameters(testClaimAllocated.DeepCopy())
+				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
+				claim.DeletionTimestamp = &metav1.Time{}
+				claim.Finalizers = []string{}
+				claim.Status.Allocation = nil
 				return []resourcev1alpha2.ResourceClaim{*claim}
 			}(),
 			expectedMetrics: expectedMetrics{0, 0},
@@ -543,6 +624,14 @@ func allocateClaim(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.Reso
 	claim.Status.Allocation = &resourcev1alpha2.AllocationResult{
 		Shareable: true,
 	}
+	return claim
+}
+
+func structuredParameters(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+	claim = claim.DeepCopy()
+	// As far the controller is concerned, a claim was allocated by us if it has
+	// this finalizer. For testing we don't need to update the allocation result.
+	claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
 	return claim
 }
 

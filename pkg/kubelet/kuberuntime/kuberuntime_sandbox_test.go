@@ -37,12 +37,14 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const testPodLogsDirectory = "/var/log/pods"
+
 func TestGeneratePodSandboxConfig(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := newTestPod()
 
-	expectedLogDirectory := filepath.Join(podLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
+	expectedLogDirectory := filepath.Join(testPodLogsDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
 	expectedLabels := map[string]string{
 		"io.kubernetes.pod.name":      pod.Name,
 		"io.kubernetes.pod.namespace": pod.Namespace,
@@ -78,7 +80,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
 		// Check pod logs root directory is created.
-		assert.Equal(t, filepath.Join(podLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
+		assert.Equal(t, filepath.Join(testPodLogsDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
 		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}
@@ -379,7 +381,7 @@ func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, false)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, false)
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 
@@ -458,7 +460,7 @@ func TestGeneratePodSandboxWindowsConfig_HostNetwork(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 

@@ -224,6 +224,7 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 
 	// Gather the relevant packages from the manifest.
 	items := make([]GetPackagesItem, r.uint64())
+	uniquePkgPaths := make(map[string]bool)
 	for i := range items {
 		pkgPathOff := r.uint64()
 		pkgPath := p.stringAt(pkgPathOff)
@@ -248,6 +249,12 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 		}
 
 		items[i].nameIndex = nameIndex
+
+		uniquePkgPaths[pkgPath] = true
+	}
+	// Debugging #63822; hypothesis: there are duplicate PkgPaths.
+	if len(uniquePkgPaths) != len(items) {
+		reportf("found duplicate PkgPaths while reading export data manifest: %v", items)
 	}
 
 	// Request packages all at once from the client,

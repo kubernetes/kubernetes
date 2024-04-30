@@ -18,7 +18,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 1.4.0
+    version: 1.4.1
     refPaths:
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
@@ -48,7 +48,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.29.0
+    version: 1.30.0
     refPaths:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
@@ -64,7 +64,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.12
+    version: 3.5.13
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -76,20 +76,18 @@ dependencies:
       match: ETCD_VERSION=
     - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
       match: gcr.io/etcd-development/etcd
-    - path: test/e2e/framework/providers/gcp.go
-      match: const etcdImage
     - path: test/utils/image/manifest.go
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.12
+    version: 3.5.13
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
     - path: cluster/images/etcd/migrate/options.go
 
   - name: "node-problem-detector"
-    version: 0.8.13
+    version: 0.8.16
     refPaths:
     - path: test/e2e_node/image_list.go
       match: const defaultImage
@@ -111,14 +109,14 @@ dependencies:
 
   # From https://github.com/etcd-io/etcd/blob/main/Makefile
   - name: "golang: etcd release version"
-    version: 1.20.13 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
+    version: 1.21.8 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION := \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.22.0
+    version: 1.22.2
     refPaths:
     - path: .go-version
     - path: build/build-image/cross/VERSION
@@ -140,13 +138,13 @@ dependencies:
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.30.0-go1.22.0-bullseye.0
+    version: v1.30.0-go1.22.2-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
   # Base images
   - name: "registry.k8s.io/debian-base: dependents"
-    version: bookworm-v1.0.1
+    version: bookworm-v1.0.2
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
@@ -178,7 +176,7 @@ dependencies:
       match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "registry.k8s.io/distroless-iptables: dependents"
-    version: v0.5.1
+    version: v0.5.3
     refPaths:
     - path: build/common.sh
       match: __default_distroless_iptables_version=
@@ -186,7 +184,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.3.1-go1.22.0-bookworm.0
+    version: v2.3.1-go1.22.2-bookworm.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
@@ -254,7 +252,7 @@ dependencies:
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
 
   - name: "registry.k8s.io/build-image/setcap: dependents"
-    version: bookworm-v1.0.1
+    version: bookworm-v1.0.2
     refPaths:
     - path: build/common.sh
       match: __default_setcap_version=

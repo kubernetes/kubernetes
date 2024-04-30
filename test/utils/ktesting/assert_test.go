@@ -19,21 +19,14 @@ package ktesting
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"testing"
 	"time"
 
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestAsync(t *testing.T) {
-	for name, tc := range map[string]struct {
-		cb             func(TContext)
-		expectNoFail   bool
-		expectError    string
-		expectDuration time.Duration
-	}{
+func TestAssert(t *testing.T) {
+	for name, tc := range map[string]testcase{
 		"eventually-timeout": {
 			cb: func(tCtx TContext) {
 				Eventually(tCtx, func(tCtx TContext) int {
@@ -165,30 +158,114 @@ The function passed to Consistently returned the following error:
 			expectError: `Timed out while waiting on TryAgainAfter after x.y s.
 told to try again after 1ms: intermittent error`,
 		},
+
+		"expect-equal": {
+			cb: func(tCtx TContext) {
+				tCtx.Expect(1).To(gomega.Equal(42))
+			},
+			expectError: `Expected
+    <int>: 1
+to equal
+    <int>: 42`,
+		},
+
+		"expect-no-error-success": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(nil)
+			},
+			expectNoFail: true,
+		},
+		"expect-no-error-normal-error": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(errors.New("fake error"))
+			},
+			expectError: `Unexpected error: fake error`,
+			expectLog: `<klog header>: Unexpected error:
+    <*errors.errorString | 0xXXXX>: 
+    fake error
+    {s: "fake error"}
+`,
+		},
+		"expect-no-error-failure": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}))
+			},
+			expectError: `doing something: fake error`,
+		},
+		"expect-no-error-explanation-string": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}), "testing error checking")
+			},
+			expectError: `testing error checking: doing something: fake error`,
+		},
+		"expect-no-error-explanation-printf": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}), "testing %s %d checking", "error", 42)
+			},
+			expectError: `testing error 42 checking: doing something: fake error`,
+		},
+		"expect-no-error-explanation-callback": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error"}), func() string { return "testing error checking" })
+			},
+			expectError: `testing error checking: doing something: fake error`,
+		},
+		"expect-no-error-backtrace": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}))
+			},
+			expectError: `doing something: fake error`,
+			expectLog: `<klog header>: Failed at:
+    abc
+    xyz
+`,
+		},
+		"expect-no-error-backtrace-and-explanation": {
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}), "testing error checking")
+			},
+			expectError: `testing error checking: doing something: fake error`,
+			expectLog: `<klog header>: testing error checking
+<klog header>: Failed at:
+    abc
+    xyz
+`,
+		},
+
+		"output": {
+			cb: func(tCtx TContext) {
+				tCtx.Log("Log", "a", "b", 42)
+				tCtx.Logf("Logf %s %s %d", "a", "b", 42)
+				tCtx.Error("Error", "a", "b", 42)
+				tCtx.Errorf("Errorf %s %s %d", "a", "b", 42)
+			},
+			expectLog: `<klog header>: Log a b 42
+<klog header>: Logf a b 42
+`,
+			expectError: `Error a b 42
+Errorf a b 42`,
+		},
+		"fatal": {
+			cb: func(tCtx TContext) {
+				tCtx.Fatal("Error", "a", "b", 42)
+				// not reached
+				tCtx.Log("Log")
+			},
+			expectError: `Error a b 42`,
+		},
+		"fatalf": {
+			cb: func(tCtx TContext) {
+				tCtx.Fatalf("Error %s %s %d", "a", "b", 42)
+				// not reached
+				tCtx.Log("Log")
+			},
+			expectError: `Error a b 42`,
+		},
 	} {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			tCtx := Init(t)
-			var err error
-			tCtx, finalize := WithError(tCtx, &err)
-			start := time.Now()
-			func() {
-				defer finalize()
-				tc.cb(tCtx)
-			}()
-			duration := time.Since(start)
-			assert.InDelta(t, tc.expectDuration.Seconds(), duration.Seconds(), 0.1, fmt.Sprintf("callback invocation duration %s", duration))
-			assert.Equal(t, !tc.expectNoFail, tCtx.Failed(), "Failed()")
-			if tc.expectError == "" {
-				assert.NoError(t, err)
-			} else if assert.NotNil(t, err) {
-				t.Logf("Result:\n%s", err.Error())
-				errMsg := err.Error()
-				errMsg = regexp.MustCompile(`[[:digit:]]+\.[[:digit:]]+s`).ReplaceAllString(errMsg, "x.y s")
-				errMsg = regexp.MustCompile(`0x[[:xdigit:]]+`).ReplaceAllString(errMsg, "0xXXXX")
-				assert.Equal(t, tc.expectError, errMsg)
-			}
+			tc.run(t)
 		})
 	}
 }

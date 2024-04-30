@@ -31,14 +31,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/logs/logreduction"
 	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
 
@@ -88,10 +85,12 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 	var dialOpts []grpc.DialOption
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithAuthority("localhost"),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if tp != nil {
 		tracingOpts := []otelgrpc.Option{
+			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
 			otelgrpc.WithPropagators(tracing.Propagators()),
 			otelgrpc.WithTracerProvider(tp),
 		}
@@ -807,15 +806,17 @@ func (r *remoteRuntimeService) CheckpointContainer(ctx context.Context, options 
 	return nil
 }
 
-func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	containerEventsStreamingClient, err := r.runtimeClient.GetContainerEvents(context.Background(), &runtimeapi.GetEventsRequest{})
 	if err != nil {
 		klog.ErrorS(err, "GetContainerEvents failed to get streaming client")
 		return err
 	}
 
-	// The connection is successfully established and we have a streaming client ready for use.
-	metrics.EventedPLEGConn.Inc()
+	if connectionEstablishedCallback != nil {
+		// The connection is successfully established and we have a streaming client ready for use.
+		connectionEstablishedCallback(containerEventsStreamingClient)
+	}
 
 	for {
 		resp, err := containerEventsStreamingClient.Recv()

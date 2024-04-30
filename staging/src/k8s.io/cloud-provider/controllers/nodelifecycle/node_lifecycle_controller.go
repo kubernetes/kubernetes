@@ -21,7 +21,7 @@ import (
 	"errors"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,7 +42,8 @@ import (
 )
 
 const (
-	deleteNodeEvent = "DeletingNode"
+	deleteNodeEvent       = "DeletingNode"
+	deleteNodeFailedEvent = "DeletingNodeFailed"
 )
 
 var ShutdownTaint = &v1.Taint{
@@ -73,9 +74,6 @@ func NewCloudNodeLifecycleController(
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration) (*CloudNodeLifecycleController, error) {
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
-
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
 	}
@@ -93,8 +91,6 @@ func NewCloudNodeLifecycleController(
 	c := &CloudNodeLifecycleController{
 		kubeClient:        kubeClient,
 		nodeLister:        nodeInformer.Lister(),
-		broadcaster:       eventBroadcaster,
-		recorder:          recorder,
 		cloud:             cloud,
 		nodeMonitorPeriod: nodeMonitorPeriod,
 	}
@@ -105,6 +101,9 @@ func NewCloudNodeLifecycleController(
 // Run starts the main loop for this controller. Run is blocking so should
 // be called via a goroutine
 func (c *CloudNodeLifecycleController) Run(ctx context.Context, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
+	c.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	c.recorder = c.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
+
 	defer utilruntime.HandleCrash()
 	controllerManagerMetrics.ControllerStarted("cloud-node-lifecycle")
 	defer controllerManagerMetrics.ControllerStopped("cloud-node-lifecycle")
@@ -175,6 +174,8 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 
 			if err := c.kubeClient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
 				klog.Errorf("unable to delete node %q: %v", node.Name, err)
+				c.recorder.Eventf(ref, v1.EventTypeWarning, deleteNodeFailedEvent,
+					"Failed deleting node %s: %v", node.Name, err)
 			}
 		} else {
 			// Node exists. We need to check this to get taint working in similar in all cloudproviders

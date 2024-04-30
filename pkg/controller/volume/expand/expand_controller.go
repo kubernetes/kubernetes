@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -80,9 +79,6 @@ type expandController struct {
 	pvcLister  corelisters.PersistentVolumeClaimLister
 	pvcsSynced cache.InformerSynced
 
-	// cloud provider used by volume host
-	cloud cloudprovider.Interface
-
 	// volumePluginMgr used to initialize and fetch volume plugins
 	volumePluginMgr volume.VolumePluginMgr
 
@@ -100,16 +96,15 @@ type expandController struct {
 
 // NewExpandController expands the pvs
 func NewExpandController(
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
 	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient:               kubeClient,
-		cloud:                    cloud,
 		pvcLister:                pvcInformer.Lister(),
 		pvcsSynced:               pvcInformer.Informer().HasSynced,
 		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
@@ -121,8 +116,8 @@ func NewExpandController(
 		return nil, fmt.Errorf("could not initialize volume plugins for Expand Controller : %+v", err)
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	eventBroadcaster.StartStructuredLogging(3)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	expc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "volume_expand"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
@@ -404,10 +399,6 @@ func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec
 
 func (expc *expandController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by expand controller's VolumeHost implementation")
-}
-
-func (expc *expandController) GetCloudProvider() cloudprovider.Interface {
-	return expc.cloud
 }
 
 func (expc *expandController) GetMounter(pluginName string) mount.Interface {

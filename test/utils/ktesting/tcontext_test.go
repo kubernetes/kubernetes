@@ -22,7 +22,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -80,4 +84,31 @@ func TestCancelCtx(t *testing.T) {
 
 	// Cancel, then let testing.T invoke test cleanup.
 	tCtx.Cancel("test is complete")
+}
+
+func TestWithTB(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	cfg := new(rest.Config)
+	mapper := new(restmapper.DeferredDiscoveryRESTMapper)
+	client := clientset.New(nil)
+	dynamic := dynamic.New(nil)
+	apiextensions := apiextensions.New(nil)
+	tCtx = ktesting.WithClients(tCtx, cfg, mapper, client, dynamic, apiextensions)
+
+	t.Run("sub", func(t *testing.T) {
+		tCtx := ktesting.WithTB(tCtx, t)
+
+		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")
+		assert.Equal(t, mapper, tCtx.RESTMapper(), "RESTMapper")
+		assert.Equal(t, client, tCtx.Client(), "Client")
+		assert.Equal(t, dynamic, tCtx.Dynamic(), "Dynamic")
+		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
+
+		tCtx.Cancel("test is complete")
+	})
+
+	if err := tCtx.Err(); err != nil {
+		t.Errorf("parent TContext should not have been cancelled: %v", err)
+	}
 }

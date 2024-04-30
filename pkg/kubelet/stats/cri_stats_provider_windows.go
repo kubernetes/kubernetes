@@ -88,7 +88,7 @@ func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.Po
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo,
 	updateCPUNanoCoreUsage bool) error {
-	for _, criContainerStat := range criSandboxStat.Windows.Containers {
+	for _, criContainerStat := range criSandboxStat.GetWindows().GetContainers() {
 		container, found := containerMap[criContainerStat.Attributes.Id]
 		if !found {
 			continue

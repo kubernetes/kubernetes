@@ -67,11 +67,12 @@ const (
 
 // NewController returns a new *Controller.
 func NewController(
+	ctx context.Context,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
 	ipAddressInformer networkinginformers.IPAddressInformer,
 	client clientset.Interface,
 ) *Controller {
-	broadcaster := record.NewBroadcaster()
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	c := &Controller{
 		client:           client,
@@ -129,7 +130,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	c.eventBroadcaster.StartStructuredLogging(0)
+	c.eventBroadcaster.StartStructuredLogging(3)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 

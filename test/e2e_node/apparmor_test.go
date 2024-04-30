@@ -60,11 +60,11 @@ var _ = SIGDescribe("AppArmor", feature.AppArmor, nodefeature.AppArmor, func() {
 			f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject an unloaded profile", func(ctx context.Context) {
-				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
+				status := runAppArmorTest(ctx, f, false, v1.DeprecatedAppArmorBetaProfileNamePrefix+"non-existent-profile")
 				gomega.Expect(status.ContainerStatuses[0].State.Waiting.Message).To(gomega.ContainSubstring("apparmor"))
 			})
 			ginkgo.It("should enforce a profile blocking writes", func(ctx context.Context) {
-				status := runAppArmorTest(ctx, f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
+				status := runAppArmorTest(ctx, f, true, v1.DeprecatedAppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", dump.Pretty(status))
 					return
@@ -75,7 +75,7 @@ var _ = SIGDescribe("AppArmor", feature.AppArmor, nodefeature.AppArmor, func() {
 
 			})
 			ginkgo.It("should enforce a permissive profile", func(ctx context.Context) {
-				status := runAppArmorTest(ctx, f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
+				status := runAppArmorTest(ctx, f, true, v1.DeprecatedAppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", dump.Pretty(status))
 					return
@@ -91,7 +91,7 @@ var _ = SIGDescribe("AppArmor", feature.AppArmor, nodefeature.AppArmor, func() {
 			f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func(ctx context.Context) {
-				status := runAppArmorTest(ctx, f, false, v1.AppArmorBetaProfileRuntimeDefault)
+				status := runAppArmorTest(ctx, f, false, v1.DeprecatedAppArmorBetaProfileRuntimeDefault)
 				expectSoftRejection(status)
 			})
 		})
@@ -214,7 +214,7 @@ func createPodWithAppArmor(ctx context.Context, f *framework.Framework, profile 
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("test-apparmor-%s", strings.Replace(profile, "/", "-", -1)),
 			Annotations: map[string]string{
-				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
+				v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
 			},
 		},
 		Spec: v1.PodSpec{

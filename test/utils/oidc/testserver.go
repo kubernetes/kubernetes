@@ -31,8 +31,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"gopkg.in/square/go-jose.v2"
 )
 
@@ -80,7 +80,7 @@ func (ts *TestServer) TokenURL() (string, error) {
 }
 
 // BuildAndRunTestServer configures OIDC TLS server and its routing
-func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath string) *TestServer {
+func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride string) *TestServer {
 	t.Helper()
 
 	certContent, err := os.ReadFile(caPath)
@@ -111,33 +111,21 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath string) *TestServer {
 		jwksHandler:  NewMockJWKsHandler(mockCtrl),
 	}
 
+	issuer := httpServer.URL
+	// issuerOverride is used to override the issuer URL in the well-known configuration.
+	// This is useful to validate scenarios where discovery url is different from the issuer url.
+	if len(issuerOverride) > 0 {
+		issuer = issuerOverride
+	}
+
 	mux.HandleFunc(openIDWellKnownWebPath, func(writer http.ResponseWriter, request *http.Request) {
-		authURL, err := url.JoinPath(httpServer.URL + authWebPath)
-		require.NoError(t, err)
-		tokenURL, err := url.JoinPath(httpServer.URL + tokenWebPath)
-		require.NoError(t, err)
-		jwksURL, err := url.JoinPath(httpServer.URL + jwksWebPath)
-		require.NoError(t, err)
-		userInfoURL, err := url.JoinPath(httpServer.URL + authWebPath)
-		require.NoError(t, err)
+		discoveryDocHandler(t, writer, httpServer.URL, issuer)
+	})
 
-		err = json.NewEncoder(writer).Encode(struct {
-			Issuer      string `json:"issuer"`
-			AuthURL     string `json:"authorization_endpoint"`
-			TokenURL    string `json:"token_endpoint"`
-			JWKSURL     string `json:"jwks_uri"`
-			UserInfoURL string `json:"userinfo_endpoint"`
-		}{
-			Issuer:      httpServer.URL,
-			AuthURL:     authURL,
-			TokenURL:    tokenURL,
-			JWKSURL:     jwksURL,
-			UserInfoURL: userInfoURL,
-		})
-		require.NoError(t, err)
-
-		writer.Header().Add("Content-Type", "application/json")
-		writer.WriteHeader(http.StatusOK)
+	// /c/d/bar/.well-known/openid-configuration is used to validate scenarios where discovery url is different from the issuer url
+	// and discovery url contains path.
+	mux.HandleFunc("/c/d/bar"+openIDWellKnownWebPath, func(writer http.ResponseWriter, request *http.Request) {
+		discoveryDocHandler(t, writer, httpServer.URL, issuer)
 	})
 
 	mux.HandleFunc(tokenWebPath, func(writer http.ResponseWriter, request *http.Request) {
@@ -169,6 +157,34 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath string) *TestServer {
 	})
 
 	return oidcServer
+}
+
+func discoveryDocHandler(t *testing.T, writer http.ResponseWriter, httpServerURL, issuer string) {
+	authURL, err := url.JoinPath(httpServerURL + authWebPath)
+	require.NoError(t, err)
+	tokenURL, err := url.JoinPath(httpServerURL + tokenWebPath)
+	require.NoError(t, err)
+	jwksURL, err := url.JoinPath(httpServerURL + jwksWebPath)
+	require.NoError(t, err)
+	userInfoURL, err := url.JoinPath(httpServerURL + authWebPath)
+	require.NoError(t, err)
+
+	writer.Header().Add("Content-Type", "application/json")
+
+	err = json.NewEncoder(writer).Encode(struct {
+		Issuer      string `json:"issuer"`
+		AuthURL     string `json:"authorization_endpoint"`
+		TokenURL    string `json:"token_endpoint"`
+		JWKSURL     string `json:"jwks_uri"`
+		UserInfoURL string `json:"userinfo_endpoint"`
+	}{
+		Issuer:      issuer,
+		AuthURL:     authURL,
+		TokenURL:    tokenURL,
+		JWKSURL:     jwksURL,
+		UserInfoURL: userInfoURL,
+	})
+	require.NoError(t, err)
 }
 
 type JosePrivateKey interface {

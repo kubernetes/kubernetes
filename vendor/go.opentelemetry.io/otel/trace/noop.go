@@ -19,16 +19,20 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace/embedded"
 )
 
 // NewNoopTracerProvider returns an implementation of TracerProvider that
 // performs no operations. The Tracer and Spans created from the returned
 // TracerProvider also perform no operations.
+//
+// Deprecated: Use [go.opentelemetry.io/otel/trace/noop.NewTracerProvider]
+// instead.
 func NewNoopTracerProvider() TracerProvider {
 	return noopTracerProvider{}
 }
 
-type noopTracerProvider struct{}
+type noopTracerProvider struct{ embedded.TracerProvider }
 
 var _ TracerProvider = noopTracerProvider{}
 
@@ -38,7 +42,7 @@ func (p noopTracerProvider) Tracer(string, ...TracerOption) Tracer {
 }
 
 // noopTracer is an implementation of Tracer that performs no operations.
-type noopTracer struct{}
+type noopTracer struct{ embedded.Tracer }
 
 var _ Tracer = noopTracer{}
 
@@ -54,7 +58,7 @@ func (t noopTracer) Start(ctx context.Context, name string, _ ...SpanStartOption
 }
 
 // noopSpan is an implementation of Span that performs no operations.
-type noopSpan struct{}
+type noopSpan struct{ embedded.Span }
 
 var _ Span = noopSpan{}
 

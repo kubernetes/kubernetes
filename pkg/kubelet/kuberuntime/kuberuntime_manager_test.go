@@ -1229,7 +1229,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 }
 
 func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnabled bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -1488,7 +1488,7 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 }
 
 func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -1900,7 +1900,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 }
 
 func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarContainersEnabled bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -2118,7 +2118,7 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 }
 
 func TestComputePodActionsForPodResize(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
@@ -2465,7 +2465,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 }
 
 func TestUpdatePodContainerResources(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)

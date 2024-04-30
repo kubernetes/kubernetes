@@ -1391,6 +1391,32 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.AppArmorProfile": {
+        "description": "AppArmorProfile defines a pod or container's AppArmor settings.",
+        "properties": {
+          "localhostProfile": {
+            "description": "localhostProfile indicates a profile loaded on the node that should be used. The profile must be preconfigured on the node to work. Must match the loaded name of the profile. Must be set if and only if type is \"Localhost\".",
+            "type": "string"
+          },
+          "type": {
+            "default": "",
+            "description": "type indicates which kind of AppArmor profile will be applied. Valid options are:\n  Localhost - a profile pre-loaded on the node.\n  RuntimeDefault - the container runtime's default profile.\n  Unconfined - no AppArmor enforcement.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "x-kubernetes-unions": [
+          {
+            "discriminator": "type",
+            "fields-to-discriminateBy": {
+              "localhostProfile": "LocalhostProfile"
+            }
+          }
+        ]
+      },
       "io.k8s.api.core.v1.AzureDiskVolumeSource": {
         "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
         "properties": {
@@ -2026,7 +2052,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ObjectFieldSelector"
               }
             ],
-            "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+            "description": "Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported."
           },
           "mode": {
             "description": "Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
@@ -3190,7 +3216,7 @@
             "type": "string"
           },
           "volumeAttributesClassName": {
-            "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass will be applied to the claim but it's not allowed to reset this field to empty string once it is set. If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass will be set by the persistentvolume controller if it exists. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
+            "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass will be applied to the claim but it's not allowed to reset this field to empty string once it is set. If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass will be set by the persistentvolume controller if it exists. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/ (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
             "type": "string"
           },
           "volumeMode": {
@@ -3578,6 +3604,14 @@
       "io.k8s.api.core.v1.PodSecurityContext": {
         "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
         "properties": {
+          "appArmorProfile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.AppArmorProfile"
+              }
+            ],
+            "description": "appArmorProfile is the AppArmor options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows."
+          },
           "fsGroup": {
             "description": "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw----\n\nIf unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.",
             "format": "int64",
@@ -3724,7 +3758,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "hostAliases": {
-            "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
+            "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.",
             "items": {
               "allOf": [
                 {
@@ -3798,7 +3832,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "nodeName": {
-            "description": "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
+            "description": "NodeName indicates in which node this pod is scheduled. If empty, this pod is a candidate for scheduling by the scheduler defined in schedulerName. Once this field is set, the kubelet for this node becomes responsible for the lifecycle of this pod. This field should not be used to express a desire for the pod to be scheduled on a specific node. https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename",
             "type": "string"
           },
           "nodeSelector": {
@@ -3816,7 +3850,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodOS"
               }
             ],
-            "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
+            "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
           },
           "overhead": {
             "additionalProperties": {
@@ -3882,7 +3916,7 @@
             "type": "string"
           },
           "schedulingGates": {
-            "description": "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the scheduler will not attempt to schedule the pod.\n\nSchedulingGates can only be set at pod creation time, and be removed only afterwards.\n\nThis is a beta feature enabled by the PodSchedulingReadiness feature gate.",
+            "description": "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the scheduler will not attempt to schedule the pod.\n\nSchedulingGates can only be set at pod creation time, and be removed only afterwards.",
             "items": {
               "allOf": [
                 {
@@ -3908,7 +3942,7 @@
             "description": "SecurityContext holds pod-level security attributes and common container settings. Optional: Defaults to empty.  See type description for default values of each field."
           },
           "serviceAccount": {
-            "description": "DeprecatedServiceAccount is a depreciated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
+            "description": "DeprecatedServiceAccount is a deprecated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
             "type": "string"
           },
           "serviceAccountName": {
@@ -4524,6 +4558,14 @@
             "description": "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when spec.os.name is windows.",
             "type": "boolean"
           },
+          "appArmorProfile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.AppArmorProfile"
+              }
+            ],
+            "description": "appArmorProfile is the AppArmor options to use by this container. If set, this profile overrides the pod's appArmorProfile. Note that this field cannot be set when spec.os.name is windows."
+          },
           "capabilities": {
             "allOf": [
               {
@@ -4748,7 +4790,7 @@
             "type": "integer"
           },
           "minDomains": {
-            "description": "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.\n\nThis is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).",
+            "description": "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.",
             "format": "int32",
             "type": "integer"
           },
@@ -5105,7 +5147,7 @@
             "type": "string"
           },
           "mountPropagation": {
-            "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.",
+            "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10. When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified (which defaults to None).",
             "type": "string"
           },
           "name": {
@@ -5116,6 +5158,10 @@
           "readOnly": {
             "description": "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
             "type": "boolean"
+          },
+          "recursiveReadOnly": {
+            "description": "RecursiveReadOnly specifies whether read-only mounts should be handled recursively.\n\nIf ReadOnly is false, this field has no meaning and must be unspecified.\n\nIf ReadOnly is true, and this field is set to Disabled, the mount is not made recursively read-only.  If this field is set to IfPossible, the mount is made recursively read-only, if it is supported by the container runtime.  If this field is set to Enabled, the mount is made recursively read-only if it is supported by the container runtime, otherwise the pod will not be started and an error will be generated to indicate the reason.\n\nIf this field is set to IfPossible or Enabled, MountPropagation must be set to None (or be unspecified, which defaults to None).\n\nIf this field is not specified, it is treated as an equivalent of Disabled.",
+            "type": "string"
           },
           "subPath": {
             "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
@@ -5729,6 +5775,11 @@
             "group": "storage.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           }
         ]
       },
@@ -6465,6 +6516,11 @@
             "group": "storage.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           }
         ]
       },

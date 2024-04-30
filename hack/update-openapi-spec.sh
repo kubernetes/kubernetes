@@ -30,6 +30,8 @@ kube::util::require-jq
 kube::golang::setup_env
 kube::etcd::install
 
+# We need to call `make` here because that includes all of the compile and link
+# flags that we use for a production build, which we need for this script.
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
@@ -69,14 +71,15 @@ fi
 
 # Start kube-apiserver
 # omit enums from static openapi snapshots used to generate clients until #109177 is resolved
+# TODO(aojea) remove ConsistentListFromCache after https://issues.k8s.io/123674
 kube::log::status "Starting kube-apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+kube-apiserver \
   --bind-address="${API_HOST}" \
   --secure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
-  --feature-gates=AllAlpha=true,OpenAPIEnums=false \
+  --feature-gates=AllAlpha=true,OpenAPIEnums=false,ConsistentListFromCache=false \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
   --authorization-mode=RBAC \
@@ -100,6 +103,9 @@ kube::log::status "Updating aggregated discovery"
 
 rm -fr "${DISCOVERY_ROOT_DIR}"
 mkdir -p "${DISCOVERY_ROOT_DIR}"
+curl -kfsS -H 'Authorization: Bearer dummy_token' -H 'Accept: application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList' "https://${API_HOST}:${API_PORT}/apis" | jq -S . > "${DISCOVERY_ROOT_DIR}/aggregated_v2.json"
+
+# Deprecated, remove before v1.33
 curl -kfsS -H 'Authorization: Bearer dummy_token' -H 'Accept: application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList' "https://${API_HOST}:${API_PORT}/apis" | jq -S . > "${DISCOVERY_ROOT_DIR}/aggregated_v2beta1.json"
 
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"

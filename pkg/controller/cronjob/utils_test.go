@@ -25,7 +25,7 @@ import (
 
 	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -47,7 +47,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 		scheduledTime   = *topOfTheHour()
 	)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)
 
 	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -701,6 +701,59 @@ func TestNextScheduleTimeDuration(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotScheduleTimeDuration, &tt.expectedDuration) {
 				t.Errorf("scheduleTimeDuration - got %s, want %s", gotScheduleTimeDuration, tt.expectedDuration)
+			}
+		})
+	}
+}
+
+func TestIsJobSucceeded(t *testing.T) {
+	tests := map[string]struct {
+		job        batchv1.Job
+		wantResult bool
+	}{
+		"job doesn't have any conditions": {
+			wantResult: false,
+		},
+		"job has Complete=True condition": {
+			job: batchv1.Job{
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobSuspended,
+							Status: v1.ConditionFalse,
+						},
+						{
+							Type:   batchv1.JobComplete,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantResult: true,
+		},
+		"job has Complete=False condition": {
+			job: batchv1.Job{
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{
+							Type:   batchv1.JobFailed,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:   batchv1.JobComplete,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			wantResult: false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotResult := IsJobSucceeded(&tc.job)
+			if tc.wantResult != gotResult {
+				t.Errorf("unexpected result, want=%v, got=%v", tc.wantResult, gotResult)
 			}
 		})
 	}

@@ -46,7 +46,7 @@ option go_package = "k8s.io/api/certificates/v1alpha1";
 message ClusterTrustBundle {
   // metadata contains the object metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the signer (if any) and trust anchors.
   optional ClusterTrustBundleSpec spec = 2;
@@ -57,7 +57,7 @@ message ClusterTrustBundleList {
   // metadata contains the list metadata.
   //
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a collection of ClusterTrustBundle objects
   repeated ClusterTrustBundle items = 2;

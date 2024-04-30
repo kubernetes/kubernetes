@@ -88,6 +88,11 @@ type KubeletConfiguration struct {
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	StaticPodPath string
+	// podLogsDir is a custom root directory path kubelet will use to place pod's log files.
+	// Default: "/var/log/pods/"
+	// Note: it is not recommended to use the temp folder as a log directory as it may cause
+	// unexpected behavior in many places.
+	PodLogsDir string
 	// syncFrequency is the max period between synchronizing running
 	// containers and config
 	SyncFrequency metav1.Duration
@@ -661,8 +666,8 @@ type ShutdownGracePeriodByPodPriority struct {
 
 type MemorySwapConfiguration struct {
 	// swapBehavior configures swap memory available to container workloads. May be one of
-	// "", "LimitedSwap": workload combined memory and swap usage cannot exceed pod memory limit
-	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	// "", "NoSwap": workloads can not use swap, default option.
+	// "LimitedSwap": workload swap usage is limited. The swap limit is proportionate to the container's memory request.
 	// +featureGate=NodeSwap
 	// +optional
 	SwapBehavior string

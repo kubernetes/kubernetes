@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -29,7 +30,7 @@ import (
 // Test all public methods behave ok when the feature gate is disabled.
 
 func TestMakeUserNsManagerDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	_, err := MakeUserNsManager(testUserNsPodsManager)
@@ -37,7 +38,7 @@ func TestMakeUserNsManagerDisabled(t *testing.T) {
 }
 
 func TestReleaseDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)
@@ -47,19 +48,67 @@ func TestReleaseDisabled(t *testing.T) {
 }
 
 func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
-	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
-	require.NoError(t, err)
+	trueVal := true
+	falseVal := false
 
-	userns, err := m.GetOrCreateUserNamespaceMappings(nil)
-	assert.NoError(t, err)
-	assert.Nil(t, userns)
+	tests := []struct {
+		name    string
+		pod     *v1.Pod
+		success bool
+	}{
+		{
+			name:    "pod is nil",
+			pod:     nil,
+			success: true,
+		},
+		{
+			name: "hostUsers is nil",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: nil,
+				},
+			},
+			success: true,
+		},
+		{
+			name: "hostUsers is true",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &trueVal,
+				},
+			},
+		},
+		{
+			name: "hostUsers is false",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					HostUsers: &falseVal,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testUserNsPodsManager := &testUserNsPodsManager{}
+			m, err := MakeUserNsManager(testUserNsPodsManager)
+			require.NoError(t, err)
+
+			userns, err := m.GetOrCreateUserNamespaceMappings(test.pod, "")
+			assert.Nil(t, userns)
+			if test.success {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
 }
 
 func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(testUserNsPodsManager)

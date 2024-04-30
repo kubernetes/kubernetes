@@ -440,6 +440,11 @@ func (w *watchCache) List() []interface{} {
 // You HAVE TO explicitly call w.RUnlock() after this function.
 func (w *watchCache) waitUntilFreshAndBlock(ctx context.Context, resourceVersion uint64) error {
 	startTime := w.clock.Now()
+	defer func() {
+		if resourceVersion > 0 {
+			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.String()).Observe(w.clock.Since(startTime).Seconds())
+		}
+	}()
 
 	// In case resourceVersion is 0, we accept arbitrarily stale result.
 	// As a result, the condition in the below for loop will never be
@@ -531,7 +536,14 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
 func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
-	err := w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	var err error
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
+		w.waitingUntilFresh.Add()
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+		w.waitingUntilFresh.Remove()
+	} else {
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	}
 	defer w.RUnlock()
 	if err != nil {
 		return nil, false, 0, err
@@ -691,7 +703,11 @@ func (w *watchCache) isIndexValidLocked(index int) bool {
 // getAllEventsSinceLocked returns a watchCacheInterval that can be used to
 // retrieve events since a certain resourceVersion. This function assumes to
 // be called under the watchCache lock.
-func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCacheInterval, error) {
+func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, opts storage.ListOptions) (*watchCacheInterval, error) {
+	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		return w.getIntervalFromStoreLocked()
+	}
+
 	size := w.endIndex - w.startIndex
 	var oldest uint64
 	switch {
@@ -711,13 +727,19 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCach
 	}
 
 	if resourceVersion == 0 {
-		// resourceVersion = 0 means that we don't require any specific starting point
-		// and we would like to start watching from ~now.
-		// However, to keep backward compatibility, we additionally need to return the
-		// current state and only then start watching from that point.
-		//
-		// TODO: In v2 api, we should stop returning the current state - #13969.
-		return w.getIntervalFromStoreLocked()
+		if opts.SendInitialEvents == nil {
+			// resourceVersion = 0 means that we don't require any specific starting point
+			// and we would like to start watching from ~now.
+			// However, to keep backward compatibility, we additionally need to return the
+			// current state and only then start watching from that point.
+			//
+			// TODO: In v2 api, we should stop returning the current state - #13969.
+			return w.getIntervalFromStoreLocked()
+		}
+		// SendInitialEvents = false and resourceVersion = 0
+		// means that the request would like to start watching
+		// from Any resourceVersion
+		resourceVersion = w.resourceVersion
 	}
 	if resourceVersion < oldest-1 {
 		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d (%d)", resourceVersion, oldest-1))

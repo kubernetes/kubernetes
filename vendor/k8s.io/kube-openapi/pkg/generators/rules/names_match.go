@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kube-openapi/pkg/util/sets"
 
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 )
 
 var (
@@ -135,7 +135,7 @@ func namesMatch(goName, jsonName string) bool {
 	if !isAllowedName(goName) || !isAllowedName(jsonName) {
 		return false
 	}
-	if strings.ToLower(goName) != strings.ToLower(jsonName) {
+	if !strings.EqualFold(goName, jsonName) {
 		return false
 	}
 	// Go field names must be CamelCase. JSON field names must be camelCase.

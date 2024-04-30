@@ -240,23 +240,6 @@ leaderElection:
 			},
 		},
 		{
-			name: "default config with a beta feature disabled",
-			flags: []string{
-				"--kubeconfig", configKubeconfig,
-				"--feature-gates=PodSchedulingReadiness=false",
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := defaults.ExpandedPluginsV1.DeepCopy()
-					plugins.PreEnqueue = config.PluginSet{}
-					return plugins
-				}(),
-			},
-			restoreFeatures: map[featuregate.Feature]bool{
-				features.PodSchedulingReadiness: true,
-			},
-		},
-		{
 			name: "default config",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
@@ -407,7 +390,7 @@ leaderElection:
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			for k, v := range tc.restoreFeatures {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
 			}
 
 			fs := pflag.NewFlagSet("test", pflag.PanicOnError)

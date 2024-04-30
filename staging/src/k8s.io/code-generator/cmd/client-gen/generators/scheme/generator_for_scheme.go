@@ -20,24 +20,24 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
-	"k8s.io/code-generator/cmd/client-gen/path"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 // GenScheme produces a package for a clientset with the scheme, codecs and parameter codecs.
 type GenScheme struct {
-	generator.DefaultGen
-	OutputPackage   string
+	generator.GoGenerator
+	OutputPkg       string // Must be a Go import-path
+	OutputPath      string // optional
 	Groups          []clientgentypes.GroupVersions
 	GroupGoNames    map[clientgentypes.GroupVersion]string
 	InputPackages   map[clientgentypes.GroupVersion]string
-	OutputPath      string
 	ImportTracker   namer.ImportTracker
 	PrivateScheme   bool
 	CreateRegistry  bool
@@ -46,7 +46,7 @@ type GenScheme struct {
 
 func (g *GenScheme) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.OutputPackage, g.ImportTracker),
+		"raw": namer.NewRawNamer(g.OutputPkg, g.ImportTracker),
 	}
 }
 
@@ -66,14 +66,14 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 			if g.CreateRegistry {
 				// import the install package for internal clientsets instead of the type package with register.go
 				if version.Version != "" {
-					packagePath = filepath.Dir(packagePath)
+					packagePath = path.Dir(packagePath)
 				}
-				packagePath = filepath.Join(packagePath, "install")
+				packagePath = path.Join(packagePath, "install")
 
-				imports = append(imports, fmt.Sprintf("%s \"%s\"", groupAlias, path.Vendorless(packagePath)))
+				imports = append(imports, fmt.Sprintf("%s \"%s\"", groupAlias, packagePath))
 				break
 			} else {
-				imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.Version.NonEmpty()), path.Vendorless(packagePath)))
+				imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.Version.NonEmpty()), packagePath))
 			}
 		}
 	}

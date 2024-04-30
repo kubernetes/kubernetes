@@ -535,6 +535,10 @@ func (g *GCERunner) createGCEInstance(imageConfig *internalGCEImage) (string, er
 					return "", fmt.Errorf("unable to create temp file %v", err)
 				}
 				defer os.Remove(dataFile.Name()) // clean up
+				if err = dataFile.Close(); err != nil {
+					return "", fmt.Errorf("unable to close temp file %w", err)
+				}
+
 				if err = os.WriteFile(dataFile.Name(), []byte(item.Value), 0666); err != nil {
 					return "", fmt.Errorf("could not write contents of metadata item into file %v", err)
 				}
@@ -644,7 +648,12 @@ func (g *GCERunner) imageToInstanceName(imageConfig *internalGCEImage) string {
 	}
 	// For benchmark test, node name has the format 'machine-image-uuid' to run
 	// different machine types with the same image in parallel
-	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.New().String()[:8]
+	name := imageConfig.machine + "-" + imageConfig.image + "-" + uuid.New().String()[:8]
+	// Sometimes the image is too long, we need instance names to have a max length of 63
+	if len(name) > 63 {
+		return name[:63]
+	}
+	return name
 }
 
 func (g *GCERunner) registerGceHostIP(host string) error {

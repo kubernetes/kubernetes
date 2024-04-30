@@ -2087,6 +2087,9 @@ func TestForceApply(t *testing.T) {
 		"post":        1,
 	}
 
+	// Set the patch retry back off period to something low, so the test can run more quickly
+	patchRetryBackOffPeriod = 1 * time.Millisecond
+
 	for _, testingOpenAPISchema := range testingOpenAPISchemas {
 		for _, openAPIFeatureToggle := range applyFeatureToggles {
 

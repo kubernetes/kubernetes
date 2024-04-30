@@ -337,6 +337,13 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 				}
 			}
 		}
+		for _, envFrom := range container.EnvFrom {
+			if envFrom.SecretRef != nil {
+				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
+					return fmt.Errorf("init container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
+				}
+			}
+		}
 	}
 
 	for _, container := range pod.Spec.Containers {
@@ -344,6 +351,13 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
 					return fmt.Errorf("container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+				}
+			}
+		}
+		for _, envFrom := range container.EnvFrom {
+			if envFrom.SecretRef != nil {
+				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
+					return fmt.Errorf("container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
 				}
 			}
 		}
@@ -385,6 +399,13 @@ func (s *Plugin) limitEphemeralContainerSecretReferences(pod *api.Pod, a admissi
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
 					return fmt.Errorf("ephemeral container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+				}
+			}
+		}
+		for _, envFrom := range container.EnvFrom {
+			if envFrom.SecretRef != nil {
+				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
+					return fmt.Errorf("ephemeral container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
 				}
 			}
 		}

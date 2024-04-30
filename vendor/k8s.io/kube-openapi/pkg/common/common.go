@@ -164,6 +164,9 @@ type OpenAPIV3Config struct {
 	// It is an optional function to customize model names.
 	GetDefinitionName func(name string) (string, spec.Extensions)
 
+	// PostProcessSpec runs after the spec is ready to serve. It allows a final modification to the spec before serving.
+	PostProcessSpec func(*spec3.OpenAPI) (*spec3.OpenAPI, error)
+
 	// SecuritySchemes is list of all security schemes for OpenAPI service.
 	SecuritySchemes spec3.SecuritySchemes
 

@@ -125,6 +125,13 @@ export GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
 export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
 
+# Ability to inject custom versions (COS images ONLY)
+# if KUBE_COS_INSTALL_CONTAINERD_VERSION or KUBE_COS_INSTALL_RUNC_VERSION
+# is set to empty then we do not override the version(s) and just
+# use whatever is in the default installation of containerd package
+export COS_INSTALL_CONTAINERD_VERSION=${KUBE_COS_INSTALL_CONTAINERD_VERSION:-}
+export COS_INSTALL_RUNC_VERSION=${KUBE_COS_INSTALL_RUNC_VERSION:-}
+
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
 export MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
@@ -353,7 +360,7 @@ fi
 # IP_ALIAS_SIZE is the size of the podCIDR allocated to a node.
 # IP_ALIAS_SUBNETWORK is the subnetwork to allocate from. If empty, a
 #   new subnetwork will be created for the cluster.
-ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-false}
+ENABLE_IP_ALIASES=${KUBE_GCE_ENABLE_IP_ALIASES:-true}
 export NODE_IPAM_MODE=${KUBE_GCE_NODE_IPAM_MODE:-RangeAllocator}
 if [ "${ENABLE_IP_ALIASES}" = true ]; then
   # Number of Pods that can run on this node.
@@ -525,7 +532,7 @@ KUBE_PROXY_DAEMONSET=${KUBE_PROXY_DAEMONSET:-false} # true, false
 # as an addon daemonset.
 KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
 
-# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
+# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs, nftables].
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-iptables}
 
 # Will be passed into the kube-proxy via `--detect-local-mode`
@@ -539,7 +546,7 @@ ROTATE_CERTIFICATES=${ROTATE_CERTIFICATES:-}
 
 # The number of services that are allowed to sync concurrently. Will be passed
 # into kube-controller-manager via `--concurrent-service-syncs`
-CONCURRENT_SERVICE_SYNCS=${CONCURRENT_SERVICE_SYNCS:-}
+CONCURRENT_SERVICE_SYNCS=${CONCURRENT_SERVICE_SYNCS:-5}
 
 # The value kubernetes.default.svc.cluster.local is only usable for full
 # OIDC discovery flows in Pods in the same cluster. For some providers

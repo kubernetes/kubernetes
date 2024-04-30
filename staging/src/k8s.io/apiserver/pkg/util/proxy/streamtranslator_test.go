@@ -41,9 +41,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	rcconstants "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/proxy/metrics"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 // TestStreamTranslator_LoopbackStdinToStdout returns random data sent on the client's
@@ -53,6 +56,9 @@ import (
 // websocket data into spdy). The returned data read on the websocket client STDOUT is then
 // compared the random data sent on STDIN to ensure they are the same.
 func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
 	// Create upstream fake SPDY server which copies STDIN back onto STDOUT stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx, err := createSPDYServerStreams(w, req, Options{
@@ -132,6 +138,16 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 	if !bytes.Equal(randomData, data) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
+	// Validate the streamtranslator metrics; should be one 200 success.
+	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="200"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestStreamTranslator_LoopbackStdinToStderr returns random data sent on the client's
@@ -141,6 +157,9 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 // websocket data into spdy). The returned data read on the websocket client STDERR is then
 // compared the random data sent on STDIN to ensure they are the same.
 func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
 	// Create upstream fake SPDY server which copies STDIN back onto STDERR stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx, err := createSPDYServerStreams(w, req, Options{
@@ -219,6 +238,16 @@ func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
 	if !bytes.Equal(randomData, data) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
+	// Validate the streamtranslator metrics; should be one 200 success.
+	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="200"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Returns a random exit code in the range(1-127).
@@ -231,6 +260,9 @@ func randomExitCode() int {
 // TestStreamTranslator_ErrorStream tests the error stream by sending an error with a random
 // exit code, then validating the error arrives on the error stream.
 func TestStreamTranslator_ErrorStream(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
 	expectedExitCode := randomExitCode()
 	// Create upstream fake SPDY server, returning a non-zero exit code
 	// on error stream within the structured error.
@@ -321,11 +353,24 @@ func TestStreamTranslator_ErrorStream(t *testing.T) {
 			t.Errorf("expected error (%s), got (%s)", expectedError, err)
 		}
 	}
+	// Validate the streamtranslator metrics; an exit code error is considered 200 success.
+	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="200"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestStreamTranslator_MultipleReadChannels tests two streams (STDOUT, STDERR) reading from
 // the connections at the same time.
 func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
 	// Create upstream fake SPDY server which copies STDIN back onto STDOUT and STDERR stream.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx, err := createSPDYServerStreams(w, req, Options{
@@ -416,6 +461,16 @@ func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
 	// Check the random data sent on STDIN was the same returned on STDERR.
 	if !bytes.Equal(stderrBytes, randomData) {
 		t.Errorf("unexpected data received: %d sent: %d", len(stderrBytes), len(randomData))
+	}
+	// Validate the streamtranslator metrics; should have one 200 success.
+	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="200"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -556,6 +611,9 @@ func randomTerminalSize() remotecommand.TerminalSize {
 
 // TestStreamTranslator_MultipleWriteChannels
 func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
 	// Create the fake terminal size queue and the actualTerminalSizes which
 	// will be received at the opposite websocket endpoint.
 	numSizeQueue := 10000
@@ -633,11 +691,24 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 			t.Errorf("expected terminal resize window %v, got %v", expected, actual)
 		}
 	}
+	// Validate the streamtranslator metrics; should have one 200 success.
+	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="200"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestStreamTranslator_WebSocketServerErrors validates that when there is a problem creating
 // the websocket server as the first step of the StreamTranslator an error is properly returned.
 func TestStreamTranslator_WebSocketServerErrors(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
 	spdyLocation, err := url.Parse("http://127.0.0.1")
 	if err != nil {
 		t.Fatalf("Unable to parse spdy server URL")
@@ -684,11 +755,24 @@ func TestStreamTranslator_WebSocketServerErrors(t *testing.T) {
 			t.Errorf("expected websocket bad handshake error, got (%s)", err)
 		}
 	}
+	// Validate the streamtranslator metrics; should have one 500 failure.
+	metricNames := []string{"apiserver_stream_translator_requests_total"}
+	expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="400"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestStreamTranslator_BlockRedirects verifies that the StreamTranslator will *not* follow
 // redirects; it will thrown an error instead.
 func TestStreamTranslator_BlockRedirects(t *testing.T) {
+	metrics.Register()
+	metrics.ResetForTest()
+	t.Cleanup(metrics.ResetForTest)
 	for _, statusCode := range []int{
 		http.StatusMovedPermanently,  // 301
 		http.StatusFound,             // 302
@@ -744,6 +828,17 @@ func TestStreamTranslator_BlockRedirects(t *testing.T) {
 				t.Errorf("expected redirect not allowed error, got (%s)", err)
 			}
 		}
+		// Validate the streamtranslator metrics; should have one 500 failure each loop.
+		metricNames := []string{"apiserver_stream_translator_requests_total"}
+		expected := `
+# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# TYPE apiserver_stream_translator_requests_total counter
+apiserver_stream_translator_requests_total{code="500"} 1
+`
+		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
+			t.Fatal(err)
+		}
+		metrics.ResetForTest() // Clear metrics each loop
 	}
 }
 

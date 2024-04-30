@@ -125,7 +125,7 @@ func (test *evalTestOnly) Eval(ctx Activation) ref.Val {
 	val, err := test.Resolve(ctx)
 	// Return an error if the resolve step fails
 	if err != nil {
-		return types.WrapErr(err)
+		return types.LabelErrNode(test.id, types.WrapErr(err))
 	}
 	if optVal, isOpt := val.(*types.Optional); isOpt {
 		return types.Bool(optVal.HasValue())
@@ -231,6 +231,7 @@ func (or *evalOr) Eval(ctx Activation) ref.Val {
 				} else {
 					err = types.MaybeNoSuchOverloadErr(val)
 				}
+				err = types.LabelErrNode(or.id, err)
 			}
 		}
 	}
@@ -273,6 +274,7 @@ func (and *evalAnd) Eval(ctx Activation) ref.Val {
 				} else {
 					err = types.MaybeNoSuchOverloadErr(val)
 				}
+				err = types.LabelErrNode(and.id, err)
 			}
 		}
 	}
@@ -377,7 +379,7 @@ func (zero *evalZeroArity) ID() int64 {
 
 // Eval implements the Interpretable interface method.
 func (zero *evalZeroArity) Eval(ctx Activation) ref.Val {
-	return zero.impl()
+	return types.LabelErrNode(zero.id, zero.impl())
 }
 
 // Function implements the InterpretableCall interface method.
@@ -421,14 +423,14 @@ func (un *evalUnary) Eval(ctx Activation) ref.Val {
 	// If the implementation is bound and the argument value has the right traits required to
 	// invoke it, then call the implementation.
 	if un.impl != nil && (un.trait == 0 || (!strict && types.IsUnknownOrError(argVal)) || argVal.Type().HasTrait(un.trait)) {
-		return un.impl(argVal)
+		return types.LabelErrNode(un.id, un.impl(argVal))
 	}
 	// Otherwise, if the argument is a ReceiverType attempt to invoke the receiver method on the
 	// operand (arg0).
 	if argVal.Type().HasTrait(traits.ReceiverType) {
-		return argVal.(traits.Receiver).Receive(un.function, un.overload, []ref.Val{})
+		return types.LabelErrNode(un.id, argVal.(traits.Receiver).Receive(un.function, un.overload, []ref.Val{}))
 	}
-	return types.NewErr("no such overload: %s", un.function)
+	return types.NewErrWithNodeID(un.id, "no such overload: %s", un.function)
 }
 
 // Function implements the InterpretableCall interface method.
@@ -479,14 +481,14 @@ func (bin *evalBinary) Eval(ctx Activation) ref.Val {
 	// If the implementation is bound and the argument value has the right traits required to
 	// invoke it, then call the implementation.
 	if bin.impl != nil && (bin.trait == 0 || (!strict && types.IsUnknownOrError(lVal)) || lVal.Type().HasTrait(bin.trait)) {
-		return bin.impl(lVal, rVal)
+		return types.LabelErrNode(bin.id, bin.impl(lVal, rVal))
 	}
 	// Otherwise, if the argument is a ReceiverType attempt to invoke the receiver method on the
 	// operand (arg0).
 	if lVal.Type().HasTrait(traits.ReceiverType) {
-		return lVal.(traits.Receiver).Receive(bin.function, bin.overload, []ref.Val{rVal})
+		return types.LabelErrNode(bin.id, lVal.(traits.Receiver).Receive(bin.function, bin.overload, []ref.Val{rVal}))
 	}
-	return types.NewErr("no such overload: %s", bin.function)
+	return types.NewErrWithNodeID(bin.id, "no such overload: %s", bin.function)
 }
 
 // Function implements the InterpretableCall interface method.
@@ -545,14 +547,14 @@ func (fn *evalVarArgs) Eval(ctx Activation) ref.Val {
 	// invoke it, then call the implementation.
 	arg0 := argVals[0]
 	if fn.impl != nil && (fn.trait == 0 || (!strict && types.IsUnknownOrError(arg0)) || arg0.Type().HasTrait(fn.trait)) {
-		return fn.impl(argVals...)
+		return types.LabelErrNode(fn.id, fn.impl(argVals...))
 	}
 	// Otherwise, if the argument is a ReceiverType attempt to invoke the receiver method on the
 	// operand (arg0).
 	if arg0.Type().HasTrait(traits.ReceiverType) {
-		return arg0.(traits.Receiver).Receive(fn.function, fn.overload, argVals[1:])
+		return types.LabelErrNode(fn.id, arg0.(traits.Receiver).Receive(fn.function, fn.overload, argVals[1:]))
 	}
-	return types.NewErr("no such overload: %s", fn.function)
+	return types.NewErrWithNodeID(fn.id, "no such overload: %s %d", fn.function, fn.id)
 }
 
 // Function implements the InterpretableCall interface method.
@@ -595,7 +597,7 @@ func (l *evalList) Eval(ctx Activation) ref.Val {
 		if l.hasOptionals && l.optionals[i] {
 			optVal, ok := elemVal.(*types.Optional)
 			if !ok {
-				return invalidOptionalElementInit(elemVal)
+				return types.LabelErrNode(l.id, invalidOptionalElementInit(elemVal))
 			}
 			if !optVal.HasValue() {
 				continue
@@ -645,7 +647,7 @@ func (m *evalMap) Eval(ctx Activation) ref.Val {
 		if m.hasOptionals && m.optionals[i] {
 			optVal, ok := valVal.(*types.Optional)
 			if !ok {
-				return invalidOptionalEntryInit(keyVal, valVal)
+				return types.LabelErrNode(m.id, invalidOptionalEntryInit(keyVal, valVal))
 			}
 			if !optVal.HasValue() {
 				delete(entries, keyVal)
@@ -705,7 +707,7 @@ func (o *evalObj) Eval(ctx Activation) ref.Val {
 		if o.hasOptionals && o.optionals[i] {
 			optVal, ok := val.(*types.Optional)
 			if !ok {
-				return invalidOptionalEntryInit(field, val)
+				return types.LabelErrNode(o.id, invalidOptionalEntryInit(field, val))
 			}
 			if !optVal.HasValue() {
 				delete(fieldVals, field)
@@ -715,7 +717,7 @@ func (o *evalObj) Eval(ctx Activation) ref.Val {
 		}
 		fieldVals[field] = val
 	}
-	return o.provider.NewValue(o.typeName, fieldVals)
+	return types.LabelErrNode(o.id, o.provider.NewValue(o.typeName, fieldVals))
 }
 
 func (o *evalObj) InitVals() []Interpretable {
@@ -921,7 +923,7 @@ func (e *evalWatchConstQual) Qualify(vars Activation, obj any) (any, error) {
 	out, err := e.ConstantQualifier.Qualify(vars, obj)
 	var val ref.Val
 	if err != nil {
-		val = types.WrapErr(err)
+		val = types.LabelErrNode(e.ID(), types.WrapErr(err))
 	} else {
 		val = e.adapter.NativeToValue(out)
 	}
@@ -934,7 +936,7 @@ func (e *evalWatchConstQual) QualifyIfPresent(vars Activation, obj any, presence
 	out, present, err := e.ConstantQualifier.QualifyIfPresent(vars, obj, presenceOnly)
 	var val ref.Val
 	if err != nil {
-		val = types.WrapErr(err)
+		val = types.LabelErrNode(e.ID(), types.WrapErr(err))
 	} else if out != nil {
 		val = e.adapter.NativeToValue(out)
 	} else if presenceOnly {
@@ -964,7 +966,7 @@ func (e *evalWatchAttrQual) Qualify(vars Activation, obj any) (any, error) {
 	out, err := e.Attribute.Qualify(vars, obj)
 	var val ref.Val
 	if err != nil {
-		val = types.WrapErr(err)
+		val = types.LabelErrNode(e.ID(), types.WrapErr(err))
 	} else {
 		val = e.adapter.NativeToValue(out)
 	}
@@ -977,7 +979,7 @@ func (e *evalWatchAttrQual) QualifyIfPresent(vars Activation, obj any, presenceO
 	out, present, err := e.Attribute.QualifyIfPresent(vars, obj, presenceOnly)
 	var val ref.Val
 	if err != nil {
-		val = types.WrapErr(err)
+		val = types.LabelErrNode(e.ID(), types.WrapErr(err))
 	} else if out != nil {
 		val = e.adapter.NativeToValue(out)
 	} else if presenceOnly {
@@ -1001,7 +1003,7 @@ func (e *evalWatchQual) Qualify(vars Activation, obj any) (any, error) {
 	out, err := e.Qualifier.Qualify(vars, obj)
 	var val ref.Val
 	if err != nil {
-		val = types.WrapErr(err)
+		val = types.LabelErrNode(e.ID(), types.WrapErr(err))
 	} else {
 		val = e.adapter.NativeToValue(out)
 	}
@@ -1014,7 +1016,7 @@ func (e *evalWatchQual) QualifyIfPresent(vars Activation, obj any, presenceOnly 
 	out, present, err := e.Qualifier.QualifyIfPresent(vars, obj, presenceOnly)
 	var val ref.Val
 	if err != nil {
-		val = types.WrapErr(err)
+		val = types.LabelErrNode(e.ID(), types.WrapErr(err))
 	} else if out != nil {
 		val = e.adapter.NativeToValue(out)
 	} else if presenceOnly {
@@ -1157,12 +1159,12 @@ func (cond *evalExhaustiveConditional) Eval(ctx Activation) ref.Val {
 	}
 	if cBool {
 		if tErr != nil {
-			return types.WrapErr(tErr)
+			return types.LabelErrNode(cond.id, types.WrapErr(tErr))
 		}
 		return cond.adapter.NativeToValue(tVal)
 	}
 	if fErr != nil {
-		return types.WrapErr(fErr)
+		return types.LabelErrNode(cond.id, types.WrapErr(fErr))
 	}
 	return cond.adapter.NativeToValue(fVal)
 }
@@ -1202,7 +1204,7 @@ func (a *evalAttr) Adapter() types.Adapter {
 func (a *evalAttr) Eval(ctx Activation) ref.Val {
 	v, err := a.attr.Resolve(ctx)
 	if err != nil {
-		return types.WrapErr(err)
+		return types.LabelErrNode(a.ID(), types.WrapErr(err))
 	}
 	return a.adapter.NativeToValue(v)
 }

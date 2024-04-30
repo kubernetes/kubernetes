@@ -18,22 +18,36 @@ package testing
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
 
 	"k8s.io/component-base/featuregate"
 )
 
-// SetFeatureGateDuringTest sets the specified gate to the specified value, and returns a function that restores the original value.
-// Failures to set or restore cause the test to fail.
+var (
+	overrideLock        sync.Mutex
+	featureFlagOverride map[featuregate.Feature]string
+)
+
+func init() {
+	featureFlagOverride = map[featuregate.Feature]string{}
+}
+
+// SetFeatureGateDuringTest sets the specified gate to the specified value for duration of the test.
+// Fails when it detects second call to the same flag or is unable to set or restore feature flag.
+//
+// WARNING: Can leak set variable when called in test calling t.Parallel(), however second attempt to set the same feature flag will cause fatal.
 //
 // Example use:
 //
-// defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
-func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
+// featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)
+func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) {
+	tb.Helper()
+	detectParallelOverrideCleanup := detectParallelOverride(tb, f)
 	originalValue := gate.Enabled(f)
 
 	// Specially handle AllAlpha and AllBeta
-	var cleanups []func()
 	if f == "AllAlpha" || f == "AllBeta" {
 		// Iterate over individual gates so their individual values get restored
 		for k, v := range gate.(featuregate.MutableFeatureGate).GetAll() {
@@ -41,7 +55,7 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 				continue
 			}
 			if (f == "AllAlpha" && v.PreRelease == featuregate.Alpha) || (f == "AllBeta" && v.PreRelease == featuregate.Beta) {
-				cleanups = append(cleanups, SetFeatureGateDuringTest(tb, gate, k, value))
+				SetFeatureGateDuringTest(tb, gate, k, value)
 			}
 		}
 	}
@@ -50,12 +64,37 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 		tb.Errorf("error setting %s=%v: %v", f, value, err)
 	}
 
-	return func() {
+	tb.Cleanup(func() {
+		tb.Helper()
+		detectParallelOverrideCleanup()
 		if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
 			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
 		}
-		for _, cleanup := range cleanups {
-			cleanup()
-		}
+	})
+}
+
+func detectParallelOverride(tb testing.TB, f featuregate.Feature) func() {
+	tb.Helper()
+	overrideLock.Lock()
+	defer overrideLock.Unlock()
+	beforeOverrideTestName := featureFlagOverride[f]
+	if beforeOverrideTestName != "" && !sameTestOrSubtest(tb, beforeOverrideTestName) {
+		tb.Fatalf("Detected parallel setting of a feature gate by both %q and %q", beforeOverrideTestName, tb.Name())
 	}
+	featureFlagOverride[f] = tb.Name()
+
+	return func() {
+		tb.Helper()
+		overrideLock.Lock()
+		defer overrideLock.Unlock()
+		if afterOverrideTestName := featureFlagOverride[f]; afterOverrideTestName != tb.Name() {
+			tb.Fatalf("Detected parallel setting of a feature gate between both %q and %q", afterOverrideTestName, tb.Name())
+		}
+		featureFlagOverride[f] = beforeOverrideTestName
+	}
+}
+
+func sameTestOrSubtest(tb testing.TB, testName string) bool {
+	// Assumes that "/" is not used in test names.
+	return tb.Name() == testName || strings.HasPrefix(tb.Name(), testName+"/")
 }

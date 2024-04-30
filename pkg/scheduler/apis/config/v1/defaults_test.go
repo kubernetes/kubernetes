@@ -331,6 +331,7 @@ func TestSchedulerDefaults(t *testing.T) {
 						Plugins: &configv1.Plugins{
 							MultiPoint: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
+									{Name: names.SchedulingGates},
 									{Name: names.PrioritySort},
 									{Name: names.NodeUnschedulable},
 									{Name: names.NodeName},
@@ -351,7 +352,6 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 									{Name: names.DefaultBinder},
-									{Name: names.SchedulingGates},
 								},
 							},
 							Bind: configv1.PluginSet{
@@ -842,7 +842,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 		utilruntime.Must(AddToScheme(scheme))
 		t.Run(tc.name, func(t *testing.T) {
 			for k, v := range tc.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
 			}
 			scheme.Default(tc.in)
 			if diff := cmp.Diff(tc.want, tc.in); diff != "" {

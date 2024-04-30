@@ -34,6 +34,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -171,7 +172,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 // getEtcdEndpoints returns the list of etcd endpoints.
 func getEtcdEndpoints(client clientset.Interface) ([]string, error) {
 	return getEtcdEndpointsWithRetry(client,
-		constants.StaticPodMirroringRetryInterval, constants.StaticPodMirroringTimeout)
+		constants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration)
 }
 
 func getEtcdEndpointsWithRetry(client clientset.Interface, interval, timeout time.Duration) ([]string, error) {
@@ -223,6 +224,16 @@ func getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client clientset.Interface
 	}
 	etcdEndpoints := []string{}
 	for _, pod := range podList.Items {
+		podIsReady := false
+		for _, c := range pod.Status.Conditions {
+			if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
+				podIsReady = true
+				break
+			}
+		}
+		if !podIsReady {
+			klog.V(3).Infof("etcd pod %q is not ready", pod.ObjectMeta.Name)
+		}
 		etcdEndpoint, ok := pod.ObjectMeta.Annotations[constants.EtcdAdvertiseClientUrlsAnnotationKey]
 		if !ok {
 			klog.V(3).Infof("etcd Pod %q is missing the %q annotation; cannot infer etcd advertise client URL using the Pod annotation", pod.ObjectMeta.Name, constants.EtcdAdvertiseClientUrlsAnnotationKey)

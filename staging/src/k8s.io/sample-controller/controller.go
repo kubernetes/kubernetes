@@ -101,7 +101,7 @@ func NewController(
 	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
 	logger.V(4).Info("Creating event broadcaster")
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})

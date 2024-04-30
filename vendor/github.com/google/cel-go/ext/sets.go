@@ -19,6 +19,8 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+	"github.com/google/cel-go/common/ast"
+	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
@@ -116,6 +118,68 @@ func (setsLib) ProgramOptions() []cel.ProgramOption {
 			interpreter.OverloadCostTracker("list_sets_intersects_list", trackSetsCost(1)),
 			interpreter.OverloadCostTracker("list_sets_equivalent_list", trackSetsCost(2)),
 		),
+	}
+}
+
+// NewSetMembershipOptimizer rewrites set membership tests using the `in` operator against a list
+// of constant values of enum, int, uint, string, or boolean type into a set membership test against
+// a map where the map keys are the elements of the list.
+func NewSetMembershipOptimizer() (cel.ASTOptimizer, error) {
+	return setsLib{}, nil
+}
+
+func (setsLib) Optimize(ctx *cel.OptimizerContext, a *ast.AST) *ast.AST {
+	root := ast.NavigateAST(a)
+	matches := ast.MatchDescendants(root, matchInConstantList(a))
+	for _, match := range matches {
+		call := match.AsCall()
+		listArg := call.Args()[1]
+		entries := make([]ast.EntryExpr, len(listArg.AsList().Elements()))
+		for i, elem := range listArg.AsList().Elements() {
+			var entry ast.EntryExpr
+			if r, found := a.ReferenceMap()[elem.ID()]; found && r.Value != nil {
+				entry = ctx.NewMapEntry(ctx.NewLiteral(r.Value), ctx.NewLiteral(types.True), false)
+			} else {
+				entry = ctx.NewMapEntry(elem, ctx.NewLiteral(types.True), false)
+			}
+			entries[i] = entry
+		}
+		mapArg := ctx.NewMap(entries)
+		ctx.UpdateExpr(listArg, mapArg)
+	}
+	return a
+}
+
+func matchInConstantList(a *ast.AST) ast.ExprMatcher {
+	return func(e ast.NavigableExpr) bool {
+		if e.Kind() != ast.CallKind {
+			return false
+		}
+		call := e.AsCall()
+		if call.FunctionName() != operators.In {
+			return false
+		}
+		aggregateVal := call.Args()[1]
+		if aggregateVal.Kind() != ast.ListKind {
+			return false
+		}
+		listVal := aggregateVal.AsList()
+		for _, elem := range listVal.Elements() {
+			if r, found := a.ReferenceMap()[elem.ID()]; found {
+				if r.Value != nil {
+					continue
+				}
+			}
+			if elem.Kind() != ast.LiteralKind {
+				return false
+			}
+			lit := elem.AsLiteral()
+			if !(lit.Type() == cel.StringType || lit.Type() == cel.IntType ||
+				lit.Type() == cel.UintType || lit.Type() == cel.BoolType) {
+				return false
+			}
+		}
+		return true
 	}
 }
 

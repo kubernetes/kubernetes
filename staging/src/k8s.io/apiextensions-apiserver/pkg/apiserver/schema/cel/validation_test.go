@@ -2676,11 +2676,10 @@ func TestReasonAndFldPath(t *testing.T) {
 		return &r
 	}()
 	tests := []struct {
-		name      string
-		schema    *schema.Structural
-		obj       interface{}
-		errors    []string
-		errorType field.ErrorType
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		errors field.ErrorList
 	}{
 		{name: "Return error based on input reason",
 			obj: map[string]interface{}{
@@ -2691,8 +2690,12 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", forbiddenReason),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeForbidden,
-			errors:    []string{"root.f: Forbidden"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.f",
+				},
+			},
 		},
 		{name: "Return error default is invalid",
 			obj: map[string]interface{}{
@@ -2703,8 +2706,12 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", "", nil),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeInvalid,
-			errors:    []string{"root.f: Invalid"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeInvalid,
+					Field: "root.f",
+				},
+			},
 		},
 		{name: "Return error based on input fieldPath",
 			obj: map[string]interface{}{
@@ -2715,8 +2722,63 @@ func TestReasonAndFldPath(t *testing.T) {
 			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
 				"f": withReasonAndFldPath(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2", ".m", forbiddenReason),
 			}), "1 == 1"),
-			errorType: field.ErrorTypeForbidden,
-			errors:    []string{"root.f.m: Forbidden"},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.f.m",
+				},
+			},
+		},
+		{
+			name: "multiple rules with custom reason and field path",
+			obj: map[string]interface{}{
+				"field1": "value1",
+				"field2": "value2",
+				"field3": "value3",
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"field1": stringType,
+					"field2": stringType,
+					"field3": stringType,
+				},
+				Extensions: schema.Extensions{
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule:      `self.field2 != "value2"`,
+							Reason:    ptr.To(apiextensions.FieldValueDuplicate),
+							FieldPath: ".field2",
+						},
+						{
+							Rule:      `self.field3 != "value3"`,
+							Reason:    ptr.To(apiextensions.FieldValueRequired),
+							FieldPath: ".field3",
+						},
+						{
+							Rule:      `self.field1 != "value1"`,
+							Reason:    ptr.To(apiextensions.FieldValueForbidden),
+							FieldPath: ".field1",
+						},
+					},
+				},
+			},
+			errors: field.ErrorList{
+				{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "root.field2",
+				},
+				{
+					Type:  field.ErrorTypeRequired,
+					Field: "root.field3",
+				},
+				{
+					Type:  field.ErrorTypeForbidden,
+					Field: "root.field1",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -2727,30 +2789,14 @@ func TestReasonAndFldPath(t *testing.T) {
 				t.Fatal("expected non nil validator")
 			}
 			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, nil, celconfig.RuntimeCELCostBudget)
-			unmatched := map[string]struct{}{}
-			for _, e := range tt.errors {
-				unmatched[e] = struct{}{}
+
+			for i := range errs {
+				// Ignore unchecked fields for this test
+				errs[i].Detail = ""
+				errs[i].BadValue = nil
 			}
-			for _, err := range errs {
-				if err.Type != tt.errorType {
-					t.Errorf("expected error type %v, but got: %v", tt.errorType, err.Type)
-					continue
-				}
-				matched := false
-				for expected := range unmatched {
-					if strings.Contains(err.Error(), expected) {
-						delete(unmatched, expected)
-						matched = true
-						break
-					}
-				}
-				if !matched {
-					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
-				}
-			}
-			if len(unmatched) > 0 {
-				t.Errorf("expected errors %v", unmatched)
-			}
+
+			require.ElementsMatch(t, tt.errors, errs)
 		})
 	}
 }
@@ -3073,7 +3119,7 @@ func TestValidateFieldPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
+			validField, _, err := ValidFieldPath(tc.fieldPath, tc.schema)
 
 			if err == nil && tc.errDetail != "" {
 				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
@@ -3778,7 +3824,7 @@ func TestRatcheting(t *testing.T) {
 
 // Runs transition rule cases with OptionalOldSelf set to true on the schema
 func TestOptionalOldSelf(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	tests := []struct {
 		name   string
@@ -3933,7 +3979,7 @@ func TestOptionalOldSelf(t *testing.T) {
 // Shows that type(oldSelf) == null_type works for all supported OpenAPI types
 // both when oldSelf is null and when it is not null
 func TestOptionalOldSelfCheckForNull(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	tests := []struct {
 		name   string
@@ -4075,7 +4121,7 @@ func TestOptionalOldSelfCheckForNull(t *testing.T) {
 
 // Show that we cant just use oldSelf as if it was unwrapped
 func TestOptionalOldSelfIsOptionalType(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	cases := []struct {
 		name   string
@@ -4089,7 +4135,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf + self > 5
 			`),
 			obj:    5,
-			errors: []string{"no matching overload for '_+_' applied to '(optional(int), int)"},
+			errors: []string{"no matching overload for '_+_' applied to '(optional_type(int), int)"},
 		},
 		{
 			name: "forbid direct usage of optional string",
@@ -4097,7 +4143,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf == "foo"
 			`),
 			obj:    "bar",
-			errors: []string{"no matching overload for '_==_' applied to '(optional(string), string)"},
+			errors: []string{"no matching overload for '_==_' applied to '(optional_type(string), string)"},
 		},
 		{
 			name: "forbid direct usage of optional array",
@@ -4105,7 +4151,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf.all(x, x == x)
 			`),
 			obj:    []interface{}{"bar"},
-			errors: []string{"expression of type 'optional(list(string))' cannot be range of a comprehension"},
+			errors: []string{"expression of type 'optional_type(list(string))' cannot be range of a comprehension"},
 		},
 		{
 			name: "forbid direct usage of optional array element",
@@ -4113,7 +4159,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf[0] == "foo"
 			`),
 			obj:    []interface{}{"bar"},
-			errors: []string{"found no matching overload for '_==_' applied to '(optional(string), string)"},
+			errors: []string{"found no matching overload for '_==_' applied to '(optional_type(string), string)"},
 		},
 		{
 			name: "forbid direct usage of optional struct",
@@ -4520,6 +4566,14 @@ func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
 		s.ValueValidation = &schema.ValueValidation{}
 	}
 	s.ValueValidation.MaxItems = maxItems
+	return s
+}
+
+func withMaxProperties(s schema.Structural, maxProperties *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxProperties = maxProperties
 	return s
 }
 

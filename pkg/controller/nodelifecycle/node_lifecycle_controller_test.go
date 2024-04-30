@@ -2352,6 +2352,29 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 					},
 				},
 			},
+			// NotReady Taint with NoExecute effect should not be applied to a node if the NodeCondition Type NodeReady has been set to nil in the interval between the NodeController enqueuing the node and the taint manager picking up.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node3",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
 		},
 		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 	}
@@ -2363,6 +2386,24 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 				LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 10, 0, 0, time.UTC),
 				LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
 			},
+		},
+	}
+	unhealthyNodeNewStatus := v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
+				Type:               v1.NodeReady,
+				Status:             v1.ConditionFalse,
+				LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 10, 0, 0, time.UTC),
+				LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+	overrideNodeNewStatusConditions := []v1.NodeCondition{
+		{
+			Type:               "MemoryPressure",
+			Status:             v1.ConditionUnknown,
+			LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 10, 0, 0, time.UTC),
+			LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
 		},
 	}
 	originalTaint := UnreachableTaintTemplate
@@ -2428,6 +2469,44 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	// We should not see any taint on the node(especially the Not-Ready taint with NoExecute effect).
 	if taintutils.TaintExists(node2.Spec.Taints, NotReadyTaintTemplate) || len(node2.Spec.Taints) > 0 {
 		t.Errorf("Found taint %v in %v, which should not be present", NotReadyTaintTemplate, node2.Spec.Taints)
+	}
+
+	node3, err := fakeNodeHandler.Get(ctx, "node3", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node3...")
+		return
+	}
+	node3.Status = unhealthyNodeNewStatus
+	_, err = fakeNodeHandler.UpdateStatus(ctx, node3, metav1.UpdateOptions{})
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(ctx); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Before taint manager work, the status has been replaced(maybe merge-patch replace).
+	node3.Status.Conditions = overrideNodeNewStatusConditions
+	_, err = fakeNodeHandler.UpdateStatus(ctx, node3, metav1.UpdateOptions{})
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	nodeController.doNoExecuteTaintingPass(ctx)
+	node3, err = fakeNodeHandler.Get(ctx, "node3", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node3...")
+		return
+	}
+	// We should not see any taint on the node(especially the Not-Ready taint with NoExecute effect).
+	if taintutils.TaintExists(node3.Spec.Taints, NotReadyTaintTemplate) || len(node3.Spec.Taints) > 0 {
+		t.Errorf("Found taint %v in %v, which should not be present", NotReadyTaintTemplate, node3.Spec.Taints)
 	}
 }
 

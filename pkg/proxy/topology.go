@@ -137,21 +137,27 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 	return
 }
 
-// canUseTopology returns true if topology aware routing is enabled and properly configured
-// in this cluster. That is, it checks that:
-// * The TopologyAwareHints feature is enabled
-// * The "service.kubernetes.io/topology-aware-hints" annotation on this Service is set to "Auto"
-// * The node's labels include "topology.kubernetes.io/zone"
-// * All of the endpoints for this Service have a topology hint
-// * At least one endpoint for this Service is hinted for this node's zone.
+// canUseTopology returns true if topology aware routing is enabled and properly
+// configured in this cluster. That is, it checks that:
+//   - The TopologyAwareHints or ServiceTrafficDistribution feature is enabled.
+//   - If ServiceTrafficDistribution feature gate is not enabled, then the
+//     hintsAnnotation should represent an enabled value.
+//   - The node's labels include "topology.kubernetes.io/zone".
+//   - All of the endpoints for this Service have a topology hint.
+//   - At least one endpoint for this Service is hinted for this node's zone.
 func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) && !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution) {
 		return false
 	}
-	// Any non-empty and non-disabled values for the hints annotation are acceptable.
-	hintsAnnotation := svcInfo.HintsAnnotation()
-	if hintsAnnotation == "" || hintsAnnotation == "disabled" || hintsAnnotation == "Disabled" {
-		return false
+
+	// Ignore value of hintsAnnotation if the ServiceTrafficDistribution feature
+	// gate is enabled.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution) {
+		// If the hintsAnnotation has a disabled value, we do not consider hints for route programming.
+		hintsAnnotation := svcInfo.HintsAnnotation()
+		if hintsAnnotation == "" || hintsAnnotation == "disabled" || hintsAnnotation == "Disabled" {
+			return false
+		}
 	}
 
 	zone, ok := nodeLabels[v1.LabelTopologyZone]

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	netutils "k8s.io/utils/net"
 )
 
@@ -37,12 +37,11 @@ type NodePortAddresses struct {
 var ipv4LoopbackStart = net.IPv4(127, 0, 0, 0)
 
 // NewNodePortAddresses takes an IP family and the `--nodeport-addresses` value (which is
-// assumed to contain only valid CIDRs, potentially of both IP families) and the primary IP
-// (which will be used as node port address when `--nodeport-addresses` is empty).
-// It will return a NodePortAddresses object for the given family. If there are no CIDRs of
-// the given family then the CIDR "0.0.0.0/0" or "::/0" will be added (even if there are
-// CIDRs of the other family).
-func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string, primaryIP net.IP) *NodePortAddresses {
+// assumed to contain only valid CIDRs, potentially of both IP families) and returns a
+// NodePortAddresses object for the given family. If there are no CIDRs of the given
+// family then the CIDR "0.0.0.0/0" or "::/0" will be added (even if there are CIDRs of
+// the other family).
+func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string) *NodePortAddresses {
 	npa := &NodePortAddresses{}
 
 	// Filter CIDRs to correct family
@@ -52,24 +51,17 @@ func NewNodePortAddresses(family v1.IPFamily, cidrStrings []string, primaryIP ne
 		}
 	}
 	if len(npa.cidrStrings) == 0 {
-		if primaryIP == nil {
-			if family == v1.IPv4Protocol {
-				npa.cidrStrings = []string{IPv4ZeroCIDR}
-			} else {
-				npa.cidrStrings = []string{IPv6ZeroCIDR}
-			}
+		if family == v1.IPv4Protocol {
+			npa.cidrStrings = []string{IPv4ZeroCIDR}
 		} else {
-			if family == v1.IPv4Protocol {
-				npa.cidrStrings = []string{fmt.Sprintf("%s/32", primaryIP.String())}
-			} else {
-				npa.cidrStrings = []string{fmt.Sprintf("%s/128", primaryIP.String())}
-			}
+			npa.cidrStrings = []string{IPv6ZeroCIDR}
 		}
 	}
 
 	// Now parse
 	for _, str := range npa.cidrStrings {
 		_, cidr, _ := netutils.ParseCIDRSloppy(str)
+
 		if netutils.IsIPv4CIDR(cidr) {
 			if cidr.IP.IsLoopback() || cidr.Contains(ipv4LoopbackStart) {
 				npa.containsIPv4Loopback = true

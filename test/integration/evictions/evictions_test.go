@@ -69,18 +69,16 @@ const (
 func TestConcurrentEvictionRequests(t *testing.T) {
 	podNameFormat := "test-pod-%d"
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-
-	closeFn, rm, informers, _, clientSet := rmSetup(ctx, t)
+	tCtx := ktesting.Init(t)
+	closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
 	defer closeFn()
 
 	ns := framework.CreateNamespaceOrDie(clientSet, "concurrent-eviction-requests", t)
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-	defer cancel()
+	defer tCtx.Cancel("test has completed")
 
-	informers.Start(ctx.Done())
-	go rm.Run(ctx)
+	informers.Start(tCtx.Done())
+	go rm.Run(tCtx)
 
 	var gracePeriodSeconds int64 = 30
 	deleteOption := metav1.DeleteOptions{
@@ -184,18 +182,16 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 // TestTerminalPodEviction ensures that PDB is not checked for terminal pods.
 func TestTerminalPodEviction(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-
-	closeFn, rm, informers, _, clientSet := rmSetup(ctx, t)
+	tCtx := ktesting.Init(t)
+	closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
 	defer closeFn()
 
 	ns := framework.CreateNamespaceOrDie(clientSet, "terminalpod-eviction", t)
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-	defer cancel()
+	defer tCtx.Cancel("test has completed")
 
-	informers.Start(ctx.Done())
-	go rm.Run(ctx)
+	informers.Start(tCtx.Done())
+	go rm.Run(tCtx)
 
 	var gracePeriodSeconds int64 = 30
 	deleteOption := metav1.DeleteOptions{
@@ -260,15 +256,13 @@ func TestTerminalPodEviction(t *testing.T) {
 
 // TestEvictionVersions ensures the eviction endpoint accepts and returns the correct API versions
 func TestEvictionVersions(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-
-	closeFn, rm, informers, config, clientSet := rmSetup(ctx, t)
+	tCtx := ktesting.Init(t)
+	closeFn, rm, informers, config, clientSet := rmSetup(tCtx, t)
 	defer closeFn()
-	defer cancel()
+	defer tCtx.Cancel("test has completed")
 
-	informers.Start(ctx.Done())
-	go rm.Run(ctx)
+	informers.Start(tCtx.Done())
+	go rm.Run(tCtx)
 
 	ns := "default"
 	subresource := "eviction"
@@ -386,29 +380,27 @@ func TestEvictionWithFinalizers(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-
-			closeFn, rm, informers, _, clientSet := rmSetup(ctx, t)
+			tCtx := ktesting.Init(t)
+			closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
 			defer closeFn()
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-finalizers", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
-			defer cancel()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)
+			defer tCtx.Cancel("test has completed")
 
-			informers.Start(ctx.Done())
-			go rm.Run(ctx)
+			informers.Start(tCtx.Done())
+			go rm.Run(tCtx)
 
 			pod := newPod("pod")
 			pod.ObjectMeta.Finalizers = []string{"test.k8s.io/finalizer"}
-			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(tCtx, pod, metav1.CreateOptions{}); err != nil {
 				t.Errorf("Failed to create pod: %v", err)
 			}
 
 			pod.Status.Phase = tc.phase
 			addPodConditionReady(pod)
-			if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+			if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, pod, metav1.UpdateOptions{}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -420,12 +412,12 @@ func TestEvictionWithFinalizers(t *testing.T) {
 
 			eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
 
-			err := clientSet.PolicyV1().Evictions(ns.Name).Evict(ctx, eviction)
+			err := clientSet.PolicyV1().Evictions(ns.Name).Evict(tCtx, eviction)
 			if err != nil {
 				t.Fatalf("Eviction of pod failed %v", err)
 			}
 
-			updatedPod, e := clientSet.CoreV1().Pods(ns.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			updatedPod, e := clientSet.CoreV1().Pods(ns.Name).Get(tCtx, pod.Name, metav1.GetOptions{})
 			if e != nil {
 				t.Fatalf("Failed to get the pod %q with error: %q", klog.KObj(pod), e)
 			}
@@ -474,19 +466,17 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
-			closeFn, rm, informers, _, clientSet := rmSetup(ctx, t)
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)
+			closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
 			defer closeFn()
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-pdb-pod-healthy-policy", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-			defer cancel()
+			defer tCtx.Cancel("test has completed")
 
-			informers.Start(ctx.Done())
-			go rm.Run(ctx)
+			informers.Start(tCtx.Done())
+			go rm.Run(tCtx)
 
 			pod := newPod("pod")
 			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
@@ -498,7 +488,7 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 				addPodConditionReady(pod)
 			}
 
-			if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+			if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, pod, metav1.UpdateOptions{}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -524,7 +514,7 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 
 			deleteOption := metav1.DeleteOptions{}
 			eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
-			err := policyV1NoRetriesClient.Evictions(ns.Name).Evict(ctx, eviction)
+			err := policyV1NoRetriesClient.Evictions(ns.Name).Evict(tCtx, eviction)
 			if err != nil {
 				t.Fatalf("Eviction of pod failed %v", err)
 			}
@@ -570,18 +560,16 @@ func TestEvictionWithPrecondition(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-
-			closeFn, rm, informers, _, clientSet := rmSetup(ctx, t)
+			tCtx := ktesting.Init(t)
+			closeFn, rm, informers, _, clientSet := rmSetup(tCtx, t)
 			defer closeFn()
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-preconditions", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
-			defer cancel()
-			informers.Start(ctx.Done())
-			go rm.Run(ctx)
+			defer tCtx.Cancel("test has completed")
+			informers.Start(tCtx.Done())
+			go rm.Run(tCtx)
 
 			pod := newPod("pod")
 			pod, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -593,7 +581,7 @@ func TestEvictionWithPrecondition(t *testing.T) {
 			addPodConditionReady(pod)
 
 			// generate a new resource version
-			updatedPod, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+			updatedPod, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(tCtx, pod, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -629,7 +617,7 @@ func TestEvictionWithPrecondition(t *testing.T) {
 			policyV1NoRetriesClient := policyv1client.New(policyV1NoRetriesRESTClient)
 
 			eviction := newV1Eviction(ns.Name, updatedPod.Name, deleteOption)
-			err = policyV1NoRetriesClient.Evictions(ns.Name).Evict(ctx, eviction)
+			err = policyV1NoRetriesClient.Evictions(ns.Name).Evict(tCtx, eviction)
 			if err != nil && !tc.shouldErr {
 				t.Fatalf("Eviction of pod failed %q", err)
 			}

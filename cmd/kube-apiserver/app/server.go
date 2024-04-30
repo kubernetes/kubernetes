@@ -20,6 +20,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -27,7 +28,6 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -115,7 +115,7 @@ cluster's shared state through which all other components interact.`,
 			}
 			// add feature enablement metrics
 			utilfeature.DefaultMutableFeatureGate.AddMetrics()
-			return Run(completedOptions, genericapiserver.SetupSignalHandler())
+			return Run(cmd.Context(), completedOptions)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -126,6 +126,7 @@ cluster's shared state through which all other components interact.`,
 			return nil
 		},
 	}
+	cmd.SetContext(genericapiserver.SetupSignalContext())
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
@@ -143,7 +144,7 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
+func Run(ctx context.Context, opts options.CompletedOptions) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -167,25 +168,25 @@ func Run(opts options.CompletedOptions, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	return prepared.Run(stopCh)
+	return prepared.Run(ctx)
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
 func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
-	notFoundHandler := notfoundhandler.New(config.ControlPlane.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
+	notFoundHandler := notfoundhandler.New(config.KubeAPIs.ControlPlane.Generic.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
 	apiExtensionsServer, err := config.ApiExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
 		return nil, err
 	}
 	crdAPIEnabled := config.ApiExtensions.GenericConfig.MergedResourceConfig.ResourceEnabled(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions"))
 
-	kubeAPIServer, err := config.ControlPlane.New(apiExtensionsServer.GenericAPIServer)
+	kubeAPIServer, err := config.KubeAPIs.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
 		return nil, err
 	}
 
 	// aggregator comes last in the chain
-	aggregatorServer, err := createAggregatorServer(config.Aggregator, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers, crdAPIEnabled)
+	aggregatorServer, err := createAggregatorServer(config.Aggregator, kubeAPIServer.ControlPlane.GenericAPIServer, apiExtensionsServer.Informers, crdAPIEnabled)
 	if err != nil {
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return nil, err
@@ -218,6 +219,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
 		opts.CompletedOptions,
 		[]*runtime.Scheme{legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme},
+		controlplane.DefaultAPIResourceConfigSource(),
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
 	if err != nil {
@@ -230,14 +232,25 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	serviceaccount.RegisterMetrics()
 
 	config := &controlplane.Config{
-		GenericConfig: genericConfig,
-		ExtraConfig: controlplane.ExtraConfig{
-			APIResourceConfigSource: storageFactory.APIResourceConfigSource,
-			StorageFactory:          storageFactory,
-			EventTTL:                opts.EventTTL,
-			KubeletClientConfig:     opts.KubeletConfig,
-			EnableLogsSupport:       opts.EnableLogsHandler,
-			ProxyTransport:          proxyTransport,
+		ControlPlane: controlplaneapiserver.Config{
+			Generic: genericConfig,
+			Extra: controlplaneapiserver.Extra{
+				APIResourceConfigSource: storageFactory.APIResourceConfigSource,
+				StorageFactory:          storageFactory,
+				EventTTL:                opts.EventTTL,
+				EnableLogsSupport:       opts.EnableLogsHandler,
+				ProxyTransport:          proxyTransport,
+				SystemNamespaces:        opts.SystemNamespaces,
+
+				ServiceAccountIssuer:        opts.ServiceAccountIssuer,
+				ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
+				ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
+
+				VersionedInformers: versionedInformers,
+			},
+		},
+		Extra: controlplane.Extra{
+			KubeletClientConfig: opts.KubeletConfig,
 
 			ServiceIPRange:          opts.PrimaryServiceClusterIPRange,
 			APIServerServiceIP:      opts.APIServerServiceIP,
@@ -250,24 +263,18 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 
 			EndpointReconcilerType: reconcilers.Type(opts.EndpointReconcilerType),
 			MasterCount:            opts.MasterCount,
-
-			ServiceAccountIssuer:        opts.ServiceAccountIssuer,
-			ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
-			ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
-
-			VersionedInformers: versionedInformers,
 		},
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
-		config.ExtraConfig.PeerEndpointLeaseReconciler, err = controlplaneapiserver.CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
+		config.ControlPlane.PeerEndpointLeaseReconciler, err = controlplaneapiserver.CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		// build peer proxy config only if peer ca file exists
 		if opts.PeerCAFile != "" {
-			config.ExtraConfig.PeerProxy, err = controlplaneapiserver.BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
-				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.ExtraConfig.PeerEndpointLeaseReconciler, config.GenericConfig.Serializer)
+			config.ControlPlane.PeerProxy, err = controlplaneapiserver.BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
+				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.ControlPlane.Extra.PeerEndpointLeaseReconciler, config.ControlPlane.Generic.Serializer)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -278,18 +285,18 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	config.ExtraConfig.ClusterAuthenticationInfo.ClientCA = clientCAProvider
+	config.ControlPlane.ClusterAuthenticationInfo.ClientCA = clientCAProvider
 
 	requestHeaderConfig, err := opts.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	if requestHeaderConfig != nil {
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderCA = requestHeaderConfig.CAContentProvider
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderAllowedNames = requestHeaderConfig.AllowedClientNames
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = requestHeaderConfig.ExtraHeaderPrefixes
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
-		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
+		config.ControlPlane.ClusterAuthenticationInfo.RequestHeaderCA = requestHeaderConfig.CAContentProvider
+		config.ControlPlane.ClusterAuthenticationInfo.RequestHeaderAllowedNames = requestHeaderConfig.AllowedClientNames
+		config.ControlPlane.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = requestHeaderConfig.ExtraHeaderPrefixes
+		config.ControlPlane.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
+		config.ControlPlane.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
 	}
 
 	// setup admission
@@ -299,7 +306,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		CloudConfigFile:      opts.CloudProvider.CloudConfigFile,
 	}
 	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
-	pluginInitializers, admissionPostStartHook, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
+	pluginInitializers, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
 	}
@@ -321,23 +328,20 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)
 	}
-	if err := config.GenericConfig.AddPostStartHook("start-kube-apiserver-admission-initializer", admissionPostStartHook); err != nil {
-		return nil, nil, nil, err
-	}
 
-	if config.GenericConfig.EgressSelector != nil {
-		// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
-		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
+	if config.ControlPlane.Generic.EgressSelector != nil {
+		// Use the config.ControlPlane.Generic.EgressSelector lookup to find the dialer to connect to the kubelet
+		config.Extra.KubeletClientConfig.Lookup = config.ControlPlane.Generic.EgressSelector.Lookup
 
-		// Use the config.GenericConfig.EgressSelector lookup as the transport used by the "proxy" subresources.
+		// Use the config.ControlPlane.Generic.EgressSelector lookup as the transport used by the "proxy" subresources.
 		networkContext := egressselector.Cluster.AsNetworkContext()
-		dialer, err := config.GenericConfig.EgressSelector.Lookup(networkContext)
+		dialer, err := config.ControlPlane.Generic.EgressSelector.Lookup(networkContext)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		c := proxyTransport.Clone()
 		c.DialContext = dialer
-		config.ExtraConfig.ProxyTransport = c
+		config.ControlPlane.ProxyTransport = c
 	}
 
 	// Load and set the public keys.
@@ -349,9 +353,9 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		}
 		pubKeys = append(pubKeys, keys...)
 	}
-	config.ExtraConfig.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
-	config.ExtraConfig.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
-	config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
+	config.ControlPlane.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
+	config.ControlPlane.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
+	config.ControlPlane.ServiceAccountPublicKeys = pubKeys
 
 	return config, serviceResolver, pluginInitializers, nil
 }

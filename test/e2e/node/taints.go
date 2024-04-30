@@ -39,10 +39,6 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
-var (
-	pauseImage = imageutils.GetE2EImage(imageutils.Pause)
-)
-
 const (
 	testFinalizer = "example.com/test-finalizer"
 )
@@ -73,7 +69,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				Containers: []v1.Container{
 					{
 						Name:  "pause",
-						Image: pauseImage,
+						Image: imageutils.GetE2EImage(imageutils.Pause),
 					},
 				},
 			},
@@ -92,7 +88,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				Containers: []v1.Container{
 					{
 						Name:  "pause",
-						Image: pauseImage,
+						Image: imageutils.GetE2EImage(imageutils.Pause),
 					},
 				},
 				Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
@@ -111,7 +107,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
-					Image: pauseImage,
+					Image: imageutils.GetE2EImage(imageutils.Pause),
 				},
 			},
 			// default - tolerate forever

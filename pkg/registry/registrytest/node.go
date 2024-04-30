@@ -37,13 +37,13 @@ type NodeRegistry struct {
 }
 
 // MakeNodeList constructs api.NodeList from list of node names and a NodeResource.
-func MakeNodeList(nodes []string, nodeResources api.NodeResources) *api.NodeList {
+func MakeNodeList(nodes []string, nodeResources api.ResourceList) *api.NodeList {
 	list := api.NodeList{
 		Items: make([]api.Node, len(nodes)),
 	}
 	for i := range nodes {
 		list.Items[i].Name = nodes[i]
-		list.Items[i].Status.Capacity = nodeResources.Capacity
+		list.Items[i].Status.Capacity = nodeResources
 	}
 	return &list
 }

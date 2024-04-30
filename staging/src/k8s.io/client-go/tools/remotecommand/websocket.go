@@ -36,13 +36,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// writeDeadline defines the time that a write to the websocket connection
-// must complete by, otherwise an i/o timeout occurs. The writeDeadline
-// has nothing to do with a response from the other websocket connection
-// endpoint; only that the message was successfully processed by the
-// local websocket connection. The typical write deadline within the websocket
-// library is one second.
-const writeDeadline = 2 * time.Second
+// writeDeadline defines the time that a client-side write to the websocket
+// connection must complete before an i/o timeout occurs.
+const writeDeadline = 60 * time.Second
 
 var (
 	_ Executor          = &wsStreamExecutor{}
@@ -65,8 +61,8 @@ const (
 	// "pong" message before a timeout error occurs for websocket reading.
 	// This duration must always be greater than the "pingPeriod". By defining
 	// this deadline in terms of the ping period, we are essentially saying
-	// we can drop "X-1" (e.g. 3-1=2) pings before firing the timeout.
-	pingReadDeadline = (pingPeriod * 3) + (1 * time.Second)
+	// we can drop "X" (e.g. 12) pings before firing the timeout.
+	pingReadDeadline = (pingPeriod * 12) + (1 * time.Second)
 )
 
 // wsStreamExecutor handles transporting standard shell streams over an httpstream connection.
@@ -187,6 +183,9 @@ type wsStreamCreator struct {
 	// map of stream id to stream; multiple streams read/write the connection
 	streams   map[byte]*stream
 	streamsMu sync.Mutex
+	// setStreamErr holds the error to return to anyone calling setStreams.
+	// this is populated in closeAllStreamReaders
+	setStreamErr error
 }
 
 func newWSStreamCreator(conn *gwebsocket.Conn) *wsStreamCreator {
@@ -202,10 +201,14 @@ func (c *wsStreamCreator) getStream(id byte) *stream {
 	return c.streams[id]
 }
 
-func (c *wsStreamCreator) setStream(id byte, s *stream) {
+func (c *wsStreamCreator) setStream(id byte, s *stream) error {
 	c.streamsMu.Lock()
 	defer c.streamsMu.Unlock()
+	if c.setStreamErr != nil {
+		return c.setStreamErr
+	}
 	c.streams[id] = s
+	return nil
 }
 
 // CreateStream uses id from passed headers to create a stream over "c.conn" connection.
@@ -228,7 +231,11 @@ func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, 
 		connWriteLock: &c.connWriteLock,
 		id:            id,
 	}
-	c.setStream(id, s)
+	if err := c.setStream(id, s); err != nil {
+		_ = s.writePipe.Close()
+		_ = s.readPipe.Close()
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -312,13 +319,19 @@ func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, de
 }
 
 // closeAllStreamReaders closes readers in all streams.
-// This unblocks all stream.Read() calls.
+// This unblocks all stream.Read() calls, and keeps any future streams from being created.
 func (c *wsStreamCreator) closeAllStreamReaders(err error) {
 	c.streamsMu.Lock()
 	defer c.streamsMu.Unlock()
 	for _, s := range c.streams {
 		// Closing writePipe unblocks all readPipe.Read() callers and prevents any future writes.
 		_ = s.writePipe.CloseWithError(err)
+	}
+	// ensure callers to setStreams receive an error after this point
+	if err != nil {
+		c.setStreamErr = err
+	} else {
+		c.setStreamErr = fmt.Errorf("closed all streams")
 	}
 }
 
@@ -480,7 +493,7 @@ func (h *heartbeat) start() {
 			// "WriteControl" does not need to be protected by a mutex. According to
 			// gorilla/websockets library docs: "The Close and WriteControl methods can
 			// be called concurrently with all other methods."
-			if err := h.conn.WriteControl(gwebsocket.PingMessage, h.message, time.Now().Add(writeDeadline)); err == nil {
+			if err := h.conn.WriteControl(gwebsocket.PingMessage, h.message, time.Now().Add(pingReadDeadline)); err == nil {
 				klog.V(8).Infof("Websocket Ping succeeeded")
 			} else {
 				klog.Errorf("Websocket Ping failed: %v", err)

@@ -44,22 +44,24 @@ var podtemplatesKind = v1.SchemeGroupVersion.WithKind("PodTemplate")
 
 // Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
 func (c *FakePodTemplates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PodTemplate, err error) {
+	emptyResult := &v1.PodTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podtemplatesResource, c.ns, name), &v1.PodTemplate{})
+		Invokes(testing.NewGetAction(podtemplatesResource, c.ns, name), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.PodTemplate), err
 }
 
 // List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
 func (c *FakePodTemplates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodTemplateList, err error) {
+	emptyResult := &v1.PodTemplateList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podtemplatesResource, podtemplatesKind, c.ns, opts), &v1.PodTemplateList{})
+		Invokes(testing.NewListAction(podtemplatesResource, podtemplatesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -84,22 +86,24 @@ func (c *FakePodTemplates) Watch(ctx context.Context, opts metav1.ListOptions) (
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
 func (c *FakePodTemplates) Create(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.CreateOptions) (result *v1.PodTemplate, err error) {
+	emptyResult := &v1.PodTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podtemplatesResource, c.ns, podTemplate), &v1.PodTemplate{})
+		Invokes(testing.NewCreateAction(podtemplatesResource, c.ns, podTemplate), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.PodTemplate), err
 }
 
 // Update takes the representation of a podTemplate and updates it. Returns the server's representation of the podTemplate, and an error, if there is any.
 func (c *FakePodTemplates) Update(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.UpdateOptions) (result *v1.PodTemplate, err error) {
+	emptyResult := &v1.PodTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podtemplatesResource, c.ns, podTemplate), &v1.PodTemplate{})
+		Invokes(testing.NewUpdateAction(podtemplatesResource, c.ns, podTemplate), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.PodTemplate), err
 }
@@ -122,11 +126,12 @@ func (c *FakePodTemplates) DeleteCollection(ctx context.Context, opts metav1.Del
 
 // Patch applies the patch and returns the patched podTemplate.
 func (c *FakePodTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error) {
+	emptyResult := &v1.PodTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, pt, data, subresources...), &v1.PodTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, pt, data, subresources...), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.PodTemplate), err
 }
@@ -144,11 +149,12 @@ func (c *FakePodTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTem
 	if name == nil {
 		return nil, fmt.Errorf("podTemplate.Name must be provided to Apply")
 	}
+	emptyResult := &v1.PodTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, *name, types.ApplyPatchType, data), &v1.PodTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.PodTemplate), err
 }

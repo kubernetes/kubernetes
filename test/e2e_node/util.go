@@ -316,16 +316,6 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	}
 }
 
-// runCommand runs the cmd and returns the combined stdout and stderr, or an
-// error if the command failed.
-func runCommand(cmd ...string) (string, error) {
-	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
-	}
-	return string(output), nil
-}
-
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.
 func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
@@ -469,18 +459,6 @@ func stopKubelet() func() {
 		stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 	}
-}
-
-// killKubelet sends a signal (SIGINT, SIGSTOP, SIGTERM...) to the running kubelet
-func killKubelet(sig string) {
-	kubeletServiceName := findKubeletServiceName(true)
-
-	// reset the kubelet service start-limit-hit
-	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
-
-	stdout, err = exec.Command("sudo", "systemctl", "kill", "-s", sig, kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
 }
 
 func kubeletHealthCheck(url string) bool {

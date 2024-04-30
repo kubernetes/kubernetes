@@ -1070,7 +1070,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enableMatchLabelKeysInAffinity)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enableMatchLabelKeysInAffinity)
 			_, ctx := ktesting.NewTestContext(t)
 
 			testCtx := initTest(t, "")
@@ -1363,7 +1363,6 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 		fits                      bool
 		nodes                     []*v1.Node
 		candidateNodes            []string // nodes expected to schedule onto
-		enableMinDomains          bool
 		enableNodeInclusionPolicy bool
 		enableMatchLabelKeys      bool
 	}{
@@ -1483,10 +1482,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().ZeroTerminationGracePeriod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().ZeroTerminationGracePeriod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-3"},
 		},
 		{
 			name: "pods spread across nodes as 2/2/1, maxSkew is 2, and the number of domains > minDomains, then the all nodes fit",
@@ -1510,10 +1508,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().ZeroTerminationGracePeriod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().ZeroTerminationGracePeriod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-1", "node-2", "node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-1", "node-2", "node-3"},
 		},
 		{
 			name: "pods spread across zone as 2/1, maxSkew is 2 and the number of domains < minDomains, then the third and fourth nodes fit",
@@ -1533,10 +1530,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().Name("p2a").Node("node-1").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().Name("p3a").Node("node-2").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-2", "node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-2", "node-3"},
 		},
 		{
 			name: "pods spread across zone as 2/1, maxSkew is 2 and the number of domains < minDomains, then the all nodes fit",
@@ -1556,10 +1552,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-0", "node-1", "node-2", "node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-0", "node-1", "node-2", "node-3"},
 		},
 		{
 			name: "NodeAffinityPolicy honored with labelSelectors, pods spread across zone as 2/1",
@@ -1772,9 +1767,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, tt.enableMinDomains)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTest(t, "pts-predicate")
 			cs := testCtx.ClientSet

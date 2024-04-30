@@ -139,20 +139,17 @@ type DeltaFIFO struct {
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
-// TransformFunc (similarly to ResourceEventHandler functions) should be able
-// to correctly handle the tombstone of type cache.DeletedFinalStateUnknown.
-//
-// New in v1.27: In such cases, the contained object will already have gone
-// through the transform object separately (when it was added / updated prior
-// to the delete), so the TransformFunc can likely safely ignore such objects
-// (i.e., just return the input object).
 //
 // The most common usage pattern is to clean-up some parts of the object to
 // reduce component memory usage if a given component doesn't care about them.
 //
-// New in v1.27: unless the object is a DeletedFinalStateUnknown, TransformFunc
-// sees the object before any other actor, and it is now safe to mutate the
-// object in place instead of making a copy.
+// New in v1.27: TransformFunc sees the object before any other actor, and it
+// is now safe to mutate the object in place instead of making a copy.
+//
+// It's recommended for the TransformFunc to be idempotent.
+// It MUST be idempotent if objects already present in the cache are passed to
+// the Replace() to avoid re-mutating them. Default informers do not pass
+// existing objects to Replace though.
 //
 // Note that TransformFunc is called while inserting objects into the
 // notification queue and is therefore extremely performance sensitive; please
@@ -440,22 +437,38 @@ func isDeletionDup(a, b *Delta) *Delta {
 // queueActionLocked appends to the delta list for the object.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
+	return f.queueActionInternalLocked(actionType, actionType, obj)
+}
+
+// queueActionInternalLocked appends to the delta list for the object.
+// The actionType is emitted and must honor emitDeltaTypeReplaced.
+// The internalActionType is only used within this function and must
+// ignore emitDeltaTypeReplaced.
+// Caller must lock first.
+func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType DeltaType, obj interface{}) error {
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
 
-	// Every object comes through this code path once, so this is a good
-	// place to call the transform func.  If obj is a
-	// DeletedFinalStateUnknown tombstone, then the contained inner object
-	// will already have gone through the transformer, but we document that
-	// this can happen. In cases involving Replace(), such an object can
-	// come through multiple times.
+  // Every object comes through this code path once, so this is a good
+	// place to call the transform func.
+	//
+	// If obj is a DeletedFinalStateUnknown tombstone or the action is a Sync,
+	// then the object have already gone through the transformer.
+	//
+	// If the objects already present in the cache are passed to Replace(),
+	// the transformer must be idempotent to avoid re-mutating them,
+	// or coordinate with all readers from the cache to avoid data races.
+	// Default informers do not pass existing objects to Replace.
 	if f.transformer != nil {
-		var err error
-		obj, err = f.transformer(obj)
-		if err != nil {
-			return err
+		_, isTombstone := obj.(DeletedFinalStateUnknown)
+		if !isTombstone && internalActionType != Sync {
+			var err error
+			obj, err = f.transformer(obj)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -636,7 +649,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 			return KeyError{item, err}
 		}
 		keys.Insert(key)
-		if err := f.queueActionLocked(action, item); err != nil {
+		if err := f.queueActionInternalLocked(action, Replaced, item); err != nil {
 			return fmt.Errorf("couldn't enqueue object: %v", err)
 		}
 	}

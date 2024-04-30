@@ -167,22 +167,45 @@ func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
 }
 
-func TestListWithListFromCache(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+func TestListWithConsistentListFromCache(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true)
+}
+
+func TestConsistentList(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true, false)
+}
+
+func TestConsistentListWithConsistentListFromCache(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client), true, true)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, cacher)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
+}
+
+func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
 }
 
 func checkStorageCalls(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
@@ -214,7 +237,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	storagetesting.RunTestListInconsistentContinuation(ctx, t, cacher, nil)
 }
 
-func TestConsistentList(t *testing.T) {
+func TestListResourceVersionMatch(t *testing.T) {
 	// TODO(#109831): Enable use of this test and run it.
 }
 
@@ -340,13 +363,13 @@ func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
 	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
 }
 
-func TestCacherWatchSemantics(t *testing.T) {
+func TestWatchSemantics(t *testing.T) {
 	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchSemantics(context.TODO(), t, store)
 }
 
-func TestCacherWatchSemanticInitialEventsExtended(t *testing.T) {
+func TestWatchSemanticInitialEventsExtended(t *testing.T) {
 	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
 	t.Cleanup(terminate)
 	storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)

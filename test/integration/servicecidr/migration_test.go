@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestMigrateServiceCIDR validates the steps necessary to migrate a cluster default ServiceCIDR
@@ -48,9 +49,8 @@ import (
 // 6. start the new apiserver with the new ServiceCIDRs on the flags and shutdown the old one
 // 7. delete the kubernetes.default service, the new apiserver will recreate it within the new ServiceCIDR
 func TestMigrateServiceCIDR(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
-	ctx, cancelFn := context.WithCancel(context.Background())
-	defer cancelFn()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
+	tCtx := ktesting.Init(t)
 
 	cidr1 := "192.168.0.0/29"
 	cidr2 := "10.168.0.0/24"
@@ -78,11 +78,12 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	informers1 := informers.NewSharedInformerFactory(client1, resyncPeriod)
 	// ServiceCIDR controller
 	go servicecidrs.NewController(
+		tCtx,
 		informers1.Networking().V1alpha1().ServiceCIDRs(),
 		informers1.Networking().V1alpha1().IPAddresses(),
 		client1,
-	).Run(ctx, 5)
-	informers1.Start(ctx.Done())
+	).Run(tCtx, 5)
+	informers1.Start(tCtx.Done())
 
 	// the default serviceCIDR should have a finalizer and ready condition set to true
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
@@ -203,19 +204,20 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(client2, ns, t)
 
 	// switch the controller to the new apiserver
-	cancelFn()
+	tCtx.Cancel("tearing down ServiceCIDR controller 1")
 	s1.TearDownFn()
 
 	// ServiceCIDR controller
-	ctx2, cancelFn2 := context.WithCancel(context.Background())
-	defer cancelFn2()
+	tCtx2 := ktesting.Init(t)
+	defer tCtx2.Cancel("tearing down ServiceCIDR controller 2")
 	informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
 	go servicecidrs.NewController(
+		tCtx2,
 		informers2.Networking().V1alpha1().ServiceCIDRs(),
 		informers2.Networking().V1alpha1().IPAddresses(),
 		client2,
-	).Run(ctx2, 5)
-	informers2.Start(ctx2.Done())
+	).Run(tCtx2, 5)
+	informers2.Start(tCtx2.Done())
 
 	// delete the kubernetes.default service so the old DefaultServiceCIDR can be deleted
 	// and the new apiserver can take over

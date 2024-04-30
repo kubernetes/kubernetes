@@ -30,6 +30,7 @@ import (
 
 // This const block defines the metric names for the kubelet metrics.
 const (
+	FirstNetworkPodStartSLIDurationKey = "first_network_pod_start_sli_duration_seconds"
 	KubeletSubsystem                   = "kubelet"
 	NodeNameKey                        = "node_name"
 	NodeLabelKey                       = "node"
@@ -236,6 +237,20 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{},
+	)
+
+	// FirstNetworkPodStartSLIDuration is a gauge that tracks the duration (in seconds) it takes for the first network pod to run,
+	// excluding the time for image pulling. This is an internal and temporary metric required because of the existing limitations of the
+	// existing networking subsystem and CRI/CNI implementations that will be solved by https://github.com/containernetworking/cni/issues/859
+	// The metric represents the latency observed by an user to run workloads in a new node.
+	// ref: https://github.com/kubernetes/community/blob/master/sig-scalability/slos/pod_startup_latency.md
+	FirstNetworkPodStartSLIDuration = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           FirstNetworkPodStartSLIDurationKey,
+			Help:           "Duration in seconds to start the first network pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
+			StabilityLevel: metrics.INTERNAL,
+		},
 	)
 
 	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
@@ -900,6 +915,7 @@ var registerMetrics sync.Once
 func Register(collectors ...metrics.StableCollector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(FirstNetworkPodStartSLIDuration)
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)

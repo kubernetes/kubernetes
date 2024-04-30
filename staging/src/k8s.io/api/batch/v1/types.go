@@ -57,6 +57,9 @@ const (
 	// to the pod, which don't count towards the backoff limit, according to the
 	// pod failure policy. When the annotation is absent zero is implied.
 	JobIndexIgnoredFailureCountAnnotation = labelPrefix + "job-index-ignored-failure-count"
+	// JobControllerName reserved value for the managedBy field for the built-in
+	// Job controller.
+	JobControllerName = "kubernetes.io/job-controller"
 )
 
 // +genclient
@@ -252,6 +255,51 @@ type PodFailurePolicy struct {
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
+// SuccessPolicy describes when a Job can be declared as succeeded based on the success of some indexes.
+type SuccessPolicy struct {
+	// rules represents the list of alternative rules for the declaring the Jobs
+	// as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met,
+	// the "SucceededCriteriaMet" condition is added, and the lingering pods are removed.
+	// The terminal state for such a Job has the "Complete" condition.
+	// Additionally, these rules are evaluated in order; Once the Job meets one of the rules,
+	// other rules are ignored. At most 20 elements are allowed.
+	// +listType=atomic
+	Rules []SuccessPolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
+}
+
+// SuccessPolicyRule describes rule for declaring a Job as succeeded.
+// Each rule must have at least one of the "succeededIndexes" or "succeededCount" specified.
+type SuccessPolicyRule struct {
+	// succeededIndexes specifies the set of indexes
+	// which need to be contained in the actual set of the succeeded indexes for the Job.
+	// The list of indexes must be within 0 to ".spec.completions-1" and
+	// must not contain duplicates. At least one element is required.
+	// The indexes are represented as intervals separated by commas.
+	// The intervals can be a decimal integer or a pair of decimal integers separated by a hyphen.
+	// The number are listed in represented by the first and last element of the series,
+	// separated by a hyphen.
+	// For example, if the completed indexes are 1, 3, 4, 5 and 7, they are
+	// represented as "1,3-5,7".
+	// When this field is null, this field doesn't default to any value
+	// and is never evaluated at any time.
+	//
+	// +optional
+	SucceededIndexes *string `json:"succeededIndexes,omitempty" protobuf:"bytes,1,opt,name=succeededIndexes"`
+
+	// succeededCount specifies the minimal required size of the actual set of the succeeded indexes
+	// for the Job. When succeededCount is used along with succeededIndexes, the check is
+	// constrained only to the set of indexes specified by succeededIndexes.
+	// For example, given that succeededIndexes is "1-4", succeededCount is "3",
+	// and completed indexes are "1", "3", and "5", the Job isn't declared as succeeded
+	// because only "1" and "3" indexes are considered in that rules.
+	// When this field is null, this doesn't default to any value and
+	// is never evaluated at any time.
+	// When specified it needs to be a positive integer.
+	//
+	// +optional
+	SucceededCount *int32 `json:"succeededCount,omitempty" protobuf:"varint,2,opt,name=succeededCount"`
+}
+
 // JobSpec describes how the job execution will look like.
 type JobSpec struct {
 
@@ -292,6 +340,17 @@ type JobSpec struct {
 	// feature gate is enabled (enabled by default).
 	// +optional
 	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty" protobuf:"bytes,11,opt,name=podFailurePolicy"`
+
+	// successPolicy specifies the policy when the Job can be declared as succeeded.
+	// If empty, the default behavior applies - the Job is declared as succeeded
+	// only when the number of succeeded pods equals to the completions.
+	// When the field is specified, it must be immutable and works only for the Indexed Jobs.
+	// Once the Job meets the SuccessPolicy, the lingering pods are terminated.
+	//
+	// This field  is alpha-level. To use this field, you must enable the
+	// `JobSuccessPolicy` feature gate (disabled by default).
+	// +optional
+	SuccessPolicy *SuccessPolicy `json:"successPolicy,omitempty" protobuf:"bytes,16,opt,name=successPolicy"`
 
 	// Specifies the number of retries before marking this job failed.
 	// Defaults to 6
@@ -410,6 +469,20 @@ type JobSpec struct {
 	// This is on by default.
 	// +optional
 	PodReplacementPolicy *PodReplacementPolicy `json:"podReplacementPolicy,omitempty" protobuf:"bytes,14,opt,name=podReplacementPolicy,casttype=podReplacementPolicy"`
+
+	// ManagedBy field indicates the controller that manages a Job. The k8s Job
+	// controller reconciles jobs which don't have this field at all or the field
+	// value is the reserved string `kubernetes.io/job-controller`, but skips
+	// reconciling Jobs with a custom value for this field.
+	// The value must be a valid domain-prefixed path (e.g. acme.io/foo) -
+	// all characters before the first "/" must be a valid subdomain as defined
+	// by RFC 1123. All characters trailing the first "/" must be valid HTTP Path
+	// characters as defined by RFC 3986. The value cannot exceed 64 characters.
+	//
+	// This field is alpha-level. The job controller accepts setting the field
+	// when the feature gate JobManagedBy is enabled (disabled by default).
+	// +optional
+	ManagedBy *string `json:"managedBy,omitempty" protobuf:"bytes,15,opt,name=managedBy"`
 }
 
 // JobStatus represents the current state of a Job.
@@ -420,6 +493,12 @@ type JobStatus struct {
 	// status true; when the Job is resumed, the status of this condition will
 	// become false. When a Job is completed, one of the conditions will have
 	// type "Complete" and status true.
+	//
+	// A job is considered finished when it is in a terminal condition, either
+	// "Complete" or "Failed". A Job cannot have both the "Complete" and "Failed" conditions.
+	// Additionally, it cannot be in the "Complete" and "FailureTarget" conditions.
+	// The "Complete", "Failed" and "FailureTarget" conditions cannot be disabled.
+	//
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
 	// +patchMergeKey=type
@@ -431,26 +510,36 @@ type JobStatus struct {
 	// Job is created in the suspended state, this field is not set until the
 	// first time it is resumed. This field is reset every time a Job is resumed
 	// from suspension. It is represented in RFC3339 form and is in UTC.
+	//
+	// Once set, the field can only be removed when the job is suspended.
+	// The field cannot be modified while the job is unsuspended or finished.
+	//
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
 
 	// Represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	// The completion time is only set when the job finishes successfully.
+	// The completion time is set when the job finishes successfully, and only then.
+	// The value cannot be updated or removed. The value indicates the same or
+	// later point in time as the startTime field.
 	// +optional
 	CompletionTime *metav1.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
 
 	// The number of pending and running pods which are not terminating (without
 	// a deletionTimestamp).
+	// The value is zero for finished jobs.
 	// +optional
 	Active int32 `json:"active,omitempty" protobuf:"varint,4,opt,name=active"`
 
 	// The number of pods which reached phase Succeeded.
+	// The value increases monotonically for a given spec. However, it may
+	// decrease in reaction to scale down of elastic indexed jobs.
 	// +optional
 	Succeeded int32 `json:"succeeded,omitempty" protobuf:"varint,5,opt,name=succeeded"`
 
 	// The number of pods which reached phase Failed.
+	// The value increases monotonically.
 	// +optional
 	Failed int32 `json:"failed,omitempty" protobuf:"varint,6,opt,name=failed"`
 
@@ -472,7 +561,7 @@ type JobStatus struct {
 	// +optional
 	CompletedIndexes string `json:"completedIndexes,omitempty" protobuf:"bytes,7,opt,name=completedIndexes"`
 
-	// FailedIndexes holds the failed indexes when backoffLimitPerIndex=true.
+	// FailedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set.
 	// The indexes are represented in the text format analogous as for the
 	// `completedIndexes` field, ie. they are kept as decimal integers
 	// separated by commas. The numbers are listed in increasing order. Three or
@@ -480,6 +569,8 @@ type JobStatus struct {
 	// last element of the series, separated by a hyphen.
 	// For example, if the failed indexes are 1, 3, 4, 5 and 7, they are
 	// represented as "1,3-5,7".
+	// The set of failed indexes cannot overlap with the set of completed indexes.
+	//
 	// This field is beta-level. It can be used when the `JobBackoffLimitPerIndex`
 	// feature gate is enabled (enabled by default).
 	// +optional
@@ -499,6 +590,7 @@ type JobStatus struct {
 	//
 	// Old jobs might not be tracked using this field, in which case the field
 	// remains null.
+	// The structure is empty for finished jobs.
 	// +optional
 	UncountedTerminatedPods *UncountedTerminatedPods `json:"uncountedTerminatedPods,omitempty" protobuf:"bytes,8,opt,name=uncountedTerminatedPods"`
 
@@ -533,6 +625,8 @@ const (
 	JobFailed JobConditionType = "Failed"
 	// FailureTarget means the job is about to fail its execution.
 	JobFailureTarget JobConditionType = "FailureTarget"
+	// JobSuccessCriteriaMet means the Job has been succeeded.
+	JobSuccessCriteriaMet JobConditionType = "SuccessCriteriaMet"
 )
 
 const (
@@ -552,6 +646,11 @@ const (
 	// JobReasonFailedIndexes means Job has failed indexes.
 	// This const is used in beta-level feature: https://kep.k8s.io/3850.
 	JobReasonFailedIndexes string = "FailedIndexes"
+	// JobReasonSuccessPolicy reason indicates a SuccessCriteriaMet condition is added due to
+	// a Job met successPolicy.
+	// https://kep.k8s.io/3998
+	// This is currently an alpha field.
+	JobReasonSuccessPolicy string = "SuccessPolicy"
 )
 
 // JobCondition describes current state of a job.

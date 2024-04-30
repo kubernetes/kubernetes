@@ -67,6 +67,7 @@ type Controller struct {
 
 // NewController returns a new instance of the IPAM controller.
 func NewController(
+	ctx context.Context,
 	config *Config,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
@@ -89,7 +90,7 @@ func NewController(
 
 	c := &Controller{
 		config:  config,
-		adapter: newAdapter(kubeClient, gceCloud),
+		adapter: newAdapter(ctx, kubeClient, gceCloud),
 		syncers: make(map[string]*nodesync.NodeSync),
 		set:     set,
 	}
@@ -117,7 +118,8 @@ func NewController(
 func (c *Controller) Start(logger klog.Logger, nodeInformer informers.NodeInformer) error {
 	logger.Info("Starting IPAM controller", "config", c.config)
 
-	nodes, err := listNodes(logger, c.adapter.k8s)
+	ctx := klog.NewContext(context.TODO(), logger)
+	nodes, err := listNodes(ctx, c.adapter.k8s)
 	if err != nil {
 		return err
 	}

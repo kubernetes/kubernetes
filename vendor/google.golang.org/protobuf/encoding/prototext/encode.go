@@ -33,7 +33,7 @@ func Format(m proto.Message) string {
 	return MarshalOptions{Multiline: true}.Format(m)
 }
 
-// Marshal writes the given proto.Message in textproto format using default
+// Marshal writes the given [proto.Message] in textproto format using default
 // options. Do not depend on the output being stable. It may change over time
 // across different versions of the program.
 func Marshal(m proto.Message) ([]byte, error) {
@@ -97,7 +97,7 @@ func (o MarshalOptions) Format(m proto.Message) string {
 	return string(b)
 }
 
-// Marshal writes the given proto.Message in textproto format using options in
+// Marshal writes the given [proto.Message] in textproto format using options in
 // MarshalOptions object. Do not depend on the output being stable. It may
 // change over time across different versions of the program.
 func (o MarshalOptions) Marshal(m proto.Message) ([]byte, error) {

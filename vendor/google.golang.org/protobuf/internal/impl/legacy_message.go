@@ -206,13 +206,18 @@ func aberrantLoadMessageDescReentrant(t reflect.Type, name protoreflect.FullName
 
 	// Obtain a list of oneof wrapper types.
 	var oneofWrappers []reflect.Type
-	for _, method := range []string{"XXX_OneofFuncs", "XXX_OneofWrappers"} {
-		if fn, ok := t.MethodByName(method); ok {
-			for _, v := range fn.Func.Call([]reflect.Value{reflect.Zero(fn.Type.In(0))}) {
-				if vs, ok := v.Interface().([]interface{}); ok {
-					for _, v := range vs {
-						oneofWrappers = append(oneofWrappers, reflect.TypeOf(v))
-					}
+	methods := make([]reflect.Method, 0, 2)
+	if m, ok := t.MethodByName("XXX_OneofFuncs"); ok {
+		methods = append(methods, m)
+	}
+	if m, ok := t.MethodByName("XXX_OneofWrappers"); ok {
+		methods = append(methods, m)
+	}
+	for _, fn := range methods {
+		for _, v := range fn.Func.Call([]reflect.Value{reflect.Zero(fn.Type.In(0))}) {
+			if vs, ok := v.Interface().([]interface{}); ok {
+				for _, v := range vs {
+					oneofWrappers = append(oneofWrappers, reflect.TypeOf(v))
 				}
 			}
 		}

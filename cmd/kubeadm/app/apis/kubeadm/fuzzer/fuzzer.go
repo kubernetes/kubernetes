@@ -41,6 +41,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
 		fuzzResetConfiguration,
+		fuzzUpgradeConfiguration,
 	}
 }
 
@@ -150,5 +151,16 @@ func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "/tmp"
+	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
+}
+
+func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.Node.EtcdUpgrade = ptr.To(true)
+	obj.Apply.EtcdUpgrade = ptr.To(true)
+	obj.Apply.CertificateRenewal = ptr.To(false)
+	obj.Node.CertificateRenewal = ptr.To(false)
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }

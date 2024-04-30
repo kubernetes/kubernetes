@@ -31,6 +31,7 @@ import (
 	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/plugin/pkg/admission/disableservicelinks"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
 	"k8s.io/kubernetes/plugin/pkg/admission/extendedresourcetoleration"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
@@ -93,6 +94,7 @@ var AllOrderedPlugins = []string{
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
+	disableservicelinks.PluginName,          // DisableServiceLinks
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -114,6 +116,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	defaultingressclass.Register(plugins)
 	denyserviceexternalips.Register(plugins)
 	deny.Register(plugins) // DEPRECATED as no real meaning
+	disableservicelinks.Register(plugins)
 	eventratelimit.Register(plugins)
 	extendedresourcetoleration.Register(plugins)
 	gc.Register(plugins)

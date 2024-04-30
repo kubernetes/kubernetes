@@ -31,6 +31,8 @@ import (
 	"k8s.io/utils/clock"
 
 	"k8s.io/klog/v2"
+
+	clientgofeaturegate "k8s.io/client-go/features"
 )
 
 // SharedInformer provides eventually consistent linkage of its
@@ -409,6 +411,10 @@ func (v *dummyController) HasSynced() bool {
 }
 
 func (v *dummyController) LastSyncResourceVersion() string {
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
+		return v.informer.LastSyncResourceVersion()
+	}
+
 	return ""
 }
 

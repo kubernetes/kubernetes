@@ -21,30 +21,25 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/validating/metrics"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/warning"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
 
 type dispatcher struct {
-	matcher Matcher
+	matcher generic.PolicyMatcher
 	authz   authorizer.Authorizer
 }
 
@@ -52,7 +47,7 @@ var _ generic.Dispatcher[PolicyHook] = &dispatcher{}
 
 func NewDispatcher(
 	authorizer authorizer.Authorizer,
-	matcher Matcher,
+	matcher generic.PolicyMatcher,
 ) generic.Dispatcher[PolicyHook] {
 	return &dispatcher{
 		matcher: matcher,
@@ -64,8 +59,8 @@ func NewDispatcher(
 // that determined the decision
 type policyDecisionWithMetadata struct {
 	PolicyDecision
-	Definition *v1beta1.ValidatingAdmissionPolicy
-	Binding    *v1beta1.ValidatingAdmissionPolicyBinding
+	Definition *admissionregistrationv1.ValidatingAdmissionPolicy
+	Binding    *admissionregistrationv1.ValidatingAdmissionPolicyBinding
 }
 
 // Dispatch implements generic.Dispatcher.
@@ -73,21 +68,21 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 
 	var deniedDecisions []policyDecisionWithMetadata
 
-	addConfigError := func(err error, definition *v1beta1.ValidatingAdmissionPolicy, binding *v1beta1.ValidatingAdmissionPolicyBinding) {
+	addConfigError := func(err error, definition *admissionregistrationv1.ValidatingAdmissionPolicy, binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding) {
 		// we always default the FailurePolicy if it is unset and validate it in API level
-		var policy v1beta1.FailurePolicyType
+		var policy admissionregistrationv1.FailurePolicyType
 		if definition.Spec.FailurePolicy == nil {
-			policy = v1beta1.Fail
+			policy = admissionregistrationv1.Fail
 		} else {
 			policy = *definition.Spec.FailurePolicy
 		}
 
 		// apply FailurePolicy specified in ValidatingAdmissionPolicy, the default would be Fail
 		switch policy {
-		case v1beta1.Ignore:
+		case admissionregistrationv1.Ignore:
 			// TODO: add metrics for ignored error here
 			return
-		case v1beta1.Fail:
+		case admissionregistrationv1.Fail:
 			var message string
 			if binding == nil {
 				message = fmt.Errorf("failed to configure policy: %w", err).Error()
@@ -124,7 +119,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		var versionedAttr *admission.VersionedAttributes
 
 		definition := hook.Policy
-		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(a, o, definition)
+		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(a, o, NewValidatingAdmissionPolicyAccessor(definition))
 		if err != nil {
 			// Configuration error.
 			addConfigError(err, definition, nil)
@@ -143,7 +138,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		for _, binding := range hook.Bindings {
 			// If the key is inside dependentBindings, there is guaranteed to
 			// be a bindingInfo for it
-			matches, err := c.matcher.BindingMatches(a, o, binding)
+			matches, err := c.matcher.BindingMatches(a, o, NewValidatingAdmissionPolicyBindingAccessor(binding))
 			if err != nil {
 				// Configuration error.
 				addConfigError(err, definition, binding)
@@ -153,8 +148,8 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 				continue
 			}
 
-			params, err := c.collectParams(
-				definition.Spec.ParamKind,
+			params, err := generic.CollectParams(
+				hook.Policy.Spec.ParamKind,
 				hook.ParamInformer,
 				hook.ParamScope,
 				binding.Spec.ParamRef,
@@ -233,17 +228,17 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 					case ActionDeny:
 						for _, action := range binding.Spec.ValidationActions {
 							switch action {
-							case v1beta1.Deny:
+							case admissionregistrationv1.Deny:
 								deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
 									Definition:     definition,
 									Binding:        binding,
 									PolicyDecision: decision,
 								})
 								celmetrics.Metrics.ObserveRejection(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
-							case v1beta1.Audit:
+							case admissionregistrationv1.Audit:
 								publishValidationFailureAnnotation(binding, i, decision, versionedAttr)
 								celmetrics.Metrics.ObserveAudit(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
-							case v1beta1.Warn:
+							case admissionregistrationv1.Warn:
 								warning.AddWarning(ctx, "", fmt.Sprintf("Validation failed for ValidatingAdmissionPolicy '%s' with binding '%s': %s", definition.Name, binding.Name, decision.Message))
 								celmetrics.Metrics.ObserveWarn(ctx, decision.Elapsed, definition.Name, binding.Name, "active")
 							}
@@ -307,126 +302,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 	return nil
 }
 
-// Returns objects to use to evaluate the policy
-// Copied with minor modification to account for slightly different arguments
-func (c *dispatcher) collectParams(
-	paramKind *v1beta1.ParamKind,
-	paramInformer informers.GenericInformer,
-	paramScope meta.RESTScope,
-	paramRef *v1beta1.ParamRef,
-	namespace string,
-) ([]runtime.Object, error) {
-	// If definition has paramKind, paramRef is required in binding.
-	// If definition has no paramKind, paramRef set in binding will be ignored.
-	var params []runtime.Object
-	var paramStore cache.GenericNamespaceLister
-
-	// Make sure the param kind is ready to use
-	if paramKind != nil && paramRef != nil {
-		if paramInformer == nil {
-			return nil, fmt.Errorf("paramKind kind `%v` not known",
-				paramKind.String())
-		}
-
-		// Set up cluster-scoped, or namespaced access to the params
-		// "default" if not provided, and paramKind is namespaced
-		paramStore = paramInformer.Lister()
-		if paramScope.Name() == meta.RESTScopeNameNamespace {
-			paramsNamespace := namespace
-			if len(paramRef.Namespace) > 0 {
-				paramsNamespace = paramRef.Namespace
-			} else if len(paramsNamespace) == 0 {
-				// You must supply namespace if your matcher can possibly
-				// match a cluster-scoped resource
-				return nil, fmt.Errorf("cannot use namespaced paramRef in policy binding that matches cluster-scoped resources")
-			}
-
-			paramStore = paramInformer.Lister().ByNamespace(paramsNamespace)
-		}
-
-		// If the param informer for this admission policy has not yet
-		// had time to perform an initial listing, don't attempt to use
-		// it.
-		timeoutCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-
-		if !cache.WaitForCacheSync(timeoutCtx.Done(), paramInformer.Informer().HasSynced) {
-			return nil, fmt.Errorf("paramKind kind `%v` not yet synced to use for admission",
-				paramKind.String())
-		}
-	}
-
-	// Find params to use with policy
-	switch {
-	case paramKind == nil:
-		// ParamKind is unset. Ignore any globalParamRef or namespaceParamRef
-		// setting.
-		return []runtime.Object{nil}, nil
-	case paramRef == nil:
-		// Policy ParamKind is set, but binding does not use it.
-		// Validate with nil params
-		return []runtime.Object{nil}, nil
-	case len(paramRef.Namespace) > 0 && paramScope.Name() == meta.RESTScopeRoot.Name():
-		// Not allowed to set namespace for cluster-scoped param
-		return nil, fmt.Errorf("paramRef.namespace must not be provided for a cluster-scoped `paramKind`")
-
-	case len(paramRef.Name) > 0:
-		if paramRef.Selector != nil {
-			// This should be validated, but just in case.
-			return nil, fmt.Errorf("paramRef.name and paramRef.selector are mutually exclusive")
-		}
-
-		switch param, err := paramStore.Get(paramRef.Name); {
-		case err == nil:
-			params = []runtime.Object{param}
-		case k8serrors.IsNotFound(err):
-			// Param not yet available. User may need to wait a bit
-			// before being able to use it for validation.
-			//
-			// Set params to nil to prepare for not found action
-			params = nil
-		case k8serrors.IsInvalid(err):
-			// Param mis-configured
-			// require to set namespace for namespaced resource
-			// and unset namespace for cluster scoped resource
-			return nil, err
-		default:
-			// Internal error
-			utilruntime.HandleError(err)
-			return nil, err
-		}
-	case paramRef.Selector != nil:
-		// Select everything by default if empty name and selector
-		selector, err := metav1.LabelSelectorAsSelector(paramRef.Selector)
-		if err != nil {
-			// Cannot parse label selector: configuration error
-			return nil, err
-
-		}
-
-		paramList, err := paramStore.List(selector)
-		if err != nil {
-			// There was a bad internal error
-			utilruntime.HandleError(err)
-			return nil, err
-		}
-
-		// Successfully grabbed params
-		params = paramList
-	default:
-		// Should be unreachable due to validation
-		return nil, fmt.Errorf("one of name or selector must be provided")
-	}
-
-	// Apply fail action for params not found case
-	if len(params) == 0 && paramRef.ParameterNotFoundAction != nil && *paramRef.ParameterNotFoundAction == v1beta1.DenyAction {
-		return nil, errors.New("no params found for policy binding with `Deny` parameterNotFoundAction")
-	}
-
-	return params, nil
-}
-
-func publishValidationFailureAnnotation(binding *v1beta1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
+func publishValidationFailureAnnotation(binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, expressionIndex int, decision PolicyDecision, attributes admission.Attributes) {
 	key := "validation.policy.admission.k8s.io/validation_failure"
 	// Marshal to a list of failures since, in the future, we may need to support multiple failures
 	valueJSON, err := utiljson.Marshal([]ValidationFailureValue{{
@@ -450,11 +326,11 @@ const maxAuditAnnotationValueLength = 10 * 1024
 // validationFailureValue defines the JSON format of a "validation.policy.admission.k8s.io/validation_failure" audit
 // annotation value.
 type ValidationFailureValue struct {
-	Message           string                     `json:"message"`
-	Policy            string                     `json:"policy"`
-	Binding           string                     `json:"binding"`
-	ExpressionIndex   int                        `json:"expressionIndex"`
-	ValidationActions []v1beta1.ValidationAction `json:"validationActions"`
+	Message           string                                     `json:"message"`
+	Policy            string                                     `json:"policy"`
+	Binding           string                                     `json:"binding"`
+	ExpressionIndex   int                                        `json:"expressionIndex"`
+	ValidationActions []admissionregistrationv1.ValidationAction `json:"validationActions"`
 }
 
 type auditAnnotationCollector struct {

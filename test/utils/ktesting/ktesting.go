@@ -17,7 +17,6 @@ limitations under the License.
 package ktesting
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"testing"
@@ -41,14 +40,9 @@ func SetDefaultVerbosity(v int) {
 	_ = f.Value.Set(fmt.Sprintf("%d", v))
 }
 
-// NewTestContext is a drop-in replacement for ktesting.NewTestContext
+// NewTestContext is a replacement for ktesting.NewTestContext
 // which returns a more versatile context.
-//
-// The type of that context is still context.Context because replacing
-// it with TContext breaks tests which use `WithCancel`.
-//
-// TODO(pohly): change all of that code together with changing the return type.
-func NewTestContext(tb testing.TB) (klog.Logger, context.Context) {
+func NewTestContext(tb testing.TB) (klog.Logger, TContext) {
 	tCtx := Init(tb)
 	return tCtx.Logger(), tCtx
 }

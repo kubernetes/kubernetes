@@ -38,6 +38,8 @@ const (
 	EtcdLearnerMode = "EtcdLearnerMode"
 	// UpgradeAddonsBeforeControlPlane is expected to be in deprecated in v1.28 and will be removed in future release
 	UpgradeAddonsBeforeControlPlane = "UpgradeAddonsBeforeControlPlane"
+	// WaitForAllControlPlaneComponents is expected to be alpha in v1.30
+	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
 )
 
 // InitFeatureGates are the default feature gates for the init command
@@ -53,6 +55,7 @@ var InitFeatureGates = FeatureList{
 		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
 		DeprecationMessage: "The UpgradeAddonsBeforeControlPlane feature gate is deprecated and will be removed in a future release.",
 	},
+	WaitForAllControlPlaneComponents: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 
 // Feature represents a feature being gated

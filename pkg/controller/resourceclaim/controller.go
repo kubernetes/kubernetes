@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -394,7 +395,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting ephemeral volume controller")
 	defer logger.Info("Shutting down ephemeral volume controller")
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ec.kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
@@ -546,7 +547,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	return nil
 }
 
-// handleResourceClaim is invoked for each volume of a pod.
+// handleResourceClaim is invoked for each resource claim of a pod.
 func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim, newPodClaims *map[string]string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
 	ctx = klog.NewContext(ctx, logger)
@@ -832,9 +833,11 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		return fmt.Errorf("unsupported ReservedFor entry: %v", reservedFor)
 	}
 
-	logger.V(5).Info("claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid))
+	builtinControllerFinalizer := slices.Index(claim.Finalizers, resourcev1alpha2.Finalizer)
+	logger.V(5).Info("claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid), "builtinController", builtinControllerFinalizer >= 0)
 	if len(valid) < len(claim.Status.ReservedFor) {
-		// TODO (#113700): patch
+		// This is not using a patch because we want the update to fail if anything
+		// changed in the meantime.
 		claim := claim.DeepCopy()
 		claim.Status.ReservedFor = valid
 
@@ -854,12 +857,53 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		// those, the resource claim controller will trigger deletion when the
 		// pod is done. However, it doesn't hurt to also trigger deallocation
 		// for such claims and not checking for them keeps this code simpler.
-		if len(valid) == 0 &&
-			claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
-			claim.Status.DeallocationRequested = true
+		if len(valid) == 0 {
+			if builtinControllerFinalizer >= 0 {
+				if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer ||
+					claim.DeletionTimestamp != nil {
+					// Allocated by scheduler with structured parameters. We can "deallocate"
+					// by clearing the allocation.
+					claim.Status.Allocation = nil
+				}
+			} else if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
+				// DRA driver controller in the control plane
+				// needs to do the deallocation.
+				claim.Status.DeallocationRequested = true
+			}
+			// In all other cases, we keep the claim allocated, in particular for immediate allocation
+			// with a control plane controller.
 		}
 
-		_, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		claim, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Now also remove the finalizer if it is not needed anymore.
+		// Note that the index may have changed as a result of the UpdateStatus call.
+		builtinControllerFinalizer := slices.Index(claim.Finalizers, resourcev1alpha2.Finalizer)
+		if builtinControllerFinalizer >= 0 && claim.Status.Allocation == nil {
+			claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
+			if _, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
+				return err
+			}
+		}
+	} else if builtinControllerFinalizer >= 0 && claim.DeletionTimestamp != nil && len(valid) == 0 {
+		claim := claim.DeepCopy()
+		if claim.Status.Allocation != nil {
+			// This can happen when a claim with immediate allocation
+			// stopped being used, remained allocated, and then got
+			// deleted. As above we then need to clear the allocation.
+			claim.Status.Allocation = nil
+			var err error
+			claim, err = ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+		}
+		// Whether it was allocated or not, remove the finalizer to unblock removal.
+		claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
+		_, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}

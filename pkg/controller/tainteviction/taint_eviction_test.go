@@ -203,7 +203,7 @@ func TestCreatePod(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)
 			ctx, cancel := context.WithCancel(context.Background())
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.pod}})
 			controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
@@ -301,7 +301,7 @@ func TestUpdatePod(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)
 			ctx, cancel := context.WithCancel(context.Background())
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.prevPod}})
 			controller, podIndexer, _ := setupNewController(context.TODO(), fakeClientset)
@@ -500,7 +500,7 @@ func TestUpdateNode(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 

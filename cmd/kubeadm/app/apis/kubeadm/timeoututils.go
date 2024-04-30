@@ -32,6 +32,7 @@ func SetDefaultTimeouts(t **Timeouts) {
 		EtcdAPICall:                      &metav1.Duration{Duration: constants.EtcdAPICallTimeout},
 		TLSBootstrap:                     &metav1.Duration{Duration: constants.TLSBootstrapTimeout},
 		Discovery:                        &metav1.Duration{Duration: constants.DiscoveryTimeout},
+		UpgradeManifests:                 &metav1.Duration{Duration: constants.UpgradeManifestsTimeout},
 	}
 }
 

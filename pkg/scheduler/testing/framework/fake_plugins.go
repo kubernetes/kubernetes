@@ -280,3 +280,13 @@ func NewFakePreScoreAndScorePlugin(name string, score int64, preScoreStatus, sco
 		}, nil
 	}
 }
+
+// NewEqualPrioritizerPlugin returns a factory function to build equalPrioritizerPlugin.
+func NewEqualPrioritizerPlugin() frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakePreScoreAndScorePlugin{
+			name:  "EqualPrioritizerPlugin",
+			score: 1,
+		}, nil
+	}
+}

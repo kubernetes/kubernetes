@@ -63,6 +63,8 @@ type hollowNodeConfig struct {
 	NodeName                string
 	ServerPort              int
 	ContentType             string
+	QPS                     float32
+	Burst                   int
 	NodeLabels              map[string]string
 	RegisterWithTaints      []v1.Taint
 	MaxPods                 int
@@ -94,6 +96,9 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
 	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
 	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType of requests sent to apiserver.")
+	fs.Float32Var(&c.QPS, "kube-api-qps", 10, "QPS indicates the maximum QPS to the apiserver.")
+	fs.IntVar(&c.Burst, "kube-api-burst", 20, "Burst indicates maximum burst for throttle to the apiserver.")
+
 	bindableNodeLabels := cliflag.ConfigurationMap(c.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "Additional node labels")
 	fs.Var(utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
@@ -120,8 +125,8 @@ func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, err
 		return nil, fmt.Errorf("error while creating kubeconfig: %v", err)
 	}
 	config.ContentType = c.ContentType
-	config.QPS = 10
-	config.Burst = 20
+	config.QPS = c.QPS
+	config.Burst = c.Burst
 	return config, nil
 }
 
@@ -157,7 +162,7 @@ func NewHollowNodeCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
-			return run(s)
+			return run(cmd.Context(), s)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -176,7 +181,7 @@ func NewHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(config *hollowNodeConfig) error {
+func run(ctx context.Context, config *hollowNodeConfig) error {
 	// To help debugging, immediately log version and print flags.
 	klog.Infof("Version: %+v", version.Get())
 
@@ -264,7 +269,7 @@ func run(config *hollowNodeConfig) error {
 			runtimeService,
 			containerManager,
 		)
-		hollowKubelet.Run()
+		hollowKubelet.Run(ctx)
 	}
 
 	if config.Morph == "proxy" {

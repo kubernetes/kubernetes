@@ -162,12 +162,17 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 		return nil, ErrBucketNameRequired
 	}
 
+	// Insert into node.
+	// Tip: Use a new variable `newKey` instead of reusing the existing `key` to prevent
+	// it from being marked as leaking, and accordingly cannot be allocated on stack.
+	newKey := cloneBytes(key)
+
 	// Move cursor to correct position.
 	c := b.Cursor()
-	k, _, flags := c.seek(key)
+	k, _, flags := c.seek(newKey)
 
 	// Return an error if there is an existing key.
-	if bytes.Equal(key, k) {
+	if bytes.Equal(newKey, k) {
 		if (flags & bucketLeafFlag) != 0 {
 			return nil, ErrBucketExists
 		}
@@ -182,16 +187,14 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 	}
 	var value = bucket.write()
 
-	// Insert into node.
-	key = cloneBytes(key)
-	c.node().put(key, key, value, 0, bucketLeafFlag)
+	c.node().put(newKey, newKey, value, 0, bucketLeafFlag)
 
 	// Since subbuckets are not allowed on inline buckets, we need to
 	// dereference the inline page, if it exists. This will cause the bucket
 	// to be treated as a regular, non-inline bucket for the rest of the tx.
 	b.page = nil
 
-	return b.Bucket(key), nil
+	return b.Bucket(newKey), nil
 }
 
 // CreateBucketIfNotExists creates a new bucket if it doesn't already exist and returns a reference to it.
@@ -288,18 +291,23 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 		return ErrValueTooLarge
 	}
 
+	// Insert into node.
+	// Tip: Use a new variable `newKey` instead of reusing the existing `key` to prevent
+	// it from being marked as leaking, and accordingly cannot be allocated on stack.
+	newKey := cloneBytes(key)
+
 	// Move cursor to correct position.
 	c := b.Cursor()
-	k, _, flags := c.seek(key)
+	k, _, flags := c.seek(newKey)
 
 	// Return an error if there is an existing key with a bucket value.
-	if bytes.Equal(key, k) && (flags&bucketLeafFlag) != 0 {
+	if bytes.Equal(newKey, k) && (flags&bucketLeafFlag) != 0 {
 		return ErrIncompatibleValue
 	}
 
-	// Insert into node.
-	key = cloneBytes(key)
-	c.node().put(key, key, value, 0, 0)
+	// gofail: var beforeBucketPut struct{}
+
+	c.node().put(newKey, newKey, value, 0, 0)
 
 	return nil
 }

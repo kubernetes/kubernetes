@@ -31,6 +31,7 @@ import (
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/utils/ptr"
 )
 
 type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
@@ -128,6 +129,7 @@ func TestToKubeContainer(t *testing.T) {
 			Attempt: 1,
 		},
 		Image:    &runtimeapi.ImageSpec{Image: "test-image"},
+		ImageId:  "test-image-id",
 		ImageRef: "test-image-ref",
 		State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
 		Annotations: map[string]string{
@@ -140,7 +142,8 @@ func TestToKubeContainer(t *testing.T) {
 			ID:   "test-id",
 		},
 		Name:                "test-name",
-		ImageID:             "test-image-ref",
+		ImageID:             "test-image-id",
+		ImageRef:            "test-image-ref",
 		Image:               "test-image",
 		ImageRuntimeHandler: "",
 		Hash:                uint64(0x1234),
@@ -161,7 +164,7 @@ func TestToKubeContainer(t *testing.T) {
 }
 
 func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 	c := &runtimeapi.Container{
 		Id: "test-id",
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -169,6 +172,7 @@ func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 			Attempt: 1,
 		},
 		Image:    &runtimeapi.ImageSpec{Image: "test-image", RuntimeHandler: "test-runtimeHandler"},
+		ImageId:  "test-image-id",
 		ImageRef: "test-image-ref",
 		State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
 		Annotations: map[string]string{
@@ -181,7 +185,8 @@ func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 			ID:   "test-id",
 		},
 		Name:                "test-name",
-		ImageID:             "test-image-ref",
+		ImageID:             "test-image-id",
+		ImageRef:            "test-image-ref",
 		Image:               "test-image",
 		ImageRuntimeHandler: "test-runtimeHandler",
 		Hash:                uint64(0x1234),
@@ -356,6 +361,83 @@ func TestToKubeContainerState(t *testing.T) {
 			if result := toKubeContainerState(runtimeapi.ContainerState(test.state)); result != test.expected {
 				t.Errorf("expected %s but got %s", test.expected, result)
 			}
+		})
+	}
+}
+
+func TestGetAppArmorProfile(t *testing.T) {
+	tests := []struct {
+		name               string
+		podProfile         *v1.AppArmorProfile
+		expectedProfile    *runtimeapi.SecurityProfile
+		expectedOldProfile string
+		expectError        bool
+	}{{
+		name:            "no appArmor",
+		expectedProfile: nil,
+	}, {
+		name:       "runtime default",
+		podProfile: &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeRuntimeDefault},
+		expectedProfile: &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		},
+		expectedOldProfile: "runtime/default",
+	}, {
+		name:       "unconfined",
+		podProfile: &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeUnconfined},
+		expectedProfile: &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		},
+		expectedOldProfile: "unconfined",
+	}, {
+		name: "localhost",
+		podProfile: &v1.AppArmorProfile{
+			Type:             v1.AppArmorProfileTypeLocalhost,
+			LocalhostProfile: ptr.To("test"),
+		},
+		expectedProfile: &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: "test",
+		},
+		expectedOldProfile: "localhost/test",
+	}, {
+		name: "invalid localhost",
+		podProfile: &v1.AppArmorProfile{
+			Type: v1.AppArmorProfileTypeLocalhost,
+		},
+		expectError: true,
+	}, {
+		name: "invalid type",
+		podProfile: &v1.AppArmorProfile{
+			Type: "foo",
+		},
+		expectError: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						AppArmorProfile: test.podProfile,
+					},
+					Containers: []v1.Container{{Name: "foo"}},
+				},
+			}
+
+			actual, actualOld, err := getAppArmorProfile(&pod, &pod.Spec.Containers[0])
+
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedProfile, actual, "AppArmor profile")
+			assert.Equal(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
 		})
 	}
 }

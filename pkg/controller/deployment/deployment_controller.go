@@ -99,7 +99,7 @@ type DeploymentController struct {
 
 // NewDeploymentController creates a new DeploymentController.
 func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dc := &DeploymentController{
 		client:           client,
@@ -158,7 +158,7 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	// Start events processing pipeline.
-	dc.eventBroadcaster.StartStructuredLogging(0)
+	dc.eventBroadcaster.StartStructuredLogging(3)
 	dc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.client.CoreV1().Events("")})
 	defer dc.eventBroadcaster.Shutdown()
 

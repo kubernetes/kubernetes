@@ -97,10 +97,23 @@ func PidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 	return runtimeapi.NamespaceMode_CONTAINER
 }
 
+// LookupRuntimeHandler is implemented by *runtimeclass.Manager.
+type RuntimeHandlerResolver interface {
+	LookupRuntimeHandler(runtimeClassName *string) (string, error)
+}
+
 // namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
 // An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func NamespacesForPod(pod *v1.Pod, runtimeHelper kubecontainer.RuntimeHelper) (*runtimeapi.NamespaceOption, error) {
-	userNs, err := runtimeHelper.GetOrCreateUserNamespaceMappings(pod)
+func NamespacesForPod(pod *v1.Pod, runtimeHelper kubecontainer.RuntimeHelper, rcManager RuntimeHandlerResolver) (*runtimeapi.NamespaceOption, error) {
+	runtimeHandler := ""
+	if pod != nil && rcManager != nil {
+		var err error
+		runtimeHandler, err = rcManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+		if err != nil {
+			return nil, err
+		}
+	}
+	userNs, err := runtimeHelper.GetOrCreateUserNamespaceMappings(pod, runtimeHandler)
 	if err != nil {
 		return nil, err
 	}

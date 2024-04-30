@@ -23,48 +23,32 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPreEnqueue(t *testing.T) {
 	tests := []struct {
-		name                         string
-		pod                          *v1.Pod
-		enablePodSchedulingReadiness bool
-		want                         *framework.Status
+		name string
+		pod  *v1.Pod
+		want *framework.Status
 	}{
 		{
-			name:                         "pod does not carry scheduling gates, feature disabled",
-			pod:                          st.MakePod().Name("p").Obj(),
-			enablePodSchedulingReadiness: false,
-			want:                         nil,
+			name: "pod does not carry scheduling gates",
+			pod:  st.MakePod().Name("p").Obj(),
+			want: nil,
 		},
 		{
-			name:                         "pod does not carry scheduling gates, feature enabled",
-			pod:                          st.MakePod().Name("p").Obj(),
-			enablePodSchedulingReadiness: true,
-			want:                         nil,
-		},
-		{
-			name:                         "pod carries scheduling gates, feature disabled",
-			pod:                          st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).Obj(),
-			enablePodSchedulingReadiness: false,
-			want:                         nil,
-		},
-		{
-			name:                         "pod carries scheduling gates, feature enabled",
-			pod:                          st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).Obj(),
-			enablePodSchedulingReadiness: true,
-			want:                         framework.NewStatus(framework.UnschedulableAndUnresolvable, "waiting for scheduling gates: [foo bar]"),
+			name: "pod carries scheduling gates",
+			pod:  st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).Obj(),
+			want: framework.NewStatus(framework.UnschedulableAndUnresolvable, "waiting for scheduling gates: [foo bar]"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			p, err := New(ctx, nil, nil, feature.Features{EnablePodSchedulingReadiness: tt.enablePodSchedulingReadiness})
+			p, err := New(ctx, nil, nil)
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}

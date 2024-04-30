@@ -26,9 +26,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::verify_go_version
 
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-    GO111MODULE=on go install github.com/jcchavezs/porto/cmd/porto
-popd >/dev/null
+go -C "${KUBE_ROOT}/hack/tools" install github.com/jcchavezs/porto/cmd/porto
 
 porto --restrict-to-dirs="staging" --restrict-to-files="doc\\.go$" -w "${KUBE_ROOT}"
 

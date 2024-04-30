@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -684,7 +683,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 }
 
 func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	testFn := func(t *testing.T, scaledownPolicy, deletionPolicy apps.PersistentVolumeClaimRetentionPolicyType) {
 		set := newStatefulSet(4)
@@ -819,7 +818,7 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 }
 
 func TestStaleOwnerRefOnScaleup(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	for _, policy := range []*apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		{
@@ -946,8 +945,7 @@ func newFakeStatefulSetController(ctx context.Context, initialObjects ...runtime
 	ssh := history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions())
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
-	recorder := record.NewFakeRecorder(10)
-	ssc.control = NewDefaultStatefulSetControl(spc, ssu, ssh, recorder)
+	ssc.control = NewDefaultStatefulSetControl(spc, ssu, ssh)
 
 	return ssc, spc, om, ssh
 }

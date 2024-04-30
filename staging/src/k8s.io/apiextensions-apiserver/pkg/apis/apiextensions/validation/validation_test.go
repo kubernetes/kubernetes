@@ -31,6 +31,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	celschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
@@ -70,6 +73,12 @@ func immutable(path ...string) validationMatch {
 }
 func forbidden(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeForbidden}
+}
+func duplicate(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeDuplicate}
+}
+func tooMany(path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeTooMany}
 }
 
 func (v validationMatch) matches(err *field.Error) bool {
@@ -4363,6 +4372,294 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 	}
 }
 
+func TestSelectableFields(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
+	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
+		{
+			Name:    "version",
+			Served:  true,
+			Storage: true,
+		},
+	}
+	tests := []struct {
+		name     string
+		resource *apiextensions.CustomResourceDefinition
+		errors   []validationMatch
+	}{
+		{
+			name: "selectableFields with jsonPaths that do not refer to a field in the schema are invalid",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{Name: "version", Served: true, Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "string"}},
+									Required:   []string{"foo"},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{{JSONPath: ".foo"}, {JSONPath: ".xyz"}},
+						},
+						{Name: "version2", Served: true, Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "integer"}},
+									Required:   []string{"foo"},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{{JSONPath: ".xyz"}, {JSONPath: ".foo"}, {JSONPath: ".abc"}},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "versions[0]", "selectableFields[1].jsonPath"),
+				invalid("spec", "versions[1]", "selectableFields[0].jsonPath"),
+				invalid("spec", "versions[1]", "selectableFields[2].jsonPath"),
+			},
+		},
+		{
+			name: "in top level schema, selectableFields with jsonPaths that do not refer to a field in the schema are invalid",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"spec": {
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "string"}},
+									Required:   []string{"foo"},
+								},
+								"status": {
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"phase": {Type: "string"}},
+									Required:   []string{"phase"},
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{{JSONPath: ".spec.foo"}, {JSONPath: ".spec.xyz"}, {JSONPath: ".status.phase"}},
+					Scope:            apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "selectableFields[1].jsonPath"),
+			},
+		},
+		{
+			name: "selectableFields with jsonPaths that do not refer to fields that are not strings, booleans or integers are invalid",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{Name: "version", Served: true, Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "string"}, "obj": {Type: "object"}},
+									Required:   []string{"foo", "obj"},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{{JSONPath: ".foo"}, {JSONPath: ".obj"}},
+						},
+						{Name: "version2", Served: true, Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "integer"}, "obj": {Type: "object"}, "bool": {Type: "boolean"}},
+									Required:   []string{"foo", "obj", "bool"},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{{JSONPath: ".obj"}, {JSONPath: ".foo"}, {JSONPath: ".bool"}},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "versions[0]", "selectableFields[1].jsonPath"),
+				invalid("spec", "versions[1]", "selectableFields[0].jsonPath"),
+			},
+		},
+		{
+			name: "selectableFields with duplicate jsonPaths are invalid",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{Name: "version", Served: true, Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "string"}},
+									Required:   []string{"foo"},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{{JSONPath: ".foo"}, {JSONPath: ".foo"}},
+						},
+						{Name: "version2", Served: true, Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "integer"}},
+									Required:   []string{"foo"},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{{JSONPath: ".foo"}, {JSONPath: ".foo"}},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				duplicate("spec", "versions[0]", "selectableFields[1].jsonPath"),
+				duplicate("spec", "versions[1]", "selectableFields[1].jsonPath"),
+			},
+		},
+		{
+			name: "too many selectableFields are not allowed",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{Name: "version", Served: true, Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"a1": {Type: "string"}, "a2": {Type: "string"}, "a3": {Type: "string"},
+										"a4": {Type: "string"}, "a5": {Type: "string"}, "a6": {Type: "string"},
+										"a7": {Type: "string"}, "a8": {Type: "string"}, "a9": {Type: "string"},
+									},
+									Required: []string{"a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9"},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{
+								{JSONPath: ".a1"}, {JSONPath: ".a2"}, {JSONPath: ".a3"},
+								{JSONPath: ".a4"}, {JSONPath: ".a5"}, {JSONPath: ".a6"},
+								{JSONPath: ".a7"}, {JSONPath: ".a8"}, {JSONPath: ".a9"},
+							},
+						},
+						{Name: "version2", Served: true, Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type:       "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "integer"}},
+								},
+							},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				tooMany("spec", "versions[0]", "selectableFields"),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+
+			// duplicate defaulting behaviour
+			if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
+				tc.resource.Spec.Conversion.ConversionReviewVersions = []string{"v1beta1"}
+			}
+			ctx := context.TODO()
+			errs := ValidateCustomResourceDefinition(ctx, tc.resource)
+			seenErrs := make([]bool, len(errs))
+
+			for _, expectedError := range tc.errors {
+				found := false
+				for i, err := range errs {
+					if expectedError.matches(err) && !seenErrs[i] {
+						found = true
+						seenErrs[i] = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("expected %v at %v, got %v", expectedError.errorType, expectedError.path.String(), errs)
+				}
+			}
+
+			for i, seen := range seenErrs {
+				if !seen {
+					t.Errorf("unexpected error: %v", errs[i])
+				}
+			}
+		})
+	}
+}
+
 func TestValidateFieldPath(t *testing.T) {
 	schema := apiextensions.JSONSchemaProps{
 		Type: "object",
@@ -4589,7 +4886,7 @@ func TestValidateFieldPath(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error when converting schema to structural schema: %v", err)
 			}
-			_, err = celschema.ValidFieldPath(tc.fieldPath, ss)
+			_, _, err = celschema.ValidFieldPath(tc.fieldPath, ss)
 			if err == nil && tc.errMsg != "" {
 				t.Errorf("expected err contains: %v but get nil", tc.errMsg)
 			}

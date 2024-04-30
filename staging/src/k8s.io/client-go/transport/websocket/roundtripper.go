@@ -18,6 +18,7 @@ package websocket
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,6 +26,7 @@ import (
 	gwebsocket "github.com/gorilla/websocket"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
@@ -88,8 +90,8 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	}()
 
 	// set the protocol version directly on the dialer from the header
-	protocolVersions := request.Header[httpstream.HeaderProtocolVersion]
-	delete(request.Header, httpstream.HeaderProtocolVersion)
+	protocolVersions := request.Header[wsstream.WebSocketProtocolHeader]
+	delete(request.Header, wsstream.WebSocketProtocolHeader)
 
 	dialer := gwebsocket.Dialer{
 		Proxy:           rt.Proxier,
@@ -108,7 +110,23 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	}
 	wsConn, resp, err := dialer.DialContext(request.Context(), request.URL.String(), request.Header)
 	if err != nil {
-		return nil, &httpstream.UpgradeFailureError{Cause: err}
+		if errors.Is(err, gwebsocket.ErrBadHandshake) {
+			return nil, &httpstream.UpgradeFailureError{Cause: err}
+		}
+		return nil, err
+	}
+
+	// Ensure we got back a protocol we understand
+	foundProtocol := false
+	for _, protocolVersion := range protocolVersions {
+		if protocolVersion == wsConn.Subprotocol() {
+			foundProtocol = true
+			break
+		}
+	}
+	if !foundProtocol {
+		wsConn.Close() // nolint:errcheck
+		return nil, &httpstream.UpgradeFailureError{Cause: fmt.Errorf("invalid protocol, expected one of %q, got %q", protocolVersions, wsConn.Subprotocol())}
 	}
 
 	rt.Conn = wsConn
@@ -149,7 +167,8 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, ConnectionHo
 // a WebSocket connection. Upon success, it returns the negotiated connection.
 // The round tripper rt must use the WebSocket round tripper wsRt - see RoundTripperFor.
 func Negotiate(rt http.RoundTripper, connectionInfo ConnectionHolder, req *http.Request, protocols ...string) (*gwebsocket.Conn, error) {
-	req.Header[httpstream.HeaderProtocolVersion] = protocols
+	// Plumb protocols to RoundTripper#RoundTrip
+	req.Header[wsstream.WebSocketProtocolHeader] = protocols
 	resp, err := rt.RoundTrip(req)
 	if err != nil {
 		return nil, err

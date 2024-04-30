@@ -216,6 +216,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 		fakeAuthorizer{},
 		featureGate,
 		testContext.Done(),
+		fakeRestMapper,
 	)
 	genericInitializer.Initialize(plugin)
 	plugin.SetRESTMapper(fakeRestMapper)
@@ -317,7 +318,11 @@ func (p *PolicyTestContext[P, B, E]) WaitForReconcile(timeoutCtx context.Context
 		return err
 	}
 
-	objectGVK := object.GetObjectKind().GroupVersionKind()
+	objectGVK, _, err := p.inferGVK(object)
+	if err != nil {
+		return err
+	}
+
 	switch objectGVK {
 	case p.policyGVK:
 		return wait.PollUntilContextCancel(timeoutCtx, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
@@ -443,32 +448,7 @@ func (p *PolicyTestContext[P, B, E]) updateOne(object runtime.Object) error {
 		return err
 	}
 	objectMeta.SetResourceVersion(string(uuid.NewUUID()))
-	objectGVK := object.GetObjectKind().GroupVersionKind()
-
-	if objectGVK.Empty() {
-		// If the object doesn't have a GVK, ask the schema for preferred GVK
-		knownKinds, _, err := p.scheme.ObjectKinds(object)
-		if err != nil {
-			return err
-		} else if len(knownKinds) == 0 {
-			return fmt.Errorf("no known GVKs for object in schema: %T", object)
-		}
-		toTake := 0
-
-		// Prefer GVK if it is our fake policy or binding
-		for i, knownKind := range knownKinds {
-			if knownKind == p.policyGVK || knownKind == p.bindingGVK {
-				toTake = i
-				break
-			}
-		}
-
-		objectGVK = knownKinds[toTake]
-		object.GetObjectKind().SetGroupVersionKind(objectGVK)
-	}
-
-	// Make sure GVK is known to the fake rest mapper. To prevent cryptic error
-	mapping, err := p.restMapper.RESTMapping(objectGVK.GroupKind(), objectGVK.Version)
+	objectGVK, gvr, err := p.inferGVK(object)
 	if err != nil {
 		return err
 	}
@@ -490,16 +470,16 @@ func (p *PolicyTestContext[P, B, E]) updateOne(object runtime.Object) error {
 		return err
 	default:
 		if _, ok := object.(*unstructured.Unstructured); ok {
-			if err := p.unstructuredTracker.Create(mapping.Resource, object, objectMeta.GetNamespace()); err != nil {
+			if err := p.unstructuredTracker.Create(gvr, object, objectMeta.GetNamespace()); err != nil {
 				if errors.IsAlreadyExists(err) {
-					return p.unstructuredTracker.Update(mapping.Resource, object, objectMeta.GetNamespace())
+					return p.unstructuredTracker.Update(gvr, object, objectMeta.GetNamespace())
 				}
 				return err
 			}
 			return nil
-		} else if err := p.nativeTracker.Create(mapping.Resource, object, objectMeta.GetNamespace()); err != nil {
+		} else if err := p.nativeTracker.Create(gvr, object, objectMeta.GetNamespace()); err != nil {
 			if errors.IsAlreadyExists(err) {
-				return p.nativeTracker.Update(mapping.Resource, object, objectMeta.GetNamespace())
+				return p.nativeTracker.Update(gvr, object, objectMeta.GetNamespace())
 			}
 		}
 		return nil
@@ -524,9 +504,14 @@ func (p *PolicyTestContext[P, B, E]) DeleteAndWait(object ...runtime.Object) err
 			return err
 		}
 
+		objectGVK, _, err := p.inferGVK(object)
+		if err != nil {
+			return err
+		}
+
 		if err := p.waitForDelete(
 			timeoutCtx,
-			object.GetObjectKind().GroupVersionKind(),
+			objectGVK,
 			types.NamespacedName{Name: accessor.GetName(), Namespace: accessor.GetNamespace()}); err != nil {
 			return err
 		}
@@ -540,15 +525,73 @@ func (p *PolicyTestContext[P, B, E]) deleteOne(object runtime.Object) error {
 		return err
 	}
 	objectMeta.SetResourceVersion(string(uuid.NewUUID()))
-	objectGVK := object.GetObjectKind().GroupVersionKind()
+	objectGVK, gvr, err := p.inferGVK(object)
+	if err != nil {
+		return err
+	}
 
+	switch objectGVK {
+	case p.policyGVK:
+		return p.policyAndBindingTracker.Delete(p.policyGVR, objectMeta.GetNamespace(), objectMeta.GetName())
+	case p.bindingGVK:
+		return p.policyAndBindingTracker.Delete(p.bindingGVR, objectMeta.GetNamespace(), objectMeta.GetName())
+	default:
+		if _, ok := object.(*unstructured.Unstructured); ok {
+			return p.unstructuredTracker.Delete(gvr, objectMeta.GetNamespace(), objectMeta.GetName())
+		}
+		return p.nativeTracker.Delete(gvr, objectMeta.GetNamespace(), objectMeta.GetName())
+	}
+}
+
+func (p *PolicyTestContext[P, B, E]) Dispatch(
+	new, old runtime.Object,
+	operation admission.Operation,
+) error {
+	if old == nil && new == nil {
+		return fmt.Errorf("both old and new objects cannot be nil")
+	}
+
+	nonNilObject := new
+	if nonNilObject == nil {
+		nonNilObject = old
+	}
+
+	gvk, gvr, err := p.inferGVK(nonNilObject)
+	if err != nil {
+		return err
+	}
+
+	nonNilMeta, err := meta.Accessor(nonNilObject)
+	if err != nil {
+		return err
+	}
+
+	return p.Plugin.Dispatch(
+		p,
+		admission.NewAttributesRecord(
+			new,
+			old,
+			gvk,
+			nonNilMeta.GetName(),
+			nonNilMeta.GetNamespace(),
+			gvr,
+			"",
+			operation,
+			nil,
+			false,
+			nil,
+		), admission.NewObjectInterfacesFromScheme(p.scheme))
+}
+
+func (p *PolicyTestContext[P, B, E]) inferGVK(object runtime.Object) (schema.GroupVersionKind, schema.GroupVersionResource, error) {
+	objectGVK := object.GetObjectKind().GroupVersionKind()
 	if objectGVK.Empty() {
 		// If the object doesn't have a GVK, ask the schema for preferred GVK
 		knownKinds, _, err := p.scheme.ObjectKinds(object)
 		if err != nil {
-			return err
+			return schema.GroupVersionKind{}, schema.GroupVersionResource{}, err
 		} else if len(knownKinds) == 0 {
-			return fmt.Errorf("no known GVKs for object in schema: %T", object)
+			return schema.GroupVersionKind{}, schema.GroupVersionResource{}, fmt.Errorf("no known GVKs for object in schema: %T", object)
 		}
 		toTake := 0
 
@@ -561,26 +604,14 @@ func (p *PolicyTestContext[P, B, E]) deleteOne(object runtime.Object) error {
 		}
 
 		objectGVK = knownKinds[toTake]
-		object.GetObjectKind().SetGroupVersionKind(objectGVK)
 	}
 
 	// Make sure GVK is known to the fake rest mapper. To prevent cryptic error
 	mapping, err := p.restMapper.RESTMapping(objectGVK.GroupKind(), objectGVK.Version)
 	if err != nil {
-		return err
+		return schema.GroupVersionKind{}, schema.GroupVersionResource{}, err
 	}
-
-	switch objectGVK {
-	case p.policyGVK:
-		return p.policyAndBindingTracker.Delete(p.policyGVR, objectMeta.GetNamespace(), objectMeta.GetName())
-	case p.bindingGVK:
-		return p.policyAndBindingTracker.Delete(p.bindingGVR, objectMeta.GetNamespace(), objectMeta.GetName())
-	default:
-		if _, ok := object.(*unstructured.Unstructured); ok {
-			return p.unstructuredTracker.Delete(mapping.Resource, objectMeta.GetNamespace(), objectMeta.GetName())
-		}
-		return p.nativeTracker.Delete(mapping.Resource, objectMeta.GetNamespace(), objectMeta.GetName())
-	}
+	return objectGVK, mapping.Resource, nil
 }
 
 type FakeList[T runtime.Object] struct {

@@ -188,7 +188,7 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 func New(ctx context.Context, c clientset.Interface, podInformer corev1informers.PodInformer, nodeInformer corev1informers.NodeInformer, controllerName string) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 	metrics.Register()
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	podIndexer := podInformer.Informer().GetIndexer()
@@ -286,7 +286,7 @@ func (tc *Controller) Run(ctx context.Context) {
 	defer logger.Info("Shutting down controller", "controller", tc.name)
 
 	// Start events processing pipeline.
-	tc.broadcaster.StartStructuredLogging(0)
+	tc.broadcaster.StartStructuredLogging(3)
 	if tc.client != nil {
 		logger.Info("Sending events to api server")
 		tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})

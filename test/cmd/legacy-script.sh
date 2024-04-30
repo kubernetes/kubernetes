@@ -81,7 +81,7 @@ export IMAGE_STATEFULSET_R1="registry.k8s.io/nginx-slim:0.7"
 export IMAGE_STATEFULSET_R2="registry.k8s.io/nginx-slim:0.8"
 
 # Expose kubectl directly for readability
-PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
+PATH="${THIS_PLATFORM_BIN}":$PATH
 
 # Define variables for resource types to prevent typos.
 clusterroles="clusterroles"
@@ -314,7 +314,7 @@ setup() {
 
   # Check kubectl
   kube::log::status "Running kubectl with no options"
-  "${KUBE_OUTPUT_HOSTBIN}/kubectl"
+  "${THIS_PLATFORM_BIN}/kubectl"
 
   # TODO: we need to note down the current default namespace and set back to this
   # namespace after the tests are done.

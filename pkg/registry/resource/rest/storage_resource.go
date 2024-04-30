@@ -26,8 +26,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	podschedulingcontextsstore "k8s.io/kubernetes/pkg/registry/resource/podschedulingcontext/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
+	resourceclaimparametersstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimparameters/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
 	resourceclassstore "k8s.io/kubernetes/pkg/registry/resource/resourceclass/storage"
+	resourceclassparametersstore "k8s.io/kubernetes/pkg/registry/resource/resourceclassparameters/storage"
+	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -81,6 +84,30 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		}
 		storage[resource] = podSchedulingStorage
 		storage[resource+"/status"] = podSchedulingStatusStorage
+	}
+
+	if resource := "resourceclaimparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		resourceClaimParametersStorage, err := resourceclaimparametersstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceClaimParametersStorage
+	}
+
+	if resource := "resourceclassparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		resourceClassParametersStorage, err := resourceclassparametersstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceClassParametersStorage
+	}
+
+	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceSliceStorage
 	}
 
 	return storage, nil

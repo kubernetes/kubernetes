@@ -49,6 +49,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterConfiguration{},
 		&JoinConfiguration{},
 		&ResetConfiguration{},
+		&UpgradeConfiguration{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

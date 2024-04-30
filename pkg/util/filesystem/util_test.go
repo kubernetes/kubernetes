@@ -19,6 +19,7 @@ package filesystem
 import (
 	"net"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,4 +84,49 @@ func TestIsUnixDomainSocket(t *testing.T) {
 		}
 		assert.Equal(t, result, test.expectSocket, "Unexpected result from IsUnixDomainSocket: %v for %s", result, test.label)
 	}
+}
+
+func TestIsCleanPath(t *testing.T) {
+	type Case struct {
+		path     string
+		expected bool
+	}
+
+	// Credits https://github.com/kubernetes/kubernetes/pull/124084/files#r1557566941
+	cases := []Case{
+		{path: "/logs", expected: true},
+		{path: "/var/lib/something", expected: true},
+		{path: "var/lib/something", expected: true},
+		{path: "var\\lib\\something", expected: true},
+		{path: "/", expected: true},
+		{path: ".", expected: true},
+		{path: "/var/../something", expected: false},
+		{path: "/var//lib/something", expected: false},
+		{path: "/var/./lib/something", expected: false},
+	}
+
+	// Additional cases applicable on Windows
+	if runtime.GOOS == "windows" {
+		cases = append(cases, []Case{
+			{path: "\\", expected: true},
+			{path: "C:/var/lib/something", expected: true},
+			{path: "C:\\var\\lib\\something", expected: true},
+			{path: "C:/", expected: true},
+			{path: "C:\\", expected: true},
+			{path: "C:/var//lib/something", expected: false},
+			{path: "\\var\\\\lib\\something", expected: false},
+			{path: "C:\\var\\\\lib\\something", expected: false},
+			{path: "C:\\var\\..\\something", expected: false},
+			{path: "\\var\\.\\lib\\something", expected: false},
+			{path: "C:\\var\\.\\lib\\something", expected: false},
+		}...)
+	}
+
+	for _, tc := range cases {
+		actual := IsPathClean(tc.path)
+		if actual != tc.expected {
+			t.Errorf("actual: %t, expected: %t, for path: %s\n", actual, tc.expected, tc.path)
+		}
+	}
+
 }

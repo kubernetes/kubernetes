@@ -62,8 +62,8 @@ const (
 	numberOfHighestScoredNodesToReport = 3
 )
 
-// scheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
-func (sched *Scheduler) scheduleOne(ctx context.Context) {
+// ScheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
+func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	podInfo, err := sched.NextPod(logger)
 	if err != nil {
@@ -546,6 +546,29 @@ func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, 
 	return feasibleNodes, nil
 }
 
+// hasScoring checks if scoring nodes is configured.
+func (sched *Scheduler) hasScoring(fwk framework.Framework) bool {
+	if fwk.HasScorePlugins() {
+		return true
+	}
+	for _, extender := range sched.Extenders {
+		if extender.IsPrioritizer() {
+			return true
+		}
+	}
+	return false
+}
+
+// hasExtenderFilters checks if any extenders filter nodes.
+func (sched *Scheduler) hasExtenderFilters() bool {
+	for _, extender := range sched.Extenders {
+		if extender.IsFilter() {
+			return true
+		}
+	}
+	return false
+}
+
 // findNodesThatPassFilters finds the nodes that fit the filter plugins.
 func (sched *Scheduler) findNodesThatPassFilters(
 	ctx context.Context,
@@ -556,6 +579,9 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	nodes []*framework.NodeInfo) ([]*framework.NodeInfo, error) {
 	numAllNodes := len(nodes)
 	numNodesToFind := sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes))
+	if !sched.hasExtenderFilters() && !sched.hasScoring(fwk) {
+		numNodesToFind = 1
+	}
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
@@ -569,10 +595,15 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	}
 
 	errCh := parallelize.NewErrorChannel()
-	var statusesLock sync.Mutex
 	var feasibleNodesLen int32
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	type nodeStatus struct {
+		node   string
+		status *framework.Status
+	}
+	result := make([]*nodeStatus, numAllNodes)
 	checkNode := func(i int) {
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
@@ -591,10 +622,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 				feasibleNodes[length-1] = nodeInfo
 			}
 		} else {
-			statusesLock.Lock()
-			diagnosis.NodeToStatusMap[nodeInfo.Node().Name] = status
-			diagnosis.AddPluginStatus(status)
-			statusesLock.Unlock()
+			result[i] = &nodeStatus{node: nodeInfo.Node().Name, status: status}
 		}
 	}
 
@@ -611,6 +639,13 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// are found.
 	fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
+	for _, item := range result {
+		if item == nil {
+			continue
+		}
+		diagnosis.NodeToStatusMap[item.node] = item.status
+		diagnosis.AddPluginStatus(item.status)
+	}
 	if err := errCh.ReceiveError(); err != nil {
 		statusCode = framework.Error
 		return feasibleNodes, err

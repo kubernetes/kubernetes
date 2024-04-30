@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -126,8 +127,8 @@ func NewHollowKubelet(
 }
 
 // Starts this HollowKubelet and blocks.
-func (hk *HollowKubelet) Run() {
-	if err := kubeletapp.RunKubelet(&options.KubeletServer{
+func (hk *HollowKubelet) Run(ctx context.Context) {
+	if err := kubeletapp.RunKubelet(ctx, &options.KubeletServer{
 		KubeletFlags:         *hk.KubeletFlags,
 		KubeletConfiguration: *hk.KubeletConfiguration,
 	}, hk.KubeletDeps, false); err != nil {
@@ -152,6 +153,7 @@ type HollowKubeletOptions struct {
 func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
+	podLogsPath := utils.MakeTempDirOrDie("pod-logs", testRootDir)
 	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	// Flags struct
@@ -210,6 +212,7 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 	c.RegisterWithTaints = opt.RegisterWithTaints
 	c.RegisterNode = true
 	c.LocalStorageCapacityIsolation = true
+	c.PodLogsDir = podLogsPath
 
 	return f, c
 }

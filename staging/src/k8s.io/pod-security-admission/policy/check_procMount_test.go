@@ -27,6 +27,7 @@ func TestProcMount(t *testing.T) {
 	unmaskedValue := corev1.UnmaskedProcMount
 	otherValue := corev1.ProcMountType("other")
 
+	hostUsers := false
 	tests := []struct {
 		name         string
 		pod          *corev1.Pod
@@ -43,6 +44,7 @@ func TestProcMount(t *testing.T) {
 					{Name: "d", SecurityContext: &corev1.SecurityContext{ProcMount: &unmaskedValue}},
 					{Name: "e", SecurityContext: &corev1.SecurityContext{ProcMount: &otherValue}},
 				},
+				HostUsers: &hostUsers,
 			}},
 			expectReason: `procMount`,
 			expectDetail: `containers "d", "e" must not set securityContext.procMount to "Unmasked", "other"`,
