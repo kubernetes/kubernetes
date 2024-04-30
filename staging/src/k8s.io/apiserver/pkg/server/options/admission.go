@@ -139,6 +139,9 @@ func (a *AdmissionOptions) ApplyTo(
 	if informers == nil {
 		return fmt.Errorf("admission depends on a Kubernetes core API shared informer, it cannot be nil")
 	}
+	if kubeClient == nil || dynamicClient == nil {
+		return fmt.Errorf("admission depends on a Kubernetes core API client, it cannot be nil")
+	}
 
 	pluginNames := a.enabledPluginNames()
 
