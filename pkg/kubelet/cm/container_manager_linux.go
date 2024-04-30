@@ -305,7 +305,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	cm.topologyManager.AddHintProvider(cm.deviceManager)
 
-	// initialize DRA manager
+	// Initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
 		cm.draManager, err = dra.NewManagerImpl(kubeClient, nodeConfig.KubeletRootDir, nodeConfig.NodeName)
@@ -563,6 +563,14 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	ctx := context.Background()
 
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
+
+	// Initialize DRA manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		err := cm.draManager.Start(dra.ActivePodsFunc(activePods), sourcesReady)
+		if err != nil {
+			return fmt.Errorf("start dra manager error: %w", err)
+		}
+	}
 
 	// Initialize CPU manager
 	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
