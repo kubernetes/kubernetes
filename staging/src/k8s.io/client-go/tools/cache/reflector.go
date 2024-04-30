@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -39,6 +38,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -254,9 +254,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	// don't overwrite UseWatchList if already set
 	// because the higher layers (e.g. storage/cacher) disabled it on purpose
 	if r.UseWatchList == nil {
-		if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
-			r.UseWatchList = ptr.To(true)
-		}
+		r.UseWatchList = ptr.To(clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient))
 	}
 
 	return r

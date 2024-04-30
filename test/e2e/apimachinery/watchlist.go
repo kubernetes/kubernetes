@@ -19,7 +19,6 @@ package apimachinery
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -38,16 +38,14 @@ import (
 
 var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), feature.WatchList, func() {
 	f := framework.NewDefaultFramework("watchlist")
-	ginkgo.It("should be requested when ENABLE_CLIENT_GO_WATCH_LIST_ALPHA is set", func(ctx context.Context) {
-		prevWatchListEnvValue, wasWatchListEnvSet := os.LookupEnv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA")
-		os.Setenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA", "true")
+	ginkgo.It("should be requested when WatchListClient is enabled", func(ctx context.Context) {
+		// TODO(p0lyn0mial): use https://github.com/kubernetes/kubernetes/pull/123974
+		//  instead of using directly clientfeatures.ReplaceFeatureGates
+		prevClientFeatureGates := clientfeatures.FeatureGates()
 		defer func() {
-			if !wasWatchListEnvSet {
-				os.Unsetenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA")
-				return
-			}
-			os.Setenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA", prevWatchListEnvValue)
+			clientfeatures.ReplaceFeatureGates(prevClientFeatureGates)
 		}()
+		clientfeatures.ReplaceFeatureGates(newEnabledWatchListClientFeatureGateRegistry(prevClientFeatureGates))
 		stopCh := make(chan struct{})
 		defer close(stopCh)
 		secretInformer := cache.NewSharedIndexInformer(
@@ -122,4 +120,19 @@ func newSecret(name string) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
+}
+
+type enabledWatchListClientFeatureGateRegistry struct {
+	originalGates clientfeatures.Gates
+}
+
+func newEnabledWatchListClientFeatureGateRegistry(originalGates clientfeatures.Gates) *enabledWatchListClientFeatureGateRegistry {
+	return &enabledWatchListClientFeatureGateRegistry{originalGates: originalGates}
+}
+
+func (r *enabledWatchListClientFeatureGateRegistry) Enabled(feature clientfeatures.Feature) bool {
+	if feature == clientfeatures.WatchListClient {
+		return true
+	}
+	return r.originalGates.Enabled(feature)
 }
