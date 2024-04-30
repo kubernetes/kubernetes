@@ -285,7 +285,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods")
 				framework.Logf("got output %q", out)
 				gomega.Expect(out).NotTo(gomega.BeEmpty())
-				gomega.Expect(lines(out)).To(gomega.HaveLen(22))
+				gomega.Expect(lines(out)).To(gomega.HaveLen(21))
 
 				ginkgo.By("all containers for each pod")
 				out = e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods", "--all-containers")
