@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
@@ -442,9 +443,19 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
-// This is the diagram of what channels/signals are dependent on each other:
 //
-// |                                  stopCh
+// Deprecated: use RunWithContext instead. Run will not get removed to avoid
+// breaking consumers, but should not be used in new code.
+func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
+	ctx := wait.ContextForChannel(stopCh)
+	return s.RunWithContext(ctx)
+}
+
+// RunWithContext spawns the secure http server. It only returns if ctx is canceled
+// or the secure port cannot be listened on initially.
+// This is the diagram of what contexts/channels/signals are dependent on each other:
+//
+// |                                   ctx
 // |                                    |
 // |           ---------------------------------------------------------
 // |           |                                                       |
@@ -477,12 +488,13 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // |           |                                         |                                        |
 // |           |-------------------|---------------------|----------------------------------------|
 // |                               |                     |
-// |                       stopHttpServerCh     (AuditBackend::Shutdown())
+// |                       stopHttpServerCtx     (AuditBackend::Shutdown())
 // |                               |
 // |                       listenerStoppedCh
 // |                               |
 // |      HTTPServerStoppedListening (httpServerStoppedListeningCh)
-func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
+func (s preparedGenericAPIServer) RunWithContext(ctx context.Context) error {
+	stopCh := ctx.Done()
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
 
@@ -544,9 +556,11 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	notAcceptingNewRequestCh := s.lifecycleSignals.NotAcceptingNewRequest
 	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
-	stopHttpServerCh := make(chan struct{})
+	// Canceling the parent context does not immediately cancel the HTTP server.
+	// We only inherit context values here and deal with cancellation ourselves.
+	stopHTTPServerCtx, stopHTTPServer := context.WithCancelCause(context.WithoutCancel(ctx))
 	go func() {
-		defer close(stopHttpServerCh)
+		defer stopHTTPServer(errors.New("time to stop HTTP server"))
 
 		timeToStopHttpServerCh := notAcceptingNewRequestCh.Signaled()
 		if s.ShutdownSendRetryAfter {
@@ -565,7 +579,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		}
 	}
 
-	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
+	stoppedCh, listenerStoppedCh, err := s.NonBlockingRunWithContext(stopHTTPServerCtx, shutdownTimeout)
 	if err != nil {
 		return err
 	}
@@ -694,7 +708,18 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
+//
+// Deprecated: use RunWithContext instead. Run will not get removed to avoid
+// breaking consumers, but should not be used in new code.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
+	ctx := wait.ContextForChannel(stopCh)
+	return s.NonBlockingRunWithContext(ctx, shutdownTimeout)
+}
+
+// NonBlockingRunWithContext spawns the secure http server. An error is
+// returned if the secure port cannot be listened on.
+// The returned channel is closed when the (asynchronous) termination is finished.
+func (s preparedGenericAPIServer) NonBlockingRunWithContext(ctx context.Context, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 	var stoppedCh <-chan struct{}
@@ -712,11 +737,11 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 	// responsibility of the caller to close the provided channel to
 	// ensure cleanup.
 	go func() {
-		<-stopCh
+		<-ctx.Done()
 		close(internalStopCh)
 	}()
 
-	s.RunPostStartHooks(stopCh)
+	s.RunPostStartHooks(ctx)
 
 	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
 		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -41,6 +42,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/http2"
@@ -200,10 +202,15 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}, nil)
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	_, ctx := ktesting.NewTestContext(t)
+	stopCtx, stop := context.WithCancelCause(ctx)
+	defer stop(errors.New("test has completed"))
+	runCompletedCh := make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		if err := s.PrepareRun().RunWithContext(stopCtx); err != nil {
+			t.Errorf("unexpected error from RunWithContext: %v", err)
+		}
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -222,7 +229,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 
 	// signal termination event: initiate a shutdown
-	close(stopCh)
+	stop(errors.New("shutting down"))
 	waitForeverUntilSignaled(t, signals.ShutdownInitiated)
 
 	// /readyz must return an error, but we need to give it some time
@@ -423,10 +430,15 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}, nil)
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	_, ctx := ktesting.NewTestContext(t)
+	stopCtx, stop := context.WithCancelCause(ctx)
+	defer stop(errors.New("test has completed"))
+	runCompletedCh := make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		if err := s.PrepareRun().RunWithContext(stopCtx); err != nil {
+			t.Errorf("unexpected error from RunWithContext: %v", err)
+		}
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -445,7 +457,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}
 
 	// signal termination event: initiate a shutdown
-	close(stopCh)
+	stop(errors.New("shutting down"))
 	waitForeverUntilSignaled(t, signals.ShutdownInitiated)
 
 	// /readyz must return an error, but we need to give it some time
@@ -568,10 +580,15 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 	}
 
 	// start the API server
-	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	_, ctx := ktesting.NewTestContext(t)
+	stopCtx, stop := context.WithCancelCause(ctx)
+	defer stop(errors.New("test has completed"))
+	runCompletedCh := make(chan struct{})
 	go func() {
 		defer close(runCompletedCh)
-		s.PrepareRun().Run(stopCh)
+		if err := s.PrepareRun().RunWithContext(stopCtx); err != nil {
+			t.Errorf("unexpected error from RunWithContext: %v", err)
+		}
 	}()
 	waitForAPIServerStarted(t, doer)
 
@@ -612,6 +629,9 @@ func TestPreShutdownHooks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			stopCtx, stop := context.WithCancelCause(ctx)
+			defer stop(errors.New("test has completed"))
 			s := test.server()
 			doer := setupDoer(t, s.SecureServingInfo)
 
@@ -643,14 +663,16 @@ func TestPreShutdownHooks(t *testing.T) {
 			}
 
 			// start the API server
-			stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+			runCompletedCh := make(chan struct{})
 			go func() {
 				defer close(runCompletedCh)
-				s.PrepareRun().Run(stopCh)
+				if err := s.PrepareRun().RunWithContext(stopCtx); err != nil {
+					t.Errorf("unexpected error from RunWithContext: %v", err)
+				}
 			}()
 			waitForAPIServerStarted(t, doer)
 
-			close(stopCh)
+			stop(errors.New("shutting down"))
 
 			waitForeverUntil(t, runCompletedCh, "the apiserver Run method did not return")
 
