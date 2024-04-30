@@ -39,7 +39,7 @@ type ClaimInfo struct {
 	prepared    bool
 }
 
-// claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
+// claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
 type claimInfoCache struct {
 	sync.RWMutex
 	state     state.CheckpointState
@@ -172,7 +172,7 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 
 	for _, entry := range curState {
 		info := newClaimInfoFromState(&entry)
-		cache.claimInfo[info.ClaimName+info.Namespace] = info
+		cache.claimInfo[info.Namespace+"/"+info.ClaimName] = info
 	}
 
 	return cache, nil
@@ -194,25 +194,25 @@ func (cache *claimInfoCache) withRLock(f func() error) error {
 
 // add adds a new claim info object into the claim info cache.
 func (cache *claimInfoCache) add(info *ClaimInfo) *ClaimInfo {
-	cache.claimInfo[info.ClaimName+info.Namespace] = info
+	cache.claimInfo[info.Namespace+"/"+info.ClaimName] = info
 	return info
 }
 
 // contains checks to see if a specific claim info object is already in the cache.
 func (cache *claimInfoCache) contains(claimName, namespace string) bool {
-	_, exists := cache.claimInfo[claimName+namespace]
+	_, exists := cache.claimInfo[namespace+"/"+claimName]
 	return exists
 }
 
 // get gets a specific claim info object from the cache.
 func (cache *claimInfoCache) get(claimName, namespace string) (*ClaimInfo, bool) {
-	info, exists := cache.claimInfo[claimName+namespace]
+	info, exists := cache.claimInfo[namespace+"/"+claimName]
 	return info, exists
 }
 
 // delete deletes a specific claim info object from the cache.
 func (cache *claimInfoCache) delete(claimName, namespace string) {
-	delete(cache.claimInfo, claimName+namespace)
+	delete(cache.claimInfo, namespace+"/"+claimName)
 }
 
 // hasPodReference checks if there is at least one claim
