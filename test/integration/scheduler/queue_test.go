@@ -191,7 +191,9 @@ func TestGatedPodSchedulableAfterEvent(t *testing.T) {
 	}
 
 	// delete p2, which triggers DeletePodFromCache event
-	cs.CoreV1().Pods(ns).Delete(ctx, "p2", metav1.DeleteOptions{})
+	if err := cs.CoreV1().Pods(ns).Delete(ctx, "p2", metav1.DeleteOptions{}); err != nil {
+		t.Fatal("Error calling Delete on p2")
+	}
 	if err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodDeleted(ctx, cs, ns, "p2")); err != nil {
 		t.Fatal("Failed to delete p2")
 	}

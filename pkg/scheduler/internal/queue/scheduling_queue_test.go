@@ -3751,7 +3751,9 @@ func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(m))
 
 	gatedPod := st.MakePod().SchedulingGates([]string{"hello world"}).Obj()
-	q.Add(logger, gatedPod)
+	if err := q.Add(logger, gatedPod); err != nil {
+		t.Error("Error calling Add")
+	}
 
 	if !q.unschedulablePods.get(gatedPod).Gated {
 		t.Error("expected pod to be gated")
@@ -3759,7 +3761,9 @@ func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 
 	ungatedPod := gatedPod.DeepCopy()
 	ungatedPod.Spec.SchedulingGates = nil
-	q.Update(logger, gatedPod, ungatedPod)
+	if err := q.Update(logger, gatedPod, ungatedPod); err != nil {
+		t.Error("Error calling Update")
+	}
 
 	ungatedPodInfo, _ := q.Pop(logger)
 	if ungatedPodInfo.Gated {
