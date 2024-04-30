@@ -290,7 +290,7 @@ type patcher struct {
 }
 
 type patchMechanism interface {
-	applyPatchToCurrentObject(requextContext context.Context, currentObject runtime.Object) (runtime.Object, error)
+	applyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object) (runtime.Object, error)
 	createNewObject(requestContext context.Context) (runtime.Object, error)
 }
 
