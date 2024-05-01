@@ -1033,7 +1033,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DisableCloudProviders: {Default: true, PreRelease: featuregate.Beta},
 
-	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
+	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Alpha},
 
