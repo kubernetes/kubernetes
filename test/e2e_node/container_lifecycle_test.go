@@ -1161,7 +1161,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 0,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1232,7 +1232,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1371,7 +1371,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1564,7 +1564,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 0,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1638,7 +1638,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1786,7 +1786,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1985,7 +1985,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 0,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -2055,7 +2055,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -2199,7 +2199,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
