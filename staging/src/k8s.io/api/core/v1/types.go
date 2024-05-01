@@ -6556,8 +6556,11 @@ type ObjectReference struct {
 // +structType=atomic
 type LocalObjectReference struct {
 	// Name of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// This field is effectively required, but due to backwards compatibility is
+	// allowed to be empty. Instances of this type with an empty value here are
+	// almost certainly wrong.
 	// TODO: Add other useful fields. apiVersion, kind, uid?
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// +optional
 	// +default=""
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
