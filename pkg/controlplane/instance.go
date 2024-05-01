@@ -58,6 +58,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientdiscovery "k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
@@ -322,67 +323,11 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
-	// TODO: update to a version that caches success but will recheck on failure, unlike memcache discovery
-	discoveryClientForAdmissionRegistration := client.Discovery()
-
-	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
-		GenericConfig: corerest.GenericConfig{
-			StorageFactory:              c.ControlPlane.Extra.StorageFactory,
-			EventTTL:                    c.ControlPlane.Extra.EventTTL,
-			LoopbackClientConfig:        c.ControlPlane.Generic.LoopbackClientConfig,
-			ServiceAccountIssuer:        c.ControlPlane.Extra.ServiceAccountIssuer,
-			ExtendExpiration:            c.ControlPlane.Extra.ExtendExpiration,
-			ServiceAccountMaxExpiration: c.ControlPlane.Extra.ServiceAccountMaxExpiration,
-			APIAudiences:                c.ControlPlane.Generic.Authentication.APIAudiences,
-			Informers:                   c.ControlPlane.Extra.VersionedInformers,
-		},
-		Proxy: corerest.ProxyConfig{
-			Transport:           c.ControlPlane.Extra.ProxyTransport,
-			KubeletClientConfig: c.Extra.KubeletClientConfig,
-		},
-		Services: corerest.ServicesConfig{
-			ClusterIPRange:          c.Extra.ServiceIPRange,
-			SecondaryClusterIPRange: c.Extra.SecondaryServiceIPRange,
-			NodePortRange:           c.Extra.ServiceNodePortRange,
-			IPRepairInterval:        c.Extra.RepairServicesInterval,
-		},
-	})
+	restStorageProviders, err := c.StorageProviders(client.Discovery())
 	if err != nil {
 		return nil, err
 	}
 
-	// The order here is preserved in discovery.
-	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
-	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
-	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
-	// with specific priorities.
-	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
-	// handlers that we have.
-	restStorageProviders := []controlplaneapiserver.RESTStorageProvider{
-		legacyRESTStorageProvider,
-		apiserverinternalrest.StorageProvider{},
-		authenticationrest.RESTStorageProvider{Authenticator: c.ControlPlane.Generic.Authentication.Authenticator, APIAudiences: c.ControlPlane.Generic.Authentication.APIAudiences},
-		authorizationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, RuleResolver: c.ControlPlane.Generic.RuleResolver},
-		autoscalingrest.RESTStorageProvider{},
-		batchrest.RESTStorageProvider{},
-		certificatesrest.RESTStorageProvider{},
-		coordinationrest.RESTStorageProvider{},
-		discoveryrest.StorageProvider{},
-		networkingrest.RESTStorageProvider{},
-		noderest.RESTStorageProvider{},
-		policyrest.RESTStorageProvider{},
-		rbacrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
-		schedulingrest.RESTStorageProvider{},
-		storagerest.RESTStorageProvider{},
-		svmrest.RESTStorageProvider{},
-		flowcontrolrest.RESTStorageProvider{InformerFactory: c.ControlPlane.Generic.SharedInformerFactory},
-		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
-		// See https://github.com/kubernetes/kubernetes/issues/42392
-		appsrest.StorageProvider{},
-		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: discoveryClientForAdmissionRegistration},
-		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
-		resourcerest.RESTStorageProvider{},
-	}
 	if err := s.ControlPlane.InstallAPIs(restStorageProviders...); err != nil {
 		return nil, err
 	}
@@ -426,6 +371,59 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	return s, nil
+
+}
+
+func (c CompletedConfig) StorageProviders(discovery clientdiscovery.DiscoveryInterface) ([]controlplaneapiserver.RESTStorageProvider, error) {
+	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
+		GenericConfig: *c.ControlPlane.NewCoreGenericConfig(),
+		Proxy: corerest.ProxyConfig{
+			Transport:           c.ControlPlane.Extra.ProxyTransport,
+			KubeletClientConfig: c.Extra.KubeletClientConfig,
+		},
+		Services: corerest.ServicesConfig{
+			ClusterIPRange:          c.Extra.ServiceIPRange,
+			SecondaryClusterIPRange: c.Extra.SecondaryServiceIPRange,
+			NodePortRange:           c.Extra.ServiceNodePortRange,
+			IPRepairInterval:        c.Extra.RepairServicesInterval,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// The order here is preserved in discovery.
+	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
+	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
+	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
+	// with specific priorities.
+	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
+	// handlers that we have.
+	return []controlplaneapiserver.RESTStorageProvider{
+		legacyRESTStorageProvider,
+		apiserverinternalrest.StorageProvider{},
+		authenticationrest.RESTStorageProvider{Authenticator: c.ControlPlane.Generic.Authentication.Authenticator, APIAudiences: c.ControlPlane.Generic.Authentication.APIAudiences},
+		authorizationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, RuleResolver: c.ControlPlane.Generic.RuleResolver},
+		autoscalingrest.RESTStorageProvider{},
+		batchrest.RESTStorageProvider{},
+		certificatesrest.RESTStorageProvider{},
+		coordinationrest.RESTStorageProvider{},
+		discoveryrest.StorageProvider{},
+		networkingrest.RESTStorageProvider{},
+		noderest.RESTStorageProvider{},
+		policyrest.RESTStorageProvider{},
+		rbacrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
+		schedulingrest.RESTStorageProvider{},
+		storagerest.RESTStorageProvider{},
+		svmrest.RESTStorageProvider{},
+		flowcontrolrest.RESTStorageProvider{InformerFactory: c.ControlPlane.Generic.SharedInformerFactory},
+		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
+		// See https://github.com/kubernetes/kubernetes/issues/42392
+		appsrest.StorageProvider{},
+		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: discovery},
+		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
+		resourcerest.RESTStorageProvider{},
+	}, nil
 }
 
 var (
