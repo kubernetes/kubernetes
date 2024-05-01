@@ -22,13 +22,65 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/client-go/discovery"
 	"k8s.io/klog/v2"
+	svmrest "k8s.io/kubernetes/pkg/registry/storagemigration/rest"
+
+	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
+	apiserverinternalrest "k8s.io/kubernetes/pkg/registry/apiserverinternal/rest"
+	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
+	authorizationrest "k8s.io/kubernetes/pkg/registry/authorization/rest"
+	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
+	coordinationrest "k8s.io/kubernetes/pkg/registry/coordination/rest"
+	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
+	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
+	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 )
 
 // RESTStorageProvider is a factory type for REST storage.
 type RESTStorageProvider interface {
 	GroupName() string
 	NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error)
+}
+
+// NewCoreGenericConfig returns a new core rest generic config.
+func (c *CompletedConfig) NewCoreGenericConfig() *corerest.GenericConfig {
+	return &corerest.GenericConfig{
+		StorageFactory:              c.Extra.StorageFactory,
+		EventTTL:                    c.Extra.EventTTL,
+		LoopbackClientConfig:        c.Generic.LoopbackClientConfig,
+		ServiceAccountIssuer:        c.Extra.ServiceAccountIssuer,
+		ExtendExpiration:            c.Extra.ExtendExpiration,
+		ServiceAccountMaxExpiration: c.Extra.ServiceAccountMaxExpiration,
+		APIAudiences:                c.Generic.Authentication.APIAudiences,
+		Informers:                   c.Extra.VersionedInformers,
+	}
+}
+
+// GenericStorageProviders returns a set of APIs for a generic control plane.
+// They ought to be a subset of those served by kube-apiserver.
+func (c *CompletedConfig) GenericStorageProviders(discovery discovery.DiscoveryInterface) ([]RESTStorageProvider, error) {
+	// The order here is preserved in discovery.
+	// If resources with identical names exist in more than one of these groups (e.g. "deployments.apps"" and "deployments.extensions"),
+	// the order of this list determines which group an unqualified resource name (e.g. "deployments") should prefer.
+	// This priority order is used for local discovery, but it ends up aggregated in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go
+	// with specific priorities.
+	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
+	// handlers that we have.
+	return []RESTStorageProvider{
+		c.NewCoreGenericConfig(),
+		apiserverinternalrest.StorageProvider{},
+		authenticationrest.RESTStorageProvider{Authenticator: c.Generic.Authentication.Authenticator, APIAudiences: c.Generic.Authentication.APIAudiences},
+		authorizationrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer, RuleResolver: c.Generic.RuleResolver},
+		certificatesrest.RESTStorageProvider{},
+		coordinationrest.RESTStorageProvider{},
+		rbacrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer},
+		svmrest.RESTStorageProvider{},
+		flowcontrolrest.RESTStorageProvider{InformerFactory: c.Generic.SharedInformerFactory},
+		admissionregistrationrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer, DiscoveryClient: discovery},
+		eventsrest.RESTStorageProvider{TTL: c.EventTTL},
+	}, nil
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
