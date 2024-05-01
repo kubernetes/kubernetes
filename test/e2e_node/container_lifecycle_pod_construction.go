@@ -124,8 +124,8 @@ func (o containerOutputList) RunTogether(lhs, rhs string) error {
 	lhsStart := o.findIndex(lhs, "Started", 0)
 	rhsStart := o.findIndex(rhs, "Started", 0)
 
-	lhsFinish := o.findIndex(lhs, "Finishing", 0)
-	rhsFinish := o.findIndex(rhs, "Finishing", 0)
+	lhsFinish := o.findIndex(lhs, "Exiting", 0)
+	rhsFinish := o.findIndex(rhs, "Exiting", 0)
 
 	if lhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got\n%v", lhs, o)
@@ -135,11 +135,11 @@ func (o containerOutputList) RunTogether(lhs, rhs string) error {
 	}
 
 	if lhsFinish != -1 && rhsStart > lhsFinish {
-		return fmt.Errorf("expected %s to start before finishing %s, got\n%v", rhs, lhs, o)
+		return fmt.Errorf("expected %s to start before exiting %s, got\n%v", rhs, lhs, o)
 	}
 
 	if rhsFinish != -1 && lhsStart > rhsFinish {
-		return fmt.Errorf("expected %s to start before finishing %s, got\n%v", lhs, rhs, o)
+		return fmt.Errorf("expected %s to start before exiting %s, got\n%v", lhs, rhs, o)
 	}
 
 	return nil
