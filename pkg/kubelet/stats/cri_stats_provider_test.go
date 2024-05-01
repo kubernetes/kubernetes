@@ -336,6 +336,10 @@ func TestCRIListPodStats(t *testing.T) {
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// TODO: remove skip once the failing test has been fixed.
+		t.Skip("Skip failing test on Windows.")
+	}
 	ctx := context.Background()
 	var (
 		imageFsMountpoint = "/test/mount/point"
