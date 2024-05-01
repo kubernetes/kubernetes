@@ -353,3 +353,68 @@ func TestTaintTolerationFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulableAfterNodeChange(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		oldObj       interface{}
+		newObj       interface{}
+		expectedHint framework.QueueingHint
+		wantErr      bool
+	}{
+		{
+			name:         "backoff-wrong-new-object",
+			newObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			wantErr:      true,
+		},
+		{
+			name:         "backoff-wrong-old-object",
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			oldObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			wantErr:      true,
+		},
+		{
+			name:         "skip-queue-on-untoleratedtaint-node-added",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "queue-on-toleratedtaint-node-added",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
+			expectedHint: framework.Queue,
+		},
+		{
+			name:         "skip-unrelated-change",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}, {Key: "dedicated", Value: "user3", Effect: "NoSchedule"}}),
+			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "queue-on-taint-change",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
+			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pl := &TaintToleration{}
+			got, err := pl.isSchedulableAfterNodeChange(logger, test.pod, test.oldObj, test.newObj)
+			if (err != nil) != test.wantErr {
+				t.Errorf("isSchedulableAfterNodeChange() error = %v, wantErr %v", err, test.wantErr)
+			}
+			if got != test.expectedHint {
+				t.Errorf("isSchedulableAfterNodeChange() = %v, want %v", got, test.expectedHint)
+			}
+		})
+	}
+}
