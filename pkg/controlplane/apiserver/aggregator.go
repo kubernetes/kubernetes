@@ -236,10 +236,10 @@ func makeAPIServiceAvailableHealthCheck(name string, apiServices []*v1.APIServic
 	}
 
 	// Watch add/update events for APIServices
-	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{ //nolint:errcheck // no way to return error
 		AddFunc:    func(obj interface{}) { handleAPIServiceChange(obj.(*v1.APIService)) },
 		UpdateFunc: func(old, new interface{}) { handleAPIServiceChange(new.(*v1.APIService)) },
-	}) //nolint:errcheck // no way to return error
+	})
 
 	// Don't return healthy until the pending list is empty
 	return healthz.NamedCheck(name, func(r *http.Request) error {
