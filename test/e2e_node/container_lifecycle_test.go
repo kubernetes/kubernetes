@@ -1161,7 +1161,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 0,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1232,7 +1232,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1371,7 +1371,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1564,7 +1564,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 0,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1638,7 +1638,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1786,7 +1786,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -1985,7 +1985,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 0,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -2055,7 +2055,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -2199,7 +2199,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 							Name:  restartableInit1,
 							Image: busyboxImage,
 							Command: ExecCommand(restartableInit1, execCommand{
-								Delay:    1,
+								Delay:    5,
 								ExitCode: 1,
 							}),
 							RestartPolicy: &containerRestartPolicyAlways,
@@ -2703,7 +2703,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		ps3Last, err := results.TimeOfLastLoop(prefixedName(PreStopPrefix, restartableInit3))
 		framework.ExpectNoError(err)
 
-		const simulToleration = 0.5
+		const simulToleration = 500 // milliseconds
 		// should all end together since they loop infinitely and exceed their grace period
 		gomega.Expect(ps1Last-ps2Last).To(gomega.BeNumerically("~", 0, simulToleration),
 			fmt.Sprintf("expected PostStart 1 & PostStart 2 to be killed at the same time, got %s", results))
@@ -2713,12 +2713,12 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 			fmt.Sprintf("expected PostStart 2 & PostStart 3 to be killed at the same time, got %s", results))
 
 		// 30 seconds + 2 second minimum grace for the SIGKILL
-		const lifetimeToleration = 1
-		gomega.Expect(ps1Last-ps1).To(gomega.BeNumerically("~", 32, lifetimeToleration),
+		const lifetimeToleration = 1000 // milliseconds
+		gomega.Expect(ps1Last-ps1).To(gomega.BeNumerically("~", 32000, lifetimeToleration),
 			fmt.Sprintf("expected PostStart 1 to live for ~32 seconds, got %s", results))
-		gomega.Expect(ps2Last-ps2).To(gomega.BeNumerically("~", 32, lifetimeToleration),
+		gomega.Expect(ps2Last-ps2).To(gomega.BeNumerically("~", 32000, lifetimeToleration),
 			fmt.Sprintf("expected PostStart 2 to live for ~32 seconds, got %s", results))
-		gomega.Expect(ps3Last-ps3).To(gomega.BeNumerically("~", 32, lifetimeToleration),
+		gomega.Expect(ps3Last-ps3).To(gomega.BeNumerically("~", 32000, lifetimeToleration),
 			fmt.Sprintf("expected PostStart 3 to live for ~32 seconds, got %s", results))
 
 	})
@@ -2835,7 +2835,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		ps3, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit3))
 		framework.ExpectNoError(err)
 
-		const toleration = 0.5
+		const toleration = 500 // milliseconds
 		gomega.Expect(ps1-ps2).To(gomega.BeNumerically("~", 0, toleration),
 			fmt.Sprintf("expected PostStart 1 & PostStart 2 to start at the same time, got %s", results))
 		gomega.Expect(ps1-ps3).To(gomega.BeNumerically("~", 0, toleration),
