@@ -655,9 +655,10 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 func TestDescribeService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name     string
-		service  *corev1.Service
-		expected string
+		name           string
+		service        *corev1.Service
+		endpointSlices []*discoveryv1.EndpointSlice
+		expected       string
 	}{
 		{
 			name: "test1",
@@ -684,6 +685,25 @@ func TestDescribeService(t *testing.T) {
 					HealthCheckNodePort:   32222,
 				},
 			},
+			endpointSlices: []*discoveryv1.EndpointSlice{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar-abcde",
+					Namespace: "foo",
+					Labels: map[string]string{
+						"kubernetes.io/service-name": "bar",
+					},
+				},
+				Endpoints: []discoveryv1.Endpoint{
+					{Addresses: []string{"10.244.0.1"}},
+					{Addresses: []string{"10.244.0.2"}},
+					{Addresses: []string{"10.244.0.3"}},
+				},
+				Ports: []discoveryv1.EndpointPort{{
+					Name:     ptr.To("port-tcp"),
+					Port:     ptr.To[int32](9527),
+					Protocol: ptr.To(corev1.ProtocolTCP),
+				}},
+			}},
 			expected: dedent.Dedent(`
 				Name:                     bar
 				Namespace:                foo
@@ -698,7 +718,7 @@ func TestDescribeService(t *testing.T) {
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               9527/TCP
 				NodePort:                 port-tcp  31111/TCP
-				Endpoints:                <none>
+				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527
 				Session Affinity:         None
 				External Traffic Policy:  Local
 				HealthCheck NodePort:     32222
@@ -730,6 +750,45 @@ func TestDescribeService(t *testing.T) {
 					HealthCheckNodePort:   32222,
 				},
 			},
+			endpointSlices: []*discoveryv1.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-12345",
+						Namespace: "foo",
+						Labels: map[string]string{
+							"kubernetes.io/service-name": "bar",
+						},
+					},
+					Endpoints: []discoveryv1.Endpoint{
+						{Addresses: []string{"10.244.0.1"}},
+						{Addresses: []string{"10.244.0.2"}},
+					},
+					Ports: []discoveryv1.EndpointPort{{
+						Name:     ptr.To("port-tcp"),
+						Port:     ptr.To[int32](9527),
+						Protocol: ptr.To(corev1.ProtocolUDP),
+					}},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-54321",
+						Namespace: "foo",
+						Labels: map[string]string{
+							"kubernetes.io/service-name": "bar",
+						},
+					},
+					Endpoints: []discoveryv1.Endpoint{
+						{Addresses: []string{"10.244.0.3"}},
+						{Addresses: []string{"10.244.0.4"}},
+						{Addresses: []string{"10.244.0.5"}},
+					},
+					Ports: []discoveryv1.EndpointPort{{
+						Name:     ptr.To("port-tcp"),
+						Port:     ptr.To[int32](9527),
+						Protocol: ptr.To(corev1.ProtocolUDP),
+					}},
+				},
+			},
 			expected: dedent.Dedent(`
 				Name:                     bar
 				Namespace:                foo
@@ -744,7 +803,7 @@ func TestDescribeService(t *testing.T) {
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP
-				Endpoints:                <none>
+				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527 + 2 more...
 				Session Affinity:         None
 				External Traffic Policy:  Local
 				HealthCheck NodePort:     32222
@@ -776,6 +835,23 @@ func TestDescribeService(t *testing.T) {
 					HealthCheckNodePort:   32222,
 				},
 			},
+			endpointSlices: []*discoveryv1.EndpointSlice{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar-123ab",
+					Namespace: "foo",
+					Labels: map[string]string{
+						"kubernetes.io/service-name": "bar",
+					},
+				},
+				Endpoints: []discoveryv1.Endpoint{
+					{Addresses: []string{"10.244.0.1"}},
+				},
+				Ports: []discoveryv1.EndpointPort{{
+					Name:     ptr.To("port-tcp"),
+					Port:     ptr.To[int32](9527),
+					Protocol: ptr.To(corev1.ProtocolTCP),
+				}},
+			}},
 			expected: dedent.Dedent(`
 				Name:                     bar
 				Namespace:                foo
@@ -790,7 +866,7 @@ func TestDescribeService(t *testing.T) {
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP
-				Endpoints:                <none>
+				Endpoints:                10.244.0.1:9527
 				Session Affinity:         None
 				External Traffic Policy:  Local
 				HealthCheck NodePort:     32222
@@ -849,7 +925,11 @@ func TestDescribeService(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := fake.NewSimpleClientset(tc.service)
+			objects := []runtime.Object{tc.service}
+			for i := range tc.endpointSlices {
+				objects = append(objects, tc.endpointSlices[i])
+			}
+			fakeClient := fake.NewSimpleClientset(objects...)
 			c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
 			d := ServiceDescriber{c}
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
@@ -3087,7 +3167,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3103,7 +3183,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3216,12 +3296,12 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3301,7 +3381,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3321,11 +3401,11 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host        Path  Backends
   ----        ----  --------
-  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+  *           *     default-backend:80 (<error: services "default-backend" not found>)
 Annotations:  <none>
 Events:       <none>
 `,
@@ -3369,11 +3449,11 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    <none>
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host        Path  Backends
   ----        ----  --------
-  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+  *           *     default-backend:80 (<error: services "default-backend" not found>)
 Annotations:  <none>
 Events:       <none>
 `,
