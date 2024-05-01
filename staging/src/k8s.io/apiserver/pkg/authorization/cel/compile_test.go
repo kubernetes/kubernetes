@@ -59,7 +59,7 @@ func TestCompileCELExpression(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
