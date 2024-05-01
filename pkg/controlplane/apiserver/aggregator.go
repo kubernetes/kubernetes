@@ -159,7 +159,7 @@ func CreateAggregatorServer(aggregatorConfig aggregatorapiserver.CompletedConfig
 
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
 		if crdAPIEnabled {
-			go crdRegistrationController.Run(5, context.StopCh)
+			go crdRegistrationController.Run(5, context.Done())
 		}
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
@@ -172,7 +172,7 @@ func CreateAggregatorServer(aggregatorConfig aggregatorapiserver.CompletedConfig
 			} else {
 				klog.Infof("CRD API not enabled, starting APIService registration without waiting for initial CRD sync")
 			}
-			autoRegistrationController.Run(5, context.StopCh)
+			autoRegistrationController.Run(5, context.Done())
 		}()
 		return nil
 	})
@@ -236,10 +236,10 @@ func makeAPIServiceAvailableHealthCheck(name string, apiServices []*v1.APIServic
 	}
 
 	// Watch add/update events for APIServices
-	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{ //nolint:errcheck // no way to return error
 		AddFunc:    func(obj interface{}) { handleAPIServiceChange(obj.(*v1.APIService)) },
 		UpdateFunc: func(old, new interface{}) { handleAPIServiceChange(new.(*v1.APIService)) },
-	}) //nolint:errcheck // no way to return error
+	})
 
 	// Don't return healthy until the pending list is empty
 	return healthz.NamedCheck(name, func(r *http.Request) error {
