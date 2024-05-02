@@ -46,6 +46,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
@@ -334,6 +336,33 @@ func createSuperAdminKubeConfig(cfg *kubeadmapi.InitConfiguration, outDir string
 		superAdminPath       = filepath.Join(outDir, kubeadmconstants.SuperAdminKubeConfigFileName)
 		superAdminBackupPath = superAdminPath + ".backup"
 	)
+
+	// Check if the CA is missing on disk. This would mean a cluster with external CA is upgraded.
+	// Show a warning, apply the new admin RBAC and return without generating a separate 'super-admin.conf'.
+	_, _, err = pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if os.IsNotExist(errors.Cause(err)) {
+		klog.Warningf("The CA files do not exist in %q, assuming this is an external CA cluster. "+
+			"Skipping the generating of a 'super-admin.conf' file. Please read the release notes for 1.29 "+
+			"and manually migrate to the separate 'admin.conf' and 'super-admin.conf' files. "+
+			"To generate them you can use 'kubeadm init phase kubeconfig ...' on a host that has the CA, or alternatively "+
+			"you can use 'kubeadm certs generate-csr' to get the new kubeconfig specs and CSRs.",
+			cfg.CertificatesDir)
+
+		// Still apply the RBAC for the regular admin. If 'admin.conf' becomes non-elevated in the future
+		// after a manual interaction by the user the RBAC will be needed.
+		adminClient, err := kubeconfigutil.ClientSetFromFile(filepath.Join(outDir, kubeadmconstants.AdminKubeConfigFileName))
+		if err != nil {
+			return err
+		}
+		// The 'superAdminClient' argument is intentionally nil, so that the function fails if creating the RBAC
+		// with 'adminClient' fails.
+		_, err = ensureRBACFunc(context.Background(), adminClient, nil,
+			kubeadmconstants.APICallRetryInterval, kubeadmconstants.APICallWithWriteTimeout)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 
 	// Create new admin.conf and super-admin.conf.
 	// If something goes wrong, old existing files will be restored from backup as a best effort.
