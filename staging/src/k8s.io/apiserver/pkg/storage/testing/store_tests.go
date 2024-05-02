@@ -2527,12 +2527,12 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/pods", storageOpts, &got); !storage.IsInternalError(err) {
+	if err := store.GetList(ctx, "/pods", storageOpts, &got); !apierrors.IsStoreReadError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
 	// Get should fail
-	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !storage.IsInternalError(err) {
+	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !apierrors.IsStoreReadError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -2540,7 +2540,7 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 		return input, nil, nil
 	}
 	// GuaranteedUpdate without suggestion should return an error
-	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, updateFunc, nil); !storage.IsInternalError(err) {
+	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, updateFunc, nil); !apierrors.IsStoreReadError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	// GuaranteedUpdate with suggestion should return an error if we don't change the object
@@ -2549,10 +2549,10 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 	}
 
 	// Delete fails with internal error.
-	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil); !storage.IsInternalError(err) {
+	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil); !apierrors.IsStoreReadError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !storage.IsInternalError(err) {
+	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !apierrors.IsStoreReadError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }

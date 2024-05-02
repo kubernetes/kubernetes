@@ -179,7 +179,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(preparedKey))
 	if err != nil {
-		return storage.NewInternalError(err.Error())
+		return apierrors.NewStorageReadError(s.groupResource, key, map[string]error{preparedKey: err})
 	}
 
 	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
@@ -748,6 +748,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
+		failedKeys := make(map[string]error)
 		for i, kv := range getResp.Kvs {
 			if paging && int64(v.Len()) >= opts.Predicate.Limit {
 				hasMore = true
@@ -757,7 +758,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
+				failedKeys[string(kv.Key)] = err
+				continue
 			}
 
 			// Check if the request has already timed out before decode object
@@ -771,7 +773,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			obj, err := decodeListItem(ctx, data, uint64(kv.ModRevision), s.codec, s.versioner, newItemFunc)
 			if err != nil {
 				recordDecodeError(s.groupResourceString, string(kv.Key))
-				return err
+				failedKeys[string(kv.Key)] = err
+				continue
 			}
 
 			// being unable to set the version does not prevent the object from being extracted
@@ -783,6 +786,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
+		}
+		if len(failedKeys) > 0 {
+			return apierrors.NewStorageReadError(s.groupResource, key, failedKeys)
 		}
 
 		// no more results remain or we didn't request paging
@@ -922,7 +928,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 	} else {
 		data, stale, err := s.transformer.TransformFromStorage(ctx, getResp.Kvs[0].Value, authenticatedDataString(key))
 		if err != nil {
-			return nil, storage.NewInternalError(err.Error())
+			return nil, apierrors.NewStorageReadError(s.groupResource, key, map[string]error{key: err})
 		}
 		state.rev = getResp.Kvs[0].ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
