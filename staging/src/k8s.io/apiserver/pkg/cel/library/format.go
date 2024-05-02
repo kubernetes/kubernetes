@@ -145,7 +145,11 @@ var ConstantFormats map[string]*apiservercel.Format = map[string]*apiservercel.F
 		ValidateFunc: validation.IsQualifiedName,
 		MaxRegexSize: 60, // uses subdomain regex
 	},
-
+	"portName": {
+		Name:         "PortName",
+		ValidateFunc: validation.IsValidPortName,
+		MaxRegexSize: 20,
+	},
 	"dns1123LabelPrefix": {
 		Name:         "DNS1123LabelPrefix",
 		ValidateFunc: func(s string) []string { return apimachineryvalidation.NameIsDNSLabel(s, true) },
