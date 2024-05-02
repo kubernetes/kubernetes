@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 )
 
 // maxMsgSize use 16MB as the default message size limit.
@@ -77,18 +76,4 @@ func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	}
 
 	return nil
-}
-
-func log(logger *klog.Logger, level int, msg string, keyAndValues ...any) {
-	if logger == nil {
-		return
-	}
-	logger.V(level).Info(msg, keyAndValues...)
-}
-
-func logErr(logger *klog.Logger, err error, msg string, keyAndValues ...any) {
-	if logger == nil {
-		return
-	}
-	logger.Error(err, msg, keyAndValues...)
 }

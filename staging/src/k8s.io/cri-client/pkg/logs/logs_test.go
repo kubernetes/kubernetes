@@ -28,17 +28,14 @@ import (
 	"testing"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
-	v1 "k8s.io/api/core/v1"
-	apitesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/utils/pointer"
-
 	"github.com/stretchr/testify/assert"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utiltesting "k8s.io/client-go/util/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestLogOptions(t *testing.T) {
@@ -102,42 +99,42 @@ func TestReadLogs(t *testing.T) {
 		{
 			name: "using TailLines 2 should output last 2 lines",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64(2),
+				TailLines: ptr.To[int64](2),
 			},
 			expected: "line2\nline3\n",
 		},
 		{
 			name: "using TailLines 4 should output all lines when the log has less than 4 lines",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64(4),
+				TailLines: ptr.To[int64](4),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using TailLines 0 should output nothing",
 			podLogOptions: v1.PodLogOptions{
-				TailLines: pointer.Int64(0),
+				TailLines: ptr.To[int64](0),
 			},
 			expected: "",
 		},
 		{
 			name: "using LimitBytes 9 should output first 9 bytes",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64(9),
+				LimitBytes: ptr.To[int64](9),
 			},
 			expected: "line1\nlin",
 		},
 		{
 			name: "using LimitBytes 100 should output all bytes when the log has less than 100 bytes",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64(100),
+				LimitBytes: ptr.To[int64](100),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using LimitBytes 0 should output nothing",
 			podLogOptions: v1.PodLogOptions{
-				LimitBytes: pointer.Int64(0),
+				LimitBytes: ptr.To[int64](0),
 			},
 			expected: "",
 		},
@@ -166,7 +163,7 @@ func TestReadLogs(t *testing.T) {
 			name: "using follow combined with TailLines 2 should output the last 2 lines",
 			podLogOptions: v1.PodLogOptions{
 				Follow:    true,
-				TailLines: pointer.Int64(2),
+				TailLines: ptr.To[int64](2),
 			},
 			expected: "line2\nline3\n",
 		},
@@ -199,7 +196,7 @@ func TestReadLogs(t *testing.T) {
 			opts := NewLogOptions(&tc.podLogOptions, time.Now())
 			stdoutBuf := bytes.NewBuffer(nil)
 			stderrBuf := bytes.NewBuffer(nil)
-			err = ReadLogs(context.TODO(), file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+			err = ReadLogs(context.TODO(), nil, file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 
 			if err != nil {
 				t.Fatalf(err.Error())
@@ -245,7 +242,7 @@ func TestReadRotatedLog(t *testing.T) {
 			Follow: true,
 		}
 		opts := NewLogOptions(&podLogOptions, time.Now())
-		_ = ReadLogs(ctx, fileName, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+		_ = ReadLogs(ctx, nil, fileName, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 	}(ctx)
 
 	// log in stdout
@@ -262,7 +259,7 @@ func TestReadRotatedLog(t *testing.T) {
 
 	for line := 0; line < 10; line++ {
 		// Write the first three lines to log file
-		now := time.Now().Format(types.RFC3339NanoLenient)
+		now := time.Now().Format(RFC3339NanoLenient)
 		if line%2 == 0 {
 			file.WriteString(fmt.Sprintf(
 				`{"log":"line%d\n","stream":"stdout","time":"%s"}`+"\n", line, now))
@@ -523,7 +520,7 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 	var buf bytes.Buffer
 	w := io.MultiWriter(&buf)
 
-	err = ReadLogs(context.Background(), tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: true}, nil, w, w)
+	err = ReadLogs(context.Background(), nil, tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: true}, nil, w, w)
 	assert.NoError(t, err)
 
 	lineCount := 0
