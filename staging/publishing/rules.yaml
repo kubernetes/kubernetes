@@ -1490,6 +1490,14 @@ rules:
       dirs:
       - staging/src/k8s.io/cri-api
   library: true
+- destination: cri-client
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/cri-client
+  library: true
 - destination: kubelet
   branches:
   - name: master
