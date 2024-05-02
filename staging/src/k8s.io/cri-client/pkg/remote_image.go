@@ -29,12 +29,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	tracing "k8s.io/component-base/tracing"
-	"k8s.io/cri-client/pkg/util"
-	"k8s.io/klog/v2"
 
+	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+
+	"k8s.io/cri-client/pkg/internal"
+	"k8s.io/cri-client/pkg/util"
 )
 
 // remoteImageService is a gRPC implementation of internalapi.ImageManagerService.
@@ -46,7 +48,7 @@ type remoteImageService struct {
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
 func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider, logger *klog.Logger) (internalapi.ImageManagerService, error) {
-	log(logger, 3, "Connecting to image service", "endpoint", endpoint)
+	internal.Log(logger, 3, "Connecting to image service", "endpoint", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, err
@@ -86,7 +88,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 
 	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
-		logErr(logger, err, "Connect remote image service failed", "address", addr)
+		internal.LogErr(logger, err, "Connect remote image service failed", "address", addr)
 		return nil, err
 	}
 
@@ -103,11 +105,11 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 }
 
 func (r *remoteImageService) log(level int, msg string, keyAndValues ...any) {
-	log(r.logger, level, msg, keyAndValues...)
+	internal.Log(r.logger, level, msg, keyAndValues...)
 }
 
 func (r *remoteImageService) logErr(err error, msg string, keyAndValues ...any) {
-	logErr(r.logger, err, msg, keyAndValues...)
+	internal.LogErr(r.logger, err, msg, keyAndValues...)
 }
 
 // validateServiceConnection tries to connect to the remote image service by

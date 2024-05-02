@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package internal
 
-const (
-	// ResolvConfDefault is the system default DNS resolver configuration.
-	ResolvConfDefault = "/etc/resolv.conf"
-)
+import "k8s.io/klog/v2"
 
-// User visible keys for managing node allocatable enforcement on the node.
-const (
-	NodeAllocatableEnforcementKey = "pods"
-	SystemReservedEnforcementKey  = "system-reserved"
-	KubeReservedEnforcementKey    = "kube-reserved"
-	NodeAllocatableNoneKey        = "none"
-)
+func Log(logger *klog.Logger, level int, msg string, keyAndValues ...any) {
+	if logger == nil {
+		return
+	}
+	logger.V(level).Info(msg, keyAndValues...)
+}
 
-// SwapBehavior types
-const (
-	LimitedSwap = "LimitedSwap"
-	NoSwap      = "NoSwap"
-)
+func LogErr(logger *klog.Logger, err error, msg string, keyAndValues ...any) {
+	if logger == nil {
+		return
+	}
+	logger.Error(err, msg, keyAndValues...)
+}
