@@ -148,12 +148,12 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 }
 
 func (e *transformTest) cleanUp() {
-	if e.configDir != "" {
-		os.RemoveAll(e.configDir)
-	}
-
 	if e.kubeAPIServer.ClientConfig != nil {
 		e.shutdownAPIServer()
+	}
+
+	if e.configDir != "" {
+		os.RemoveAll(e.configDir)
 	}
 }
 
