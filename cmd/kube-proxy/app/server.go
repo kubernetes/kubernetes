@@ -44,6 +44,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -51,9 +52,11 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/events"
+	toolswatch "k8s.io/client-go/tools/watch"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
@@ -628,7 +631,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		return nil, err
 	}
 
-	rawNodeIPs := getNodeIPs(ctx, s.Client, s.Hostname)
+	rawNodeIPs := waitForNodeIPs(ctx, s.Client, s.Hostname)
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 
 	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
@@ -1084,31 +1087,51 @@ func detectNodeIPs(ctx context.Context, rawNodeIPs []net.IP, bindAddress string)
 	return primaryFamily, nodeIPs
 }
 
-// getNodeIP returns IPs for the node with the provided name.  If
+// waitForNodeIPs returns IPs for the node with the provided name. If
 // required, it will wait for the node to be created.
-func getNodeIPs(ctx context.Context, client clientset.Interface, name string) []net.IP {
+func waitForNodeIPs(ctx context.Context, client clientset.Interface, name string) []net.IP {
 	logger := klog.FromContext(ctx)
-	var nodeIPs []net.IP
-	backoff := wait.Backoff{
-		Steps:    6,
-		Duration: 1 * time.Second,
-		Factor:   2.0,
-		Jitter:   0.2,
-	}
 
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			logger.Error(err, "Failed to retrieve node info")
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
+			options.FieldSelector = fieldSelector
+			// Make initial list read from etcd to avoid stale node object
+			if options.ResourceVersion == "0" {
+				options.ResourceVersion = ""
+			}
+			return client.CoreV1().Nodes().List(ctx, options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
+			options.FieldSelector = fieldSelector
+			return client.CoreV1().Nodes().Watch(ctx, options)
+		},
+	}
+	var nodeIPs []net.IP
+	var err error
+	condition := func(event watch.Event) (bool, error) {
+		// don't process delete events
+		if event.Type != watch.Modified && event.Type != watch.Added {
 			return false, nil
 		}
-		nodeIPs, err = utilnode.GetNodeHostIPs(node)
+
+		n, ok := event.Object.(*v1.Node)
+		if !ok {
+			return false, fmt.Errorf("event object not of type Node")
+		}
+		// don't consider the node if is going to be deleted and keep waiting
+		if !n.DeletionTimestamp.IsZero() {
+			return false, nil
+		}
+		nodeIPs, err = utilnode.GetNodeHostIPs(n)
 		if err != nil {
 			logger.Error(err, "Failed to retrieve node IPs")
 			return false, nil
 		}
 		return true, nil
-	})
+	}
+
+	_, err = toolswatch.UntilWithSync(ctx, lw, &v1.Node{}, nil, condition)
 	if err == nil {
 		logger.Info("Successfully retrieved node IP(s)", "IPs", nodeIPs)
 	}
