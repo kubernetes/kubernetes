@@ -2154,7 +2154,7 @@ func waitingWithLastTerminationUnknown(cName string, restartCount int32) v1.Cont
 		},
 		LastTerminationState: v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
-				Reason:   "ContainerStatusUnknown",
+				Reason:   kubecontainer.ContainerReasonStatusUnknown,
 				Message:  "The container could not be located when the pod was deleted.  The container used to be Running",
 				ExitCode: 137,
 			},

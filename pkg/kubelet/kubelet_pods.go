@@ -2016,7 +2016,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			// twice. "container never ran" is different than "container ran and failed".  This is handled differently in the kubelet
 			// and it is handled differently in higher order logic like crashloop detection and handling
 			status.State.Terminated = &v1.ContainerStateTerminated{
-				Reason:   "ContainerStatusUnknown",
+				Reason:   kubecontainer.ContainerReasonStatusUnknown,
 				Message:  "The container could not be located when the pod was terminated",
 				ExitCode: 137, // this code indicates an error
 			}
@@ -2226,7 +2226,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// https://github.com/kubernetes/kubernetes/blob/90c9f7b3e198e82a756a68ffeac978a00d606e55/pkg/kubelet/kubelet_pods.go#L1440-L1445
 		// This prevents the pod from becoming pending
 		status.LastTerminationState.Terminated = &v1.ContainerStateTerminated{
-			Reason:   "ContainerStatusUnknown",
+			Reason:   kubecontainer.ContainerReasonStatusUnknown,
 			Message:  "The container could not be located when the pod was deleted.  The container used to be Running",
 			ExitCode: 137,
 		}
