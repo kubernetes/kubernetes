@@ -6563,7 +6563,7 @@ type LocalObjectReference struct {
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// +optional
 	// +default=""
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
 
 // TypedLocalObjectReference contains enough information to let you locate the
