@@ -274,6 +274,9 @@ const (
 	ContainerStateUnknown State = "unknown"
 )
 
+// ContainerReasonStatusUnknown indicates a container the status of the container cannot be determined.
+const ContainerReasonStatusUnknown string = "ContainerStatusUnknown"
+
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.
 type Container struct {

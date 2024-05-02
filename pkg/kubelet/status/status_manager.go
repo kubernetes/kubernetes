@@ -446,7 +446,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 			}
 			status.ContainerStatuses[i].State = v1.ContainerState{
 				Terminated: &v1.ContainerStateTerminated{
-					Reason:   "ContainerStatusUnknown",
+					Reason:   kubecontainer.ContainerReasonStatusUnknown,
 					Message:  "The container could not be located when the pod was terminated",
 					ExitCode: 137,
 				},
@@ -462,7 +462,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 		}
 		status.InitContainerStatuses[i].State = v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{
-				Reason:   "ContainerStatusUnknown",
+				Reason:   kubecontainer.ContainerReasonStatusUnknown,
 				Message:  "The container could not be located when the pod was terminated",
 				ExitCode: 137,
 			},
