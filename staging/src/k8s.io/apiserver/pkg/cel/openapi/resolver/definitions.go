@@ -19,6 +19,7 @@ package resolver
 import (
 	"fmt"
 
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -85,6 +86,9 @@ func (d *DefinitionsSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (
 			}
 		}
 
+		// Native type schemas for now may use unsupported formats that
+		// should be strippe such as int-or-string
+		validation.StripUnsupportedFormatsPostProcess(&s)
 		return &s, true
 	}, ref)
 	if err != nil {
