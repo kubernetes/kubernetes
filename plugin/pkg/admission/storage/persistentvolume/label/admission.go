@@ -57,7 +57,6 @@ type persistentVolumeLabel struct {
 
 	mutex            sync.Mutex
 	cloudConfig      []byte
-	gcePVLabeler     cloudprovider.PVLabeler
 	azurePVLabeler   cloudprovider.PVLabeler
 	vspherePVLabeler cloudprovider.PVLabeler
 }
@@ -199,12 +198,6 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 
 	// Either missing labels or we don't trust the user provided correct values.
 	switch {
-	case volume.Spec.GCEPersistentDisk != nil:
-		labels, err := l.findGCEPDLabels(volume)
-		if err != nil {
-			return nil, fmt.Errorf("error querying GCE PD volume %s: %v", volume.Spec.GCEPersistentDisk.PDName, err)
-		}
-		return labels, nil
 	case volume.Spec.AzureDisk != nil:
 		labels, err := l.findAzureDiskLabels(volume)
 		if err != nil {
@@ -220,55 +213,6 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 	}
 	// Unrecognized volume, do not add any labels
 	return nil, nil
-}
-
-func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (map[string]string, error) {
-	// Ignore any volumes that are being provisioned
-	if volume.Spec.GCEPersistentDisk.PDName == cloudvolume.ProvisionedVolumeName {
-		return nil, nil
-	}
-
-	pvlabler, err := l.getGCEPVLabeler()
-	if err != nil {
-		return nil, err
-	}
-	if pvlabler == nil {
-		return nil, fmt.Errorf("unable to build GCE cloud provider for PD")
-	}
-
-	pv := &v1.PersistentVolume{}
-	err = k8s_api_v1.Convert_core_PersistentVolume_To_v1_PersistentVolume(volume, pv, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert PersistentVolume to core/v1: %q", err)
-	}
-	return pvlabler.GetLabelsForVolume(context.TODO(), pv)
-}
-
-// getGCEPVLabeler returns the GCE implementation of PVLabeler
-func (l *persistentVolumeLabel) getGCEPVLabeler() (cloudprovider.PVLabeler, error) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	if l.gcePVLabeler == nil {
-		var cloudConfigReader io.Reader
-		if len(l.cloudConfig) > 0 {
-			cloudConfigReader = bytes.NewReader(l.cloudConfig)
-		}
-
-		cloudProvider, err := cloudprovider.GetCloudProvider("gce", cloudConfigReader)
-		if err != nil || cloudProvider == nil {
-			return nil, err
-		}
-
-		gcePVLabeler, ok := cloudProvider.(cloudprovider.PVLabeler)
-		if !ok {
-			return nil, errors.New("GCE cloud provider does not implement PV labeling")
-		}
-
-		l.gcePVLabeler = gcePVLabeler
-
-	}
-	return l.gcePVLabeler, nil
 }
 
 // getAzurePVLabeler returns the Azure implementation of PVLabeler
