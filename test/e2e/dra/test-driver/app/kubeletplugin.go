@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/google/go-cmp/cmp"
@@ -544,4 +545,15 @@ func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
 	calls := make([]GRPCCall, 0, len(ex.gRPCCalls))
 	calls = append(calls, ex.gRPCCalls...)
 	return calls
+}
+
+// CountCalls counts GRPC calls with the given method suffix.
+func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
+	count := 0
+	for _, call := range ex.GetGRPCCalls() {
+		if strings.HasSuffix(call.FullMethod, methodSuffix) {
+			count += 1
+		}
+	}
+	return count
 }
