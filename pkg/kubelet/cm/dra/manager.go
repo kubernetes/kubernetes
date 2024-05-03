@@ -223,12 +223,6 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 
 			// Loop through all plugins and prepare for calling NodePrepareResources.
 			for _, resourceHandle := range claimInfo.ResourceHandles {
-				// If no DriverName is provided in the resourceHandle, we
-				// use the DriverName from the status
-				pluginName := claimInfo.DriverName
-				if pluginName == "" {
-					pluginName = claimInfo.DriverName
-				}
 				claim := &drapb.Claim{
 					Namespace:      claimInfo.Namespace,
 					Uid:            string(claimInfo.ClaimUID),
@@ -238,6 +232,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 				if resourceHandle.StructuredData != nil {
 					claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
 				}
+				pluginName := resourceHandle.DriverName
 				batches[pluginName] = append(batches[pluginName], claim)
 			}
 
@@ -459,13 +454,6 @@ func (m *ManagerImpl) unprepareResources(podUID types.UID, namespace string, cla
 
 			// Loop through all plugins and prepare for calling NodeUnprepareResources.
 			for _, resourceHandle := range claimInfo.ResourceHandles {
-				// If no DriverName is provided in the resourceHandle, we
-				// use the DriverName from the status
-				pluginName := resourceHandle.DriverName
-				if pluginName == "" {
-					pluginName = claimInfo.DriverName
-				}
-
 				claim := &drapb.Claim{
 					Namespace:      claimInfo.Namespace,
 					Uid:            string(claimInfo.ClaimUID),
@@ -475,6 +463,7 @@ func (m *ManagerImpl) unprepareResources(podUID types.UID, namespace string, cla
 				if resourceHandle.StructuredData != nil {
 					claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
 				}
+				pluginName := resourceHandle.DriverName
 				batches[pluginName] = append(batches[pluginName], claim)
 			}
 
