@@ -2316,6 +2316,9 @@ message LocalObjectReference {
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   // +optional
   // +default=""
+  // +kubebuilder:default=""
+  // TODO: Drop `kubebuilder:default` when controller-gen doesn't need it
+  // https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
   optional string name = 1;
 }
 
