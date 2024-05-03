@@ -130,13 +130,14 @@ func (m *testMetric) notify() {
 }
 
 type testMetricsProvider struct {
-	depth      testMetric
-	adds       testMetric
-	latency    testMetric
-	duration   testMetric
-	unfinished testMetric
-	longest    testMetric
-	retries    testMetric
+	depth           testMetric
+	adds            testMetric
+	latency         testMetric
+	duration        testMetric
+	unfinished      testMetric
+	longest         testMetric
+	retries         testMetric
+	waitingForDepth testMetric
 }
 
 func (m *testMetricsProvider) NewDepthMetric(name string) GaugeMetric {
@@ -165,6 +166,10 @@ func (m *testMetricsProvider) NewLongestRunningProcessorSecondsMetric(name strin
 
 func (m *testMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return &m.retries
+}
+
+func (m *testMetricsProvider) NewWaitingForQueueDepthMetric(name string) GaugeMetric {
+	return &m.waitingForDepth
 }
 
 func TestMetrics(t *testing.T) {

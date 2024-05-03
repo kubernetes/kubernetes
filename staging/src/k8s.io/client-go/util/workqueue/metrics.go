@@ -153,20 +153,39 @@ func (m *defaultQueueMetrics) sinceInSeconds(start time.Time) float64 {
 	return m.clock.Since(start).Seconds()
 }
 
-type retryMetrics interface {
+type delayQueueMetrics interface {
 	retry()
+
+	addToWaitingForQueue()
+	removeFromWaitingForQueue()
 }
 
-type defaultRetryMetrics struct {
-	retries CounterMetric
+type defaultDelayQueueMetrics struct {
+	retries              CounterMetric
+	waitingForQueueDepth GaugeMetric
 }
 
-func (m *defaultRetryMetrics) retry() {
+func (m *defaultDelayQueueMetrics) retry() {
 	if m == nil {
 		return
 	}
 
 	m.retries.Inc()
+}
+
+func (m *defaultDelayQueueMetrics) addToWaitingForQueue() {
+	if m == nil {
+		return
+	}
+	m.waitingForQueueDepth.Inc()
+}
+
+func (m *defaultDelayQueueMetrics) removeFromWaitingForQueue() {
+	if m == nil {
+		return
+	}
+
+	m.waitingForQueueDepth.Dec()
 }
 
 // MetricsProvider generates various metrics used by the queue.
@@ -178,6 +197,7 @@ type MetricsProvider interface {
 	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
 	NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
+	NewWaitingForQueueDepthMetric(name string) GaugeMetric
 }
 
 type noopMetricsProvider struct{}
@@ -207,6 +227,10 @@ func (_ noopMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string
 }
 
 func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
+	return noopMetric{}
+}
+
+func (_ noopMetricsProvider) NewWaitingForQueueDepthMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
 
@@ -244,8 +268,8 @@ func (f *queueMetricsFactory) newQueueMetrics(name string, clock clock.Clock) qu
 	}
 }
 
-func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
-	var ret *defaultRetryMetrics
+func newDelayQueueMetrics(name string, provider MetricsProvider) delayQueueMetrics {
+	var ret *defaultDelayQueueMetrics
 	if len(name) == 0 {
 		return ret
 	}
@@ -254,8 +278,9 @@ func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
 		provider = globalMetricsFactory.metricsProvider
 	}
 
-	return &defaultRetryMetrics{
-		retries: provider.NewRetriesMetric(name),
+	return &defaultDelayQueueMetrics{
+		retries:              provider.NewRetriesMetric(name),
+		waitingForQueueDepth: provider.NewWaitingForQueueDepthMetric(name),
 	}
 }
 

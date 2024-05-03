@@ -33,7 +33,7 @@ func TestRateLimitingQueue(t *testing.T) {
 		heartbeat:       fakeClock.NewTicker(maxWait),
 		stopCh:          make(chan struct{}),
 		waitingForAddCh: make(chan *waitFor, 1000),
-		metrics:         newRetryMetrics("", nil),
+		metrics:         newDelayQueueMetrics("", nil),
 	}
 	queue.TypedDelayingInterface = delayingQueue
 
