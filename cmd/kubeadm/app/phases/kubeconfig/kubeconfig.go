@@ -103,9 +103,6 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 	return nil
 }
 
-// CreateKubeConfigFileFunc defines a function type used for creating kubeconfig files.
-type CreateKubeConfigFileFunc func(string, string, *kubeadmapi.InitConfiguration) error
-
 // CreateKubeConfigFile creates a kubeconfig file.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadmapi.InitConfiguration) error {
