@@ -133,9 +133,22 @@ func (s sortableWatchCacheEvents) Swap(i, j int) {
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getAttrsFunc attrFunc) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getAttrsFunc attrFunc, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
-	allItems := store.List()
+	var allItems []interface{}
+
+	if matchesSingle {
+		item, exists, err := store.GetByKey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		if exists {
+			allItems = append(allItems, item)
+		}
+	} else {
+		allItems = store.List()
+	}
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))
 	for i, item := range allItems {
 		elem, ok := item.(*storeElement)
