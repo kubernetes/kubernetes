@@ -5130,8 +5130,8 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		return allErrs
 	}
 
-	if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
-		allErrs = append(allErrs, field.Invalid(fldPath, newPod.Status.QOSClass, "Pod QoS is immutable"))
+	if computedNewQOS := qos.ComputePodQOS(newPod); qos.GetPodQOS(oldPod) != computedNewQOS {
+		allErrs = append(allErrs, field.Invalid(fldPath, computedNewQOS, "pod resource changes may not change computed pod QoS, pod QoS is immutable"))
 	}
 
 	// handle updateable fields by munging those fields prior to deep equal comparison.

@@ -1510,7 +1510,7 @@ func doPodResizeErrorTests() {
 			patchString: `{"spec":{"containers":[
 						{"name":"c1", "resources":{"requests":{"memory":"400Mi"}}}
 					]}}`,
-			patchError: "Pod QoS is immutable",
+			patchError: `Pod "testpod" is invalid: metadata: Invalid value: "Burstable": pod resource changes may not change computed pod QoS, pod QoS is immutable`,
 			expected: []TestContainerInfo{
 				{
 					Name: "c1",
@@ -1559,6 +1559,7 @@ func doPodResizeErrorTests() {
 				framework.ExpectNoError(pErr, "failed to patch pod for resize")
 			} else {
 				gomega.Expect(pErr).To(gomega.HaveOccurred(), tc.patchError)
+				gomega.Expect(pErr.Error()).To(gomega.Equal(tc.patchError))
 				patchedPod = newPod
 			}
 
