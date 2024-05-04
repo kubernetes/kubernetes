@@ -27,10 +27,13 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/x509metrics"
 	"k8s.io/client-go/transport"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
@@ -59,6 +62,9 @@ type proxyHandler struct {
 
 	// reject to forward redirect response
 	rejectForwardingRedirects bool
+
+	// tracerProvider is used to wrap the proxy transport and handler with tracing
+	tracerProvider tracing.TracerProvider
 }
 
 type proxyHandlingInfo struct {
@@ -154,6 +160,11 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	upgrade := httpstream.IsUpgradeRequest(req)
 
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), proxyRoundTripper)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) && !upgrade {
+		tracingWrapper := tracing.WrapperFor(r.tracerProvider)
+		proxyRoundTripper = tracingWrapper(proxyRoundTripper)
+	}
 
 	// If we are upgrading, then the upgrade path tries to use this request with the TLS config we provide, but it does
 	// NOT use the proxyRoundTripper.  It's a direct dial that bypasses the proxyRoundTripper.  This means that we have to
