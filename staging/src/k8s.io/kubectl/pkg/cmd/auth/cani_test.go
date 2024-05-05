@@ -64,6 +64,15 @@ func TestRunAccessCheck(t *testing.T) {
 			},
 		},
 		{
+			name:    "access all resources within a specific group",
+			o:       &CanIOptions{},
+			args:    []string{"get", "*.apps"},
+			allowed: true,
+			expectedBodyStrings: []string{
+				`{"resourceAttributes":{"namespace":"test","verb":"get","group":"apps","resource":"*"}}`,
+			},
+		},
+		{
 			name: "all namespaces",
 			o: &CanIOptions{
 				AllNamespaces: true,
@@ -246,6 +255,15 @@ func TestRunResourceFor(t *testing.T) {
 			resourceArg: "*",
 			expectGVR: schema.GroupVersionResource{
 				Resource: "*",
+			},
+		},
+		{
+			name:        "any resources inside a specific group",
+			o:           &CanIOptions{},
+			resourceArg: "*.apps",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "*",
+				Group:    "apps",
 			},
 		},
 		{
