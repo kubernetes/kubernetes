@@ -616,8 +616,7 @@ func (asw *actualStateOfWorld) GetAttachedVolumesForNode(
 	asw.RLock()
 	defer asw.RUnlock()
 
-	attachedVolumes := make(
-		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	attachedVolumes := make([]AttachedVolume, 0)
 	for _, volumeObj := range asw.attachedVolumes {
 		if nodeObj, nodeExists := volumeObj.nodesAttachedTo[nodeName]; nodeExists {
 			attachedVolumes = append(
