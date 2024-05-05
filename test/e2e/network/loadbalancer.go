@@ -501,7 +501,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should have session affinity work for LoadBalancer service with ESIPP on", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should have session affinity work for LoadBalancer service with Local traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-esipp")
@@ -511,7 +511,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should be able to switch session affinity for LoadBalancer service with ESIPP on", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should be able to switch session affinity for LoadBalancer service with Local traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-esipp-transition")
@@ -521,7 +521,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should have session affinity work for LoadBalancer service with ESIPP off", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should have session affinity work for LoadBalancer service with Cluster traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb")
@@ -531,7 +531,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should be able to switch session affinity for LoadBalancer service with ESIPP off", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	f.It("should be able to switch session affinity for LoadBalancer service with Cluster traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-transition")
@@ -926,7 +926,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 })
 
-var _ = common.SIGDescribe("LoadBalancers ESIPP", feature.LoadBalancer, framework.WithSlow(), func() {
+var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature.LoadBalancer, framework.WithSlow(), func() {
 	// FIXME: What are the expected semantics of requesting an
 	// "ExternalTrafficPolicy: Local" service from a cloud provider that does not
 	// support that? What are the expected semantics of "ExternalTrafficPolicy: Local"
@@ -1196,10 +1196,10 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", feature.LoadBalancer, framewor
 			framework.ExpectNoError(err)
 		})
 
-		// save the health check node port because it disappears when ESIPP is turned off.
+		// save the health check node port because it disappears when Local traffic policy is turned off.
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 
-		ginkgo.By("turning ESIPP off")
+		ginkgo.By("changing ExternalTrafficPolicy to Cluster")
 		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
 		})
@@ -1271,7 +1271,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", feature.LoadBalancer, framewor
 				return false, nil
 			}
 			if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.TestTimeout, true, pollFn); pollErr != nil {
-				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. body %s",
+				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after traffic policy set to Cluster. body %s",
 					nodeName, healthCheckNodePort, body)
 			}
 		}
@@ -1301,7 +1301,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", feature.LoadBalancer, framewor
 			return false, nil
 		})
 		if pollErr != nil {
-			framework.Failf("Source IP WAS preserved even after ESIPP turned off. Got %v, expected a ten-dot cluster ip.", clientIP)
+			framework.Failf("Source IP WAS preserved with Cluster traffic policy. Got %v, expected a cluster ip.", clientIP)
 		}
 
 		// TODO: We need to attempt to create another service with the previously
@@ -1310,7 +1310,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", feature.LoadBalancer, framewor
 		// If the health check nodePort has NOT been freed, the new service
 		// creation will fail.
 
-		ginkgo.By("setting ExternalTraffic field back to OnlyLocal")
+		ginkgo.By("setting ExternalTrafficPolicy back to Local")
 		svc, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
@@ -1341,7 +1341,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", feature.LoadBalancer, framewor
 			return false, nil
 		})
 		if pollErr != nil {
-			framework.Failf("Source IP (%v) is not the client IP even after ESIPP turned on, expected a public IP.", clientIP)
+			framework.Failf("Source IP (%v) is not the client IP after ExternalTrafficPolicy set back to Local, expected a public IP.", clientIP)
 		}
 	})
 })
