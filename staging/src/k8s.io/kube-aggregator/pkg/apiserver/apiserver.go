@@ -246,13 +246,12 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		tracerProvider:             c.GenericConfig.TracerProvider,
 	}
 
-	// used later  to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*c.GenericConfig.Version)
+	_, err = genericapiserver.NewResourceExpirationEvaluator(*c.GenericConfig.Version)
 	if err != nil {
 		return nil, err
 	}
 
-	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter, resourceExpirationEvaluator.ShouldServeForVersion(1, 22))
+	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
