@@ -464,8 +464,8 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 // version in the endpointSliceTracker or the managed-by value of the
 // EndpointSlice has changed from or to this controller.
 func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj interface{}) {
-	prevEndpointSlice := obj.(*discovery.EndpointSlice)
-	endpointSlice := prevObj.(*discovery.EndpointSlice)
+	endpointSlice := obj.(*discovery.EndpointSlice)
+	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj))
 		return
