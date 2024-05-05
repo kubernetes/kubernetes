@@ -64,7 +64,7 @@ func NewSnippetWriter(w io.Writer, c *Context, left, right string) *SnippetWrite
 //
 // 'args' can be quite literally anything; read the text/template documentation
 // for details. Maps and structs work particularly nicely. Conveniently, the
-// types package is designed to have structs that are easily referencable from
+// types package is designed to have structs that are easily referenceable from
 // the template language.
 //
 // Example:
