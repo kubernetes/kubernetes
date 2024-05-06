@@ -541,10 +541,10 @@ func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string)
 }
 
 func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
-	cStatus = toKubeContainerStatus(status, m.runtimeName)
+	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+	cStatus = toKubeContainerStatus(status, m.runtimeName, annotatedInfo)
 	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
 		// Populate the termination message if needed.
-		annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
 		// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
 		fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError &&
 			cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
@@ -602,8 +602,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 	return statuses, nil
 }
 
-func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
-	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName string, annotatedInfo *annotatedContainerInfo) *kubecontainer.Status {
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	var cStatusResources *kubecontainer.ContainerResources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
@@ -628,7 +627,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		ImageRef:            status.ImageRef,
 		ImageRuntimeHandler: status.Image.RuntimeHandler,
 		Hash:                annotatedInfo.Hash,
-		RestartCount:        annotatedInfo.RestartCount,
+		RestartCount:        int(status.Metadata.Attempt),
 		State:               toKubeContainerState(status.State),
 		CreatedAt:           time.Unix(0, status.CreatedAt),
 		Resources:           cStatusResources,
