@@ -641,6 +641,42 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
+func TestCSILimitsAddedPVCQHint(t *testing.T) {
+	tests := []struct {
+		test      string
+		newPod    *v1.Pod
+		addedPvc  *v1.PersistentVolumeClaim
+		wantQHint framework.QueueingHint
+	}{
+		{
+			test:      "the pod isn't in the same namespace as the added PVC",
+			newPod:    st.MakePod().Namespace("ns1").Obj(),
+			addedPvc:  st.MakePersistentVolumeClaim().Namespace("ns2").Obj(),
+			wantQHint: framework.QueueSkip,
+		},
+		{
+			test:      "the pod is in the same namespace as the added PVC",
+			newPod:    st.MakePod().Namespace("ns1").Obj(),
+			addedPvc:  st.MakePersistentVolumeClaim().Namespace("ns1").Obj(),
+			wantQHint: framework.Queue,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.test, func(t *testing.T) {
+			p := &CSILimits{}
+			logger, _ := ktesting.NewTestContext(t)
+			qhint, err := p.isSchedulableAfterPVCAdded(logger, test.newPod, nil, test.addedPvc)
+			if err != nil {
+				t.Errorf("isSchedulableAfterPodDeleted failed: %v", err)
+			}
+			if qhint != test.wantQHint {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
+			}
+		})
+	}
+}
+
 func getFakeCSIPVLister(volumeName string, driverNames ...string) tf.PersistentVolumeLister {
 	pvLister := tf.PersistentVolumeLister{}
 	for _, driver := range driverNames {
