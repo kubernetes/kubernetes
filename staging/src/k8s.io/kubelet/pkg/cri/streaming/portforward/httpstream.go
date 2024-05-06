@@ -18,13 +18,11 @@ package portforward
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
-	"syscall"
 	"time"
 
 	api "k8s.io/api/core/v1"
@@ -240,16 +238,6 @@ Loop:
 	}
 }
 
-// portForwardErrResponse
-// It will be sent to the client to instruct the client whether to close the Connection.
-type portForwardErrResponse struct {
-	// unexpected error was encountered and the entire connection needs to be closed.
-	CloseConnection bool `json:"closeConnection,omitempty"`
-	// error details
-	// regardless of whether we encounter an expected error, we still need to set it up.
-	Message string `json:"message,omitempty"`
-}
-
 // portForward invokes the httpStreamHandler's forwarder.PortForward
 // function for the given stream pair.
 func (h *httpStreamHandler) portForward(p *httpStreamPair) {
@@ -264,39 +252,7 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
 	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
 
-	// happy path, we have successfully completed forwarding task
-	if err == nil {
-		return
-	}
-
-	errResp := portForwardErrResponse{
-		CloseConnection: false,
-	}
-	if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
-		// During the forwarding process, if these types of errors are encountered,
-		// we should continue to provide port forwarding services.
-		//
-		// These two errors can occur in the following scenarios:
-		// ECONNRESET: the target process reset connection between CRI and itself.
-		// see: https://github.com/kubernetes/kubernetes/issues/111825 for detail
-		//
-		// EPIPE: the target process did not read the received data, causing the
-		// buffer in the kernel to be full, resulting in the occurrence of Zero Window,
-		// then closing the connection (FIN, RESET)
-		// see: https://github.com/kubernetes/kubernetes/issues/74551 for detail
-		klog.ErrorS(err, "forwarding port", "conn", h.conn, "request", p.requestID, "port", portString)
-	} else {
-		errResp.CloseConnection = true
-	}
-
-	// send error messages to the client to let our users know what happened.
-	msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %w", port, h.pod, h.uid, err)
-	errResp.Message = msg.Error()
-	utilruntime.HandleError(msg)
-	err = json.NewEncoder(p.errorStream).Encode(errResp)
-	if err != nil {
-		klog.ErrorS(err, "encode the resp", "conn", h.conn, "request", p.requestID, "port", portString)
-	}
+	handleStreamPortForwardErr(err, h.pod, int32(port), h.uid, p.requestID, h.conn, p.errorStream)
 }
 
 // httpStreamPair represents the error and data streams for a port

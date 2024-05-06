@@ -18,14 +18,30 @@ package portforward
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"syscall"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+
+	"k8s.io/klog/v2"
 )
+
+// portForwardErrResponse
+// It will be sent to the client to instruct the client whether to close the Connection.
+type portForwardErrResponse struct {
+	// unexpected error was encountered and the connection needs to be closed.
+	CloseConnection bool `json:"closeConnection,omitempty"`
+	// error details
+	// regardless of whether we encounter an expected error, we still need to set it up.
+	Message string `json:"message,omitempty"`
+}
 
 // PortForwarder knows how to forward content from a data stream to/from a port
 // in a pod.
@@ -50,5 +66,43 @@ func ServePortForward(w http.ResponseWriter, req *http.Request, portForwarder Po
 	if err != nil {
 		runtime.HandleError(err)
 		return
+	}
+}
+
+// handleStreamPortForwardErr
+// Whether it is httpStream or WebSocket, we use the same method to handle errors.
+func handleStreamPortForwardErr(err error, pod string, port int32, uid types.UID, requestID string, conn any, errorStream io.WriteCloser) {
+	// happy path, we have successfully completed forwarding task
+	if err == nil {
+		return
+	}
+
+	errResp := portForwardErrResponse{
+		CloseConnection: false,
+	}
+	if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+		// During the forwarding process, if these types of errors are encountered,
+		// we should continue to provide port forwarding services.
+		//
+		// These two errors can occur in the following scenarios:
+		// ECONNRESET: the target process reset connection between CRI and itself.
+		// see: https://github.com/kubernetes/kubernetes/issues/111825 for detail
+		//
+		// EPIPE: the target process did not read the received data, causing the
+		// buffer in the kernel to be full, resulting in the occurrence of Zero Window,
+		// then closing the connection (FIN, RESET)
+		// see: https://github.com/kubernetes/kubernetes/issues/74551 for detail
+		klog.ErrorS(err, "forwarding port", "conn", conn, "request", requestID, "port", port)
+	} else {
+		errResp.CloseConnection = true
+	}
+
+	// send error messages to the client to let our users know what happened.
+	msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %w", port, pod, uid, err)
+	errResp.Message = msg.Error()
+	runtime.HandleError(msg)
+	err = json.NewEncoder(errorStream).Encode(errResp)
+	if err != nil {
+		klog.ErrorS(err, "encode the resp", "conn", conn, "request", requestID, "port", port)
 	}
 }
