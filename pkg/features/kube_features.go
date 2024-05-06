@@ -1038,7 +1038,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
-	RetryGenerateName: {Default: false, PreRelease: featuregate.Alpha},
+	RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
 
 	GracefulNodeShutdown: {Default: true, PreRelease: featuregate.Beta},
 

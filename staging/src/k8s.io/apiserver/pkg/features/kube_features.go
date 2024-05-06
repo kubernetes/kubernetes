@@ -335,7 +335,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RemainingItemCount: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	RetryGenerateName: {Default: false, PreRelease: featuregate.Alpha},
+	RetryGenerateName: {Default: true, PreRelease: featuregate.Beta},
 
 	SeparateCacheWatchRPC: {Default: true, PreRelease: featuregate.Beta},
 
