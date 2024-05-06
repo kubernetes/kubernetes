@@ -49,7 +49,7 @@ type DynamicEncryptionConfigContent struct {
 	lastLoadedEncryptionConfigHash string
 
 	// queue for processing changes in encryption config file.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// dynamicTransformers updates the transformers when encryption config file changes.
 	dynamicTransformers *encryptionconfig.DynamicTransformers
@@ -78,8 +78,11 @@ func NewDynamicEncryptionConfiguration(
 		filePath:                       filePath,
 		lastLoadedEncryptionConfigHash: configContentHash,
 		dynamicTransformers:            dynamicTransformers,
-		queue:                          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), name),
-		apiServerID:                    apiServerID,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: name},
+		),
+		apiServerID: apiServerID,
 		getEncryptionConfigHash: func(_ context.Context, filepath string) (string, error) {
 			return encryptionconfig.GetEncryptionConfigHash(filepath)
 		},
@@ -150,7 +153,7 @@ func (d *DynamicEncryptionConfigContent) processNextWorkItem(serverCtx context.C
 	return true
 }
 
-func (d *DynamicEncryptionConfigContent) processWorkItem(serverCtx context.Context, workqueueKey interface{}) {
+func (d *DynamicEncryptionConfigContent) processWorkItem(serverCtx context.Context, workqueueKey string) {
 	var (
 		updatedEffectiveConfig  bool
 		err                     error

@@ -40,7 +40,7 @@ var _ Controller[runtime.Object] = &controller[runtime.Object]{}
 
 type controller[T runtime.Object] struct {
 	informer Informer[T]
-	queue    workqueue.RateLimitingInterface
+	queue    workqueue.TypedRateLimitingInterface[string]
 
 	// Returns an error if there was a transient error during reconciliation
 	// and the object should be tried again later.
@@ -99,7 +99,10 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	klog.Infof("starting %s", c.options.Name)
 	defer klog.Infof("stopping %s", c.options.Name)
 
-	c.queue = workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), c.options.Name)
+	c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[string](),
+		workqueue.TypedRateLimitingQueueConfig[string]{Name: c.options.Name},
+	)
 
 	// Forcefully shutdown workqueue. Drop any enqueued items.
 	// Important to do this in a `defer` at the start of `Run`.
@@ -219,7 +222,7 @@ func (c *controller[T]) runWorker() {
 		}
 
 		// We wrap this block in a func so we can defer c.workqueue.Done.
-		err := func(obj interface{}) error {
+		err := func(obj string) error {
 			// We call Done here so the workqueue knows we have finished
 			// processing this item. We also must remember to call Forget if we
 			// do not want this work item being re-queued. For example, we do
@@ -227,19 +230,6 @@ func (c *controller[T]) runWorker() {
 			// put back on the workqueue and attempted again after a back-off
 			// period.
 			defer c.queue.Done(obj)
-			var key string
-			var ok bool
-			// We expect strings to come off the workqueue. These are of the
-			// form namespace/name. We do this as the delayed nature of the
-			// workqueue means the items in the informer cache may actually be
-			// more up to date that when the item was initially put onto the
-			// workqueue.
-			if key, ok = obj.(string); !ok {
-				// How did an incorrectly formatted key get in the workqueue?
-				// Done is sufficient. (Forget resets rate limiter for the key,
-				// but the key is invalid so there is no point in doing that)
-				return fmt.Errorf("expected string in workqueue but got %#v", obj)
-			}
 			defer c.hasProcessed.Finished(key)
 
 			if err := c.reconcile(key); err != nil {

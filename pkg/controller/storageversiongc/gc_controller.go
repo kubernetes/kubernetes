@@ -50,8 +50,8 @@ type Controller struct {
 
 	storageVersionSynced cache.InformerSynced
 
-	leaseQueue          workqueue.RateLimitingInterface
-	storageVersionQueue workqueue.RateLimitingInterface
+	leaseQueue          workqueue.TypedRateLimitingInterface[string]
+	storageVersionQueue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewStorageVersionGC creates a new Controller.
@@ -61,8 +61,14 @@ func NewStorageVersionGC(ctx context.Context, clientset kubernetes.Interface, le
 		leaseLister:          leaseInformer.Lister(),
 		leasesSynced:         leaseInformer.Informer().HasSynced,
 		storageVersionSynced: storageVersionInformer.Informer().HasSynced,
-		leaseQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "storage_version_garbage_collector_leases"),
-		storageVersionQueue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "storage_version_garbage_collector_storageversions"),
+		leaseQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "storage_version_garbage_collector_leases"},
+		),
+		storageVersionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "storage_version_garbage_collector_storageversions"},
+		),
 	}
 	logger := klog.FromContext(ctx)
 	leaseInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -121,7 +127,7 @@ func (c *Controller) processNextLease(ctx context.Context) bool {
 	}
 	defer c.leaseQueue.Done(key)
 
-	err := c.processDeletedLease(ctx, key.(string))
+	err := c.processDeletedLease(ctx, key)
 	if err == nil {
 		c.leaseQueue.Forget(key)
 		return true
@@ -144,7 +150,7 @@ func (c *Controller) processNextStorageVersion(ctx context.Context) bool {
 	}
 	defer c.storageVersionQueue.Done(key)
 
-	err := c.syncStorageVersion(ctx, key.(string))
+	err := c.syncStorageVersion(ctx, key)
 	if err == nil {
 		c.storageVersionQueue.Forget(key)
 		return true

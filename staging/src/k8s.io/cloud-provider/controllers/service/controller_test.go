@@ -175,9 +175,15 @@ func newController(ctx context.Context, objects ...runtime.Object) (*Controller,
 		serviceListerSynced: serviceInformer.Informer().HasSynced,
 		nodeLister:          nodeInformer.Lister(),
 		nodeListerSynced:    nodeInformer.Informer().HasSynced,
-		serviceQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		nodeQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
-		lastSyncedNodes:     make(map[string][]*v1.Node),
+		serviceQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](minRetryDelay, maxRetryDelay),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "service"},
+		),
+		nodeQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](minRetryDelay, maxRetryDelay),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node"},
+		),
+		lastSyncedNodes: make(map[string][]*v1.Node),
 	}
 
 	informerFactory.Start(stopCh)
@@ -897,8 +903,8 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 			if quit {
 				t.Fatalf("get no queue element")
 			}
-			if keyExpected != keyGot.(string) {
-				t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot.(string))
+			if keyExpected != keyGot {
+				t.Fatalf("get service key error, expected: %s, got: %s", keyExpected, keyGot)
 			}
 
 			newService := svc.DeepCopy()
@@ -2314,7 +2320,10 @@ func TestServiceQueueDelay(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			controller, cloud, client := newController(ctx)
-			queue := &spyWorkQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-service-queue-delay")}
+			queue := &spyWorkQueue{TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[string](),
+				workqueue.TypedRateLimitingQueueConfig[string]{Name: "test-service-queue-delay"},
+			)}
 			controller.serviceQueue = queue
 			cloud.Err = tc.lbCloudErr
 
@@ -2400,26 +2409,26 @@ func (l *fakeNodeLister) Get(name string) (*v1.Node, error) {
 // spyWorkQueue implements a work queue and adds the ability to inspect processed
 // items for testing purposes.
 type spyWorkQueue struct {
-	workqueue.RateLimitingInterface
+	workqueue.TypedRateLimitingInterface[string]
 	items []spyQueueItem
 }
 
 // spyQueueItem represents an item that was being processed.
 type spyQueueItem struct {
-	Key interface{}
+	Key string
 	// Delay represents the delayed duration if and only if AddAfter was invoked.
 	Delay time.Duration
 }
 
 // AddAfter is like workqueue.RateLimitingInterface.AddAfter but records the
 // added key and delay internally.
-func (f *spyWorkQueue) AddAfter(key interface{}, delay time.Duration) {
+func (f *spyWorkQueue) AddAfter(key string, delay time.Duration) {
 	f.items = append(f.items, spyQueueItem{
 		Key:   key,
 		Delay: delay,
 	})
 
-	f.RateLimitingInterface.AddAfter(key, delay)
+	f.TypedRateLimitingInterface.AddAfter(key, delay)
 }
 
 // getItems returns all items that were recorded.

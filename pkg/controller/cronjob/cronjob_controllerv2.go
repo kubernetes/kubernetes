@@ -60,7 +60,7 @@ var (
 // ControllerV2 is a controller for CronJobs.
 // Refactored Cronjob controller that uses DelayingQueue and informers
 type ControllerV2 struct {
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	kubeClient  clientset.Interface
 	recorder    record.EventRecorder
@@ -85,7 +85,12 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 
 	jm := &ControllerV2{
-		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "cronjob",
+			},
+		),
 		kubeClient:  kubeClient,
 		broadcaster: eventBroadcaster,
 		recorder:    eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
@@ -162,10 +167,10 @@ func (jm *ControllerV2) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer jm.queue.Done(key)
 
-	requeueAfter, err := jm.sync(ctx, key.(string))
+	requeueAfter, err := jm.sync(ctx, key)
 	switch {
 	case err != nil:
-		utilruntime.HandleError(fmt.Errorf("error syncing CronJobController %v, requeuing: %v", key.(string), err))
+		utilruntime.HandleError(fmt.Errorf("error syncing CronJobController %v, requeuing: %w", key, err))
 		jm.queue.AddRateLimited(key)
 	case requeueAfter != nil:
 		jm.queue.Forget(key)

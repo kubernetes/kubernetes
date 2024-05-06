@@ -54,7 +54,7 @@ type ResourceVersionController struct {
 	metadataClient  metadata.Interface
 	svmListers      svmlisters.StorageVersionMigrationLister
 	svmSynced       cache.InformerSynced
-	queue           workqueue.RateLimitingInterface
+	queue           workqueue.TypedRateLimitingInterface[string]
 	kubeClient      clientset.Interface
 	mapper          meta.ResettableRESTMapper
 }
@@ -76,7 +76,10 @@ func NewResourceVersionController(
 		svmListers:      svmInformer.Lister(),
 		svmSynced:       svmInformer.Informer().HasSynced,
 		mapper:          mapper,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), ResourceVersionControllerName),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: ResourceVersionControllerName},
+		),
 	}
 
 	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -137,13 +140,12 @@ func (rv *ResourceVersionController) worker(ctx context.Context) {
 }
 
 func (rv *ResourceVersionController) processNext(ctx context.Context) bool {
-	eKey, quit := rv.queue.Get()
+	key, quit := rv.queue.Get()
 	if quit {
 		return false
 	}
-	defer rv.queue.Done(eKey)
+	defer rv.queue.Done(key)
 
-	key := eKey.(string)
 	err := rv.sync(ctx, key)
 	if err == nil {
 		rv.queue.Forget(key)
