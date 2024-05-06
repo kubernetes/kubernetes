@@ -595,6 +595,7 @@ func TestFieldSelectorOpenAPI(t *testing.T) {
 
 func TestFieldSelectorDropFields(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, false)
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -706,6 +707,7 @@ func TestFieldSelectorDisablement(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, false)
 
 	// Now that the feature gate is disabled again, update the CRD to trigger an openAPI update
 	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
