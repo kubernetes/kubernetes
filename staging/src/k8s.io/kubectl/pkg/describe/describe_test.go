@@ -25,6 +25,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/lithammer/dedent"
+	"github.com/stretchr/testify/assert"
+
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -652,9 +655,10 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 func TestDescribeService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name    string
-		service *corev1.Service
-		expect  []string
+		name           string
+		service        *corev1.Service
+		endpointSlices []*discoveryv1.EndpointSlice
+		expected       string
 	}{
 		{
 			name: "test1",
@@ -676,24 +680,50 @@ func TestDescribeService(t *testing.T) {
 					ClusterIP:             "1.2.3.4",
 					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
 					HealthCheckNodePort:   32222,
 				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "9527/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
-			},
+			endpointSlices: []*discoveryv1.EndpointSlice{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar-abcde",
+					Namespace: "foo",
+					Labels: map[string]string{
+						"kubernetes.io/service-name": "bar",
+					},
+				},
+				Endpoints: []discoveryv1.Endpoint{
+					{Addresses: []string{"10.244.0.1"}},
+					{Addresses: []string{"10.244.0.2"}},
+					{Addresses: []string{"10.244.0.3"}},
+				},
+				Ports: []discoveryv1.EndpointPort{{
+					Name:     ptr.To("port-tcp"),
+					Port:     ptr.To[int32](9527),
+					Protocol: ptr.To(corev1.ProtocolTCP),
+				}},
+			}},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				IP:                       5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               9527/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 		{
 			name: "test2",
@@ -715,24 +745,70 @@ func TestDescribeService(t *testing.T) {
 					ClusterIP:             "1.2.3.4",
 					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
 					HealthCheckNodePort:   32222,
 				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "targetPort/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
+			endpointSlices: []*discoveryv1.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-12345",
+						Namespace: "foo",
+						Labels: map[string]string{
+							"kubernetes.io/service-name": "bar",
+						},
+					},
+					Endpoints: []discoveryv1.Endpoint{
+						{Addresses: []string{"10.244.0.1"}},
+						{Addresses: []string{"10.244.0.2"}},
+					},
+					Ports: []discoveryv1.EndpointPort{{
+						Name:     ptr.To("port-tcp"),
+						Port:     ptr.To[int32](9527),
+						Protocol: ptr.To(corev1.ProtocolUDP),
+					}},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-54321",
+						Namespace: "foo",
+						Labels: map[string]string{
+							"kubernetes.io/service-name": "bar",
+						},
+					},
+					Endpoints: []discoveryv1.Endpoint{
+						{Addresses: []string{"10.244.0.3"}},
+						{Addresses: []string{"10.244.0.4"}},
+						{Addresses: []string{"10.244.0.5"}},
+					},
+					Ports: []discoveryv1.EndpointPort{{
+						Name:     ptr.To("port-tcp"),
+						Port:     ptr.To[int32](9527),
+						Protocol: ptr.To(corev1.ProtocolUDP),
+					}},
+				},
 			},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				IP:                       5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527 + 2 more...
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 		{
 			name: "test-ServiceIPFamily",
@@ -754,25 +830,48 @@ func TestDescribeService(t *testing.T) {
 					ClusterIP:             "1.2.3.4",
 					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
 					HealthCheckNodePort:   32222,
 				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"IP Families", "IPv4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "targetPort/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
-			},
+			endpointSlices: []*discoveryv1.EndpointSlice{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar-123ab",
+					Namespace: "foo",
+					Labels: map[string]string{
+						"kubernetes.io/service-name": "bar",
+					},
+				},
+				Endpoints: []discoveryv1.Endpoint{
+					{Addresses: []string{"10.244.0.1"}},
+				},
+				Ports: []discoveryv1.EndpointPort{{
+					Name:     ptr.To("port-tcp"),
+					Port:     ptr.To[int32](9527),
+					Protocol: ptr.To(corev1.ProtocolTCP),
+				}},
+			}},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				IP:                       5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                10.244.0.1:9527
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 		{
 			name: "test-ServiceIPFamilyPolicy+ClusterIPs",
@@ -796,43 +895,49 @@ func TestDescribeService(t *testing.T) {
 					IPFamilyPolicy:        &singleStack,
 					ClusterIPs:            []string{"1.2.3.4"},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
 					HealthCheckNodePort:   32222,
 				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"IP Families", "IPv4",
-				"IP Family Policy", "SingleStack",
-				"IPs", "1.2.3.4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "targetPort/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
-			},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Family Policy:         SingleStack
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      1.2.3.4
+				IP:                       5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                <none>
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(testCase.service)
-			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			objects := []runtime.Object{tc.service}
+			for i := range tc.endpointSlices {
+				objects = append(objects, tc.endpointSlices[i])
+			}
+			fakeClient := fake.NewSimpleClientset(objects...)
+			c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
 			d := ServiceDescriber{c}
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			for _, expected := range testCase.expect {
-				if !strings.Contains(out, expected) {
-					t.Errorf("expected to find %q in output: %q", expected, out)
-				}
-			}
+
+			assert.Equal(t, tc.expected, out)
 		})
 	}
 }
@@ -3062,7 +3167,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3078,7 +3183,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3191,12 +3296,12 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3276,7 +3381,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3296,11 +3401,11 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host        Path  Backends
   ----        ----  --------
-  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+  *           *     default-backend:80 (<error: services "default-backend" not found>)
 Annotations:  <none>
 Events:       <none>
 `,
@@ -3344,11 +3449,11 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    <none>
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host        Path  Backends
   ----        ----  --------
-  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+  *           *     default-backend:80 (<error: services "default-backend" not found>)
 Annotations:  <none>
 Events:       <none>
 `,
