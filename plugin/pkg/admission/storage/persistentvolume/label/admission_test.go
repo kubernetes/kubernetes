@@ -369,69 +369,6 @@ func Test_PVLAdmission(t *testing.T) {
 			err: nil,
 		},
 		{
-			name:    "GCE PD PV labeled correctly",
-			handler: newPersistentVolumeLabel(),
-			pvlabeler: mockVolumeLabels(map[string]string{
-				"a":                  "1",
-				"b":                  "2",
-				v1.LabelTopologyZone: "1__2__3",
-			}),
-			preAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{Name: "gcepd", Namespace: "myns"},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-							PDName: "123",
-						},
-					},
-				},
-			},
-			postAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "gcepd",
-					Namespace: "myns",
-					Labels: map[string]string{
-						"a":                  "1",
-						"b":                  "2",
-						v1.LabelTopologyZone: "1__2__3",
-					},
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-							PDName: "123",
-						},
-					},
-					NodeAffinity: &api.VolumeNodeAffinity{
-						Required: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
-											Key:      "a",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1"},
-										},
-										{
-											Key:      "b",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"2"},
-										},
-										{
-											Key:      v1.LabelTopologyZone,
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1", "2", "3"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			err: nil,
-		},
-		{
 			name:    "Azure Disk PV labeled correctly",
 			handler: newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeLabels(map[string]string{
@@ -708,7 +645,6 @@ func Test_PVLAdmission(t *testing.T) {
 // provider does not reduce test coverage but it does simplify/clean up the tests here because
 // the provider is then decided based on the type of PV (EBS, GCEPD, Azure Disk, etc)
 func setPVLabeler(handler *persistentVolumeLabel, pvlabeler cloudprovider.PVLabeler) {
-	handler.gcePVLabeler = pvlabeler
 	handler.azurePVLabeler = pvlabeler
 	handler.vspherePVLabeler = pvlabeler
 }

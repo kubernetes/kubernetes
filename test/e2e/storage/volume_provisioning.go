@@ -44,7 +44,6 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -56,23 +55,6 @@ const (
 	// Plugin name of the external provisioner
 	externalPluginName = "example.com/nfs"
 )
-
-func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
-	cloud, err := gce.GetGCECloud()
-	if err != nil {
-		return err
-	}
-	diskName := volume.Spec.GCEPersistentDisk.PDName
-	disk, err := cloud.GetDiskByNameUnknownZone(diskName)
-	if err != nil {
-		return err
-	}
-
-	if !strings.HasSuffix(disk.Type, volumeType) {
-		return fmt.Errorf("unexpected disk type %q, expected suffix %q", disk.Type, volumeType)
-	}
-	return nil
-}
 
 var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
@@ -110,9 +92,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-						err := checkGCEPD(volume, "pd-ssd")
-						framework.ExpectNoError(err, "checkGCEPD pd-ssd")
 					},
 				},
 				{
@@ -128,9 +107,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 						volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-						err := checkGCEPD(volume, "pd-standard")
-						framework.ExpectNoError(err, "checkGCEPD pd-standard")
 					},
 				},
 				// AWS
@@ -316,9 +292,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				PvCheck: func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 					volume := testsuites.PVWriteReadSingleNodeCheck(ctx, c, f.Timeouts, claim, e2epod.NodeSelection{})
 					gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
-
-					err := checkGCEPD(volume, "pd-standard")
-					framework.ExpectNoError(err, "checkGCEPD")
 				},
 			}
 			test.Class = newStorageClass(test, ns, "reclaimpolicy")
