@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"sort"
 	"time"
-	"unsafe"
 
 	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"
@@ -510,13 +509,8 @@ func generateCacheKey(encryptedDEKSourceType kmstypes.EncryptedDEKSourceType, en
 
 // toBytes performs unholy acts to avoid allocations
 func toBytes(s string) []byte {
-	// unsafe.StringData is unspecified for the empty string, so we provide a strict interpretation
-	if len(s) == 0 {
-		return nil
-	}
-	// Copied from go 1.20.1 os.File.WriteString
-	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/os/file.go#L246
-	return unsafe.Slice(unsafe.StringData(s), len(s))
+	// Updating this logic as Go 1.22 no supports strings to bytes conversion same performance as with unsafe.
+	return []byte(s)
 }
 
 // GetHashIfNotEmpty returns the sha256 hash of the data if it is not empty.
