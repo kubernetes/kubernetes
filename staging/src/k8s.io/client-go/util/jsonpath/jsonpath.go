@@ -573,6 +573,9 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("can't print type %s", v.Type())
 	}
+	if iface == nil {
+		return []byte("null"), nil
+	}
 	var buffer bytes.Buffer
 	fmt.Fprint(&buffer, iface)
 	return buffer.Bytes(), nil

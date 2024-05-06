@@ -120,7 +120,7 @@ service RuntimeService {
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 
     // GetContainerEvents gets container events from the CRI runtime
-    rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
+    rpc GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
 
     // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
     // This list should be static at startup: either the client and server restart together when
@@ -131,6 +131,15 @@ service RuntimeService {
 
     // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
     rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
+
+    // RuntimeConfig returns configuration information of the runtime.
+    // A couple of notes:
+    // - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
+    //   The former is for having runtime tell Kubelet what to do, the latter vice versa.
+    // - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
+    //   The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
+    //   avoid updating them without a full node reboot.
+    rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -199,7 +208,7 @@ message PortMapping {
 }
 
 enum MountPropagation {
-    // No mount propagation ("private" in Linux terminology).
+    // No mount propagation ("rprivate" in Linux terminology).
     PROPAGATION_PRIVATE = 0;
     // Mounts get propagated from the host to the container ("rslave" in Linux).
     PROPAGATION_HOST_TO_CONTAINER = 1;
@@ -222,6 +231,19 @@ message Mount {
     bool selinux_relabel = 4;
     // Requested propagation mode.
     MountPropagation propagation = 5;
+    // UidMappings specifies the runtime UID mappings for the mount.
+    repeated IDMapping uidMappings = 6;
+    // GidMappings specifies the runtime GID mappings for the mount.
+    repeated IDMapping gidMappings = 7;
+    // If set to true, the mount is made recursive read-only.
+    // In this CRI API, recursive_read_only is a plain true/false boolean, although its equivalent
+    // in the Kubernetes core API is a quaternary that can be nil, "Enabled", "IfPossible", or "Disabled".
+    // kubelet translates that quaternary value in the core API into a boolean in this CRI API.
+    // Remarks:
+    // - nil is just treated as false
+    // - when set to true, readonly must be explicitly set to true, and propagation must be PRIVATE (0).
+    // - (readonly == false && recursive_read_only == false) does not make the mount read-only.
+    bool recursive_read_only = 8;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -766,6 +788,13 @@ message ImageSpec {
     // ImageSpec Annotations can be used to help the runtime target specific
     // images in multi-arch images.
     map<string, string> annotations = 2;
+    // The container image reference specified by the user (e.g. image[:tag] or digest).
+    // Only set if available within the RPC context.
+    string user_specified_image = 18;
+    // Runtime handler to use for pulling the image.
+    // If the runtime handler is unknown, the request should be rejected.
+    // An empty string would select the default runtime handler.
+    string runtime_handler = 19;
 }
 
 message KeyValue {
@@ -1173,8 +1202,7 @@ message Container {
     ContainerMetadata metadata = 3;
     // Spec of the image.
     ImageSpec image = 4;
-    // Reference to the image in use. For most runtimes, this should be an
-    // image ID.
+    // Digested reference to the image in use.
     string image_ref = 5;
     // State of the container.
     ContainerState state = 6;
@@ -1187,6 +1215,16 @@ message Container {
     // MUST be identical to that of the corresponding ContainerConfig used to
     // instantiate this Container.
     map<string, string> annotations = 9;
+    // Reference to the unique identifier of the image, on the node, as
+    // returned in the image service apis.
+    //
+    // Note: The image_ref above has been historically used by container
+    // runtimes to reference images by digest. The image_ref has been also used
+    // in the kubelet image garbage collection, which does not work with
+    // digests at all. To separate and avoid possible misusage, we now
+    // introduce the image_id field, which should always refer to a unique
+    // image identifier on the node.
+    string image_id = 10;
 }
 
 message ListContainersResponse {
@@ -1219,8 +1257,7 @@ message ContainerStatus {
     int32 exit_code = 7;
     // Spec of the image.
     ImageSpec image = 8;
-    // Reference to the image in use. For most runtimes, this should be an
-    // image ID
+    // Digested reference to the image in use.
     string image_ref = 9;
     // Brief CamelCase string explaining why container is in its current state.
     // Must be set to "OOMKilled" for containers terminated by cgroup-based Out-of-Memory killer.
@@ -1241,6 +1278,14 @@ message ContainerStatus {
     string log_path = 15;
     // Resource limits configuration of the container.
     ContainerResources resources = 16;
+    // Reference to the unique identifier of the image, on the node, as
+    // returned in the image service apis.
+    //
+    // Note: The image_ref above has been historically used by container
+    // runtimes to reference images by digest. To separate and avoid possible
+    // misusage, we now introduce the image_id field, which should always refer
+    // to a unique image identifier on the node.
+    string image_id = 17;
 }
 
 message ContainerStatusResponse {
@@ -1287,8 +1332,16 @@ message ExecSyncRequest {
 
 message ExecSyncResponse {
     // Captured command stdout output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stdout of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stdout = 1;
     // Captured command stderr output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stderr of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stderr = 2;
     // Exit code the command finished with. Default: 0 (success).
     int32 exit_code = 3;
@@ -1500,6 +1553,26 @@ message StatusRequest {
     bool verbose = 1;
 }
 
+message RuntimeHandlerFeatures {
+    // recursive_read_only_mounts is set to true if the runtime handler supports
+    // recursive read-only mounts.
+    // For runc-compatible runtimes, availability of this feature can be detected by checking whether
+    // the Linux kernel version is >= 5.12, and,  `runc features | jq .mountOptions` contains "rro".
+    bool recursive_read_only_mounts = 1;
+
+    // user_namespaces is set to true if the runtime handler supports user namespaces as implemented
+    // in Kubernetes. This means support for both, user namespaces and idmap mounts.
+    bool user_namespaces = 2;
+}
+
+message RuntimeHandler {
+    // Name must be unique in StatusResponse.
+    // An empty string denotes the default handler.
+    string name = 1;
+    // Supported features.
+    RuntimeHandlerFeatures features = 2;
+}
+
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
@@ -1508,6 +1581,8 @@ message StatusResponse {
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+    // Runtime handlers.
+    repeated RuntimeHandler runtime_handlers = 3;
 }
 
 message ImageFsInfoRequest {}
@@ -1555,6 +1630,11 @@ message WindowsFilesystemUsage {
 message ImageFsInfoResponse {
     // Information of image filesystem(s).
     repeated FilesystemUsage image_filesystems = 1;
+    // Information of container filesystem(s).
+    // This is an optional field, may be used for example if container and image
+    // storage are separated.
+    // Default will be to return this as empty.
+    repeated FilesystemUsage container_filesystems = 2;
 }
 
 message ContainerStatsRequest{
@@ -1615,6 +1695,8 @@ message ContainerStats {
     MemoryUsage memory = 3;
     // Usage of the writable layer.
     FilesystemUsage writable_layer = 4;
+    // Swap usage gathered from the container.
+    SwapUsage swap = 5;
 }
 
 // WindowsContainerStats provides the resource usage statistics for a container specific for Windows
@@ -1669,16 +1751,27 @@ message MemoryUsage {
     UInt64Value major_page_faults = 7;
 }
 
+message SwapUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Available swap for use. This is defined as the swap limit - swapUsageBytes.
+    UInt64Value swap_available_bytes = 2;
+    // Total memory in use. This includes all memory regardless of when it was accessed.
+    UInt64Value swap_usage_bytes = 3;
+}
+
 // WindowsMemoryUsage provides the memory usage information specific to Windows
 message WindowsMemoryUsage {
     // Timestamp in nanoseconds at which the information were collected. Must be > 0.
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
-    // Available memory for use. This is defined as the memory limit - workingSetBytes.
+    // Available memory for use. This is defined as the memory limit - commit_memory_bytes.
     UInt64Value available_bytes = 3;
     // Cumulative number of page faults.
     UInt64Value page_faults = 4;
+    // Total commit memory in use. Commit memory is total of physical and virtual memory in use.
+    UInt64Value commit_memory_bytes = 5;
 }
 
 message ReopenContainerLogRequest {
@@ -1789,3 +1882,29 @@ enum MetricType {
     COUNTER = 0;
     GAUGE = 1;
 }
+
+message RuntimeConfigRequest {}
+
+message RuntimeConfigResponse {
+    // Configuration information for Linux-based runtimes. This field contains
+    // global runtime configuration options that are not specific to runtime
+    // handlers.
+    LinuxRuntimeConfiguration linux = 1;
+}
+
+message LinuxRuntimeConfiguration {
+    // Cgroup driver to use
+    // Note: this field should not change for the lifecycle of the Kubelet,
+    // or while there are running containers.
+    // The Kubelet will not re-request this after startup, and will construct the cgroup
+    // hierarchy assuming it is static.
+    // If the runtime wishes to change this value, it must be accompanied by removal of
+    // all pods, and a restart of the Kubelet. The easiest way to do this is with a full node reboot.
+    CgroupDriver cgroup_driver = 1;
+}
+
+enum CgroupDriver {
+    SYSTEMD = 0;
+    CGROUPFS = 1;
+}
+

@@ -15,44 +15,18 @@
 // For more information on using workload identity federation, refer to
 // https://cloud.google.com/iam/docs/how-to#using-workload-identity-federation.
 //
-// OAuth2 Configs
+// # OAuth2 Configs
 //
 // Two functions in this package return golang.org/x/oauth2.Config values from Google credential
 // data. Google supports two JSON formats for OAuth2 credentials: one is handled by ConfigFromJSON,
 // the other by JWTConfigFromJSON. The returned Config can be used to obtain a TokenSource or
 // create an http.Client.
 //
-// Workload Identity Federation
+// # Workload and Workforce Identity Federation
 //
-// Using workload identity federation, your application can access Google Cloud
-// resources from Amazon Web Services (AWS), Microsoft Azure or any identity
-// provider that supports OpenID Connect (OIDC).
-// Traditionally, applications running outside Google Cloud have used service
-// account keys to access Google Cloud resources. Using identity federation,
-// you can allow your workload to impersonate a service account.
-// This lets you access Google Cloud resources directly, eliminating the
-// maintenance and security burden associated with service account keys.
+// For information on how to use Workload and Workforce Identity Federation, see [golang.org/x/oauth2/google/externalaccount].
 //
-// Follow the detailed instructions on how to configure Workload Identity Federation
-// in various platforms:
-//
-//   Amazon Web Services (AWS): https://cloud.google.com/iam/docs/access-resources-aws
-//   Microsoft Azure: https://cloud.google.com/iam/docs/access-resources-azure
-//   OIDC identity provider: https://cloud.google.com/iam/docs/access-resources-oidc
-//
-// For OIDC providers, the library can retrieve OIDC tokens either from a
-// local file location (file-sourced credentials) or from a local server
-// (URL-sourced credentials).
-// For file-sourced credentials, a background process needs to be continuously
-// refreshing the file location with a new OIDC token prior to expiration.
-// For tokens with one hour lifetimes, the token needs to be updated in the file
-// every hour. The token can be stored directly as plain text or in JSON format.
-// For URL-sourced credentials, a local server needs to host a GET endpoint to
-// return the OIDC token. The response can be in plain text or JSON.
-// Additional required request headers can also be specified.
-//
-//
-// Credentials
+// # Credentials
 //
 // The Credentials type represents Google credentials, including Application Default
 // Credentials.

@@ -22,7 +22,6 @@ package util
 import (
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -766,7 +765,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 			return nil
 		}
 
-		content, err := ioutil.ReadFile(path)
+		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -781,7 +780,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		return nil
 	}
 
-	d, err := ioutil.ReadDir(targetDir)
+	d, err := os.ReadDir(targetDir)
 	if err != nil {
 		t.Errorf("Unable to read dir %v: %v", targetDir, err)
 		return
@@ -790,7 +789,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		if strings.HasPrefix(info.Name(), "..") {
 			continue
 		}
-		if info.Mode()&os.ModeSymlink != 0 {
+		if info.Type()&os.ModeSymlink != 0 {
 			p := filepath.Join(targetDir, info.Name())
 			actual, err := os.Readlink(p)
 			if err != nil {
@@ -1034,5 +1033,63 @@ func TestSetPerms(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "error in setPerms") {
 		t.Fatalf("unexpected error while writing: %v", err)
+	}
+}
+
+func TestWriteAgainAfterUnexpectedExit(t *testing.T) {
+	testCases := []struct {
+		name       string
+		payload    map[string]FileProjection
+		simulateFn func(targetDir string, payload map[string]FileProjection) error
+	}{
+		{
+			name: "process killed before creating user visible files",
+			payload: map[string]FileProjection{
+				"foo": {Mode: 0644, Data: []byte("foo")},
+				"bar": {Mode: 0644, Data: []byte("bar")},
+			},
+			simulateFn: func(targetDir string, payload map[string]FileProjection) error {
+				for filename := range payload {
+					path := filepath.Join(targetDir, filename)
+					if err := os.RemoveAll(path); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			targetDir, err := utiltesting.MkTmpdir("atomic-write")
+			if err != nil {
+				t.Fatalf("unexpected error creating tmp dir: %v", err)
+			}
+			defer func() {
+				err := os.RemoveAll(targetDir)
+				if err != nil {
+					t.Errorf("%v: unexpected error removing tmp dir: %v", tc.name, err)
+				}
+			}()
+
+			writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
+			err = writer.Write(tc.payload, nil)
+			if err != nil {
+				t.Fatalf("unexpected error writing payload: %v", err)
+			}
+
+			err = tc.simulateFn(targetDir, tc.payload)
+			if err != nil {
+				t.Fatalf("failed to simulate the unexpected exit: %v", err)
+			}
+
+			err = writer.Write(tc.payload, nil)
+			if err != nil {
+				t.Fatalf("unexpected error writing payload again: %v", err)
+			}
+			checkVolumeContents(targetDir, tc.name, tc.payload, t)
+		})
 	}
 }

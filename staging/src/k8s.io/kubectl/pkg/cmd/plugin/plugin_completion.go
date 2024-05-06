@@ -28,12 +28,23 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
 )
+
+func GetPluginCommandGroup(kubectl *cobra.Command) templates.CommandGroup {
+	// Find root level
+	return templates.CommandGroup{
+		Message:  i18n.T("Subcommands provided by plugins:"),
+		Commands: registerPluginCommands(kubectl, false),
+	}
+}
 
 // SetupPluginCompletion adds a Cobra command to the command tree for each
 // plugin.  This is only done when performing shell completion that relate
 // to plugins.
 func SetupPluginCompletion(cmd *cobra.Command, args []string) {
+	kubectl := cmd.Root()
 	if len(args) > 0 {
 		if strings.HasPrefix(args[0], "-") {
 			// Plugins are not supported if the first argument is a flag,
@@ -44,7 +55,7 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 		if len(args) == 1 {
 			// We are completing a subcommand at the first level so
 			// we should include all plugins names.
-			addPluginCommands(cmd)
+			registerPluginCommands(kubectl, true)
 			return
 		}
 
@@ -53,7 +64,7 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 		// If we don't it could be a plugin and we'll need to add
 		// the plugin commands for completion to work.
 		found := false
-		for _, subCmd := range cmd.Root().Commands() {
+		for _, subCmd := range kubectl.Commands() {
 			if args[0] == subCmd.Name() {
 				found = true
 				break
@@ -69,18 +80,19 @@ func SetupPluginCompletion(cmd *cobra.Command, args []string) {
 			// to avoid them being included in the completion choices.
 			// This must be done *before* adding the plugin commands so that
 			// when creating those plugin commands, the flags don't exist.
-			cmd.Root().ResetFlags()
+			kubectl.ResetFlags()
 			cobra.CompDebugln("Cleared global flags for plugin completion", true)
 
-			addPluginCommands(cmd)
+			registerPluginCommands(kubectl, true)
 		}
 	}
 }
 
-// addPluginCommand adds a Cobra command to the command tree
-// for each plugin so that the completion logic knows about the plugins
-func addPluginCommands(cmd *cobra.Command) {
-	kubectl := cmd.Root()
+// registerPluginCommand allows adding Cobra command to the command tree or extracting them for usage in
+// e.g. the help function or for registering the completion function
+func registerPluginCommands(kubectl *cobra.Command, list bool) (cmds []*cobra.Command) {
+	userDefinedCommands := []*cobra.Command{}
+
 	streams := genericclioptions.IOStreams{
 		In:     &bytes.Buffer{},
 		Out:    io.Discard,
@@ -97,10 +109,18 @@ func addPluginCommands(cmd *cobra.Command) {
 
 		// Plugins are named "kubectl-<name>" or with more - such as
 		// "kubectl-<name>-<subcmd1>..."
-		for _, arg := range strings.Split(plugin, "-")[1:] {
+		rawPluginArgs := strings.Split(plugin, "-")[1:]
+		pluginArgs := rawPluginArgs[:1]
+		if list {
+			pluginArgs = rawPluginArgs
+		}
+
+		// Iterate through all segments, for kubectl-my_plugin-sub_cmd, we will end up with
+		// two iterations: one for my_plugin and one for sub_cmd.
+		for _, arg := range pluginArgs {
 			// Underscores (_) in plugin's filename are replaced with dashes(-)
 			// e.g. foo_bar -> foo-bar
-			args = append(args, strings.Replace(arg, "_", "-", -1))
+			args = append(args, strings.ReplaceAll(arg, "_", "-"))
 		}
 
 		// In order to avoid that the same plugin command is added more than once,
@@ -116,17 +136,24 @@ func addPluginCommands(cmd *cobra.Command) {
 				// Add a description that will be shown with completion choices.
 				// Make each one different by including the plugin name to avoid
 				// all plugins being grouped in a single line during completion for zsh.
-				Short:              fmt.Sprintf("The command %s is a plugin installed by the user", remainingArg),
+				Short:              fmt.Sprintf(i18n.T("The command %s is a plugin installed by the user"), remainingArg),
 				DisableFlagParsing: true,
 				// Allow plugins to provide their own completion choices
 				ValidArgsFunction: pluginCompletion,
 				// A Run is required for it to be a valid command
 				Run: func(cmd *cobra.Command, args []string) {},
 			}
-			parentCmd.AddCommand(cmd)
-			parentCmd = cmd
+			// Add the plugin command to the list of user defined commands
+			userDefinedCommands = append(userDefinedCommands, cmd)
+
+			if list {
+				parentCmd.AddCommand(cmd)
+				parentCmd = cmd
+			}
 		}
 	}
+
+	return userDefinedCommands
 }
 
 // pluginCompletion deals with shell completion beyond the plugin name, it allows to complete
@@ -160,7 +187,7 @@ func addPluginCommands(cmd *cobra.Command) {
 // executable must have executable permissions set on it and must be on $PATH.
 func pluginCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// Recreate the plugin name from the commandPath
-	pluginName := strings.Replace(strings.Replace(cmd.CommandPath(), "-", "_", -1), " ", "-", -1)
+	pluginName := strings.ReplaceAll(strings.ReplaceAll(cmd.CommandPath(), "-", "_"), " ", "-")
 
 	path, found := lookupCompletionExec(pluginName)
 	if !found {

@@ -232,10 +232,12 @@ func (sc *SemanticConventions) HTTPServerAttributesFromHTTPRequest(serverName, r
 	if route != "" {
 		attrs = append(attrs, sc.HTTPRouteKey.String(route))
 	}
-	if values, ok := request.Header["X-Forwarded-For"]; ok && len(values) > 0 {
-		if addresses := strings.SplitN(values[0], ",", 2); len(addresses) > 0 {
-			attrs = append(attrs, sc.HTTPClientIPKey.String(addresses[0]))
+	if values := request.Header["X-Forwarded-For"]; len(values) > 0 {
+		addr := values[0]
+		if i := strings.Index(addr, ","); i > 0 {
+			addr = addr[:i]
 		}
+		attrs = append(attrs, sc.HTTPClientIPKey.String(addr))
 	}
 
 	return append(attrs, sc.httpCommonAttributesFromHTTPRequest(request)...)

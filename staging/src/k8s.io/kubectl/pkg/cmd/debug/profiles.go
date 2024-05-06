@@ -54,6 +54,8 @@ const (
 	ProfileRestricted = "restricted"
 	// ProfileNetadmin offers elevated privileges for network debugging.
 	ProfileNetadmin = "netadmin"
+	// ProfileSysadmin offers elevated privileges for debugging.
+	ProfileSysadmin = "sysadmin"
 )
 
 type ProfileApplier interface {
@@ -74,6 +76,8 @@ func NewProfileApplier(profile string) (ProfileApplier, error) {
 		return &restrictedProfile{}, nil
 	case ProfileNetadmin:
 		return &netadminProfile{}, nil
+	case ProfileSysadmin:
+		return &sysadminProfile{}, nil
 	}
 
 	return nil, fmt.Errorf("unknown profile: %s", profile)
@@ -92,6 +96,9 @@ type restrictedProfile struct {
 }
 
 type netadminProfile struct {
+}
+
+type sysadminProfile struct {
 }
 
 func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
@@ -176,6 +183,8 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	clearSecurityContext(pod, containerName)
 	disallowRoot(pod, containerName)
 	dropCapabilities(pod, containerName)
+	disallowPrivilegeEscalation(pod, containerName)
+	setSeccompProfile(pod, containerName)
 
 	switch style {
 	case podCopy:
@@ -199,9 +208,34 @@ func (p *netadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	switch style {
 	case node:
 		useHostNamespaces(pod)
-		setPrivileged(pod, containerName)
 
-	case podCopy, ephemeral:
+	case podCopy:
+		shareProcessNamespace(pod)
+
+	case ephemeral:
+		// no additional modifications needed
+	}
+
+	return nil
+}
+
+func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("sysadmin profile: %s", err)
+	}
+
+	setPrivileged(pod, containerName)
+
+	switch style {
+	case node:
+		useHostNamespaces(pod)
+		mountRootPartition(pod, containerName)
+
+	case podCopy:
+		// to mimic general, default and baseline
+		shareProcessNamespace(pod)
+	case ephemeral:
 		// no additional modifications needed
 	}
 
@@ -215,6 +249,7 @@ func removeLabelsAndProbes(p *corev1.Pod) {
 	for i := range p.Spec.Containers {
 		p.Spec.Containers[i].LivenessProbe = nil
 		p.Spec.Containers[i].ReadinessProbe = nil
+		p.Spec.Containers[i].StartupProbe = nil
 	}
 }
 
@@ -250,7 +285,9 @@ func useHostNamespaces(p *corev1.Pod) {
 // shareProcessNamespace configures all containers in the pod to share the
 // process namespace.
 func shareProcessNamespace(p *corev1.Pod) {
-	p.Spec.ShareProcessNamespace = pointer.Bool(true)
+	if p.Spec.ShareProcessNamespace == nil {
+		p.Spec.ShareProcessNamespace = pointer.Bool(true)
+	}
 }
 
 // clearSecurityContext clears the security context for the container.
@@ -321,13 +358,14 @@ func allowProcessTracing(p *corev1.Pod, containerName string) {
 	})
 }
 
-// allowNetadminCapability grants NET_ADMIN capability to the container.
+// allowNetadminCapability grants NET_ADMIN and NET_RAW capability to the container.
 func allowNetadminCapability(p *corev1.Pod, containerName string) {
 	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
 		if c.Name != containerName {
 			return true
 		}
 		addCapability(c, "NET_ADMIN")
+		addCapability(c, "NET_RAW")
 		return false
 	})
 }
@@ -340,4 +378,32 @@ func addCapability(c *corev1.Container, capability corev1.Capability) {
 		c.SecurityContext.Capabilities = &corev1.Capabilities{}
 	}
 	c.SecurityContext.Capabilities.Add = append(c.SecurityContext.Capabilities.Add, capability)
+}
+
+// disallowPrivilegeEscalation configures the containers not allowed PrivilegeEscalation
+func disallowPrivilegeEscalation(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		c.SecurityContext.AllowPrivilegeEscalation = pointer.Bool(false)
+		return false
+	})
+}
+
+// setSeccompProfile apply SeccompProfile to the containers
+func setSeccompProfile(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		c.SecurityContext.SeccompProfile = &corev1.SeccompProfile{Type: "RuntimeDefault"}
+		return false
+	})
 }

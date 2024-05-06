@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -34,8 +34,8 @@ func TestExtraArgsFail(t *testing.T) {
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 
-	c := NewCmdCreate(f, genericclioptions.NewTestIOStreamsDiscard())
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	c := NewCmdCreate(f, genericiooptions.NewTestIOStreamsDiscard())
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 	options := NewCreateOptions(ioStreams)
 	if options.Complete(f, c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
@@ -66,7 +66,7 @@ func TestCreateObject(t *testing.T) {
 		}),
 	}
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
@@ -103,7 +103,7 @@ func TestCreateMultipleObject(t *testing.T) {
 		}),
 	}
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
 	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Flags().Set("filename", "../../../testdata/frontend-service.yaml")
@@ -140,7 +140,7 @@ func TestCreateDirectory(t *testing.T) {
 		}),
 	}
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreate(tf, ioStreams)
 	cmd.Flags().Set("filename", "../../../testdata/replace/legacy")
 	cmd.Flags().Set("output", "name")

@@ -22,16 +22,22 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/tools/internal/typeparams"
+	"golang.org/x/tools/go/types/objectpath"
+	"golang.org/x/tools/internal/tokeninternal"
 )
 
 // IExportShallow encodes "shallow" export data for the specified package.
 //
-// No promises are made about the encoding other than that it can be
-// decoded by the same version of IIExportShallow. If you plan to save
-// export data in the file system, be sure to include a cryptographic
-// digest of the executable in the key to avoid version skew.
-func IExportShallow(fset *token.FileSet, pkg *types.Package) ([]byte, error) {
+// No promises are made about the encoding other than that it can be decoded by
+// the same version of IIExportShallow. If you plan to save export data in the
+// file system, be sure to include a cryptographic digest of the executable in
+// the key to avoid version skew.
+//
+// If the provided reportf func is non-nil, it will be used for reporting bugs
+// encountered during export.
+// TODO(rfindley): remove reportf when we are confident enough in the new
+// objectpath encoding.
+func IExportShallow(fset *token.FileSet, pkg *types.Package, reportf ReportFunc) ([]byte, error) {
 	// In principle this operation can only fail if out.Write fails,
 	// but that's impossible for bytes.Buffer---and as a matter of
 	// fact iexportCommon doesn't even check for I/O errors.
@@ -43,22 +49,30 @@ func IExportShallow(fset *token.FileSet, pkg *types.Package) ([]byte, error) {
 	return out.Bytes(), err
 }
 
-// IImportShallow decodes "shallow" types.Package data encoded by IExportShallow
-// in the same executable. This function cannot import data from
+// IImportShallow decodes "shallow" types.Package data encoded by
+// IExportShallow in the same executable. This function cannot import data from
 // cmd/compile or gcexportdata.Write.
-func IImportShallow(fset *token.FileSet, imports map[string]*types.Package, data []byte, path string, insert InsertType) (*types.Package, error) {
+//
+// The importer calls getPackages to obtain package symbols for all
+// packages mentioned in the export data, including the one being
+// decoded.
+//
+// If the provided reportf func is non-nil, it will be used for reporting bugs
+// encountered during import.
+// TODO(rfindley): remove reportf when we are confident enough in the new
+// objectpath encoding.
+func IImportShallow(fset *token.FileSet, getPackages GetPackagesFunc, data []byte, path string, reportf ReportFunc) (*types.Package, error) {
 	const bundle = false
-	pkgs, err := iimportCommon(fset, imports, data, bundle, path, insert)
+	const shallow = true
+	pkgs, err := iimportCommon(fset, getPackages, data, bundle, path, shallow, reportf)
 	if err != nil {
 		return nil, err
 	}
 	return pkgs[0], nil
 }
 
-// InsertType is the type of a function that creates a types.TypeName
-// object for a named type and inserts it into the scope of the
-// specified Package.
-type InsertType = func(pkg *types.Package, name string)
+// ReportFunc is the type of a function used to report formatted bugs.
+type ReportFunc = func(string, ...interface{})
 
 // Current bundled export format version. Increase with each format change.
 // 0: initial implementation
@@ -138,6 +152,17 @@ func iexportCommon(out io.Writer, fset *token.FileSet, bundle, shallow bool, ver
 		p.doDecl(p.declTodo.popHead())
 	}
 
+	// Produce index of offset of each file record in files.
+	var files intWriter
+	var fileOffset []uint64 // fileOffset[i] is offset in files of file encoded as i
+	if p.shallow {
+		fileOffset = make([]uint64, len(p.fileInfos))
+		for i, info := range p.fileInfos {
+			fileOffset[i] = uint64(files.Len())
+			p.encodeFile(&files, info.file, info.needed)
+		}
+	}
+
 	// Append indices to data0 section.
 	dataLen := uint64(p.data0.Len())
 	w := p.newWriter()
@@ -163,14 +188,73 @@ func iexportCommon(out io.Writer, fset *token.FileSet, bundle, shallow bool, ver
 	}
 	hdr.uint64(uint64(p.version))
 	hdr.uint64(uint64(p.strings.Len()))
+	if p.shallow {
+		hdr.uint64(uint64(files.Len()))
+		hdr.uint64(uint64(len(fileOffset)))
+		for _, offset := range fileOffset {
+			hdr.uint64(offset)
+		}
+	}
 	hdr.uint64(dataLen)
 
 	// Flush output.
 	io.Copy(out, &hdr)
 	io.Copy(out, &p.strings)
+	if p.shallow {
+		io.Copy(out, &files)
+	}
 	io.Copy(out, &p.data0)
 
 	return nil
+}
+
+// encodeFile writes to w a representation of the file sufficient to
+// faithfully restore position information about all needed offsets.
+// Mutates the needed array.
+func (p *iexporter) encodeFile(w *intWriter, file *token.File, needed []uint64) {
+	_ = needed[0] // precondition: needed is non-empty
+
+	w.uint64(p.stringOff(file.Name()))
+
+	size := uint64(file.Size())
+	w.uint64(size)
+
+	// Sort the set of needed offsets. Duplicates are harmless.
+	sort.Slice(needed, func(i, j int) bool { return needed[i] < needed[j] })
+
+	lines := tokeninternal.GetLines(file) // byte offset of each line start
+	w.uint64(uint64(len(lines)))
+
+	// Rather than record the entire array of line start offsets,
+	// we save only a sparse list of (index, offset) pairs for
+	// the start of each line that contains a needed position.
+	var sparse [][2]int // (index, offset) pairs
+outer:
+	for i, lineStart := range lines {
+		lineEnd := size
+		if i < len(lines)-1 {
+			lineEnd = uint64(lines[i+1])
+		}
+		// Does this line contains a needed offset?
+		if needed[0] < lineEnd {
+			sparse = append(sparse, [2]int{i, lineStart})
+			for needed[0] < lineEnd {
+				needed = needed[1:]
+				if len(needed) == 0 {
+					break outer
+				}
+			}
+		}
+	}
+
+	// Delta-encode the columns.
+	w.uint64(uint64(len(sparse)))
+	var prev [2]int
+	for _, pair := range sparse {
+		w.uint64(uint64(pair[0] - prev[0]))
+		w.uint64(uint64(pair[1] - prev[1]))
+		prev = pair
+	}
 }
 
 // writeIndex writes out an object index. mainIndex indicates whether
@@ -242,8 +326,9 @@ type iexporter struct {
 	out     *bytes.Buffer
 	version int
 
-	shallow  bool           // don't put types from other packages in the index
-	localpkg *types.Package // (nil in bundle mode)
+	shallow    bool                // don't put types from other packages in the index
+	objEncoder *objectpath.Encoder // encodes objects from other packages in shallow mode; lazily allocated
+	localpkg   *types.Package      // (nil in bundle mode)
 
 	// allPkgs tracks all packages that have been referenced by
 	// the export data, so we can ensure to include them in the
@@ -255,12 +340,23 @@ type iexporter struct {
 	strings     intWriter
 	stringIndex map[string]uint64
 
+	// In shallow mode, object positions are encoded as (file, offset).
+	// Each file is recorded as a line-number table.
+	// Only the lines of needed positions are saved faithfully.
+	fileInfo  map[*token.File]uint64 // value is index in fileInfos
+	fileInfos []*filePositions
+
 	data0       intWriter
 	declIndex   map[types.Object]uint64
 	tparamNames map[types.Object]string // typeparam->exported name
 	typIndex    map[types.Type]uint64
 
 	indent int // for tracing support
+}
+
+type filePositions struct {
+	file   *token.File
+	needed []uint64 // unordered list of needed file offsets
 }
 
 func (p *iexporter) trace(format string, args ...interface{}) {
@@ -270,6 +366,17 @@ func (p *iexporter) trace(format string, args ...interface{}) {
 		return
 	}
 	fmt.Printf(strings.Repeat("..", p.indent)+format+"\n", args...)
+}
+
+// objectpathEncoder returns the lazily allocated objectpath.Encoder to use
+// when encoding objects in other packages during shallow export.
+//
+// Using a shared Encoder amortizes some of cost of objectpath search.
+func (p *iexporter) objectpathEncoder() *objectpath.Encoder {
+	if p.objEncoder == nil {
+		p.objEncoder = new(objectpath.Encoder)
+	}
+	return p.objEncoder
 }
 
 // stringOff returns the offset of s within the string section.
@@ -284,6 +391,25 @@ func (p *iexporter) stringOff(s string) uint64 {
 		p.strings.WriteString(s)
 	}
 	return off
+}
+
+// fileIndexAndOffset returns the index of the token.File and the byte offset of pos within it.
+func (p *iexporter) fileIndexAndOffset(file *token.File, pos token.Pos) (uint64, uint64) {
+	index, ok := p.fileInfo[file]
+	if !ok {
+		index = uint64(len(p.fileInfo))
+		p.fileInfos = append(p.fileInfos, &filePositions{file: file})
+		if p.fileInfo == nil {
+			p.fileInfo = make(map[*token.File]uint64)
+		}
+		p.fileInfo[file] = index
+	}
+	// Record each needed offset.
+	info := p.fileInfos[index]
+	offset := uint64(file.Offset(pos))
+	info.needed = append(info.needed, offset)
+
+	return index, offset
 }
 
 // pushDecl adds n to the declaration work queue, if not already present.
@@ -312,7 +438,6 @@ type exportWriter struct {
 	p *iexporter
 
 	data       intWriter
-	currPkg    *types.Package
 	prevFile   string
 	prevLine   int64
 	prevColumn int64
@@ -335,7 +460,6 @@ func (p *iexporter) doDecl(obj types.Object) {
 		}()
 	}
 	w := p.newWriter()
-	w.setPkg(obj.Pkg(), false)
 
 	switch obj := obj.(type) {
 	case *types.Var:
@@ -346,11 +470,17 @@ func (p *iexporter) doDecl(obj types.Object) {
 	case *types.Func:
 		sig, _ := obj.Type().(*types.Signature)
 		if sig.Recv() != nil {
-			panic(internalErrorf("unexpected method: %v", sig))
+			// We shouldn't see methods in the package scope,
+			// but the type checker may repair "func () F() {}"
+			// to "func (Invalid) F()" and then treat it like "func F()",
+			// so allow that. See golang/go#57729.
+			if sig.Recv().Type() != types.Typ[types.Invalid] {
+				panic(internalErrorf("unexpected method: %v", sig))
+			}
 		}
 
 		// Function.
-		if typeparams.ForSignature(sig).Len() == 0 {
+		if sig.TypeParams().Len() == 0 {
 			w.tag('F')
 		} else {
 			w.tag('G')
@@ -363,7 +493,7 @@ func (p *iexporter) doDecl(obj types.Object) {
 		//
 		// While importing the type parameters, tparamList computes and records
 		// their export name, so that it can be later used when writing the index.
-		if tparams := typeparams.ForSignature(sig); tparams.Len() > 0 {
+		if tparams := sig.TypeParams(); tparams.Len() > 0 {
 			w.tparamList(obj.Name(), tparams, obj.Pkg())
 		}
 		w.signature(sig)
@@ -376,14 +506,14 @@ func (p *iexporter) doDecl(obj types.Object) {
 	case *types.TypeName:
 		t := obj.Type()
 
-		if tparam, ok := t.(*typeparams.TypeParam); ok {
+		if tparam, ok := t.(*types.TypeParam); ok {
 			w.tag('P')
 			w.pos(obj.Pos())
 			constraint := tparam.Constraint()
 			if p.version >= iexportVersionGo1_18 {
 				implicit := false
 				if iface, _ := constraint.(*types.Interface); iface != nil {
-					implicit = typeparams.IsImplicit(iface)
+					implicit = iface.IsImplicit()
 				}
 				w.bool(implicit)
 			}
@@ -404,17 +534,17 @@ func (p *iexporter) doDecl(obj types.Object) {
 			panic(internalErrorf("%s is not a defined type", t))
 		}
 
-		if typeparams.ForNamed(named).Len() == 0 {
+		if named.TypeParams().Len() == 0 {
 			w.tag('T')
 		} else {
 			w.tag('U')
 		}
 		w.pos(obj.Pos())
 
-		if typeparams.ForNamed(named).Len() > 0 {
+		if named.TypeParams().Len() > 0 {
 			// While importing the type parameters, tparamList computes and records
 			// their export name, so that it can be later used when writing the index.
-			w.tparamList(obj.Name(), typeparams.ForNamed(named), obj.Pkg())
+			w.tparamList(obj.Name(), named.TypeParams(), obj.Pkg())
 		}
 
 		underlying := obj.Type().Underlying()
@@ -434,7 +564,7 @@ func (p *iexporter) doDecl(obj types.Object) {
 
 			// Receiver type parameters are type arguments of the receiver type, so
 			// their name must be qualified before exporting recv.
-			if rparams := typeparams.RecvTypeParams(sig); rparams.Len() > 0 {
+			if rparams := sig.RecvTypeParams(); rparams.Len() > 0 {
 				prefix := obj.Name() + "." + m.Name()
 				for i := 0; i < rparams.Len(); i++ {
 					rparam := rparams.At(i)
@@ -458,11 +588,28 @@ func (w *exportWriter) tag(tag byte) {
 }
 
 func (w *exportWriter) pos(pos token.Pos) {
-	if w.p.version >= iexportVersionPosCol {
+	if w.p.shallow {
+		w.posV2(pos)
+	} else if w.p.version >= iexportVersionPosCol {
 		w.posV1(pos)
 	} else {
 		w.posV0(pos)
 	}
+}
+
+// posV2 encoding (used only in shallow mode) records positions as
+// (file, offset), where file is the index in the token.File table
+// (which records the file name and newline offsets) and offset is a
+// byte offset. It effectively ignores //line directives.
+func (w *exportWriter) posV2(pos token.Pos) {
+	if pos == token.NoPos {
+		w.uint64(0)
+		return
+	}
+	file := w.p.fset.File(pos) // fset must be non-nil
+	index, offset := w.p.fileIndexAndOffset(file, pos)
+	w.uint64(1 + index)
+	w.uint64(offset)
 }
 
 func (w *exportWriter) posV1(pos token.Pos) {
@@ -549,6 +696,9 @@ func (w *exportWriter) qualifiedType(obj *types.TypeName) {
 	w.pkg(obj.Pkg())
 }
 
+// TODO(rfindley): what does 'pkg' even mean here? It would be better to pass
+// it in explicitly into signatures and structs that may use it for
+// constructing fields.
 func (w *exportWriter) typ(t types.Type, pkg *types.Package) {
 	w.data.uint64(w.p.typOff(t, pkg))
 }
@@ -589,19 +739,19 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 	}
 	switch t := t.(type) {
 	case *types.Named:
-		if targs := typeparams.NamedTypeArgs(t); targs.Len() > 0 {
+		if targs := t.TypeArgs(); targs.Len() > 0 {
 			w.startType(instanceType)
 			// TODO(rfindley): investigate if this position is correct, and if it
 			// matters.
 			w.pos(t.Obj().Pos())
 			w.typeList(targs, pkg)
-			w.typ(typeparams.NamedTypeOrigin(t), pkg)
+			w.typ(t.Origin(), pkg)
 			return
 		}
 		w.startType(definedType)
 		w.qualifiedType(t.Obj())
 
-	case *typeparams.TypeParam:
+	case *types.TypeParam:
 		w.startType(typeParamType)
 		w.qualifiedType(t.Obj())
 
@@ -640,30 +790,53 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 
 	case *types.Signature:
 		w.startType(signatureType)
-		w.setPkg(pkg, true)
+		w.pkg(pkg)
 		w.signature(t)
 
 	case *types.Struct:
 		w.startType(structType)
 		n := t.NumFields()
+		// Even for struct{} we must emit some qualifying package, because that's
+		// what the compiler does, and thus that's what the importer expects.
+		fieldPkg := pkg
 		if n > 0 {
-			w.setPkg(t.Field(0).Pkg(), true) // qualifying package for field objects
-		} else {
-			w.setPkg(pkg, true)
+			fieldPkg = t.Field(0).Pkg()
 		}
+		if fieldPkg == nil {
+			// TODO(rfindley): improve this very hacky logic.
+			//
+			// The importer expects a package to be set for all struct types, even
+			// those with no fields. A better encoding might be to set NumFields
+			// before pkg. setPkg panics with a nil package, which may be possible
+			// to reach with invalid packages (and perhaps valid packages, too?), so
+			// (arbitrarily) set the localpkg if available.
+			//
+			// Alternatively, we may be able to simply guarantee that pkg != nil, by
+			// reconsidering the encoding of constant values.
+			if w.p.shallow {
+				fieldPkg = w.p.localpkg
+			} else {
+				panic(internalErrorf("no package to set for empty struct"))
+			}
+		}
+		w.pkg(fieldPkg)
 		w.uint64(uint64(n))
+
 		for i := 0; i < n; i++ {
 			f := t.Field(i)
+			if w.p.shallow {
+				w.objectPath(f)
+			}
 			w.pos(f.Pos())
 			w.string(f.Name()) // unexported fields implicitly qualified by prior setPkg
-			w.typ(f.Type(), pkg)
+			w.typ(f.Type(), fieldPkg)
 			w.bool(f.Anonymous())
 			w.string(t.Tag(i)) // note (or tag)
 		}
 
 	case *types.Interface:
 		w.startType(interfaceType)
-		w.setPkg(pkg, true)
+		w.pkg(pkg)
 
 		n := t.NumEmbeddeds()
 		w.uint64(uint64(n))
@@ -678,17 +851,23 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 			w.typ(ft, tPkg)
 		}
 
+		// See comment for struct fields. In shallow mode we change the encoding
+		// for interface methods that are promoted from other packages.
+
 		n = t.NumExplicitMethods()
 		w.uint64(uint64(n))
 		for i := 0; i < n; i++ {
 			m := t.ExplicitMethod(i)
+			if w.p.shallow {
+				w.objectPath(m)
+			}
 			w.pos(m.Pos())
 			w.string(m.Name())
 			sig, _ := m.Type().(*types.Signature)
 			w.signature(sig)
 		}
 
-	case *typeparams.Union:
+	case *types.Union:
 		w.startType(unionType)
 		nt := t.Len()
 		w.uint64(uint64(nt))
@@ -703,12 +882,61 @@ func (w *exportWriter) doTyp(t types.Type, pkg *types.Package) {
 	}
 }
 
-func (w *exportWriter) setPkg(pkg *types.Package, write bool) {
-	if write {
-		w.pkg(pkg)
+// objectPath writes the package and objectPath to use to look up obj in a
+// different package, when encoding in "shallow" mode.
+//
+// When doing a shallow import, the importer creates only the local package,
+// and requests package symbols for dependencies from the client.
+// However, certain types defined in the local package may hold objects defined
+// (perhaps deeply) within another package.
+//
+// For example, consider the following:
+//
+//	package a
+//	func F() chan * map[string] struct { X int }
+//
+//	package b
+//	import "a"
+//	var B = a.F()
+//
+// In this example, the type of b.B holds fields defined in package a.
+// In order to have the correct canonical objects for the field defined in the
+// type of B, they are encoded as objectPaths and later looked up in the
+// importer. The same problem applies to interface methods.
+func (w *exportWriter) objectPath(obj types.Object) {
+	if obj.Pkg() == nil || obj.Pkg() == w.p.localpkg {
+		// obj.Pkg() may be nil for the builtin error.Error.
+		// In this case, or if obj is declared in the local package, no need to
+		// encode.
+		w.string("")
+		return
 	}
-
-	w.currPkg = pkg
+	objectPath, err := w.p.objectpathEncoder().For(obj)
+	if err != nil {
+		// Fall back to the empty string, which will cause the importer to create a
+		// new object, which matches earlier behavior. Creating a new object is
+		// sufficient for many purposes (such as type checking), but causes certain
+		// references algorithms to fail (golang/go#60819). However, we didn't
+		// notice this problem during months of gopls@v0.12.0 testing.
+		//
+		// TODO(golang/go#61674): this workaround is insufficient, as in the case
+		// where the field forwarded from an instantiated type that may not appear
+		// in the export data of the original package:
+		//
+		//  // package a
+		//  type A[P any] struct{ F P }
+		//
+		//  // package b
+		//  type B a.A[int]
+		//
+		// We need to update references algorithms not to depend on this
+		// de-duplication, at which point we may want to simply remove the
+		// workaround here.
+		w.string("")
+		return
+	}
+	w.string(string(objectPath))
+	w.pkg(obj.Pkg())
 }
 
 func (w *exportWriter) signature(sig *types.Signature) {
@@ -719,14 +947,14 @@ func (w *exportWriter) signature(sig *types.Signature) {
 	}
 }
 
-func (w *exportWriter) typeList(ts *typeparams.TypeList, pkg *types.Package) {
+func (w *exportWriter) typeList(ts *types.TypeList, pkg *types.Package) {
 	w.uint64(uint64(ts.Len()))
 	for i := 0; i < ts.Len(); i++ {
 		w.typ(ts.At(i), pkg)
 	}
 }
 
-func (w *exportWriter) tparamList(prefix string, list *typeparams.TypeParamList, pkg *types.Package) {
+func (w *exportWriter) tparamList(prefix string, list *types.TypeParamList, pkg *types.Package) {
 	ll := uint64(list.Len())
 	w.uint64(ll)
 	for i := 0; i < list.Len(); i++ {
@@ -744,7 +972,7 @@ const blankMarker = "$"
 // differs from its actual object name: it is prefixed with a qualifier, and
 // blank type parameter names are disambiguated by their index in the type
 // parameter list.
-func tparamExportName(prefix string, tparam *typeparams.TypeParam) string {
+func tparamExportName(prefix string, tparam *types.TypeParam) string {
 	assert(prefix != "")
 	name := tparam.Obj().Name()
 	if name == "_" {
@@ -787,6 +1015,17 @@ func (w *exportWriter) value(typ types.Type, v constant.Value) {
 	w.typ(typ, nil)
 	if w.p.version >= iexportVersionGo1_18 {
 		w.int64(int64(v.Kind()))
+	}
+
+	if v.Kind() == constant.Unknown {
+		// golang/go#60605: treat unknown constant values as if they have invalid type
+		//
+		// This loses some fidelity over the package type-checked from source, but that
+		// is acceptable.
+		//
+		// TODO(rfindley): we should switch on the recorded constant kind rather
+		// than the constant type
+		return
 	}
 
 	switch b := typ.Underlying().(*types.Basic); b.Info() & types.IsConstType {
@@ -843,6 +1082,16 @@ func constantToFloat(x constant.Value) *big.Float {
 		assert(ok)
 	}
 	return &f
+}
+
+func valueToRat(x constant.Value) *big.Rat {
+	// Convert little-endian to big-endian.
+	// I can't believe this is necessary.
+	bytes := constant.Bytes(x)
+	for i := 0; i < len(bytes)/2; i++ {
+		bytes[i], bytes[len(bytes)-1-i] = bytes[len(bytes)-1-i], bytes[i]
+	}
+	return new(big.Rat).SetInt(new(big.Int).SetBytes(bytes))
 }
 
 // mpint exports a multi-precision integer.
@@ -1053,4 +1302,20 @@ func (q *objQueue) popHead() types.Object {
 	obj := q.ring[q.head%len(q.ring)]
 	q.head++
 	return obj
+}
+
+// internalError represents an error generated inside this package.
+type internalError string
+
+func (e internalError) Error() string { return "gcimporter: " + string(e) }
+
+// TODO(adonovan): make this call panic, so that it's symmetric with errorf.
+// Otherwise it's easy to forget to do anything with the error.
+//
+// TODO(adonovan): also, consider switching the names "errorf" and
+// "internalErrorf" as the former is used for bugs, whose cause is
+// internal inconsistency, whereas the latter is used for ordinary
+// situations like bad input, whose cause is external.
+func internalErrorf(format string, args ...interface{}) error {
+	return internalError(fmt.Sprintf(format, args...))
 }

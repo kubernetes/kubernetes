@@ -159,7 +159,7 @@ func WaitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID stri
 		}
 		return true, err
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		return nil
 	}
 	return err

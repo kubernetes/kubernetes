@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -101,7 +102,9 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			}
 
 			opts := &PortForwardOptions{}
-			cmd := NewCmdPortForward(tf, genericclioptions.NewTestIOStreamsDiscard())
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			cmd := NewCmdPortForward(tf, genericiooptions.NewTestIOStreamsDiscard())
 			cmd.Run = func(cmd *cobra.Command, args []string) {
 				if err = opts.Complete(tf, cmd, args); err != nil {
 					return
@@ -110,7 +113,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 				if err = opts.Validate(); err != nil {
 					return
 				}
-				err = opts.RunPortForward()
+				err = opts.RunPortForwardContext(ctx)
 			}
 
 			for name, value := range flags {
@@ -158,7 +161,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -187,7 +190,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -216,7 +219,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       8080,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -246,7 +249,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -276,7 +279,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 					},
 				},
@@ -378,12 +381,12 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 						{
 							Port:       80,
 							Name:       "http",
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Port:       443,
 							Name:       "https",
-							TargetPort: intstr.FromInt(8443),
+							TargetPort: intstr.FromInt32(8443),
 						},
 					},
 				},
@@ -414,12 +417,12 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 						{
 							Port:       80,
 							Name:       "http",
-							TargetPort: intstr.FromInt(8080),
+							TargetPort: intstr.FromInt32(8080),
 						},
 						{
 							Port:       443,
 							Name:       "https",
-							TargetPort: intstr.FromInt(8443),
+							TargetPort: intstr.FromInt32(8443),
 						},
 					},
 				},

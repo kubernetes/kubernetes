@@ -36,14 +36,14 @@ import (
 
 var _ = SIGDescribe("Projected secret", func() {
 	f := framework.NewDefaultFramework("projected")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 	   Release: v1.9
 	   Testname: Projected Volume, Secrets, volume mode default
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. Pod MUST be able to read the content of the key successfully and the mode MUST be -rw-r--r-- by default.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume", f.WithNodeConformance(), func(ctx context.Context) {
 		doProjectedSecretE2EWithoutMapping(ctx, f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
@@ -53,7 +53,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with permission mode set to 0x400 on the Pod. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0400)
 		doProjectedSecretE2EWithoutMapping(ctx, f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
@@ -64,7 +64,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key. The volume has permission mode set to 0440, fsgroup set to 1001 and user set to non-root uid of 1000. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--r-----.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions, or running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		doProjectedSecretE2EWithoutMapping(ctx, f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &nonRootTestUserID)
@@ -75,7 +75,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Testname: Projected Volume, Secrets, mapped
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with default permission mode. The secret is also mapped to a custom path. Pod MUST be able to read the content of the key successfully and the mode MUST be -r--------on the mapped volume.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings", f.WithNodeConformance(), func(ctx context.Context) {
 		doProjectedSecretE2EWithMapping(ctx, f, nil)
 	})
 
@@ -85,12 +85,12 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key with permission mode set to 0400. The secret is also mapped to a specific name. Pod MUST be able to read the content of the key successfully and the mode MUST be -r-------- on the mapped volume.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		mode := int32(0400)
 		doProjectedSecretE2EWithMapping(ctx, f, &mode)
 	})
 
-	ginkgo.It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func(ctx context.Context) {
+	f.It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace", f.WithNodeConformance(), func(ctx context.Context) {
 		var (
 			namespace2  *v1.Namespace
 			err         error
@@ -116,7 +116,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Testname: Projected Volume, Secrets, mapped, multiple paths
 	   Description: A Pod is created with a projected volume source 'secret' to store a secret with a specified key. The secret is mapped to two different volume mounts. Pod MUST be able to read the content of the key successfully from the two volume mounts and the mode MUST be -r-------- on the mapped volumes.
 	*/
-	framework.ConformanceIt("should be consumable in multiple volumes in a pod [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable in multiple volumes in a pod", f.WithNodeConformance(), func(ctx context.Context) {
 		// This test ensures that the same secret can be mounted in multiple
 		// volumes in the same pod.  This test case exists to prevent
 		// regressions that break this use-case.
@@ -212,7 +212,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	   Testname: Projected Volume, Secrets, create, update delete
 	   Description: Create a Pod with three containers with secrets namely a create, update and delete container. Create Container when started MUST no have a secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
-	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("optional updates should be reflected in volume", f.WithNodeConformance(), func(ctx context.Context) {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -411,7 +411,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	//The secret is in pending during volume creation until the secret objects are available
 	//or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timeout exception unless it is marked optional.
 	//Slow (~5 mins)
-	ginkgo.It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to secret object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/projected-secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		pod := createNonOptionalSecretPod(ctx, f, volumeMountPath, podName)
@@ -422,7 +422,7 @@ var _ = SIGDescribe("Projected secret", func() {
 	//Secret object defined for the pod, If a key is specified which is not present in the secret,
 	// the volume setup will error unless it is marked optional, during the pod creation.
 	//Slow (~5 mins)
-	ginkgo.It("Should fail non-optional pod creation due to the key in the secret object does not exist [Slow]", func(ctx context.Context) {
+	f.It("Should fail non-optional pod creation due to the key in the secret object does not exist", f.WithSlow(), func(ctx context.Context) {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		pod := createNonOptionalSecretPodWithSecret(ctx, f, volumeMountPath, podName)

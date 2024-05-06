@@ -648,7 +648,7 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 			}
 			return nil, errIncompatibleVersion
 
-		case errClusterIDMismatch.Error():
+		case ErrClusterIDMismatch.Error():
 			if cr.lg != nil {
 				cr.lg.Warn(
 					"request sent was ignored by remote peer due to cluster ID mismatch",
@@ -656,10 +656,10 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 					zap.String("remote-peer-cluster-id", resp.Header.Get("X-Etcd-Cluster-ID")),
 					zap.String("local-member-id", cr.tr.ID.String()),
 					zap.String("local-member-cluster-id", cr.tr.ClusterID.String()),
-					zap.Error(errClusterIDMismatch),
+					zap.Error(ErrClusterIDMismatch),
 				)
 			}
-			return nil, errClusterIDMismatch
+			return nil, ErrClusterIDMismatch
 
 		default:
 			return nil, fmt.Errorf("unhandled error %q when precondition failed", string(b))

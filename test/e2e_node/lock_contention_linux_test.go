@@ -36,7 +36,7 @@ const contentionLockFile = "/var/run/kubelet.lock"
 // Disruptive because the kubelet is restarted in the test.
 // NodeSpecialFeature:LockContention because we don't want the test to be picked up by any other
 // test suite, hence the unique name "LockContention".
-var _ = SIGDescribe("Lock contention [Slow] [Disruptive] [NodeSpecialFeature:LockContention]", func() {
+var _ = SIGDescribe("Lock contention", framework.WithSlow(), framework.WithDisruptive(), "[NodeSpecialFeature:LockContention]", func() {
 
 	// Requires `--lock-file` & `--exit-on-lock-contention` flags to be set on the Kubelet.
 	ginkgo.It("Kubelet should stop when the test acquires the lock on lock file and restart once the lock is released", func(ctx context.Context) {

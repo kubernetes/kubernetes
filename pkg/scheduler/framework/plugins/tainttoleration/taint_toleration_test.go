@@ -23,9 +23,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 func nodeWithTaints(nodeName string, taints []v1.Taint) *v1.Node {
@@ -228,15 +230,19 @@ func TestTaintTolerationScore(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(nil, test.nodes)
-			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
-			p, _ := New(nil, fh)
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+			p, err := New(ctx, nil, fh)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -333,12 +339,81 @@ func TestTaintTolerationFilter(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(test.node)
-			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
+			p, err := New(ctx, nil, nil)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
+			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
+	}
+}
+
+func TestIsSchedulableAfterNodeChange(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		oldObj       interface{}
+		newObj       interface{}
+		expectedHint framework.QueueingHint
+		wantErr      bool
+	}{
+		{
+			name:         "backoff-wrong-new-object",
+			newObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			wantErr:      true,
+		},
+		{
+			name:         "backoff-wrong-old-object",
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			oldObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			wantErr:      true,
+		},
+		{
+			name:         "skip-queue-on-untoleratedtaint-node-added",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "queue-on-toleratedtaint-node-added",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
+			expectedHint: framework.Queue,
+		},
+		{
+			name:         "skip-unrelated-change",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}, {Key: "dedicated", Value: "user3", Effect: "NoSchedule"}}),
+			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.QueueSkip,
+		},
+		{
+			name:         "queue-on-taint-change",
+			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
+			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
+			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pl := &TaintToleration{}
+			got, err := pl.isSchedulableAfterNodeChange(logger, test.pod, test.oldObj, test.newObj)
+			if (err != nil) != test.wantErr {
+				t.Errorf("isSchedulableAfterNodeChange() error = %v, wantErr %v", err, test.wantErr)
+			}
+			if got != test.expectedHint {
+				t.Errorf("isSchedulableAfterNodeChange() = %v, want %v", got, test.expectedHint)
 			}
 		})
 	}

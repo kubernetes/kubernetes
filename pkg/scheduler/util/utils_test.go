@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 )
 
@@ -379,6 +380,164 @@ func TestPatchPodStatus(t *testing.T) {
 
 			if diff := cmp.Diff(tc.statusToUpdate, retrievedPod.Status); diff != "" {
 				t.Errorf("unexpected pod status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// Test_As tests the As function with Pod.
+func Test_As_Pod(t *testing.T) {
+	tests := []struct {
+		name       string
+		oldObj     interface{}
+		newObj     interface{}
+		wantOldObj *v1.Pod
+		wantNewObj *v1.Pod
+		wantErr    bool
+	}{
+		{
+			name:       "nil old Pod",
+			oldObj:     nil,
+			newObj:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			wantOldObj: nil,
+			wantNewObj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			name:       "nil new Pod",
+			oldObj:     &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			newObj:     nil,
+			wantOldObj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			wantNewObj: nil,
+		},
+		{
+			name:    "two different kinds of objects",
+			oldObj:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			newObj:  &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOld, gotNew, err := As[*v1.Pod](tc.oldObj, tc.newObj)
+			if err != nil && !tc.wantErr {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, but got nil")
+				}
+				return
+			}
+
+			if diff := cmp.Diff(tc.wantOldObj, gotOld); diff != "" {
+				t.Errorf("unexpected old object (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantNewObj, gotNew); diff != "" {
+				t.Errorf("unexpected new object (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// Test_As_Node tests the As function with Node.
+func Test_As_Node(t *testing.T) {
+	tests := []struct {
+		name       string
+		oldObj     interface{}
+		newObj     interface{}
+		wantOldObj *v1.Node
+		wantNewObj *v1.Node
+		wantErr    bool
+	}{
+		{
+			name:       "nil old Node",
+			oldObj:     nil,
+			newObj:     &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			wantOldObj: nil,
+			wantNewObj: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			name:       "nil new Node",
+			oldObj:     &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			newObj:     nil,
+			wantOldObj: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			wantNewObj: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOld, gotNew, err := As[*v1.Node](tc.oldObj, tc.newObj)
+			if err != nil && !tc.wantErr {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, but got nil")
+				}
+				return
+			}
+
+			if diff := cmp.Diff(tc.wantOldObj, gotOld); diff != "" {
+				t.Errorf("unexpected old object (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantNewObj, gotNew); diff != "" {
+				t.Errorf("unexpected new object (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// Test_As_KMetadata tests the As function with Pod.
+func Test_As_KMetadata(t *testing.T) {
+	tests := []struct {
+		name    string
+		oldObj  interface{}
+		newObj  interface{}
+		wantErr bool
+	}{
+		{
+			name:    "nil old Pod",
+			oldObj:  nil,
+			newObj:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			wantErr: false,
+		},
+		{
+			name:    "nil new Pod",
+			oldObj:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			newObj:  nil,
+			wantErr: false,
+		},
+		{
+			name:    "two different kinds of objects",
+			oldObj:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			newObj:  &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			wantErr: false,
+		},
+		{
+			name:    "unknown old type",
+			oldObj:  "unknown type",
+			wantErr: true,
+		},
+		{
+			name:    "unknown new type",
+			newObj:  "unknown type",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := As[klog.KMetadata](tc.oldObj, tc.newObj)
+			if err != nil && !tc.wantErr {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, but got nil")
+				}
+				return
 			}
 		})
 	}

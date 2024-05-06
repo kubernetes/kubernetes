@@ -1,3 +1,161 @@
+## 1.31.0
+
+### Features
+- Async assertions include context cancellation cause if present [121c37f]
+
+### Maintenance
+- Bump minimum go version [dee1e3c]
+- docs: fix typo in example usage "occured" -> "occurred" [49005fe]
+- Bump actions/setup-go from 4 to 5 (#714) [f1c8757]
+- Bump github/codeql-action from 2 to 3 (#715) [9836e76]
+- Bump github.com/onsi/ginkgo/v2 from 2.13.0 to 2.13.2 (#713) [54726f0]
+- Bump golang.org/x/net from 0.17.0 to 0.19.0 (#711) [df97ecc]
+- docs: fix `HaveExactElement` typo (#712) [a672c86]
+
+## 1.30.0
+
+### Features
+- BeTrueBecause and BeFalseBecause allow for better failure messages [4da4c7f]
+
+### Maintenance
+- Bump actions/checkout from 3 to 4 (#694) [6ca6e97]
+- doc: fix type on gleak go doc [f1b8343]
+
+## 1.29.0
+
+### Features
+- MatchError can now take an optional func(error) bool + description [2b39142]
+
+## 1.28.1
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.12.0 to 2.13.0 [635d196]
+- Bump github.com/google/go-cmp from 0.5.9 to 0.6.0 [14f8859]
+- Bump golang.org/x/net from 0.14.0 to 0.17.0 [d8a6508]
+- #703 doc(matchers): HaveEach() doc comment updated [2705bdb]
+- Minor typos (#699) [375648c]
+
+## 1.28.0
+
+### Features
+- Add VerifyHost handler to ghttp (#698) [0b03b36]
+
+### Fixes
+- Read Body for Newer Responses in HaveHTTPBodyMatcher (#686) [18d6673]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.11.0 to 2.12.0 (#693) [55a33f3]
+- Typo in matchers.go (#691) [de68e8f]
+- Bump commonmarker from 0.23.9 to 0.23.10 in /docs (#690) [ab17f5e]
+- chore: update test matrix for Go 1.21 (#689) [5069017]
+- Bump golang.org/x/net from 0.12.0 to 0.14.0 (#688) [babe25f]
+
+## 1.27.10
+
+### Fixes
+- fix: go 1.21 adding goroutine ID to creator+location (#685) [bdc7803]
+
+## 1.27.9
+
+### Fixes
+- Prevent nil-dereference in format.Object for boxed nil error (#681) [3b31fc3]
+
+### Maintenance
+- Bump golang.org/x/net from 0.11.0 to 0.12.0 (#679) [360849b]
+- chore: use String() instead of fmt.Sprintf (#678) [86f3659]
+- Bump golang.org/x/net from 0.10.0 to 0.11.0 (#674) [642ead0]
+- chore: unnecessary use of fmt.Sprintf (#677) [ceb9ca6]
+- Bump github.com/onsi/ginkgo/v2 from 2.10.0 to 2.11.0 (#675) [a2087d8]
+- docs: fix ContainSubstring references (#673) [fc9a89f]
+- Bump github.com/onsi/ginkgo/v2 from 2.9.7 to 2.10.0 (#671) [9076019]
+
+## 1.27.8
+
+### Fixes
+- HaveExactElement should not call FailureMessage if a submatcher returned an error [096f392]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.9.5 to 2.9.7 (#669) [8884bee]
+
+## 1.27.7
+
+### Fixes
+- fix: gcustom.MakeMatcher accepts nil as actual value (#666) [57054d5]
+
+### Maintenance
+- update gitignore [05c1bc6]
+- Bump github.com/onsi/ginkgo/v2 from 2.9.4 to 2.9.5 (#663) [7cadcf6]
+- Bump golang.org/x/net from 0.9.0 to 0.10.0 (#662) [b524839]
+- Bump github.com/onsi/ginkgo/v2 from 2.9.2 to 2.9.4 (#661) [5f44694]
+- Bump commonmarker from 0.23.8 to 0.23.9 in /docs (#657) [05dc99a]
+- Bump nokogiri from 1.14.1 to 1.14.3 in /docs (#658) [3a033d1]
+- Replace deprecated NewGomegaWithT with NewWithT (#659) [a19238f]
+- Bump golang.org/x/net from 0.8.0 to 0.9.0 (#656) [29ed041]
+- Bump actions/setup-go from 3 to 4 (#651) [11b2080]
+
+## 1.27.6
+
+### Fixes
+- Allow collections matchers to work correctly when expected has nil elements [60e7cf3]
+
+### Maintenance
+- updates MatchError godoc comment to also accept a Gomega matcher (#654) [67b869d]
+
+## 1.27.5
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.9.1 to 2.9.2 (#653) [a215021]
+- Bump github.com/go-task/slim-sprig (#652) [a26fed8]
+
+## 1.27.4
+
+### Fixes
+- improve error formatting and remove duplication of error message in Eventually/Consistently [854f075]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.9.0 to 2.9.1 (#650) [ccebd9b]
+
+## 1.27.3
+
+### Fixes
+- format.Object now always includes err.Error() when passed an error [86d97ef]
+- Fix HaveExactElements to work inside ContainElement or other collection matchers (#648) [636757e]
+
+### Maintenance
+- Bump github.com/golang/protobuf from 1.5.2 to 1.5.3 (#649) [cc16689]
+- Bump github.com/onsi/ginkgo/v2 from 2.8.4 to 2.9.0 (#646) [e783366]
+
+## 1.27.2
+
+### Fixes
+- improve poll progress message when polling a consistently that has been passing [28a319b]
+
+### Maintenance
+- bump ginkgo
+- remove tools.go hack as Ginkgo 2.8.2 automatically pulls in the cli dependencies [81443b3]
+
+## 1.27.1
+
+### Maintenance
+
+- Bump golang.org/x/net from 0.6.0 to 0.7.0 (#640) [bc686cd]
+
+## 1.27.0
+
+### Features
+- Add HaveExactElements matcher (#634) [9d50783]
+- update Gomega docs to discuss GinkgoHelper() [be32774]
+
+### Maintenance
+- Bump github.com/onsi/ginkgo/v2 from 2.8.0 to 2.8.1 (#639) [296a68b]
+- Bump golang.org/x/net from 0.5.0 to 0.6.0 (#638) [c2b098b]
+- Bump github-pages from 227 to 228 in /docs (#636) [a9069ab]
+- test: update matrix for Go 1.20 (#635) [6bd25c8]
+- Bump github.com/onsi/ginkgo/v2 from 2.7.0 to 2.8.0 (#631) [5445f8b]
+- Bump webrick from 1.7.0 to 1.8.1 in /docs (#630) [03e93bb]
+- codeql: add ruby language (#626) [63c7d21]
+- dependabot: add bundler package-ecosystem for docs (#625) [d92f963]
+
 ## 1.26.0
 
 ### Features

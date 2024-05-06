@@ -32,27 +32,32 @@ var (
 		APIServerID:       "1",
 		EncodingVersion:   "v1",
 		DecodableVersions: []string{"v1", "v2"},
+		ServedVersions:    []string{"v1"},
 	}
 	ssv2 = v1alpha1.ServerStorageVersion{
 		APIServerID:       "2",
 		EncodingVersion:   "v1",
 		DecodableVersions: []string{"v1", "v2"},
+		ServedVersions:    []string{"v1", "v2"},
 	}
 	// ssv3 has a different encoding version
 	ssv3 = v1alpha1.ServerStorageVersion{
 		APIServerID:       "3",
 		EncodingVersion:   "v2",
 		DecodableVersions: []string{"v1", "v2"},
+		ServedVersions:    []string{"v1", "v2"},
 	}
 	ssv4 = v1alpha1.ServerStorageVersion{
 		APIServerID:       "4",
 		EncodingVersion:   "v1",
 		DecodableVersions: []string{"v1", "v2", "v4"},
+		ServedVersions:    []string{"v1", "v2"},
 	}
 	ssv5 = v1alpha1.ServerStorageVersion{
 		APIServerID:       "5",
 		EncodingVersion:   "v2",
 		DecodableVersions: []string{"v1", "v2", "v4"},
+		ServedVersions:    []string{"v1", "v2"},
 	}
 )
 
@@ -114,7 +119,7 @@ func TestLocalUpdateStorageVersion(t *testing.T) {
 
 	for _, tc := range tests {
 		sv := &v1alpha1.StorageVersion{Status: tc.old}
-		updated := localUpdateStorageVersion(sv, tc.newSSV.APIServerID, tc.newSSV.EncodingVersion, tc.newSSV.DecodableVersions)
+		updated := localUpdateStorageVersion(sv, tc.newSSV.APIServerID, tc.newSSV.EncodingVersion, tc.newSSV.DecodableVersions, tc.newSSV.ServedVersions)
 		if tc.expectLastTransitionTimeUpdate == updated.Status.Conditions[0].LastTransitionTime.IsZero() {
 			t.Errorf("unexpected LastTransitionTime, expected update: %v, got: %v",
 				tc.expectLastTransitionTimeUpdate, updated.Status.Conditions[0].LastTransitionTime)

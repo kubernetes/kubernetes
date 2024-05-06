@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/internal/plugins/builtinhelpers"
 	"sigs.k8s.io/kustomize/api/internal/plugins/execplugin"
@@ -22,6 +21,7 @@ import (
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 )
@@ -42,14 +42,22 @@ func NewLoader(
 	return &Loader{pc: pc, rf: rf, fs: fs}
 }
 
+// LoaderWithWorkingDir returns loader after setting its working directory.
+// NOTE: This is not really a new loader since some of the Loader struct fields are pointers.
+func (l *Loader) LoaderWithWorkingDir(wd string) *Loader {
+	lpc := &types.PluginConfig{
+		PluginRestrictions: l.pc.PluginRestrictions,
+		BpLoadingOptions:   l.pc.BpLoadingOptions,
+		FnpLoadingOptions:  l.pc.FnpLoadingOptions,
+		HelmConfig:         l.pc.HelmConfig,
+	}
+	lpc.FnpLoadingOptions.WorkingDir = wd
+	return &Loader{pc: lpc, rf: l.rf, fs: l.fs}
+}
+
 // Config provides the global (not plugin specific) PluginConfig data.
 func (l *Loader) Config() *types.PluginConfig {
 	return l.pc
-}
-
-// SetWorkDir sets the working directory for this loader's plugins
-func (l *Loader) SetWorkDir(wd string) {
-	l.pc.FnpLoadingOptions.WorkingDir = wd
 }
 
 func (l *Loader) LoadGenerators(
@@ -58,11 +66,11 @@ func (l *Loader) LoadGenerators(
 	for _, res := range rm.Resources() {
 		g, err := l.LoadGenerator(ldr, v, res)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load generator: %w", err)
 		}
 		generatorOrigin, err := resource.OriginFromCustomPlugin(res)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get origin from CustomPlugin: %w", err)
 		}
 		result = append(result, &resmap.GeneratorWithProperties{Generator: g, Origin: generatorOrigin})
 	}
@@ -130,15 +138,19 @@ func (l *Loader) AbsolutePluginPath(id resid.ResId) (string, error) {
 // absPluginHome is the home of kustomize Exec and Go plugins.
 // Kustomize plugin configuration files are k8s-style objects
 // containing the fields 'apiVersion' and 'kind', e.g.
-//   apiVersion: apps/v1
-//   kind: Deployment
+//
+//	apiVersion: apps/v1
+//	kind: Deployment
+//
 // kustomize reads plugin configuration data from a file path
 // specified in the 'generators:' or 'transformers:' field of a
 // kustomization file.  For Exec and Go plugins, kustomize
 // uses this data to both locate the plugin and configure it.
 // Each Exec or Go plugin (its code, its tests, its supporting data
 // files, etc.) must be housed in its own directory at
-//   ${absPluginHome}/${pluginApiVersion}/LOWERCASE(${pluginKind})
+//
+//	${absPluginHome}/${pluginApiVersion}/LOWERCASE(${pluginKind})
+//
 // where
 //   - ${absPluginHome} is an absolute path, defined below.
 //   - ${pluginApiVersion} is taken from the plugin config file.
@@ -204,11 +216,11 @@ func (l *Loader) loadAndConfigurePlugin(
 	}
 	yaml, err := res.AsYAML()
 	if err != nil {
-		return nil, errors.Wrapf(err, "marshalling yaml from res %s", res.OrgId())
+		return nil, errors.WrapPrefixf(err, "marshalling yaml from res %s", res.OrgId())
 	}
 	err = c.Config(resmap.NewPluginHelpers(ldr, v, l.rf, l.pc), yaml)
 	if err != nil {
-		return nil, errors.Wrapf(
+		return nil, errors.WrapPrefixf(
 			err, "plugin %s fails configuration", res.OrgId())
 	}
 	return c, nil
@@ -226,17 +238,20 @@ func (l *Loader) makeBuiltinPlugin(r resid.Gvk) (resmap.Configurable, error) {
 }
 
 func (l *Loader) loadPlugin(res *resource.Resource) (resmap.Configurable, error) {
-	spec := fnplugin.GetFunctionSpec(res)
+	spec, err := fnplugin.GetFunctionSpec(res)
+	if err != nil {
+		return nil, fmt.Errorf("loader: %w", err)
+	}
 	if spec != nil {
 		// validation check that function mounts are under the current kustomization directory
 		for _, mount := range spec.Container.StorageMounts {
 			if filepath.IsAbs(mount.Src) {
-				return nil, errors.New(fmt.Sprintf("plugin %s with mount path '%s' is not permitted; "+
-					"mount paths must be relative to the current kustomization directory", res.OrgId(), mount.Src))
+				return nil, errors.Errorf("plugin %s with mount path '%s' is not permitted; "+
+					"mount paths must be relative to the current kustomization directory", res.OrgId(), mount.Src)
 			}
 			if strings.HasPrefix(filepath.Clean(mount.Src), "../") {
-				return nil, errors.New(fmt.Sprintf("plugin %s with mount path '%s' is not permitted; "+
-					"mount paths must be under the current kustomization directory", res.OrgId(), mount.Src))
+				return nil, errors.Errorf("plugin %s with mount path '%s' is not permitted; "+
+					"mount paths must be under the current kustomization directory", res.OrgId(), mount.Src)
 			}
 		}
 		return fnplugin.NewFnPlugin(&l.pc.FnpLoadingOptions), nil
@@ -292,11 +307,11 @@ func (l *Loader) loadGoPlugin(id resid.ResId, absPath string) (resmap.Configurab
 	log.Printf("Attempting plugin load from '%s'", absPath)
 	p, err := plugin.Open(absPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "plugin %s fails to load", absPath)
+		return nil, errors.WrapPrefixf(err, "plugin %s fails to load", absPath)
 	}
 	symbol, err := p.Lookup(konfig.PluginSymbol)
 	if err != nil {
-		return nil, errors.Wrapf(
+		return nil, errors.WrapPrefixf(
 			err, "plugin %s doesn't have symbol %s",
 			regId, konfig.PluginSymbol)
 	}

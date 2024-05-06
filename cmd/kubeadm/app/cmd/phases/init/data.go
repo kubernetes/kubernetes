@@ -45,6 +45,7 @@ type InitData interface {
 	ExternalCA() bool
 	OutputWriter() io.Writer
 	Client() (clientset.Interface, error)
+	ClientWithoutBootstrap() (clientset.Interface, error)
 	Tokens() []string
 	PatchesDir() string
 }

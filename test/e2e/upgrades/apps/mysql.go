@@ -103,7 +103,7 @@ func (t *MySQLUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	mysqlKubectlCreate(ns, "tester.yaml")
 
 	ginkgo.By("Getting the ingress IPs from the test-service")
-	err := wait.PollImmediateWithContext(ctx, statefulsetPoll, statefulsetTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, statefulsetPoll, statefulsetTimeout, true, func(ctx context.Context) (bool, error) {
 		if t.ip = t.getServiceIP(ctx, f, ns, "test-server"); t.ip == "" {
 			return false, nil
 		}
@@ -125,7 +125,7 @@ func (t *MySQLUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(count, 2)
+	gomega.Expect(count).To(gomega.Equal(2))
 }
 
 // Test continually polls the db using the read and write connections, inserting data, and checking

@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/ptr"
 )
 
 // NewTestJob returns a Job which does one of several testing behaviors. notTerminate starts a Job that will run
@@ -69,7 +71,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   framework.BusyBoxImage,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -80,16 +82,36 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 							SecurityContext: &v1.SecurityContext{},
 						},
 					},
-					NodeName: nodeName,
 				},
 			},
 		},
 	}
+	if len(nodeName) > 0 {
+		job.Spec.Template.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/hostname": nodeName,
+		}
+	}
 	switch behavior {
-	case "notTerminate":
+	case "neverTerminate":
+		// this job is being used in an upgrade job see test/e2e/upgrades/apps/job.go
+		// it should never be optimized, as it always has to restart during an upgrade
+		// and continue running
 		job.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "1000000"}
+		job.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
+	case "notTerminate":
+		job.Spec.Template.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 	case "fail":
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 1"}
+	case "failOddSucceedEven":
+		job.Spec.Template.Spec.Containers[0].Command = []string{"sh", "-c"}
+		job.Spec.Template.Spec.Containers[0].Args = []string{`
+			if [ $(expr ${JOB_COMPLETION_INDEX} % 2) -ne 0 ]; then
+				exit 1
+			else
+				exit 0
+			fi
+			`,
+		}
 	case "succeed":
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "exit 0"}
 	case "randomlySucceedOrFail":
@@ -112,6 +134,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 		// the non-0-indexed pods are succeeded is used to determine that the
 		// 0th indexed pod already created the marker file.
 		setupHostPathDirectory(job)
+		job.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
 		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "if [[ -r /data/foo ]] ; then exit 0 ; elif [[ $JOB_COMPLETION_INDEX -eq 0 ]] ; then touch /data/foo ; sleep 1000000 ; else exit 1 ; fi"}
 	}
 	return job
@@ -119,7 +142,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 
 // setup host path directory to pass information between pod restarts
 func setupHostPathDirectory(job *batchv1.Job) {
-	if len(job.Spec.Template.Spec.NodeName) > 0 {
+	if _, nodeNameSpecified := job.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"]; nodeNameSpecified {
 		randomDir := "/tmp/job-e2e/" + rand.String(10)
 		hostPathType := v1.HostPathDirectoryOrCreate
 		job.Spec.Template.Spec.Volumes[0].VolumeSource = v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: randomDir, Type: &hostPathType}}

@@ -33,7 +33,7 @@ import (
 
 var _ = SIGDescribe("Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// Test multiple projections
 	/*
@@ -41,7 +41,7 @@ var _ = SIGDescribe("Projected combined", func() {
 	   Testname: Projected Volume, multiple projections
 	   Description: A Pod is created with a projected volume source for secrets, configMap and downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the secrets, configMap values and the cpu and memory limits as well as cpu and memory requests from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should project all components that make up the projection API [Projection][NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should project all components that make up the projection API [Projection]", f.WithNodeConformance(), func(ctx context.Context) {
 		var err error
 		podName := "projected-volume-" + string(uuid.NewUUID())
 		secretName := "secret-projected-all-test-volume-" + string(uuid.NewUUID())

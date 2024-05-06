@@ -15,7 +15,7 @@ spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: gcr.io/k8s-ingress-image-push/ingress-gce-glbc-amd64:v1.20.1
+  - image: gcr.io/k8s-ingress-image-push/ingress-gce-glbc-amd64:v1.23.1
     livenessProbe:
       httpGet:
         path: /healthz
@@ -56,7 +56,6 @@ spec:
     - --running-in-cluster=false
     - --config-file-path=/etc/gce.conf
     - --healthz-port=8086
-    - --enable-endpoint-slices
     - --gce-ratelimit=ga.Operations.Get,qps,10,100
     - --gce-ratelimit=alpha.Operations.Get,qps,10,100
     - --gce-ratelimit=beta.Operations.Get,qps,10,100

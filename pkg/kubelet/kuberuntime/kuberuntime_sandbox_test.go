@@ -37,6 +37,39 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const testPodLogsDirectory = "/var/log/pods"
+
+func TestGeneratePodSandboxConfig(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	pod := newTestPod()
+
+	expectedLogDirectory := filepath.Join(testPodLogsDirectory, pod.Namespace+"_"+pod.Name+"_12345678")
+	expectedLabels := map[string]string{
+		"io.kubernetes.pod.name":      pod.Name,
+		"io.kubernetes.pod.namespace": pod.Namespace,
+		"io.kubernetes.pod.uid":       string(pod.UID),
+	}
+	expectedMetadata := &runtimeapi.PodSandboxMetadata{
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		Uid:       string(pod.UID),
+		Attempt:   uint32(1),
+	}
+	expectedPortMappings := []*runtimeapi.PortMapping{
+		{
+			HostPort: 8080,
+		},
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedLabels, podSandboxConfig.Labels)
+	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)
+	assert.Equal(t, expectedMetadata, podSandboxConfig.Metadata)
+	assert.Equal(t, expectedPortMappings, podSandboxConfig.PortMappings)
+}
+
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.
 func TestCreatePodSandbox(t *testing.T) {
 	ctx := context.Background()
@@ -47,7 +80,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.MkdirAllFn = func(path string, perm os.FileMode) error {
 		// Check pod logs root directory is created.
-		assert.Equal(t, filepath.Join(podLogsRootDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
+		assert.Equal(t, filepath.Join(testPodLogsDirectory, pod.Namespace+"_"+pod.Name+"_12345678"), path)
 		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}
@@ -57,7 +90,8 @@ func TestCreatePodSandbox(t *testing.T) {
 	sandboxes, err := fakeRuntime.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{Id: id})
 	assert.NoError(t, err)
 	assert.Equal(t, len(sandboxes), 1)
-	// TODO Check pod sandbox configuration
+	assert.Equal(t, sandboxes[0].Id, fmt.Sprintf("%s_%s_%s_1", pod.Name, pod.Namespace, pod.UID))
+	assert.Equal(t, sandboxes[0].State, runtimeapi.PodSandboxState_SANDBOX_READY)
 }
 
 func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
@@ -153,6 +187,11 @@ func newTestPod() *v1.Pod {
 					Name:            "foo",
 					Image:           "busybox",
 					ImagePullPolicy: v1.PullIfNotPresent,
+					Ports: []v1.ContainerPort{
+						{
+							HostPort: 8080,
+						},
+					},
 				},
 			},
 		},
@@ -342,7 +381,7 @@ func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, false)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, false)
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 
@@ -421,7 +460,7 @@ func TestGeneratePodSandboxWindowsConfig_HostNetwork(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 

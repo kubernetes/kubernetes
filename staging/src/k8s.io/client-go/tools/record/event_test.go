@@ -112,7 +112,7 @@ func TestNonRacyShutdown(t *testing.T) {
 
 	caster := NewBroadcasterForTests(0)
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, caster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, caster, clock)
 
 	var wg sync.WaitGroup
 	wg.Add(100)
@@ -179,11 +179,12 @@ func TestEventf(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[2]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: false,
@@ -206,11 +207,12 @@ func TestEventf(t *testing.T) {
 					UID:        "bar",
 					APIVersion: "v1",
 				},
-				Reason:  "Killed",
-				Message: "some other verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Killed",
+				Message:             "some other verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:""}): type: 'Normal' reason: 'Killed' some other verbose message: 1`,
 			expectUpdate: false,
@@ -234,11 +236,12 @@ func TestEventf(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[2]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   2,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               2,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: true,
@@ -262,11 +265,12 @@ func TestEventf(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[3]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: false,
@@ -290,11 +294,12 @@ func TestEventf(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[2]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   3,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               3,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: true,
@@ -318,11 +323,12 @@ func TestEventf(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[3]",
 				},
-				Reason:  "Stopped",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Stopped",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Stopped' some verbose message: 1`,
 			expectUpdate: false,
@@ -346,11 +352,12 @@ func TestEventf(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[3]",
 				},
-				Reason:  "Stopped",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   2,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Stopped",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               2,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Stopped' some verbose message: 1`,
 			expectUpdate: true,
@@ -374,7 +381,7 @@ func TestEventf(t *testing.T) {
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
 		clock.Step(1 * time.Second)
 		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
@@ -400,7 +407,7 @@ func TestEventf(t *testing.T) {
 	sinkWatcher.Stop()
 }
 
-func recorderWithFakeClock(eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
+func recorderWithFakeClock(t *testing.T, eventSource v1.EventSource, eventBroadcaster EventBroadcaster, clock clock.Clock) EventRecorder {
 	return &recorderImpl{scheme.Scheme, eventSource, eventBroadcaster.(*eventBroadcasterImpl).Broadcaster, clock}
 }
 
@@ -655,7 +662,7 @@ func TestEventfNoNamespace(t *testing.T) {
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	for index, item := range table {
 		clock.Step(1 * time.Second)
@@ -735,11 +742,12 @@ func TestMultiSinkCache(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[2]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: false,
@@ -762,11 +770,12 @@ func TestMultiSinkCache(t *testing.T) {
 					UID:        "bar",
 					APIVersion: "v1",
 				},
-				Reason:  "Killed",
-				Message: "some other verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Killed",
+				Message:             "some other verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:""}): type: 'Normal' reason: 'Killed' some other verbose message: 1`,
 			expectUpdate: false,
@@ -790,11 +799,12 @@ func TestMultiSinkCache(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[2]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   2,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               2,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: true,
@@ -818,11 +828,12 @@ func TestMultiSinkCache(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[3]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: false,
@@ -846,11 +857,12 @@ func TestMultiSinkCache(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[2]",
 				},
-				Reason:  "Started",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   3,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Started",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               3,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
 			expectUpdate: true,
@@ -874,11 +886,12 @@ func TestMultiSinkCache(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[3]",
 				},
-				Reason:  "Stopped",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   1,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Stopped",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               1,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Stopped' some verbose message: 1`,
 			expectUpdate: false,
@@ -902,11 +915,12 @@ func TestMultiSinkCache(t *testing.T) {
 					APIVersion: "v1",
 					FieldPath:  "spec.containers[3]",
 				},
-				Reason:  "Stopped",
-				Message: "some verbose message: 1",
-				Source:  v1.EventSource{Component: "eventTest"},
-				Count:   2,
-				Type:    v1.EventTypeNormal,
+				Reason:              "Stopped",
+				Message:             "some verbose message: 1",
+				Source:              v1.EventSource{Component: "eventTest"},
+				ReportingController: "eventTest",
+				Count:               2,
+				Type:                v1.EventTypeNormal,
 			},
 			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Stopped' some verbose message: 1`,
 			expectUpdate: true,
@@ -941,7 +955,7 @@ func TestMultiSinkCache(t *testing.T) {
 
 	eventBroadcaster := NewBroadcasterForTests(0)
 	clock := testclocks.NewFakeClock(time.Now())
-	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+	recorder := recorderWithFakeClock(t, v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 
 	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
 	for index, item := range table {

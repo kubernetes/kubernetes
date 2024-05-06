@@ -24,9 +24,10 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
-	gomock "github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"go.uber.org/mock/gomock"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
@@ -255,6 +256,93 @@ func TestGetCapacity(t *testing.T) {
 				if v.Value() != c.expectedResourceQuantity.Value() {
 					t.Errorf("got unexpected %s value, expected %d, got %d", v1.ResourceEphemeralStorage, c.expectedResourceQuantity.Value(), v.Value())
 				}
+			}
+		})
+	}
+}
+
+func TestNewPodContainerManager(t *testing.T) {
+
+	info := QOSContainersInfo{
+		Guaranteed: CgroupName{"guaranteed"},
+		BestEffort: CgroupName{"besteffort"},
+		Burstable:  CgroupName{"burstable"},
+	}
+	QosEnabled := NodeConfig{
+		CgroupsPerQOS: true,
+	}
+	QosDisabled := NodeConfig{
+		CgroupsPerQOS: false,
+	}
+
+	cases := []struct {
+		name string
+		cm   *containerManagerImpl
+	}{
+		{
+			name: "CgroupsPerQOS is disabled, return *podContainerManagerNoop",
+			cm: &containerManagerImpl{
+				qosContainerManager: &qosContainerManagerImpl{
+					qosContainersInfo: info,
+					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+				},
+
+				NodeConfig: QosDisabled,
+			},
+		},
+		{
+			name: "CgroupsPerQOS is enabled, return *podContainerManagerImpl",
+			cm: &containerManagerImpl{
+				qosContainerManager: &qosContainerManagerImpl{
+					qosContainersInfo: info,
+					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, ""),
+				},
+
+				NodeConfig: QosEnabled,
+			},
+		},
+		{
+			name: "CgroupsPerQOS is enabled, use systemd",
+			cm: &containerManagerImpl{
+				qosContainerManager: &qosContainerManagerImpl{
+					qosContainersInfo: info,
+					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+				},
+
+				NodeConfig: QosEnabled,
+			},
+		},
+		{
+			name: "CgroupsPerQOS is disabled, use systemd",
+			cm: &containerManagerImpl{
+				qosContainerManager: &qosContainerManagerImpl{
+					qosContainersInfo: info,
+					cgroupManager:     NewCgroupManager(&CgroupSubsystems{}, "systemd"),
+				},
+
+				NodeConfig: QosDisabled,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			pcm := c.cm.NewPodContainerManager()
+			if c.cm.NodeConfig.CgroupsPerQOS {
+				assert.IsType(t, &podContainerManagerImpl{}, pcm)
+				got := pcm.(*podContainerManagerImpl)
+				assert.Equal(t, c.cm.subsystems, got.subsystems)
+				assert.Equal(t, c.cm.cgroupManager, got.cgroupManager)
+				assert.Equal(t, c.cm.PodPidsLimit, got.podPidsLimit)
+				assert.Equal(t, c.cm.EnforceCPULimits, got.enforceCPULimits)
+				assert.Equal(t, uint64(c.cm.CPUCFSQuotaPeriod/time.Microsecond), got.cpuCFSQuotaPeriod)
+
+			} else {
+				assert.IsType(t, &podContainerManagerNoop{}, pcm)
+				got := pcm.(*podContainerManagerNoop)
+				assert.Equal(t, c.cm.cgroupRoot, got.cgroupRoot)
 			}
 		})
 	}

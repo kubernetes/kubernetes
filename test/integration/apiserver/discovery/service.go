@@ -117,7 +117,7 @@ func (f *fakeService) Run(ctx context.Context) error {
 }
 
 func (f *fakeService) WaitForReady(ctx context.Context) error {
-	err := wait.PollWithContext(ctx, 1*time.Second, 200*time.Millisecond, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, time.Second, false, func(ctx context.Context) (done bool, err error) {
 		return f.Port() != nil, nil
 	})
 

@@ -109,6 +109,9 @@ func (r *Response) EntityWriter() (EntityReaderWriter, bool) {
 		if DefaultResponseMimeType == MIME_XML {
 			return entityAccessRegistry.accessorAt(MIME_XML)
 		}
+		if DefaultResponseMimeType == MIME_ZIP {
+			return entityAccessRegistry.accessorAt(MIME_ZIP)
+		}
 		// Fallback to whatever the route says it can produce.
 		// https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
 		for _, each := range r.routeProduces {

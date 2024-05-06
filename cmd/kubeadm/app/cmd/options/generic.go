@@ -54,6 +54,9 @@ func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]st
 
 // AddControlPlanExtraArgsFlags adds the ExtraArgs flags for control plane components
 func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, controllerManagerExtraArgs, schedulerExtraArgs *map[string]string) {
+	// TODO: https://github.com/kubernetes/kubeadm/issues/1601
+	// Either deprecate these flags or handle duplicate keys.
+	// Currently the map[string]string returned by NewMapStringString() doesn't allow this.
 	fs.Var(cliflag.NewMapStringString(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
 	fs.Var(cliflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
 	fs.Var(cliflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
@@ -87,7 +90,7 @@ func AddKubernetesVersionFlag(fs *pflag.FlagSet, kubernetesVersion *string) {
 func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
 	flagSet.StringVar(
 		rootfsPath, "rootfs", *rootfsPath,
-		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
+		"The path to the 'real' host root filesystem. This will cause kubeadm to chroot into the provided path.",
 	)
 }
 

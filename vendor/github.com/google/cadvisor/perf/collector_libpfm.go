@@ -62,7 +62,7 @@ type group struct {
 
 var (
 	isLibpfmInitialized = false
-	libpmfMutex         = sync.Mutex{}
+	libpfmMutex         = sync.Mutex{}
 )
 
 const (
@@ -70,8 +70,8 @@ const (
 )
 
 func init() {
-	libpmfMutex.Lock()
-	defer libpmfMutex.Unlock()
+	libpfmMutex.Lock()
+	defer libpfmMutex.Unlock()
 	pErr := C.pfm_initialize()
 	if pErr != C.PFM_SUCCESS {
 		klog.Errorf("unable to initialize libpfm: %d", int(pErr))
@@ -253,9 +253,9 @@ func (c *collector) createLeaderFileDescriptors(events []Event, cgroupFd int, gr
 }
 
 func readPerfEventAttr(name string, pfmGetOsEventEncoding func(string, unsafe.Pointer) error) (*unix.PerfEventAttr, error) {
-	perfEventAttrMemory := C.malloc(C.ulong(unsafe.Sizeof(unix.PerfEventAttr{})))
+	perfEventAttrMemory := C.malloc(C.size_t(unsafe.Sizeof(unix.PerfEventAttr{})))
 	// Fill memory with 0 values.
-	C.memset(perfEventAttrMemory, 0, C.ulong(unsafe.Sizeof(unix.PerfEventAttr{})))
+	C.memset(perfEventAttrMemory, 0, C.size_t(unsafe.Sizeof(unix.PerfEventAttr{})))
 	err := pfmGetOsEventEncoding(name, unsafe.Pointer(perfEventAttrMemory))
 	if err != nil {
 		return nil, err
@@ -266,10 +266,12 @@ func readPerfEventAttr(name string, pfmGetOsEventEncoding func(string, unsafe.Po
 func pfmGetOsEventEncoding(name string, perfEventAttrMemory unsafe.Pointer) error {
 	event := pfmPerfEncodeArgT{}
 	fstr := C.CString("")
+	defer C.free(unsafe.Pointer(fstr))
 	event.fstr = unsafe.Pointer(fstr)
 	event.attr = perfEventAttrMemory
-	event.size = C.ulong(unsafe.Sizeof(event))
+	event.size = C.size_t(unsafe.Sizeof(event))
 	cSafeName := C.CString(name)
+	defer C.free(unsafe.Pointer(cSafeName))
 	pErr := C.pfm_get_os_event_encoding(cSafeName, C.PFM_PLM0|C.PFM_PLM3, C.PFM_OS_PERF_EVENT, unsafe.Pointer(&event))
 	if pErr != C.PFM_SUCCESS {
 		return fmt.Errorf("unable to transform event name %s to perf_event_attr: %d", name, int(pErr))
@@ -409,8 +411,8 @@ func (c *collector) Destroy() {
 
 // Finalize terminates libpfm4 to free resources.
 func Finalize() {
-	libpmfMutex.Lock()
-	defer libpmfMutex.Unlock()
+	libpfmMutex.Lock()
+	defer libpfmMutex.Unlock()
 
 	klog.V(1).Info("Attempting to terminate libpfm4")
 	if !isLibpfmInitialized {

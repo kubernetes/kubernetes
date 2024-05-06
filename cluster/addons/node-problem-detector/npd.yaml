@@ -26,28 +26,26 @@ subjects:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: npd-v0.8.9
+  name: node-problem-detector
   namespace: kube-system
   labels:
-    k8s-app: node-problem-detector
-    version: v0.8.9
-    kubernetes.io/cluster-service: "true"
+    app.kubernetes.io/name: node-problem-detector
+    app.kubernetes.io/version: v0.8.16
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
-      k8s-app: node-problem-detector
-      version: v0.8.9
+      app.kubernetes.io/name: node-problem-detector
+      app.kubernetes.io/version: v0.8.16
   template:
     metadata:
       labels:
-        k8s-app: node-problem-detector
-        version: v0.8.9
-        kubernetes.io/cluster-service: "true"
+        app.kubernetes.io/name: node-problem-detector
+        app.kubernetes.io/version: v0.8.16
     spec:
       containers:
       - name: node-problem-detector
-        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.9
+        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.16
         command:
         - "/bin/sh"
         - "-c"
@@ -69,6 +67,9 @@ spec:
         volumeMounts:
         - name: log
           mountPath: /var/log
+        - name: kmsg
+          mountPath: /dev/kmsg
+          readOnly: true
         - name: localtime
           mountPath: /etc/localtime
           readOnly: true
@@ -76,6 +77,9 @@ spec:
       - name: log
         hostPath:
           path: /var/log/
+      - name: kmsg
+        hostPath:
+          path: /dev/kmsg
       - name: localtime
         hostPath:
           path: /etc/localtime
@@ -84,5 +88,7 @@ spec:
       tolerations:
       - operator: "Exists"
         effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
       - key: "CriticalAddonsOnly"
         operator: "Exists"

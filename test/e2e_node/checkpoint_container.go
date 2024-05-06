@@ -34,10 +34,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -74,14 +78,69 @@ func proxyPostRequest(ctx context.Context, c clientset.Interface, node, endpoint
 	}
 }
 
-var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", func() {
+func getCheckpointContainerMetric(ctx context.Context, f *framework.Framework, pod *v1.Pod) (int, error) {
+	framework.Logf("Getting 'checkpoint_container' metrics from %q", pod.Spec.NodeName)
+	ms, err := e2emetrics.GetKubeletMetrics(
+		ctx,
+		f.ClientSet,
+		pod.Spec.NodeName,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	runtimeOperationsTotal, ok := ms["runtime_operations_total"]
+	if !ok {
+		// If the metric was not found it was probably not written to, yet.
+		return 0, nil
+	}
+
+	for _, item := range runtimeOperationsTotal {
+		if item.Metric["__name__"] == "kubelet_runtime_operations_total" && item.Metric["operation_type"] == "checkpoint_container" {
+			return int(item.Value), nil
+		}
+	}
+	// If the metric was not found it was probably not written to, yet.
+	return 0, nil
+}
+
+func getCheckpointContainerErrorMetric(ctx context.Context, f *framework.Framework, pod *v1.Pod) (int, error) {
+	framework.Logf("Getting 'checkpoint_container' error metrics from %q", pod.Spec.NodeName)
+	ms, err := e2emetrics.GetKubeletMetrics(
+		ctx,
+		f.ClientSet,
+		pod.Spec.NodeName,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	runtimeOperationsErrorsTotal, ok := ms["runtime_operations_errors_total"]
+	if !ok {
+		// If the metric was not found it was probably not written to, yet.
+		return 0, nil
+	}
+
+	for _, item := range runtimeOperationsErrorsTotal {
+		if item.Metric["__name__"] == "kubelet_runtime_operations_errors_total" && item.Metric["operation_type"] == "checkpoint_container" {
+			return int(item.Value), nil
+		}
+	}
+	// If the metric was not found it was probably not written to, yet.
+	return 0, nil
+}
+
+var _ = SIGDescribe("Checkpoint Container", nodefeature.CheckpointContainer, func() {
 	f := framework.NewDefaultFramework("checkpoint-container-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("will checkpoint a container out of a pod", func(ctx context.Context) {
 		ginkgo.By("creating a target pod")
 		podClient := e2epod.NewPodClient(f)
 		pod := podClient.CreateSync(ctx, &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-container-pod"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "checkpoint-container-pod",
+				Namespace: f.Namespace.Name,
+			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
@@ -103,11 +162,18 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(
-			isReady,
-			true,
-			"pod should be ready",
-		)
+		if !isReady {
+			framework.Failf("pod %q should be ready", p.Name)
+		}
+
+		// No checkpoint operation should have been logged
+		checkpointContainerMetric, err := getCheckpointContainerMetric(ctx, f, pod)
+		framework.ExpectNoError(err)
+		gomega.Expect(checkpointContainerMetric).To(gomega.Equal(0))
+		// No error should have been logged
+		checkpointContainerErrorMetric, err := getCheckpointContainerErrorMetric(ctx, f, pod)
+		framework.ExpectNoError(err)
+		gomega.Expect(checkpointContainerErrorMetric).To(gomega.Equal(0))
 
 		framework.Logf(
 			"About to checkpoint container %q on %q",
@@ -145,6 +211,15 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 			// If the container engine has not implemented the Checkpoint CRI API
 			// we will get 500 and a message with
 			// '(rpc error: code = Unimplemented desc = unknown method CheckpointContainer'
+			// or
+			// '(rpc error: code = Unimplemented desc = method CheckpointContainer not implemented)'
+			// if the container engine returns that it explicitly has disabled support for it.
+			// or
+			// '(rpc error: code = Unknown desc = checkpoint/restore support not available)'
+			// if the container engine explicitly disabled the checkpoint/restore support
+			// or
+			// '(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container'
+			// if the CRIU binary was not found if it is too old
 			if (int(statusError.ErrStatus.Code)) == http.StatusInternalServerError {
 				if strings.Contains(
 					statusError.ErrStatus.Message,
@@ -153,8 +228,33 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 					ginkgo.Skip("Container engine does not implement 'CheckpointContainer'")
 					return
 				}
+				if strings.Contains(
+					statusError.ErrStatus.Message,
+					"(rpc error: code = Unimplemented desc = method CheckpointContainer not implemented)",
+				) {
+					ginkgo.Skip("Container engine does not implement 'CheckpointContainer'")
+					return
+				}
+				if strings.Contains(
+					statusError.ErrStatus.Message,
+					"(rpc error: code = Unknown desc = checkpoint/restore support not available)",
+				) {
+					ginkgo.Skip("Container engine does not implement 'CheckpointContainer'")
+					return
+				}
+				if strings.Contains(
+					statusError.ErrStatus.Message,
+					"(rpc error: code = Unknown desc = CRIU binary not found or too old (<31600). Failed to checkpoint container",
+				) {
+					ginkgo.Skip("Container engine reports missing or too old CRIU binary")
+					return
+				}
 			}
-			framework.Failf("Unexpected status code (%d) during 'CheckpointContainer'", statusError.ErrStatus.Code)
+			framework.Failf(
+				"Unexpected status code (%d) during 'CheckpointContainer': %q",
+				statusError.ErrStatus.Code,
+				statusError.ErrStatus.Message,
+			)
 		}
 
 		framework.ExpectNoError(err)
@@ -199,10 +299,20 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 				}
 			}
 			for fileName := range checkForFiles {
-				framework.ExpectEqual(checkForFiles[fileName], true)
+				if !checkForFiles[fileName] {
+					framework.Failf("File %q not found in checkpoint archive %q", fileName, item)
+				}
 			}
 			// cleanup checkpoint archive
 			os.RemoveAll(item)
 		}
+		// Exactly one checkpoint operation should have happened
+		checkpointContainerMetric, err = getCheckpointContainerMetric(ctx, f, pod)
+		framework.ExpectNoError(err)
+		gomega.Expect(checkpointContainerMetric).To(gomega.Equal(1))
+		// No error should have been logged
+		checkpointContainerErrorMetric, err = getCheckpointContainerErrorMetric(ctx, f, pod)
+		framework.ExpectNoError(err)
+		gomega.Expect(checkpointContainerErrorMetric).To(gomega.Equal(0))
 	})
 })

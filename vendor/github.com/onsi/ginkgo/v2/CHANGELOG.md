@@ -1,3 +1,309 @@
+## 2.15.0
+
+### Features
+
+- JUnit reports now interpret Label(owner:X) and set owner to X. [8f3bd70]
+- include cancellation reason when cancelling spec context [96e915c]
+
+### Fixes
+
+- emit output of failed go tool cover invocation so users can try to debug things for themselves [c245d09]
+- fix outline when using nodot in ginkgo v2 [dca77c8]
+- Document areas where GinkgoT() behaves differently from testing.T [dbaf18f]
+- bugfix(docs): use Unsetenv instead of Clearenv (#1337) [6f67a14]
+
+### Maintenance
+
+- Bump to go 1.20 [4fcd0b3]
+
+## 2.14.0
+
+### Features
+You can now use `GinkgoTB()` when you need an instance of `testing.TB` to pass to a library.
+
+Prior to this release table testing only supported generating individual `It`s for each test entry.  `DescribeTableSubtree` extends table testing support to entire testing subtrees - under the hood `DescrieTableSubtree` generates a new container for each entry and invokes your function to fill our the container.  See the [docs](https://onsi.github.io/ginkgo/#generating-subtree-tables) to learn more.
+
+- Introduce DescribeTableSubtree [65ec56d]
+- add GinkgoTB() to docs [4a2c832]
+- Add GinkgoTB() function (#1333) [92b6744]
+
+### Fixes
+- Fix typo in internal/suite.go (#1332) [beb9507]
+- Fix typo in docs/index.md (#1319) [4ac3a13]
+- allow wasm to compile with ginkgo present (#1311) [b2e5bc5]
+
+### Maintenance
+- Bump golang.org/x/tools from 0.16.0 to 0.16.1 (#1316) [465a8ec]
+- Bump actions/setup-go from 4 to 5 (#1313) [eab0e40]
+- Bump github/codeql-action from 2 to 3 (#1317) [fbf9724]
+- Bump golang.org/x/crypto (#1318) [3ee80ee]
+- Bump golang.org/x/tools from 0.14.0 to 0.16.0 (#1306) [123e1d5]
+- Bump github.com/onsi/gomega from 1.29.0 to 1.30.0 (#1297) [558f6e0]
+- Bump golang.org/x/net from 0.17.0 to 0.19.0 (#1307) [84ff7f3]
+
+## 2.13.2
+
+### Fixes
+- Fix file handler leak (#1309) [e2e81c8]
+- Avoid allocations with `(*regexp.Regexp).MatchString` (#1302) [3b2a2a7]
+
+## 2.13.1
+
+### Fixes
+- # 1296 fix(precompiled test guite): exec bit check omitted on Windows (#1301) [26eea01]
+
+### Maintenance
+- Bump github.com/go-logr/logr from 1.2.4 to 1.3.0 (#1291) [7161a9d]
+- Bump golang.org/x/sys from 0.13.0 to 0.14.0 (#1295) [7fc7b10]
+- Bump golang.org/x/tools from 0.12.0 to 0.14.0 (#1282) [74bbd65]
+- Bump github.com/onsi/gomega from 1.27.10 to 1.29.0 (#1290) [9373633]
+- Bump golang.org/x/net in /integration/_fixtures/version_mismatch_fixture (#1286) [6e3cf65]
+
+## 2.13.0
+
+### Features
+
+Add PreviewSpect() to enable programmatic preview access to the suite report (fixes #1225)
+
+## 2.12.1
+
+### Fixes
+- Print logr prefix if it exists (#1275) [90d4846]
+
+### Maintenance
+- Bump actions/checkout from 3 to 4 (#1271) [555f543]
+- Bump golang.org/x/sys from 0.11.0 to 0.12.0 (#1270) [d867b7d]
+
+## 2.12.0
+
+### Features
+
+- feat: allow MustPassRepeatedly decorator to be set at suite level (#1266) [05de518]
+
+### Fixes
+
+- fix-errors-in-readme (#1244) [27c2f5d]
+
+### Maintenance
+
+Various chores/dependency bumps.
+
+## 2.11.0
+
+In prior versions of Ginkgo specs the CLI filter flags (e.g. `--focus`, `--label-filter`) would _override_ any programmatic focus.  This behavior has proved surprising and confusing in at least the following ways:
+
+- users cannot combine programmatic filters and CLI filters to more efficiently select subsets of tests
+- CLI filters can override programmatic focus on CI systems resulting in an exit code of 0 despite the presence of (incorrectly!) committed focused specs.
+
+Going forward Ginkgo will AND all programmatic and CLI filters.  Moreover, the presence of any programmatic focused tests will always result in a non-zero exit code.
+
+This change is technically a change in Ginkgo's external contract and may require some users to make changes to successfully adopt. Specifically: it's possible some users were intentionally using CLI filters to override programmatic focus.  If this is you please open an issue so we can explore solutions to the underlying problem you are trying to solve.
+
+### Fixes
+- Programmatic focus is no longer overwrriten by CLI filters [d6bba86]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.27.7 to 1.27.8 (#1218) [4a70a38]
+- Bump golang.org/x/sys from 0.8.0 to 0.9.0 (#1219) [97eda4d]
+
+## 2.10.0
+
+### Features
+- feat(ginkgo/generators): add --tags flag (#1216) [a782a77]
+  adds a new --tags flag to ginkgo generate
+
+### Fixes
+- Fix broken link of MIGRATING_TO_V2.md (#1217) [548d78e]
+
+### Maintenance
+- Bump golang.org/x/tools from 0.9.1 to 0.9.3 (#1215) [2b76a5e]
+
+## 2.9.7
+
+### Fixes
+- fix race when multiple defercleanups are called in goroutines [07fc3a0]
+
+## 2.9.6
+
+### Fixes
+- fix: create parent directory before report files (#1212) [0ac65de]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.27.6 to 1.27.7 (#1202) [3e39231]
+
+## 2.9.5
+
+### Fixes
+- ensure the correct deterministic sort order is produced when ordered specs are generated by a helper function [7fa0b6b]
+
+### Maintenance
+- fix generators link (#1200) [9f9d8b9]
+- Bump golang.org/x/tools from 0.8.0 to 0.9.1 (#1196) [150e3f2]
+- fix spelling err in docs (#1199) [0013b1a]
+- Bump golang.org/x/sys from 0.7.0 to 0.8.0 (#1193) [9e9e3e5]
+
+## 2.9.4
+
+### Fixes
+- fix hang with ginkgo -p (#1192) [15d4bdc] - this addresses a _long_ standing issue related to Ginkgo hanging when a child process spawned by the test does not exit.
+
+- fix: fail fast may cause Serial spec or cleanup Node interrupted (#1178) [8dea88b] - prior to this there was a small gap in which specs on other processes might start even if one process has tried to abort the suite.
+
+
+### Maintenance
+- Document run order when multiple setup nodes are at the same nesting level [903be81]
+
+## 2.9.3
+
+### Features
+- Add RenderTimeline to GinkgoT() [c0c77b6]
+
+### Fixes
+- update Measure deprecation message. fixes #1176 [227c662]
+- add newlines to GinkgoLogr (#1170) (#1171) [0de0e7c]
+
+### Maintenance
+- Bump commonmarker from 0.23.8 to 0.23.9 in /docs (#1183) [8b925ab]
+- Bump nokogiri from 1.14.1 to 1.14.3 in /docs (#1184) [e3795a4]
+- Bump golang.org/x/tools from 0.7.0 to 0.8.0 (#1182) [b453793]
+- Bump actions/setup-go from 3 to 4 (#1164) [73ed75b]
+- Bump github.com/onsi/gomega from 1.27.4 to 1.27.6 (#1173) [0a2bc64]
+- Bump github.com/go-logr/logr from 1.2.3 to 1.2.4 (#1174) [f41c557]
+- Bump golang.org/x/sys from 0.6.0 to 0.7.0 (#1179) [8e423e5]
+
+## 2.9.2
+
+### Maintenance
+- Bump github.com/go-task/slim-sprig (#1167) [3fcc5bf]
+- Bump github.com/onsi/gomega from 1.27.3 to 1.27.4 (#1163) [6143ffe]
+
+## 2.9.1
+
+### Fixes
+This release fixes a longstanding issue where `ginkgo -coverpkg=./...` would not work.  This is now resolved and fixes [#1161](https://github.com/onsi/ginkgo/issues/1161) and [#995](https://github.com/onsi/ginkgo/issues/995)
+- Support -coverpkg=./... [26ca1b5]
+- document coverpkg a bit more clearly [fc44c3b]
+
+### Maintenance
+- bump various dependencies
+- Improve Documentation and fix typo (#1158) [93de676]
+
+## 2.9.0
+
+### Features
+- AttachProgressReporter is an experimental feature that allows users to provide arbitrary information when a ProgressReport is requested [28801fe]
+
+- GinkgoT() has been expanded to include several Ginkgo-specific methods [2bd5a3b]
+
+  The intent is to enable the development of third-party libraries that integrate deeply with Ginkgo using `GinkgoT()` to access Ginkgo's functionality.
+
+## 2.8.4
+
+### Features
+- Add OmitSuiteSetupNodes to JunitReportConfig (#1147) [979fbc2]
+- Add a reference to ginkgolinter in docs.index.md (#1143) [8432589]
+
+### Fixes
+- rename tools hack to see if it fixes things for downstream users [a8bb39a]
+
+### Maintenance
+- Bump golang.org/x/text (#1144) [41b2a8a]
+- Bump github.com/onsi/gomega from 1.27.0 to 1.27.1 (#1142) [7c4f583]
+
+## 2.8.3
+
+Released to fix security issue in golang.org/x/net dependency
+
+### Maintenance
+
+- Bump golang.org/x/net from 0.6.0 to 0.7.0 (#1141) [fc1a02e]
+- remove tools.go hack from documentation [0718693]
+
+## 2.8.2
+
+Ginkgo now includes a `tools.go` file in the root directory of the `ginkgo` package.  This should allow modules that simply `go get github.com/onsi/ginkgo/v2` to also pull in the CLI dependencies.  This obviates the need for consumers of Ginkgo to have their own `tools.go` file and makes it simpler to ensure that the version of the `ginkgo` CLI being used matches the version of the library.  You can simply run `go run github.com/onsi/ginkgo/v2/ginkgo` to run the version of the cli associated with your package go.mod.
+
+### Maintenance
+
+- Bump github.com/onsi/gomega from 1.26.0 to 1.27.0 (#1139) [5767b0a]
+- Fix minor typos (#1138) [e1e9723]
+- Fix link in V2 Migration Guide (#1137) [a588f60]
+
+## 2.8.1
+
+### Fixes
+- lock around default report output to avoid triggering the race detector when calling By from goroutines [2d5075a]
+- don't run ReportEntries through sprintf [febbe38]
+
+### Maintenance
+- Bump golang.org/x/tools from 0.5.0 to 0.6.0 (#1135) [11a4860]
+- test: update matrix for Go 1.20 (#1130) [4890a62]
+- Bump golang.org/x/sys from 0.4.0 to 0.5.0 (#1133) [a774638]
+- Bump github.com/onsi/gomega from 1.25.0 to 1.26.0 (#1120) [3f233bd]
+- Bump github-pages from 227 to 228 in /docs (#1131) [f9b8649]
+- Bump activesupport from 6.0.6 to 6.0.6.1 in /docs (#1127) [6f8c042]
+- Update index.md with instructions on how to upgrade Ginkgo [833a75e]
+
+## 2.8.0
+
+### Features
+
+- Introduce GinkgoHelper() to track and exclude helper functions from potential CodeLocations [e19f556]
+
+Modeled after `testing.T.Helper()`.  Now, rather than write code like:
+
+```go
+func helper(model Model) {
+    Expect(model).WithOffset(1).To(BeValid())
+    Expect(model.SerialNumber).WithOffset(1).To(MatchRegexp(/[a-f0-9]*/))
+}
+```
+
+you can stop tracking offsets (which makes nesting composing helpers nearly impossible) and simply write:
+
+```go
+func helper(model Model) {
+    GinkgoHelper()
+    Expect(model).To(BeValid())
+    Expect(model.SerialNumber).To(MatchRegexp(/[a-f0-9]*/))
+}
+```
+
+- Introduce GinkgoLabelFilter() and Label().MatchesLabelFilter() to make it possible to programmatically match filters (fixes #1119) [2f6597c]
+
+You can now write code like this:
+
+```go
+BeforeSuite(func() {
+	if Label("slow").MatchesLabelFilter(GinkgoLabelFilter()) {
+		// do slow setup
+	}
+
+	if Label("fast").MatchesLabelFilter(GinkgoLabelFilter()) {
+		// do fast setup
+	}
+})
+```
+
+to programmatically check whether a given set of labels will match the configured `--label-filter`.
+
+### Maintenance
+
+- Bump webrick from 1.7.0 to 1.8.1 in /docs (#1125) [ea4966e]
+- cdeql: add ruby language (#1124) [9dd275b]
+- dependabot: add bundler package-ecosystem for docs (#1123) [14e7bdd]
+
+## 2.7.1
+
+### Fixes
+- Bring back SuiteConfig.EmitSpecProgress to avoid compilation issue for consumers that set it manually [d2a1cb0]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.24.2 to 1.25.0 (#1118) [cafece6]
+- Bump golang.org/x/tools from 0.4.0 to 0.5.0 (#1111) [eda66c2]
+- Bump golang.org/x/sys from 0.3.0 to 0.4.0 (#1112) [ac5ccaa]
+- Bump github.com/onsi/gomega from 1.24.1 to 1.24.2 (#1097) [eee6480]
+
 ## 2.7.0
 
 ### Features
@@ -89,7 +395,7 @@ to build tooling on top of as it has stronger guarantees to be stable from versi
 
 ### Fixes
 - correcting some typos (#1064) [1403d3c]
-- fix flaky internal_integration interupt specs [2105ba3]
+- fix flaky internal_integration interrupt specs [2105ba3]
 - Correct busted link in README [be6b5b9]
 
 ### Maintenance

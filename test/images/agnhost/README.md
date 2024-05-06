@@ -266,6 +266,8 @@ controlled with the time delay or via http control server.
 - `--port` (default: `5000`) can be used to override the gRPC port number.
 - `--http-port` (default: `8080`) can be used to override the http control server port number.
 - `--service` (default: ``) can be used used to specify which service this endpoint will respond to.
+- `--tls-cert-file` File containing an x509 certificate for gRPC TLS. (CA cert, if any, concatenated after server cert).
+- `--tls-private-key-file` File containing an x509 private key matching `--tls-cert-file`.
 
 Usage:
 
@@ -619,6 +621,29 @@ Usage:
 
 ```console
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
+```
+
+### tcp-reset
+
+Starts a simple TCP servers that reads only one byte of the connection and then closes it,
+having the effect of sending a TCP RST to the client.
+
+The subcommand can accept the following flags:
+
+- `port` (default: `8080`): The port number to listen to.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost tcp-reset [--port <port>]
+```
+
+Important: This behavior only works if the client send more than 1 byte and is OS
+dependant, it is guaranteed to work on Linux.
+
+```console
+echo -n 1 | nc 192.168.1.4:8080  # FIN
+echo -n 12 | nc 192.168.1.4:8080 # RST
 ```
 
 ### test-webserver

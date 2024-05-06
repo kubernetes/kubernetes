@@ -23,23 +23,23 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: metrics-server-v0.5.2
+  name: metrics-server-v0.7.0
   namespace: kube-system
   labels:
     k8s-app: metrics-server
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v0.5.2
+    version: v0.7.0
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
-      version: v0.5.2
+      version: v0.7.0
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
-        version: v0.5.2
+        version: v0.7.0
     spec:
       securityContext:
         seccompProfile:
@@ -50,10 +50,10 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: metrics-server
-        image: registry.k8s.io/metrics-server/metrics-server:v0.5.2
+        image: registry.k8s.io/metrics-server/metrics-server:v0.7.0
         command:
         - /metrics-server
-        - --metric-resolution=30s
+        - --metric-resolution=15s
         - --kubelet-use-node-status-port
         - --kubelet-insecure-tls
         - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
@@ -109,7 +109,7 @@ spec:
           - --memory={{ base_metrics_server_memory }}
           - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
-          - --deployment=metrics-server-v0.5.2
+          - --deployment=metrics-server-v0.7.0
           - --container=metrics-server
           - --poll-period=30000
           - --estimator=exponential

@@ -27,6 +27,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -34,11 +35,10 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -56,6 +56,7 @@ func NewInitializedVolumePluginMgr(
 	secretManager secret.Manager,
 	configMapManager configmap.Manager,
 	tokenManager *token.Manager,
+	clusterTrustBundleManager clustertrustbundle.Manager,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
 
@@ -76,15 +77,16 @@ func NewInitializedVolumePluginMgr(
 	}
 
 	kvh := &kubeletVolumeHost{
-		kubelet:          kubelet,
-		volumePluginMgr:  volume.VolumePluginMgr{},
-		secretManager:    secretManager,
-		configMapManager: configMapManager,
-		tokenManager:     tokenManager,
-		informerFactory:  informerFactory,
-		csiDriverLister:  csiDriverLister,
-		csiDriversSynced: csiDriversSynced,
-		exec:             utilexec.New(),
+		kubelet:                   kubelet,
+		volumePluginMgr:           volume.VolumePluginMgr{},
+		secretManager:             secretManager,
+		configMapManager:          configMapManager,
+		tokenManager:              tokenManager,
+		clusterTrustBundleManager: clusterTrustBundleManager,
+		informerFactory:           informerFactory,
+		csiDriverLister:           csiDriverLister,
+		csiDriversSynced:          csiDriversSynced,
+		exec:                      utilexec.New(),
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -105,15 +107,16 @@ func (kvh *kubeletVolumeHost) GetPluginDir(pluginName string) string {
 }
 
 type kubeletVolumeHost struct {
-	kubelet          *Kubelet
-	volumePluginMgr  volume.VolumePluginMgr
-	secretManager    secret.Manager
-	tokenManager     *token.Manager
-	configMapManager configmap.Manager
-	informerFactory  informers.SharedInformerFactory
-	csiDriverLister  storagelisters.CSIDriverLister
-	csiDriversSynced cache.InformerSynced
-	exec             utilexec.Interface
+	kubelet                   *Kubelet
+	volumePluginMgr           volume.VolumePluginMgr
+	secretManager             secret.Manager
+	tokenManager              *token.Manager
+	configMapManager          configmap.Manager
+	clusterTrustBundleManager clustertrustbundle.Manager
+	informerFactory           informers.SharedInformerFactory
+	csiDriverLister           storagelisters.CSIDriverLister
+	csiDriversSynced          cache.InformerSynced
+	exec                      utilexec.Interface
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -126,16 +129,6 @@ func (kvh *kubeletVolumeHost) GetVolumeDevicePluginDir(pluginName string) string
 
 func (kvh *kubeletVolumeHost) GetPodsDir() string {
 	return kvh.kubelet.getPodsDir()
-}
-
-// GetHostIDsForPod if the pod uses user namespaces, takes the uid and gid
-// inside the container and returns the host UID and GID those are mapped to on
-// the host. If containerUID/containerGID is nil, then it returns the host
-// UID/GID for ID 0 inside the container.
-// If the pod is not using user namespaces, as there is no mapping needed, the
-// same containerUID and containerGID params are returned.
-func (kvh *kubeletVolumeHost) GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
-	return kvh.kubelet.getHostIDsForPod(pod, containerUID, containerGID)
 }
 
 func (kvh *kubeletVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
@@ -160,11 +153,6 @@ func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 
 func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
 	return kvh.kubelet.subpather
-}
-
-func (kvh *kubeletVolumeHost) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
-	// FilteredDial is not needed in the kubelet.
-	return nil
 }
 
 func (kvh *kubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
@@ -228,10 +216,6 @@ func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Sp
 	return plugin.NewUnmounter(spec.Name(), podUID)
 }
 
-func (kvh *kubeletVolumeHost) GetCloudProvider() cloudprovider.Interface {
-	return kvh.kubelet.cloud
-}
-
 func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return kvh.kubelet.mounter
 }
@@ -280,6 +264,14 @@ func (kvh *kubeletVolumeHost) GetServiceAccountTokenFunc() func(namespace, name 
 
 func (kvh *kubeletVolumeHost) DeleteServiceAccountTokenFunc() func(podUID types.UID) {
 	return kvh.tokenManager.DeleteServiceAccountToken
+}
+
+func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
+	return kvh.clusterTrustBundleManager.GetTrustAnchorsByName(name, allowMissing)
+}
+
+func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
 }
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {

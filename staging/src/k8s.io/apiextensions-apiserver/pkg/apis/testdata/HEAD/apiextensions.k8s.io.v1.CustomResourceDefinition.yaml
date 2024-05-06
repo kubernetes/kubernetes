@@ -128,9 +128,14 @@ spec:
         x-kubernetes-map-type: x-kubernetes-map-typeValue
         x-kubernetes-preserve-unknown-fields: true
         x-kubernetes-validations:
-        - message: messageValue
+        - fieldPath: fieldPathValue
+          message: messageValue
           messageExpression: messageExpressionValue
+          optionalOldSelf: true
+          reason: reasonValue
           rule: ruleValue
+    selectableFields:
+    - jsonPath: jsonPathValue
     served: true
     storage: true
     subresources:

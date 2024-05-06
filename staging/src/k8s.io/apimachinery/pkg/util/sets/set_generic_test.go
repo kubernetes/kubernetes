@@ -84,6 +84,57 @@ func TestSetDeleteMultiples(t *testing.T) {
 
 }
 
+func TestSetClear(t *testing.T) {
+	s := sets.Set[string]{}
+	s.Insert("a", "b", "c")
+	if s.Len() != 3 {
+		t.Errorf("Expected len=3: %d", s.Len())
+	}
+
+	s.Clear()
+	if s.Len() != 0 {
+		t.Errorf("Expected len=0: %d", s.Len())
+	}
+}
+
+func TestSetClearWithSharedReference(t *testing.T) {
+	s := sets.Set[string]{}
+	s.Insert("a", "b", "c")
+	if s.Len() != 3 {
+		t.Errorf("Expected len=3: %d", s.Len())
+	}
+
+	m := s
+	s.Clear()
+	if s.Len() != 0 {
+		t.Errorf("Expected len=0 on the cleared set: %d", s.Len())
+	}
+	if m.Len() != 0 {
+		t.Errorf("Expected len=0 on the shared reference: %d", m.Len())
+	}
+}
+
+func TestSetClearInSeparateFunction(t *testing.T) {
+	s := sets.Set[string]{}
+	s.Insert("a", "b", "c")
+	if s.Len() != 3 {
+		t.Errorf("Expected len=3: %d", s.Len())
+	}
+
+	clearSetAndAdd(s, "d")
+	if s.Len() != 1 {
+		t.Errorf("Expected len=1: %d", s.Len())
+	}
+	if !s.Has("d") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+}
+
+func clearSetAndAdd[T comparable](s sets.Set[T], a T) {
+	s.Clear()
+	s.Insert(a)
+}
+
 func TestNewSet(t *testing.T) {
 	s := sets.New("a", "b", "c")
 	if len(s) != 3 {

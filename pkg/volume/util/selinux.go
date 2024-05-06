@@ -168,10 +168,6 @@ func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volum
 
 // VolumeSupportsSELinuxMount returns true if given volume access mode can support mount with SELinux mount options.
 func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
-	// Right now, SELinux mount is supported only for ReadWriteOncePod volumes.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod) {
-		return false
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		return false
 	}
@@ -181,6 +177,10 @@ func VolumeSupportsSELinuxMount(volumeSpec *volume.Spec) bool {
 	if len(volumeSpec.PersistentVolume.Spec.AccessModes) != 1 {
 		return false
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMount) {
+		return true
+	}
+	// Only SELinuxMountReadWriteOncePod feature enabled
 	if !v1helper.ContainsAccessMode(volumeSpec.PersistentVolume.Spec.AccessModes, v1.ReadWriteOncePod) {
 		return false
 	}

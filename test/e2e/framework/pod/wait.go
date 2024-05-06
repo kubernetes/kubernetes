@@ -37,7 +37,6 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/format"
@@ -76,7 +75,7 @@ func BeRunningNoRetries() types.GomegaMatcher {
 		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed, v1.PodSucceeded:
-				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead.", v1.PodRunning, pod.Status.Phase))
+				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
 			default:
 				return true, nil
 			}
@@ -100,17 +99,22 @@ func BeInPhase(phase v1.PodPhase) types.GomegaMatcher {
 	}).WithTemplate("Expected Pod {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(phase)
 }
 
-// WaitForPodsRunningReady waits up to timeout to ensure that all pods in
-// namespace ns are either running and ready, or failed but controlled by a
-// controller. Also, it ensures that at least minPods are running and
-// ready. It has separate behavior from other 'wait for' pods functions in
-// that it requests the list of pods on every iteration. This is useful, for
-// example, in cluster startup, because the number of pods increases while
-// waiting. All pods that are in SUCCESS state are not counted.
+// WaitForAlmostAllReady waits up to timeout for the following conditions:
+// 1. At least minPods Pods in Namespace ns are Running and Ready
+// 2. All Pods in Namespace ns are either Ready or Succeeded
+// 3. All Pods part of a ReplicaSet or ReplicationController in Namespace ns are Ready
+//
+// After the timeout has elapsed, an error is returned if the number of Pods in a Pending Phase
+// is greater than allowedNotReadyPods.
+//
+// It is generally recommended to use WaitForPodsRunningReady instead of this function
+// whenever possible, because its behavior is more intuitive. Similar to WaitForPodsRunningReady,
+// this function requests the list of pods on every iteration, making it useful for situations
+// where the set of Pods is likely changing, such as during cluster startup.
 //
 // If minPods or allowedNotReadyPods are -1, this method returns immediately
 // without waiting.
-func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration) error {
+func WaitForAlmostAllPodsReady(ctx context.Context, c clientset.Interface, ns string, minPods, allowedNotReadyPods int, timeout time.Duration) error {
 	if minPods == -1 || allowedNotReadyPods == -1 {
 		return nil
 	}
@@ -127,14 +131,12 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 		Pods                   []v1.Pod
 	}
 
-	// notReady is -1 for any failure other than a timeout.
-	// Otherwise it is the number of pods that we were still
-	// waiting for.
-	notReady := int32(-1)
+	nOk := 0
+	badPods := []v1.Pod{}
+	otherPods := []v1.Pod{}
+	succeededPods := []string{}
 
 	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
-		// Reset notReady at the start of a poll attempt.
-		notReady = -1
 
 		rcList, err := c.CoreV1().ReplicationControllers(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -164,11 +166,10 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			replicaOk += rs.Status.ReadyReplicas
 		}
 
-		nOk := int32(0)
-		notReady = int32(0)
-		failedPods := []v1.Pod{}
-		otherPods := []v1.Pod{}
-		succeededPods := []string{}
+		nOk = 0
+		badPods = []v1.Pod{}
+		otherPods = []v1.Pod{}
+		succeededPods = []string{}
 		for _, pod := range s.Pods {
 			res, err := testutils.PodRunningReady(&pod)
 			switch {
@@ -180,14 +181,13 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			case pod.Status.Phase == v1.PodFailed:
 				// ignore failed pods that are controlled by some controller
 				if metav1.GetControllerOf(&pod) == nil {
-					failedPods = append(failedPods, pod)
+					badPods = append(badPods, pod)
 				}
 			default:
-				notReady++
 				otherPods = append(otherPods, pod)
 			}
 		}
-		done := replicaOk == replicas && nOk >= minPods && (len(failedPods)+len(otherPods)) == 0
+		done := replicaOk == replicas && nOk >= minPods && (len(badPods)+len(otherPods)) == 0
 		if done {
 			return nil, nil
 		}
@@ -201,8 +201,8 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 			if len(succeededPods) > 0 {
 				buffer.WriteString(fmt.Sprintf("Pods that completed successfully:\n%s", format.Object(succeededPods, 1)))
 			}
-			if len(failedPods) > 0 {
-				buffer.WriteString(fmt.Sprintf("Pods that failed and were not controlled by some controller:\n%s", format.Object(failedPods, 1)))
+			if len(badPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that failed and were not controlled by some controller:\n%s", format.Object(badPods, 1)))
 			}
 			if len(otherPods) > 0 {
 				buffer.WriteString(fmt.Sprintf("Pods that were neither completed nor running:\n%s", format.Object(otherPods, 1)))
@@ -212,11 +212,77 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 	}))
 
 	// An error might not be fatal.
-	if err != nil && notReady >= 0 && notReady <= allowedNotReadyPods {
-		framework.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
+	if len(otherPods) <= allowedNotReadyPods {
 		return nil
 	}
 	return err
+}
+
+// WaitForPodsRunningReady waits up to timeout for the following conditions:
+//  1. At least minPods Pods in Namespace ns are Running and Ready
+//  2. No Pods in Namespace ns are Failed and not owned by a controller or Pending
+//
+// An error is returned if either of these conditions are not met within the timeout.
+//
+// It has separate behavior from other 'wait for' pods functions in
+// that it requests the list of pods on every iteration. This is useful, for
+// example, in cluster startup, because the number of pods increases while
+// waiting. All pods that are in SUCCESS state are not counted.
+func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns string, minPods int, timeout time.Duration) error {
+
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) ([]v1.Pod, error) {
+
+		podList, err := c.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("listing pods in namespace %s: %w", ns, err)
+		}
+		return podList.Items, nil
+	})).WithTimeout(timeout).Should(framework.MakeMatcher(func(pods []v1.Pod) (func() string, error) {
+
+		nOk := 0
+		badPods := []v1.Pod{}
+		otherPods := []v1.Pod{}
+		succeededPods := []string{}
+
+		for _, pod := range pods {
+			res, err := testutils.PodRunningReady(&pod)
+			switch {
+			case res && err == nil:
+				nOk++
+			case pod.Status.Phase == v1.PodSucceeded:
+				// ignore succeeded pods
+				succeededPods = append(succeededPods, pod.Name)
+			case pod.Status.Phase == v1.PodFailed:
+				// ignore failed pods that are controlled by some controller
+				if metav1.GetControllerOf(&pod) == nil {
+					badPods = append(badPods, pod)
+				}
+			default:
+				otherPods = append(otherPods, pod)
+			}
+		}
+		if nOk >= minPods && len(badPods)+len(otherPods) == 0 {
+			return nil, nil
+		}
+
+		// Delayed formatting of a failure message.
+		return func() string {
+			var buffer strings.Builder
+			buffer.WriteString(fmt.Sprintf("Expected all pods (need at least %d) in namespace %q to be running and ready \n", minPods, ns))
+			buffer.WriteString(fmt.Sprintf("%d / %d pods were running and ready.\n", nOk, len(pods)))
+			if len(succeededPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that completed successfully:\n%s", format.Object(succeededPods, 1)))
+			}
+			if len(badPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that failed and were not controlled by some controller:\n%s", format.Object(badPods, 1)))
+			}
+			if len(otherPods) > 0 {
+				buffer.WriteString(fmt.Sprintf("Pods that were neither completed nor running:\n%s", format.Object(otherPods, 1)))
+			}
+			return buffer.String()
+		}, nil
+	}))
+
 }
 
 // WaitForPodCondition waits a pods to be matched to the given condition.
@@ -332,12 +398,12 @@ func WaitForPods(ctx context.Context, c clientset.Interface, ns string, opts met
 // RunningReady checks whether pod p's phase is running and it has a ready
 // condition of status true.
 func RunningReady(p *v1.Pod) bool {
-	return p.Status.Phase == v1.PodRunning && podutil.IsPodReady(p)
+	return p.Status.Phase == v1.PodRunning && podutils.IsPodReady(p)
 }
 
 // WaitForPodsRunning waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` are running.
-func WaitForPodsRunning(c clientset.Interface, ns string, num int, timeout time.Duration) error {
-	_, err := WaitForPods(context.TODO(), c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
+func WaitForPodsRunning(ctx context.Context, c clientset.Interface, ns string, num int, timeout time.Duration) error {
+	_, err := WaitForPods(ctx, c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
 		"be running and ready", func(pod *v1.Pod) bool {
 			ready, _ := testutils.PodRunningReady(pod)
 			return ready
@@ -346,8 +412,8 @@ func WaitForPodsRunning(c clientset.Interface, ns string, num int, timeout time.
 }
 
 // WaitForPodsSchedulingGated waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` stay in scheduling gated state.
-func WaitForPodsSchedulingGated(c clientset.Interface, ns string, num int, timeout time.Duration) error {
-	_, err := WaitForPods(context.TODO(), c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
+func WaitForPodsSchedulingGated(ctx context.Context, c clientset.Interface, ns string, num int, timeout time.Duration) error {
+	_, err := WaitForPods(ctx, c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
 		"be in scheduling gated state", func(pod *v1.Pod) bool {
 			for _, condition := range pod.Status.Conditions {
 				if condition.Type == v1.PodScheduled && condition.Reason == v1.PodReasonSchedulingGated {
@@ -361,8 +427,8 @@ func WaitForPodsSchedulingGated(c clientset.Interface, ns string, num int, timeo
 
 // WaitForPodsWithSchedulingGates waits for a given `timeout` to evaluate if a certain amount of pods in given `ns`
 // match the given `schedulingGates`stay in scheduling gated state.
-func WaitForPodsWithSchedulingGates(c clientset.Interface, ns string, num int, timeout time.Duration, schedulingGates []v1.PodSchedulingGate) error {
-	_, err := WaitForPods(context.TODO(), c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
+func WaitForPodsWithSchedulingGates(ctx context.Context, c clientset.Interface, ns string, num int, timeout time.Duration, schedulingGates []v1.PodSchedulingGate) error {
+	_, err := WaitForPods(ctx, c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
 		"have certain scheduling gates", func(pod *v1.Pod) bool {
 			return reflect.DeepEqual(pod.Spec.SchedulingGates, schedulingGates)
 		})
@@ -401,15 +467,15 @@ func WaitForPodTerminatingInNamespaceTimeout(ctx context.Context, c clientset.In
 // WaitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func WaitForPodSuccessInNamespaceTimeout(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(ctx, c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
-		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
-			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
+		if pod.DeletionTimestamp == nil && pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName))
 		}
 		switch pod.Status.Phase {
 		case v1.PodSucceeded:
 			ginkgo.By("Saw pod success")
 			return true, nil
 		case v1.PodFailed:
-			return true, fmt.Errorf("pod %q failed with status: %+v", podName, pod.Status)
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q failed with status: %+v", podName, pod.Status))
 		default:
 			return false, nil
 		}
@@ -519,11 +585,6 @@ func WaitForPodSuccessInNamespace(ctx context.Context, c clientset.Interface, po
 	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, podStartTimeout)
 }
 
-// WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
-func WaitForPodSuccessInNamespaceSlow(ctx context.Context, c clientset.Interface, podName string, namespace string) error {
-	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, slowPodStartTimeout)
-}
-
 // WaitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.
 // Unlike `waitForPodTerminatedInNamespace`, the pod's Phase and Reason are ignored. If the pod Get
 // api returns IsNotFound then the wait stops and nil is returned. If the Get api returns an error other
@@ -542,7 +603,7 @@ func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, p
 	return nil
 }
 
-// PodsResponding waits for the pods to response.
+// WaitForPodsResponding waits for the pods to response.
 func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string, controllerName string, wantName bool, timeout time.Duration, pods *v1.PodList) error {
 	if timeout == 0 {
 		timeout = podRespondingTimeout
@@ -582,10 +643,11 @@ func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string
 
 			if err != nil {
 				// We may encounter errors here because of a race between the pod readiness and apiserver
-				// proxy. So, we log the error and retry if this occurs.
-				return nil, fmt.Errorf("Controller %s: failed to Get from replica pod %s:\n%s\nPod status:\n%s",
+				// proxy or because of temporary failures. The error gets wrapped for framework.HandleRetry.
+				// Gomega+Ginkgo will handle logging.
+				return nil, fmt.Errorf("controller %s: failed to Get from replica pod %s:\n%w\nPod status:\n%s",
 					controllerName, pod.Name,
-					format.Object(err, 1), format.Object(pod.Status, 1))
+					err, format.Object(pod.Status, 1))
 			}
 			responses = append(responses, response{podName: pod.Name, response: string(body)})
 		}
@@ -728,6 +790,13 @@ func WaitForPodContainerToFail(ctx context.Context, c clientset.Interface, names
 	})
 }
 
+// WaitForPodScheduled waits for the pod to be schedule, ie. the .spec.nodeName is set
+func WaitForPodScheduled(ctx context.Context, c clientset.Interface, namespace, podName string) error {
+	return WaitForPodCondition(ctx, c, namespace, podName, "pod is scheduled", podScheduledBeforeTimeout, func(pod *v1.Pod) (bool, error) {
+		return pod.Spec.NodeName != "", nil
+	})
+}
+
 // WaitForPodContainerStarted waits for the given Pod container to start, after a successful run of the startupProbe.
 func WaitForPodContainerStarted(ctx context.Context, c clientset.Interface, namespace, podName string, containerIndex int, timeout time.Duration) error {
 	conditionDesc := fmt.Sprintf("container %d started", containerIndex)
@@ -766,6 +835,21 @@ func WaitForContainerRunning(ctx context.Context, c clientset.Interface, namespa
 			for _, cs := range statuses {
 				if cs.Name == containerName {
 					return cs.State.Running != nil, nil
+				}
+			}
+		}
+		return false, nil
+	})
+}
+
+// WaitForContainerTerminated waits for the given Pod container to have a state of terminated
+func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %s terminated", containerName)
+	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
+			for _, cs := range statuses {
+				if cs.Name == containerName {
+					return cs.State.Terminated != nil, nil
 				}
 			}
 		}

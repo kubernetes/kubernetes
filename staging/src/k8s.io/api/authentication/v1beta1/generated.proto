@@ -45,7 +45,7 @@ message SelfSubjectReview {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Status is filled in by the server with the user attributes.
   optional SelfSubjectReviewStatus status = 2;
@@ -55,7 +55,7 @@ message SelfSubjectReview {
 message SelfSubjectReviewStatus {
   // User attributes of the user making this request.
   // +optional
-  optional k8s.io.api.authentication.v1.UserInfo userInfo = 1;
+  optional .k8s.io.api.authentication.v1.UserInfo userInfo = 1;
 }
 
 // TokenReview attempts to authenticate a token to a known user.
@@ -65,7 +65,7 @@ message TokenReview {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated
   optional TokenReviewSpec spec = 2;
@@ -87,6 +87,7 @@ message TokenReviewSpec {
   // this list. If no audiences are provided, the audience will default to the
   // audience of the Kubernetes apiserver.
   // +optional
+  // +listType=atomic
   repeated string audiences = 2;
 }
 
@@ -110,6 +111,7 @@ message TokenReviewStatus {
   // status.audience field where status.authenticated is "true", the token is
   // valid against the audience of the Kubernetes API server.
   // +optional
+  // +listType=atomic
   repeated string audiences = 4;
 
   // Error indicates that the token couldn't be checked
@@ -132,6 +134,7 @@ message UserInfo {
 
   // The names of groups this user is a part of.
   // +optional
+  // +listType=atomic
   repeated string groups = 3;
 
   // Any additional information provided by the authenticator.

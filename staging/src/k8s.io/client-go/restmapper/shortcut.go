@@ -17,6 +17,7 @@ limitations under the License.
 package restmapper
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -32,13 +33,15 @@ type shortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
 	discoveryClient discovery.DiscoveryInterface
+
+	warningHandler func(string)
 }
 
 var _ meta.ResettableRESTMapper = shortcutExpander{}
 
 // NewShortcutExpander wraps a restmapper in a layer that expands shortcuts found via discovery
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) meta.RESTMapper {
-	return shortcutExpander{RESTMapper: delegate, discoveryClient: client}
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, warningHandler func(string)) meta.RESTMapper {
+	return shortcutExpander{RESTMapper: delegate, discoveryClient: client, warningHandler: warningHandler}
 }
 
 // KindFor fulfills meta.RESTMapper
@@ -47,7 +50,7 @@ func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.
 	// In case of new CRDs this means we potentially don't have current state of discovery.
 	// In the current wiring in k8s.io/cli-runtime/pkg/genericclioptions/config_flags.go#toRESTMapper,
 	// we are using DeferredDiscoveryRESTMapper which on KindFor failure will clear the
-	// cache and fetch all data from a cluster (see vendor/k8s.io/client-go/restmapper/discovery.go#KindFor).
+	// cache and fetch all data from a cluster (see k8s.io/client-go/restmapper/discovery.go#KindFor).
 	// Thus another call to expandResourceShortcut, after a NoMatchError should successfully
 	// read Kind to the user or an error.
 	gvk, err := e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
@@ -145,15 +148,36 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 			}
 		}
 
+		found := false
+		var rsc schema.GroupVersionResource
+		warnedAmbiguousShortcut := make(map[schema.GroupResource]bool)
 		for _, item := range shortcutResources {
 			if len(resource.Group) != 0 && resource.Group != item.ShortForm.Group {
 				continue
 			}
 			if resource.Resource == item.ShortForm.Resource {
-				resource.Resource = item.LongForm.Resource
-				resource.Group = item.LongForm.Group
-				return resource
+				if found {
+					if item.LongForm.Group == rsc.Group && item.LongForm.Resource == rsc.Resource {
+						// It is common and acceptable that group/resource has multiple
+						// versions registered in cluster. This does not introduce ambiguity
+						// in terms of shortname usage.
+						continue
+					}
+					if !warnedAmbiguousShortcut[item.LongForm] {
+						if e.warningHandler != nil {
+							e.warningHandler(fmt.Sprintf("short name %q could also match lower priority resource %s", resource.Resource, item.LongForm.String()))
+						}
+						warnedAmbiguousShortcut[item.LongForm] = true
+					}
+					continue
+				}
+				rsc.Resource = item.LongForm.Resource
+				rsc.Group = item.LongForm.Group
+				found = true
 			}
+		}
+		if found {
+			return rsc
 		}
 
 		// we didn't find exact match so match on group prefixing. This allows autoscal to match autoscaling

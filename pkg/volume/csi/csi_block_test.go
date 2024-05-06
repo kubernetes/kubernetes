@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
@@ -283,6 +284,45 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 	}
 }
 
+func TestBlockMapperSetupDeviceNoClientError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+
+	pvName := pv.GetName()
+	nodeName := string(plug.host.GetNodeName())
+
+	csiMapper.csiClient = setupClient(t, true)
+
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachment := makeTestAttachment(attachID, nodeName, pvName)
+	attachment.Status.Attached = true
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to setup VolumeAttachment: %v", err)
+	}
+	t.Log("created attachment ", attachID)
+
+	// Clear out the clients
+	// The lookup to generate a new client will fail when it tries to query a driver with an unknown name
+	csiMapper.csiClient = nil
+	csiMapper.csiClientGetter.csiClient = nil
+	// Note that prepareBlockMapperTest above will create a driver with a name of "test-driver"
+	csiMapper.csiClientGetter.driverName = "unknown-driver"
+
+	_, err = csiMapper.SetUpDevice()
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
+		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
+	}
+}
+
 func TestBlockMapperMapPodDevice(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
@@ -413,6 +453,45 @@ func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
 	}
 }
 
+func TestBlockMapperMapPodDeviceNoClientError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+
+	pvName := pv.GetName()
+	nodeName := string(plug.host.GetNodeName())
+
+	csiMapper.csiClient = setupClient(t, true)
+
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
+	attachment := makeTestAttachment(attachID, nodeName, pvName)
+	attachment.Status.Attached = true
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to setup VolumeAttachment: %v", err)
+	}
+	t.Log("created attachment ", attachID)
+
+	// Clear out the clients
+	// The lookup to generate a new client will fail when it tries to query a driver with an unknown name
+	csiMapper.csiClient = nil
+	csiMapper.csiClientGetter.csiClient = nil
+	// Note that prepareBlockMapperTest above will create a driver with a name of "test-driver"
+	csiMapper.csiClientGetter.driverName = "unknown-driver"
+
+	_, err = csiMapper.MapPodDevice()
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
+		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
+	}
+}
+
 func TestBlockMapperTearDownDevice(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
@@ -468,6 +547,62 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 	vols := csiUnmapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
 	if _, ok := vols[csiUnmapper.volumeID]; ok {
 		t.Error("csi server may not have received NodeUnstageVolume call")
+	}
+}
+
+func TestBlockMapperTearDownDeviceNoClientError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+
+	_, spec, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+
+	// save volume data
+	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
+	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
+		t.Errorf("failed to create dir [%s]: %v", dir, err)
+	}
+
+	if err := saveVolumeData(
+		dir,
+		volDataFileName,
+		map[string]string{
+			volDataKey.specVolID:  pv.ObjectMeta.Name,
+			volDataKey.driverName: testDriver,
+			volDataKey.volHandle:  testVol,
+		},
+	); err != nil {
+		t.Fatalf("failed to save volume data: %v", err)
+	}
+
+	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
+	if err != nil {
+		t.Fatalf("failed to make a new Unmapper: %v", err)
+	}
+
+	csiUnmapper := unmapper.(*csiBlockMapper)
+	csiUnmapper.csiClient = setupClient(t, true)
+
+	globalMapPath, err := csiUnmapper.GetGlobalMapPath(spec)
+	if err != nil {
+		t.Fatalf("unmapper failed to GetGlobalMapPath: %v", err)
+	}
+
+	// Clear out the clients
+	// The lookup to generate a new client will fail when it tries to query a driver with an unknown name
+	csiUnmapper.csiClient = nil
+	csiUnmapper.csiClientGetter.csiClient = nil
+	// Note that prepareBlockMapperTest above will create a driver with a name of "test-driver"
+	csiUnmapper.csiClientGetter.driverName = "unknown-driver"
+
+	err = csiUnmapper.TearDownDevice(globalMapPath, "/dev/test")
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
+		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
 	}
 }
 
@@ -585,5 +720,88 @@ func TestVolumeSetupTeardown(t *testing.T) {
 	}
 	if _, err := os.Stat(stagingPath); err == nil {
 		t.Errorf("volume staging path %s was not deleted", stagingPath)
+	}
+}
+
+func TestUnmapPodDeviceNoClientError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, spec, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+
+	pvName := pv.GetName()
+	nodeName := string(plug.host.GetNodeName())
+
+	csiMapper.csiClient = setupClient(t, true)
+
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachment := makeTestAttachment(attachID, nodeName, pvName)
+	attachment.Status.Attached = true
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to setup VolumeAttachment: %v", err)
+	}
+	t.Log("created attachment ", attachID)
+
+	stagingPath, err := csiMapper.SetUpDevice()
+	if err != nil {
+		t.Fatalf("mapper failed to SetupDevice: %v", err)
+	}
+	// Check if NodeStageVolume staged to the right path
+	svols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
+	svol, ok := svols[csiMapper.volumeID]
+	if !ok {
+		t.Error("csi server may not have received NodeStageVolume call")
+	}
+	if svol.Path != stagingPath {
+		t.Errorf("csi server expected device path %s, got %s", stagingPath, svol.Path)
+	}
+
+	path, err := csiMapper.MapPodDevice()
+	if err != nil {
+		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
+	}
+	pvols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+	pvol, ok := pvols[csiMapper.volumeID]
+	if !ok {
+		t.Error("csi server may not have received NodePublishVolume call")
+	}
+	publishPath := csiMapper.getPublishPath()
+	if pvol.Path != publishPath {
+		t.Errorf("csi server expected path %s, got %s", publishPath, pvol.Path)
+	}
+	if path != publishPath {
+		t.Errorf("csi server expected path %s, but MapPodDevice returned %s", publishPath, path)
+	}
+
+	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
+	if err != nil {
+		t.Fatalf("failed to make a new Unmapper: %v", err)
+	}
+
+	csiUnmapper := unmapper.(*csiBlockMapper)
+	csiUnmapper.csiClient = csiMapper.csiClient
+
+	_, err = csiUnmapper.GetGlobalMapPath(spec)
+	if err != nil {
+		t.Fatalf("unmapper failed to GetGlobalMapPath: %v", err)
+	}
+
+	// Clear out the clients
+	// The lookup to generate a new client will fail when it tries to query a driver with an unknown name
+	csiUnmapper.csiClient = nil
+	csiUnmapper.csiClientGetter.csiClient = nil
+	// Note that prepareBlockMapperTest above will create a driver with a name of "test-driver"
+	csiUnmapper.csiClientGetter.driverName = "unknown-driver"
+
+	err = csiUnmapper.UnmapPodDevice()
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
+		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
 	}
 }

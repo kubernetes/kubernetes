@@ -20,15 +20,21 @@ import (
 	"path/filepath"
 	"testing"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	openapitesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 )
 
 var fakeSchema = openapitesting.Fake{Path: filepath.Join("..", "..", "artifacts", "openapi", "swagger.json")}
+var fakeSchemaSharedParams = openapitesting.Fake{Path: filepath.Join("..", "..", "artifacts", "openapi", "swagger-with-shared-parameters.json")}
 
 func TestSupportsQueryParam(t *testing.T) {
-	doc, err := fakeSchema.OpenAPISchema()
+	docInlineParams, err := fakeSchema.OpenAPISchema()
+	if err != nil {
+		t.Fatalf("Failed to get OpenAPI Schema: %v", err)
+	}
+	docSharedParams, err := fakeSchemaSharedParams.OpenAPISchema()
 	if err != nil {
 		t.Fatalf("Failed to get OpenAPI Schema: %v", err)
 	}
@@ -81,19 +87,26 @@ func TestSupportsQueryParam(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		supports, err := supportsQueryParam(doc, test.gvk, test.queryParam)
-		if supports != test.supports || ((err == nil) != test.success) {
-			errStr := "nil"
-			if test.success == false {
-				errStr = "err"
+	for name, doc := range map[string]*openapi_v2.Document{
+		"inline parameters": docInlineParams,
+		"shared parameters": docSharedParams,
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, test := range tests {
+				supports, err := supportsQueryParam(doc, test.gvk, test.queryParam)
+				if supports != test.supports || ((err == nil) != test.success) {
+					errStr := "nil"
+					if test.success == false {
+						errStr = "err"
+					}
+					t.Errorf("SupportsQueryParam(doc, %v, %v) = (%v, %v), expected (%v, %v)",
+						test.gvk, test.queryParam,
+						supports, err,
+						test.supports, errStr,
+					)
+				}
 			}
-			t.Errorf("SupportsQueryParam(doc, %v, %v) = (%v, %v), expected (%v, %v)",
-				test.gvk, test.queryParam,
-				supports, err,
-				test.supports, errStr,
-			)
-		}
+		})
 	}
 }
 

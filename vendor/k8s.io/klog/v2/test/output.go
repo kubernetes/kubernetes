@@ -15,11 +15,6 @@ limitations under the License.
 */
 
 // Package test contains a reusable unit test for logging output and behavior.
-//
-// # Experimental
-//
-// Notice: This package is EXPERIMENTAL and may be changed or removed in a
-// later release.
 package test
 
 import (
@@ -48,11 +43,6 @@ import (
 //
 // The returned flag set has the klog flags registered. It can
 // be used to make further changes to the klog configuration.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release.
 func InitKlog(tb testing.TB) *flag.FlagSet {
 	state := klog.CaptureState()
 	tb.Cleanup(state.Restore)
@@ -77,11 +67,6 @@ func InitKlog(tb testing.TB) *flag.FlagSet {
 }
 
 // OutputConfig contains optional settings for Output.
-//
-// # Experimental
-//
-// Notice: This type is EXPERIMENTAL and may be changed or removed in a
-// later release.
 type OutputConfig struct {
 	// NewLogger is called to create a new logger. If nil, output via klog
 	// is tested. Support for -vmodule is optional.  ClearLogger is called
@@ -180,14 +165,14 @@ var tests = map[string]testcase{
 		withNames: []string{"me"},
 		text:      "test",
 		values:    []interface{}{"akey", "avalue"},
-		expectedOutput: `I output.go:<LINE>] "me: test" akey="avalue"
+		expectedOutput: `I output.go:<LINE>] "test" logger="me" akey="avalue"
 `,
 	},
 	"log with multiple names and values": {
 		withNames: []string{"hello", "world"},
 		text:      "test",
 		values:    []interface{}{"akey", "avalue"},
-		expectedOutput: `I output.go:<LINE>] "hello/world: test" akey="avalue"
+		expectedOutput: `I output.go:<LINE>] "test" logger="hello.world" akey="avalue"
 `,
 	},
 	"override single value": {
@@ -275,30 +260,30 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 `,
 	},
 	"KObjs": {
-		text: "test",
+		text: "KObjs",
 		values: []interface{}{"pods",
 			klog.KObjs([]interface{}{
 				&kmeta{Name: "pod-1", Namespace: "kube-system"},
 				&kmeta{Name: "pod-2", Namespace: "kube-system"},
 			})},
-		expectedOutput: `I output.go:<LINE>] "test" pods=[kube-system/pod-1 kube-system/pod-2]
+		expectedOutput: `I output.go:<LINE>] "KObjs" pods=[{"name":"pod-1","namespace":"kube-system"},{"name":"pod-2","namespace":"kube-system"}]
 `,
 	},
 	"KObjSlice okay": {
-		text: "test",
+		text: "KObjSlice",
 		values: []interface{}{"pods",
 			klog.KObjSlice([]interface{}{
 				&kmeta{Name: "pod-1", Namespace: "kube-system"},
 				&kmeta{Name: "pod-2", Namespace: "kube-system"},
 			})},
-		expectedOutput: `I output.go:<LINE>] "test" pods=[kube-system/pod-1 kube-system/pod-2]
+		expectedOutput: `I output.go:<LINE>] "KObjSlice" pods=["kube-system/pod-1","kube-system/pod-2"]
 `,
 	},
 	"KObjSlice nil arg": {
 		text: "test",
 		values: []interface{}{"pods",
 			klog.KObjSlice(nil)},
-		expectedOutput: `I output.go:<LINE>] "test" pods=[]
+		expectedOutput: `I output.go:<LINE>] "test" pods=null
 `,
 	},
 	"KObjSlice int arg": {
@@ -315,14 +300,14 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 				&kmeta{Name: "pod-1", Namespace: "kube-system"},
 				nil,
 			})},
-		expectedOutput: `I output.go:<LINE>] "test" pods=[kube-system/pod-1 <nil>]
+		expectedOutput: `I output.go:<LINE>] "test" pods=["kube-system/pod-1",null]
 `,
 	},
 	"KObjSlice ints": {
 		text: "test",
 		values: []interface{}{"ints",
 			klog.KObjSlice([]int{1, 2, 3})},
-		expectedOutput: `I output.go:<LINE>] "test" ints=[<KObjSlice needs a slice of values implementing KMetadata, got type int>]
+		expectedOutput: `I output.go:<LINE>] "test" ints=["<KObjSlice needs a slice of values implementing KMetadata, got type int>"]
 `,
 	},
 	"regular error types as value": {
@@ -406,6 +391,41 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 		expectedOutput: `I output.go:<LINE>] "map keys" map[test:%!s(bool=true)]="test"
 `,
 	},
+	"map values": {
+		text:   "maps",
+		values: []interface{}{"s", map[string]string{"hello": "world"}, "i", map[int]int{1: 2, 3: 4}},
+		expectedOutput: `I output.go:<LINE>] "maps" s={"hello":"world"} i={"1":2,"3":4}
+`,
+	},
+	"slice values": {
+		text:   "slices",
+		values: []interface{}{"s", []string{"hello", "world"}, "i", []int{1, 2, 3}},
+		expectedOutput: `I output.go:<LINE>] "slices" s=["hello","world"] i=[1,2,3]
+`,
+	},
+	"struct values": {
+		text:   "structs",
+		values: []interface{}{"s", struct{ Name, Kind, hidden string }{Name: "worker", Kind: "pod", hidden: "ignore"}},
+		expectedOutput: `I output.go:<LINE>] "structs" s={"Name":"worker","Kind":"pod"}
+`,
+	},
+	"klog.Format": {
+		text:   "klog.Format",
+		values: []interface{}{"s", klog.Format(struct{ Name, Kind, hidden string }{Name: "worker", Kind: "pod", hidden: "ignore"})},
+		expectedOutput: `I output.go:<LINE>] "klog.Format" s=<
+	{
+	  "Name": "worker",
+	  "Kind": "pod"
+	}
+ >
+`,
+	},
+	"cyclic list": {
+		text:   "cycle",
+		values: []interface{}{"list", newCyclicList()},
+		expectedOutput: `I output.go:<LINE>] "cycle" list="<internal error: json: unsupported value: encountered a cycle via *test.myList>"
+`,
+	},
 }
 
 func printWithLogger(logger logr.Logger, test testcase) {
@@ -466,7 +486,7 @@ func printWithKlog(test testcase) {
 		}
 		return false
 	}
-	appendKV := func(withValues []interface{}) {
+	appendKV := func(withValues ...interface{}) {
 		if len(withValues)%2 != 0 {
 			withValues = append(withValues, "(MISSING)")
 		}
@@ -477,15 +497,18 @@ func printWithKlog(test testcase) {
 		}
 	}
 	// Here we need to emulate the handling of WithValues above.
-	appendKV(test.withValues)
+	if len(test.withNames) > 0 {
+		appendKV("logger", strings.Join(test.withNames, "."))
+	}
+	appendKV(test.withValues...)
 	kvs := [][]interface{}{copySlice(kv)}
 	if test.moreValues != nil {
-		appendKV(test.moreValues)
+		appendKV(test.moreValues...)
 		kvs = append(kvs, copySlice(kv), copySlice(kvs[0]))
 	}
 	if test.evenMoreValues != nil {
 		kv = copySlice(kvs[0])
-		appendKV(test.evenMoreValues)
+		appendKV(test.evenMoreValues...)
 		kvs = append(kvs, copySlice(kv))
 	}
 	for _, kv := range kvs {
@@ -493,9 +516,6 @@ func printWithKlog(test testcase) {
 			kv = append(kv, test.values...)
 		}
 		text := test.text
-		if len(test.withNames) > 0 {
-			text = strings.Join(test.withNames, "/") + ": " + text
-		}
 		if test.withHelper {
 			klogHelper(klog.Level(test.v), text, kv)
 		} else if test.err != nil {
@@ -518,12 +538,6 @@ var _, _, printWithKlogLine, _ = runtime.Caller(0) // anchor for finding the lin
 //
 // Loggers will be tested with direct calls to Info or
 // as backend for klog.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release. The test cases and thus the expected output also may
-// change.
 func Output(t *testing.T, config OutputConfig) {
 	for n, test := range tests {
 		t.Run(n, func(t *testing.T) {
@@ -595,6 +609,15 @@ func Output(t *testing.T, config OutputConfig) {
 	}
 
 	if config.NewLogger == nil || config.AsBackend {
+		configStruct := klog.Format(myConfig{typeMeta: typeMeta{Kind: "config"}, RealField: 42})
+		configStructOutput := `I output.go:<LINE>] "Format" config=<
+	{
+	  "Kind": "config",
+	  "RealField": 42
+	}
+ >
+`
+
 		// Test all klog output functions.
 		//
 		// Each test case must be defined with the same number of
@@ -760,6 +783,11 @@ func Output(t *testing.T, config OutputConfig) {
 				logFunc: func() { klog.V(1).ErrorS(errors.New("hello"), "one world") },
 				output:  "E output.go:<LINE>] \"one world\" err=\"hello\"\n",
 			},
+			{
+				name:    "Format InfoS",
+				logFunc: func() { klog.InfoS("Format", "config", configStruct) },
+				output:  configStructOutput,
+			},
 		}
 		_, _, line, _ := runtime.Caller(0)
 
@@ -830,12 +858,6 @@ func Output(t *testing.T, config OutputConfig) {
 //
 // Loggers will be tested with direct calls to Info or
 // as backend for klog.
-//
-// # Experimental
-//
-// Notice: This function is EXPERIMENTAL and may be changed or removed in a
-// later release. The test cases and thus the expected output also may
-// change.
 func Benchmark(b *testing.B, config OutputConfig) {
 	for n, test := range tests {
 		b.Run(n, func(b *testing.B) {
@@ -964,3 +986,39 @@ func (f faultyError) Error() string {
 }
 
 var _ error = faultyError{}
+
+// typeMeta implements fmt.Stringer and logr.Marshaler. config below
+// inherits those (incomplete!) implementations.
+type typeMeta struct {
+	Kind string
+}
+
+func (t typeMeta) String() string {
+	return "kind is " + t.Kind
+}
+
+func (t typeMeta) MarshalLog() interface{} {
+	return t.Kind
+}
+
+type myConfig struct {
+	typeMeta
+
+	RealField int
+}
+
+var _ logr.Marshaler = myConfig{}
+var _ fmt.Stringer = myConfig{}
+
+// This is a linked list. It can contain a cycle, which cannot be expressed in JSON.
+type myList struct {
+	Value int
+	Next  *myList
+}
+
+func newCyclicList() *myList {
+	a := &myList{Value: 1}
+	b := &myList{Value: 2, Next: a}
+	a.Next = b
+	return a
+}

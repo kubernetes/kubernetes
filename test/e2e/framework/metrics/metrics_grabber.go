@@ -181,21 +181,34 @@ func (g *Grabber) GrabFromKubelet(ctx context.Context, nodeName string) (Kubelet
 		return KubeletMetrics{}, fmt.Errorf("Error listing nodes with name %v, got %v", nodeName, nodes.Items)
 	}
 	kubeletPort := nodes.Items[0].Status.DaemonEndpoints.KubeletEndpoint.Port
-	return g.grabFromKubeletInternal(ctx, nodeName, int(kubeletPort))
+	return g.grabFromKubeletInternal(ctx, nodeName, int(kubeletPort), "metrics")
 }
 
-func (g *Grabber) grabFromKubeletInternal(ctx context.Context, nodeName string, kubeletPort int) (KubeletMetrics, error) {
+// GrabresourceMetricsFromKubelet returns resource metrics from kubelet
+func (g *Grabber) GrabResourceMetricsFromKubelet(ctx context.Context, nodeName string) (KubeletMetrics, error) {
+	nodes, err := g.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": nodeName}.AsSelector().String()})
+	if err != nil {
+		return KubeletMetrics{}, err
+	}
+	if len(nodes.Items) != 1 {
+		return KubeletMetrics{}, fmt.Errorf("Error listing nodes with name %v, got %v", nodeName, nodes.Items)
+	}
+	kubeletPort := nodes.Items[0].Status.DaemonEndpoints.KubeletEndpoint.Port
+	return g.grabFromKubeletInternal(ctx, nodeName, int(kubeletPort), "metrics/resource")
+}
+
+func (g *Grabber) grabFromKubeletInternal(ctx context.Context, nodeName string, kubeletPort int, pathSuffix string) (KubeletMetrics, error) {
 	if kubeletPort <= 0 || kubeletPort > 65535 {
 		return KubeletMetrics{}, fmt.Errorf("Invalid Kubelet port %v. Skipping Kubelet's metrics gathering", kubeletPort)
 	}
-	output, err := g.getMetricsFromNode(ctx, nodeName, int(kubeletPort))
+	output, err := g.getMetricsFromNode(ctx, nodeName, int(kubeletPort), pathSuffix)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
 	return parseKubeletMetrics(output)
 }
 
-func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubeletPort int) (string, error) {
+func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubeletPort int, pathSuffix string) (string, error) {
 	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
 	finished := make(chan struct{}, 1)
 	var err error
@@ -205,7 +218,7 @@ func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubel
 			Resource("nodes").
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", nodeName, kubeletPort)).
-			Suffix("metrics").
+			Suffix(pathSuffix).
 			Do(ctx).Raw()
 		finished <- struct{}{}
 	}()
@@ -239,7 +252,7 @@ func (g *Grabber) GrabFromScheduler(ctx context.Context) (SchedulerMetrics, erro
 
 	var lastMetricsFetchErr error
 	var output string
-	if metricsWaitErr := wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+	if metricsWaitErr := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output, lastMetricsFetchErr = g.getSecureMetricsFromPod(ctx, g.kubeScheduler, metav1.NamespaceSystem, kubeSchedulerPort)
 		return lastMetricsFetchErr == nil, nil
 	}); metricsWaitErr != nil {
@@ -290,7 +303,7 @@ func (g *Grabber) GrabFromControllerManager(ctx context.Context) (ControllerMana
 
 	var output string
 	var lastMetricsFetchErr error
-	if metricsWaitErr := wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+	if metricsWaitErr := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output, lastMetricsFetchErr = g.getSecureMetricsFromPod(ctx, g.kubeControllerManager, metav1.NamespaceSystem, kubeControllerManagerPort)
 		return lastMetricsFetchErr == nil, nil
 	}); metricsWaitErr != nil {
@@ -329,7 +342,7 @@ func (g *Grabber) GrabFromSnapshotController(ctx context.Context, podName string
 
 	var output string
 	var lastMetricsFetchErr error
-	if metricsWaitErr := wait.PollImmediateWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+	if metricsWaitErr := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output, lastMetricsFetchErr = g.getMetricsFromPod(ctx, g.client, podName, metav1.NamespaceSystem, port)
 		return lastMetricsFetchErr == nil, nil
 	}); metricsWaitErr != nil {
@@ -432,7 +445,7 @@ func (g *Grabber) Grab(ctx context.Context) (Collection, error) {
 		} else {
 			for _, node := range nodes.Items {
 				kubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
-				metrics, err := g.grabFromKubeletInternal(ctx, node.Name, int(kubeletPort))
+				metrics, err := g.grabFromKubeletInternal(ctx, node.Name, int(kubeletPort), "metrics")
 				if err != nil {
 					errs = append(errs, err)
 				}

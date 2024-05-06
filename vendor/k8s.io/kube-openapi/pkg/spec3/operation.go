@@ -35,6 +35,9 @@ type Operation struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Operation as JSON
 func (o *Operation) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(o)
+	}
 	b1, err := json.Marshal(o.OperationProps)
 	if err != nil {
 		return nil, err
@@ -44,6 +47,16 @@ func (o *Operation) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2), nil
+}
+
+func (o *Operation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		spec.Extensions
+		OperationProps operationPropsOmitZero `json:",inline"`
+	}
+	x.Extensions = internal.SanitizeExtensions(o.Extensions)
+	x.OperationProps = operationPropsOmitZero(o.OperationProps)
+	return opts.MarshalNext(enc, x)
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
@@ -94,4 +107,18 @@ type OperationProps struct {
 	SecurityRequirement []map[string][]string `json:"security,omitempty"`
 	// Servers contains an alternative server array to service this operation
 	Servers []*Server `json:"servers,omitempty"`
+}
+
+type operationPropsOmitZero struct {
+	Tags                []string               `json:"tags,omitempty"`
+	Summary             string                 `json:"summary,omitempty"`
+	Description         string                 `json:"description,omitempty"`
+	ExternalDocs        *ExternalDocumentation `json:"externalDocs,omitzero"`
+	OperationId         string                 `json:"operationId,omitempty"`
+	Parameters          []*Parameter           `json:"parameters,omitempty"`
+	RequestBody         *RequestBody           `json:"requestBody,omitzero"`
+	Responses           *Responses             `json:"responses,omitzero"`
+	Deprecated          bool                   `json:"deprecated,omitzero"`
+	SecurityRequirement []map[string][]string  `json:"security,omitempty"`
+	Servers             []*Server              `json:"servers,omitempty"`
 }

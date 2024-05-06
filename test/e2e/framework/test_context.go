@@ -23,9 +23,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -36,12 +38,12 @@ import (
 	"github.com/onsi/gomega"
 	gomegaformat "github.com/onsi/gomega/format"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
 	"k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
@@ -52,6 +54,20 @@ const (
 
 	// DefaultNumNodes is the number of nodes. If not specified, then number of nodes is auto-detected
 	DefaultNumNodes = -1
+)
+
+var (
+	// Output is used for output when not running tests, for example in -list-tests.
+	// Test output should go to ginkgo.GinkgoWriter.
+	Output io.Writer = os.Stdout
+
+	// Exit is called when the framework detects fatal errors or when
+	// it is done with the execution of e.g. -list-tests.
+	Exit = os.Exit
+
+	// CheckForBugs determines whether the framework bails out when
+	// test initialization found any bugs.
+	CheckForBugs = true
 )
 
 // TestContextType contains test settings and global state. Due to
@@ -83,17 +99,20 @@ const (
 // Test suite authors can use framework/viper to make all command line
 // parameters also configurable via a configuration file.
 type TestContextType struct {
-	KubeConfig         string
-	KubeContext        string
-	KubeAPIContentType string
-	KubeletRootDir     string
-	CertDir            string
-	Host               string
-	BearerToken        string `datapolicy:"token"`
+	KubeConfig             string
+	KubeContext            string
+	KubeAPIContentType     string
+	KubeletRootDir         string
+	KubeletConfigDropinDir string
+	CertDir                string
+	Host                   string
+	BearerToken            string `datapolicy:"token"`
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot string
 	// ListImages will list off all images that are used then quit
 	ListImages bool
+
+	listTests, listLabels bool
 
 	// ListConformanceTests will list off all conformance tests that are available then quit
 	ListConformanceTests bool
@@ -244,8 +263,6 @@ type NodeTestContextType struct {
 	NodeConformance bool
 	// PrepullImages indicates whether node e2e framework should prepull images.
 	PrepullImages bool
-	// KubeletConfig is the kubelet configuration the test is running against.
-	KubeletConfig kubeletconfig.KubeletConfiguration
 	// ImageDescription is the description of the image on which the test is running.
 	ImageDescription string
 	// RuntimeConfig is a map of API server runtime configuration values.
@@ -258,6 +275,8 @@ type NodeTestContextType struct {
 	RestartKubelet bool
 	// ExtraEnvs is a map of environment names to values.
 	ExtraEnvs map[string]string
+	// StandaloneMode indicates whether the test is running kubelet in a standalone mode.
+	StandaloneMode bool
 }
 
 // CloudConfig holds the cloud configuration for e2e test suites.
@@ -348,20 +367,17 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the simplified JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports.  If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
 	flags.BoolVar(&TestContext.ReportCompleteGinkgo, "report-complete-ginkgo", false, "Enables writing a complete test report as Ginkgo JSON to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
 	flags.BoolVar(&TestContext.ReportCompleteJUnit, "report-complete-junit", false, "Enables writing a complete test report as JUnit XML to <report dir>/ginkgo/report.json. Ignored if --report-dir is not set.")
-	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
-	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
-	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
-	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "docker", "The comma separated list of systemd services the framework will dump logs for.")
+	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
+	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "containerd", "The name of the container runtime process.")
+	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/run/containerd/containerd.pid", "The pid file of the container runtime.")
+	flags.StringVar(&TestContext.SystemdServices, "systemd-services", "containerd*", "The comma separated list of systemd services the framework will dump logs for.")
 	flags.BoolVar(&TestContext.DumpSystemdJournal, "dump-systemd-journal", false, "Whether to dump the full systemd journal.")
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
-	// TODO: remove the node-role.kubernetes.io/master taint in 1.25 or later.
-	// The change will likely require an action for some users that do not
-	// use k8s originated tools like kubeadm or kOps for creating clusters
-	// and taint their control plane nodes with "master", expecting the test
-	// suite to work with this legacy non-blocking taint.
-	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane,node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests. The default taint 'node-role.kubernetes.io/master' is DEPRECATED and will be removed from the list in a future release.")
+	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for running tests.")
+	flags.BoolVar(&TestContext.listLabels, "list-labels", false, "If true, will show the list of labels that can be used to select tests via -ginkgo.label-filter.")
+	flags.BoolVar(&TestContext.listTests, "list-tests", false, "If true, will show the full names of all tests (aka specs) that can be used to select test via -ginkgo.focus/skip.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
@@ -449,10 +465,10 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
-// GenerateSecureToken returns a string of length tokenLen, consisting
+// generateSecureToken returns a string of length tokenLen, consisting
 // of random bytes encoded as base64 for use as a Bearer Token during
 // communication with an APIServer
-func GenerateSecureToken(tokenLen int) (string, error) {
+func generateSecureToken(tokenLen int) (string, error) {
 	// Number of bytes to be tokenLen when base64 encoded.
 	tokenSize := math.Ceil(float64(tokenLen) * 6 / 8)
 	rawToken := make([]byte, int(tokenSize))
@@ -476,19 +492,12 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if t.KubeTestRepoList != "" {
 		image.Init(t.KubeTestRepoList)
 	}
-	var fs flag.FlagSet
-	klog.InitFlags(&fs)
-	fs.Set("logtostderr", "false")
-	fs.Set("alsologtostderr", "false")
-	fs.Set("one_output", "true")
-	fs.Set("stderrthreshold", "10" /* higher than any of the severities -> none pass the threshold */)
-	klog.SetOutput(ginkgo.GinkgoWriter)
 
 	if t.ListImages {
 		for _, v := range image.GetImageConfigs() {
 			fmt.Println(v.GetE2EImage())
 		}
-		os.Exit(0)
+		Exit(0)
 	}
 
 	// Reconfigure gomega defaults. The poll interval should be suitable
@@ -499,6 +508,20 @@ func AfterReadingAllFlags(t *TestContextType) {
 	gomega.SetDefaultConsistentlyPollingInterval(t.timeouts.Poll)
 	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
 	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
+
+	// ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
+	report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")
+	validateSpecs(report.SpecReports)
+	if err := FormatBugs(); CheckForBugs && err != nil {
+		// Refuse to do anything if the E2E suite is buggy.
+		fmt.Fprint(Output, "ERROR: E2E suite initialization was faulty, these errors must be fixed:")
+		fmt.Fprint(Output, "\n"+err.Error())
+		Exit(1)
+	}
+	if t.listLabels || t.listTests {
+		listTestInformation(report)
+		Exit(0)
+	}
 
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
@@ -518,10 +541,8 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 	if len(t.BearerToken) == 0 {
 		var err error
-		t.BearerToken, err = GenerateSecureToken(16)
-		if err != nil {
-			klog.Fatalf("Failed to generate bearer token: %v", err)
-		}
+		t.BearerToken, err = generateSecureToken(16)
+		ExpectNoError(err, "Failed to generate bearer token")
 	}
 
 	// Allow 1% of nodes to be unready (statistically) - relevant for large clusters.
@@ -559,7 +580,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		} else {
 			klog.Errorf("Failed to setup provider config for %q: %v", TestContext.Provider, err)
 		}
-		os.Exit(1)
+		Exit(1)
 	}
 
 	if TestContext.ReportDir != "" {
@@ -569,13 +590,13 @@ func AfterReadingAllFlags(t *TestContextType) {
 		// in parallel, so we will get "exists" error in most of them.
 		if err := os.MkdirAll(TestContext.ReportDir, 0777); err != nil && !os.IsExist(err) {
 			klog.Errorf("Create report dir: %v", err)
-			os.Exit(1)
+			Exit(1)
 		}
 		ginkgoDir := path.Join(TestContext.ReportDir, "ginkgo")
 		if TestContext.ReportCompleteGinkgo || TestContext.ReportCompleteJUnit {
 			if err := os.MkdirAll(ginkgoDir, 0777); err != nil && !os.IsExist(err) {
 				klog.Errorf("Create <report-dir>/ginkgo: %v", err)
-				os.Exit(1)
+				Exit(1)
 			}
 		}
 
@@ -605,4 +626,48 @@ func AfterReadingAllFlags(t *TestContextType) {
 			ExpectNoError(junit.WriteJUnitReport(report, junitReport))
 		})
 	}
+}
+
+func listTestInformation(report ginkgo.Report) {
+	indent := strings.Repeat(" ", 4)
+
+	if TestContext.listLabels {
+		labels := sets.New[string]()
+		for _, spec := range report.SpecReports {
+			if spec.LeafNodeType == types.NodeTypeIt {
+				labels.Insert(spec.Labels()...)
+			}
+		}
+		fmt.Fprintf(Output, "The following labels can be used with 'ginkgo run --label-filter':\n%s%s\n\n", indent, strings.Join(sets.List(labels), "\n"+indent))
+	}
+	if TestContext.listTests {
+		leafs := make([][]string, 0, len(report.SpecReports))
+		wd, _ := os.Getwd()
+		for _, spec := range report.SpecReports {
+			if spec.LeafNodeType == types.NodeTypeIt {
+				leafs = append(leafs, []string{fmt.Sprintf("%s:%d: ", relativePath(wd, spec.LeafNodeLocation.FileName), spec.LeafNodeLocation.LineNumber), spec.FullText()})
+			}
+		}
+		// Sort by test name, not the source code location, because the test
+		// name is more stable across code refactoring.
+		sort.Slice(leafs, func(i, j int) bool {
+			return leafs[i][1] < leafs[j][1]
+		})
+		fmt.Fprint(Output, "The following spec names can be used with 'ginkgo run --focus/skip':\n")
+		for _, leaf := range leafs {
+			fmt.Fprintf(Output, "%s%s%s\n", indent, leaf[0], leaf[1])
+		}
+		fmt.Fprint(Output, "\n")
+	}
+}
+
+func relativePath(wd, path string) string {
+	if wd == "" {
+		return path
+	}
+	relpath, err := filepath.Rel(wd, path)
+	if err != nil {
+		return path
+	}
+	return relpath
 }

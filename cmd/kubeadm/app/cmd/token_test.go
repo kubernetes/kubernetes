@@ -34,7 +34,7 @@ import (
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
-	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
@@ -249,18 +249,14 @@ func TestNewCmdToken(t *testing.T) {
 			if _, err = f.WriteString(tc.configToWrite); err != nil {
 				t.Errorf("Unable to write test file %q: %v", fullPath, err)
 			}
-			// store the current value of the environment variable.
-			storedEnv := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
 			if tc.kubeConfigEnv != "" {
-				os.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
+				t.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
 			}
 			cmd.SetArgs(tc.args)
 			err := cmd.Execute()
 			if (err != nil) != tc.expectedError {
 				t.Errorf("Test case %q: newCmdToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
 			}
-			// restore the environment variable.
-			os.Setenv(clientcmd.RecommendedConfigPathEnvVar, storedEnv)
 		})
 	}
 }
@@ -359,7 +355,7 @@ func TestTokenOutput(t *testing.T) {
 			outputFormat: "json",
 			expected: `{
     "kind": "BootstrapToken",
-    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha3",
     "token": "abcdef.1234567890123456",
     "description": "valid bootstrap tooken",
     "usages": [
@@ -380,7 +376,7 @@ func TestTokenOutput(t *testing.T) {
 			usages:       []string{"signing", "authentication"},
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "yaml",
-			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha2
+			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha3
 description: valid bootstrap tooken
 groups:
 - system:bootstrappers:kubeadm:default-node-token
@@ -427,7 +423,7 @@ abcdef.1234567890123456   <forever>   <never>   signing,authentication   valid b
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := outputapiv1alpha2.BootstrapToken{
+			token := outputapiv1alpha3.BootstrapToken{
 				BootstrapToken: bootstraptokenv1.BootstrapToken{
 					Token:       &bootstraptokenv1.BootstrapTokenString{ID: tc.id, Secret: tc.secret},
 					Description: tc.description,

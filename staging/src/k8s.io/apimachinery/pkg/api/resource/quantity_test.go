@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"math/rand"
 	"os"
 	"strings"
@@ -32,13 +33,27 @@ import (
 	inf "gopkg.in/inf.v0"
 )
 
+var (
+	bigMostPositive = big.NewInt(mostPositive)
+	bigMostNegative = big.NewInt(mostNegative)
+)
+
 func dec(i int64, exponent int) infDecAmount {
 	// See the below test-- scale is the negative of an exponent.
 	return infDecAmount{inf.NewDec(i, inf.Scale(-exponent))}
 }
 
+func bigDec(i *big.Int, exponent int) infDecAmount {
+	// See the below test-- scale is the negative of an exponent.
+	return infDecAmount{inf.NewDecBig(i, inf.Scale(-exponent))}
+}
+
 func decQuantity(i int64, exponent int, format Format) Quantity {
 	return Quantity{d: dec(i, exponent), Format: format}
+}
+
+func bigDecQuantity(i *big.Int, exponent int, format Format) Quantity {
+	return Quantity{d: bigDec(i, exponent), Format: format}
 }
 
 func intQuantity(i int64, exponent Scale, format Format) Quantity {
@@ -58,6 +73,38 @@ func TestDec(t *testing.T) {
 		{dec(1, -1), "0.1"},
 		{dec(3, -2), "0.03"},
 		{dec(4, -3), "0.004"},
+	}
+
+	for _, item := range table {
+		if e, a := item.expect, item.got.Dec.String(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+}
+
+func TestBigDec(t *testing.T) {
+	table := []struct {
+		got    infDecAmount
+		expect string
+	}{
+		{bigDec(big.NewInt(1), 0), "1"},
+		{bigDec(big.NewInt(1), 1), "10"},
+		{bigDec(big.NewInt(5), 2), "500"},
+		{bigDec(big.NewInt(8), 3), "8000"},
+		{bigDec(big.NewInt(2), 0), "2"},
+		{bigDec(big.NewInt(1), -1), "0.1"},
+		{bigDec(big.NewInt(3), -2), "0.03"},
+		{bigDec(big.NewInt(4), -3), "0.004"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 0), "9223372036854775808"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 1), "92233720368547758080"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 2), "922337203685477580800"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), -1), "922337203685477580.8"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), -2), "92233720368547758.08"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), 0), "-9223372036854775809"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), 1), "-92233720368547758090"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), 2), "-922337203685477580900"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), -1), "-922337203685477580.9"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), -2), "-92233720368547758.09"},
 	}
 
 	for _, item := range table {
@@ -1133,6 +1180,58 @@ func TestAdd(t *testing.T) {
 		test.a.Add(test.b)
 		if test.a.Cmp(test.expected) != 0 {
 			t.Errorf("[%d] Expected %q, got %q", i, test.expected.String(), test.a.String())
+		}
+	}
+}
+
+func TestMul(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        int64
+		expected Quantity
+		ok       bool
+	}{
+		{decQuantity(10, 0, DecimalSI), 10, decQuantity(100, 0, DecimalSI), true},
+		{decQuantity(10, 0, DecimalSI), 1, decQuantity(10, 0, DecimalSI), true},
+		{decQuantity(10, 0, BinarySI), 1, decQuantity(10, 0, BinarySI), true},
+		{Quantity{Format: DecimalSI}, 50, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(50, 0, DecimalSI), 0, decQuantity(0, 0, DecimalSI), true},
+		{Quantity{Format: DecimalSI}, 0, decQuantity(0, 0, DecimalSI), true},
+
+		{decQuantity(10, 0, DecimalSI), -10, decQuantity(-100, 0, DecimalSI), true},
+		{decQuantity(-10, 0, DecimalSI), 1, decQuantity(-10, 0, DecimalSI), true},
+		{decQuantity(10, 0, BinarySI), -1, decQuantity(-10, 0, BinarySI), true},
+		{decQuantity(-50, 0, DecimalSI), 0, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(-50, 0, DecimalSI), -50, decQuantity(2500, 0, DecimalSI), true},
+		{Quantity{Format: DecimalSI}, -50, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), 0, decQuantity(0, 1, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), 1, decQuantity(mostPositive, 0, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), -1, decQuantity(-mostPositive, 0, DecimalSI), true},
+		{decQuantity(mostPositive/2, 0, DecimalSI), 2, decQuantity((mostPositive/2)*2, 0, DecimalSI), true},
+		{decQuantity(mostPositive/-2, 0, DecimalSI), -2, decQuantity((mostPositive/2)*2, 0, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), 2,
+			bigDecQuantity(big.NewInt(0).Mul(bigMostPositive, big.NewInt(2)), 0, DecimalSI), false},
+		{decQuantity(mostPositive, 0, DecimalSI), 10, decQuantity(mostPositive, 1, DecimalSI), false},
+		{decQuantity(mostPositive, 0, DecimalSI), -10, decQuantity(-mostPositive, 1, DecimalSI), false},
+		{decQuantity(mostNegative, 0, DecimalSI), 0, decQuantity(0, 1, DecimalSI), true},
+		{decQuantity(mostNegative, 0, DecimalSI), 1, decQuantity(mostNegative, 0, DecimalSI), true},
+		{decQuantity(mostNegative, 0, DecimalSI), -1,
+			bigDecQuantity(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 0, DecimalSI), false},
+		{decQuantity(mostNegative/2, 0, DecimalSI), 2, decQuantity(mostNegative, 0, DecimalSI), true},
+		{decQuantity(mostNegative/-2, 0, DecimalSI), -2, decQuantity(mostNegative, 0, DecimalSI), true},
+		{decQuantity(mostNegative, 0, DecimalSI), 2,
+			bigDecQuantity(big.NewInt(0).Mul(bigMostNegative, big.NewInt(2)), 0, DecimalSI), false},
+		{decQuantity(mostNegative, 0, DecimalSI), 10, decQuantity(mostNegative, 1, DecimalSI), false},
+		{decQuantity(mostNegative, 0, DecimalSI), -10,
+			bigDecQuantity(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 1, DecimalSI), false},
+	}
+
+	for i, test := range tests {
+		if ok := test.a.Mul(test.b); test.ok != ok {
+			t.Errorf("[%d] Expected ok: %t, got ok: %t", i, test.ok, ok)
+		}
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.AsDec().String(), test.a.AsDec().String())
 		}
 	}
 }

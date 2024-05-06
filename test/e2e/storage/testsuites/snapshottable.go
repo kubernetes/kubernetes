@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -66,7 +67,7 @@ func InitCustomSnapshottableTestSuite(patterns []storageframework.TestPattern) s
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
-			FeatureTag: "[Feature:VolumeSnapshotDataSource]",
+			TestTags: []interface{}{feature.VolumeSnapshotDataSource},
 		},
 	}
 }
@@ -108,7 +109,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshotting")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("volume snapshot controller", func() {
 		var (
@@ -440,9 +441,9 @@ func checkSnapshot(ctx context.Context, dc dynamic.Interface, sr *storageframewo
 	ginkgo.By("checking the SnapshotContent")
 	// PreprovisionedCreatedSnapshot do not need to set volume snapshot class name
 	if pattern.SnapshotType != storageframework.PreprovisionedCreatedSnapshot {
-		framework.ExpectEqual(snapshotContentSpec["volumeSnapshotClassName"], vsc.GetName())
+		gomega.Expect(snapshotContentSpec["volumeSnapshotClassName"]).To(gomega.Equal(vsc.GetName()))
 	}
-	framework.ExpectEqual(volumeSnapshotRef["name"], vs.GetName())
-	framework.ExpectEqual(volumeSnapshotRef["namespace"], vs.GetNamespace())
+	gomega.Expect(volumeSnapshotRef).To(gomega.HaveKeyWithValue("name", vs.GetName()))
+	gomega.Expect(volumeSnapshotRef).To(gomega.HaveKeyWithValue("namespace", vs.GetNamespace()))
 	return vscontent
 }

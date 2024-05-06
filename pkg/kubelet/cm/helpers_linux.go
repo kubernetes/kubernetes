@@ -196,7 +196,7 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, 
 		}
 		if memoryMin > 0 {
 			result.Unified = map[string]string{
-				MemoryMin: strconv.FormatInt(memoryMin, 10),
+				Cgroup2MemoryMin: strconv.FormatInt(memoryMin, 10),
 			}
 		}
 	}

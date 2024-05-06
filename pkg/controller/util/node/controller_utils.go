@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,7 +28,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -44,9 +45,10 @@ import (
 func DeletePods(ctx context.Context, kubeClient clientset.Interface, pods []*v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
 	remaining := false
 	var updateErrList []error
+	logger := klog.FromContext(ctx)
 
 	if len(pods) > 0 {
-		RecordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+		RecordNodeEvent(ctx, recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
 	}
 
 	for i := range pods {
@@ -76,7 +78,7 @@ func DeletePods(ctx context.Context, kubeClient clientset.Interface, pods []*v1.
 			continue
 		}
 
-		klog.V(2).InfoS("Starting deletion of pod", "pod", klog.KObj(pod))
+		logger.V(2).Info("Starting deletion of pod", "pod", klog.KObj(pod))
 		recorder.Eventf(pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -117,7 +119,8 @@ func SetPodTerminationReason(ctx context.Context, kubeClient clientset.Interface
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
 func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
-	klog.V(2).InfoS("Update ready status of pods on node", "node", klog.KRef("", nodeName))
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Update ready status of pods on node", "node", klog.KRef("", nodeName))
 
 	errs := []error{}
 	for i := range pods {
@@ -138,14 +141,14 @@ func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recor
 				break
 			}
 
-			klog.V(2).InfoS("Updating ready status of pod to false", "pod", pod.Name)
+			logger.V(2).Info("Updating ready status of pod to false", "pod", klog.KObj(pod))
 			if _, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
 				if apierrors.IsNotFound(err) {
 					// NotFound error means that pod was already deleted.
 					// There is nothing left to do with this pod.
 					continue
 				}
-				klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
+				logger.Info("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
 				errs = append(errs, err)
 			}
 			// record NodeNotReady event after updateStatus to make sure pod still exists
@@ -158,7 +161,8 @@ func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recor
 }
 
 // RecordNodeEvent records a event related to a node.
-func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
+func RecordNodeEvent(ctx context.Context, recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
+	logger := klog.FromContext(ctx)
 	ref := &v1.ObjectReference{
 		APIVersion: "v1",
 		Kind:       "Node",
@@ -166,12 +170,12 @@ func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 		UID:        types.UID(nodeUID),
 		Namespace:  "",
 	}
-	klog.V(2).InfoS("Recording event message for node", "event", event, "node", klog.KRef("", nodeName))
+	logger.V(2).Info("Recording event message for node", "event", event, "node", klog.KRef("", nodeName))
 	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
 // RecordNodeStatusChange records a event related to a node status change. (Common to lifecycle and ipam)
-func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newStatus string) {
+func RecordNodeStatusChange(logger klog.Logger, recorder record.EventRecorder, node *v1.Node, newStatus string) {
 	ref := &v1.ObjectReference{
 		APIVersion: "v1",
 		Kind:       "Node",
@@ -179,7 +183,7 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 		UID:        node.UID,
 		Namespace:  "",
 	}
-	klog.V(2).InfoS("Recording status change event message for node", "status", newStatus, "node", node.Name)
+	logger.V(2).Info("Recording status change event message for node", "status", newStatus, "node", node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
 	recorder.Eventf(ref, v1.EventTypeNormal, newStatus, "Node %s status is now: %s", node.Name, newStatus)
@@ -188,6 +192,7 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 // SwapNodeControllerTaint returns true in case of success and false
 // otherwise.
 func SwapNodeControllerTaint(ctx context.Context, kubeClient clientset.Interface, taintsToAdd, taintsToRemove []*v1.Taint, node *v1.Node) bool {
+	logger := klog.FromContext(ctx)
 	for _, taintToAdd := range taintsToAdd {
 		now := metav1.Now()
 		taintToAdd.TimeAdded = &now
@@ -203,7 +208,7 @@ func SwapNodeControllerTaint(ctx context.Context, kubeClient clientset.Interface
 				err))
 		return false
 	}
-	klog.V(4).InfoS("Added taint to node", "taint", taintsToAdd, "node", node.Name)
+	logger.V(4).Info("Added taint to node", "taint", taintsToAdd, "node", klog.KRef("", node.Name))
 
 	err = controller.RemoveTaintOffNode(ctx, kubeClient, node.Name, node, taintsToRemove...)
 	if err != nil {
@@ -215,14 +220,15 @@ func SwapNodeControllerTaint(ctx context.Context, kubeClient clientset.Interface
 				err))
 		return false
 	}
-	klog.V(4).InfoS("Made sure that node has no taint", "node", node.Name, "taint", taintsToRemove)
+	logger.V(4).Info("Made sure that node has no taint", "node", klog.KRef("", node.Name), "taint", taintsToRemove)
 
 	return true
 }
 
 // AddOrUpdateLabelsOnNode updates the labels on the node and returns true on
 // success and false on failure.
-func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, labelsToUpdate map[string]string, node *v1.Node) bool {
+func AddOrUpdateLabelsOnNode(ctx context.Context, kubeClient clientset.Interface, labelsToUpdate map[string]string, node *v1.Node) bool {
+	logger := klog.FromContext(ctx)
 	if err := controller.AddOrUpdateLabelsOnNode(kubeClient, node.Name, labelsToUpdate); err != nil {
 		utilruntime.HandleError(
 			fmt.Errorf(
@@ -232,7 +238,7 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, labelsToUpdate map[
 				err))
 		return false
 	}
-	klog.V(4).InfoS("Updated labels to node", "label", labelsToUpdate, "node", node.Name)
+	logger.V(4).Info("Updated labels to node", "label", labelsToUpdate, "node", klog.KRef("", node.Name))
 	return true
 }
 
@@ -259,7 +265,7 @@ func CreateUpdateNodeHandler(f func(oldNode, newNode *v1.Node) error) func(oldOb
 }
 
 // CreateDeleteNodeHandler creates a delete node handler. (Common to lifecycle and ipam)
-func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
+func CreateDeleteNodeHandler(logger klog.Logger, f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {
 		originalNode, isNode := originalObj.(*v1.Node)
 		// We can get DeletedFinalStateUnknown instead of *v1.Node here and
@@ -267,12 +273,12 @@ func CreateDeleteNodeHandler(f func(node *v1.Node) error) func(obj interface{}) 
 		if !isNode {
 			deletedState, ok := originalObj.(cache.DeletedFinalStateUnknown)
 			if !ok {
-				klog.ErrorS(nil, "Received unexpected object", "object", originalObj)
+				logger.Error(nil, "Received unexpected object", "object", originalObj)
 				return
 			}
 			originalNode, ok = deletedState.Obj.(*v1.Node)
 			if !ok {
-				klog.ErrorS(nil, "DeletedFinalStateUnknown contained non-Node object", "object", deletedState.Obj)
+				logger.Error(nil, "DeletedFinalStateUnknown contained non-Node object", "object", deletedState.Obj)
 				return
 			}
 		}

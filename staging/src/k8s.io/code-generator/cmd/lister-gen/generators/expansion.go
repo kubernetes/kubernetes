@@ -22,17 +22,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/types"
+	"k8s.io/klog/v2"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // expansionGenerator produces a file for a expansion interfaces.
 type expansionGenerator struct {
-	generator.DefaultGen
-	packagePath string
-	types       []*types.Type
+	generator.GoGenerator
+	outputPath string
+	types      []*types.Type
 }
 
 // We only want to call GenerateType() once per group.
@@ -44,11 +45,16 @@ func (g *expansionGenerator) GenerateType(c *generator.Context, t *types.Type, w
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	for _, t := range g.types {
 		tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
-		if _, err := os.Stat(filepath.Join(g.packagePath, strings.ToLower(t.Name.Name+"_expansion.go"))); os.IsNotExist(err) {
+		manualFile := filepath.Join(g.outputPath, strings.ToLower(t.Name.Name+"_expansion.go"))
+		if _, err := os.Stat(manualFile); err == nil {
+			klog.V(4).Infof("file %q exists, not generating", manualFile)
+		} else if os.IsNotExist(err) {
 			sw.Do(expansionInterfaceTemplate, t)
 			if !tags.NonNamespaced {
 				sw.Do(namespacedExpansionInterfaceTemplate, t)
 			}
+		} else {
+			return err
 		}
 	}
 	return sw.Error()

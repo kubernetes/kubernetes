@@ -65,7 +65,7 @@ message CSIStorageCapacity {
   //
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // nodeTopology defines which nodes have access to the storage
   // for which capacity was reported. If not set, the storage is
@@ -74,7 +74,7 @@ message CSIStorageCapacity {
   // immutable.
   //
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector nodeTopology = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector nodeTopology = 2;
 
   // storageClassName represents the name of the StorageClass that the reported capacity applies to.
   // It must meet the same requirements as the name of a StorageClass
@@ -94,7 +94,7 @@ message CSIStorageCapacity {
   // unavailable.
   //
   // +optional
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;
 
   // maximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
   // for a GetCapacityRequest with topology and parameters that match the
@@ -108,7 +108,7 @@ message CSIStorageCapacity {
   // API is ResourceRequirements.Requests in a volume claim.
   //
   // +optional
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity maximumVolumeSize = 5;
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity maximumVolumeSize = 5;
 }
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
@@ -116,11 +116,9 @@ message CSIStorageCapacityList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CSIStorageCapacity objects.
-  // +listType=map
-  // +listMapKey=name
   repeated CSIStorageCapacity items = 2;
 }
 
@@ -132,7 +130,7 @@ message VolumeAttachment {
   // Standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
@@ -150,7 +148,7 @@ message VolumeAttachmentList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of VolumeAttachments
   repeated VolumeAttachment items = 2;
@@ -172,7 +170,7 @@ message VolumeAttachmentSource {
   // PersistentVolumeSpec. This field is alpha-level and is only
   // honored by servers that enabled the CSIMigration feature.
   // +optional
-  optional k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
+  optional .k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
 }
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
@@ -216,11 +214,51 @@ message VolumeAttachmentStatus {
   optional VolumeError detachError = 4;
 }
 
+// VolumeAttributesClass represents a specification of mutable volume attributes
+// defined by the CSI driver. The class can be specified during dynamic provisioning
+// of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
+message VolumeAttributesClass {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Name of the CSI driver
+  // This field is immutable.
+  optional string driverName = 2;
+
+  // parameters hold volume attributes defined by the CSI driver. These values
+  // are opaque to the Kubernetes and are passed directly to the CSI driver.
+  // The underlying storage provider supports changing these attributes on an
+  // existing volume, however the parameters field itself is immutable. To
+  // invoke a volume update, a new VolumeAttributesClass should be created with
+  // new parameters, and the PersistentVolumeClaim should be updated to reference
+  // the new VolumeAttributesClass.
+  //
+  // This field is required and must contain at least one key/value pair.
+  // The keys cannot be empty, and the maximum number of parameters is 512, with
+  // a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
+  // the target PersistentVolumeClaim will be set to an "Infeasible" state in the
+  // modifyVolumeStatus field.
+  map<string, string> parameters = 3;
+}
+
+// VolumeAttributesClassList is a collection of VolumeAttributesClass objects.
+message VolumeAttributesClassList {
+  // Standard list metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of VolumeAttributesClass objects.
+  repeated VolumeAttributesClass items = 2;
+}
+
 // VolumeError captures an error encountered during a volume operation.
 message VolumeError {
   // time represents the time the error was encountered.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time time = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time time = 1;
 
   // message represents the error encountered during Attach or Detach operation.
   // This string maybe logged, so it should not contain sensitive

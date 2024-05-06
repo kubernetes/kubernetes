@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -57,13 +58,13 @@ This test performs the following:
 - Removes the `out-of-service` taint from the node.
 */
 
-var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [LinuxOnly] NonGracefulNodeShutdown", func() {
+var _ = utils.SIGDescribe(feature.NodeOutOfServiceVolumeDetach, framework.WithDisruptive(), "[LinuxOnly] NonGracefulNodeShutdown", func() {
 	var (
 		c  clientset.Interface
 		ns string
 	)
 	f := framework.NewDefaultFramework("non-graceful-shutdown")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet

@@ -18,17 +18,17 @@ package events
 
 import (
 	"io"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"net/http"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -108,9 +108,9 @@ func getFakeEvents() *corev1.EventList {
 
 func TestEventIsSorted(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	clientset, err := kubernetes.NewForConfig(cmdtesting.DefaultClientConfig())
-	if err != err {
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -146,9 +146,9 @@ otherfoo    15m (x3 over 25m)   Normal    ScalingReplicaSet   Deployment/bar   S
 
 func TestEventNoHeaders(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	clientset, err := kubernetes.NewForConfig(cmdtesting.DefaultClientConfig())
-	if err != err {
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -183,9 +183,9 @@ otherfoo   15m (x3 over 25m)   Normal    ScalingReplicaSet   Deployment/bar   Sc
 
 func TestEventFiltered(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	clientset, err := kubernetes.NewForConfig(cmdtesting.DefaultClientConfig())
-	if err != err {
+	if err != nil {
 		t.Fatal(err)
 	}
 

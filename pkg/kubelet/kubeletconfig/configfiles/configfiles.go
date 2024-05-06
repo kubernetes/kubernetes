@@ -31,6 +31,9 @@ import (
 type Loader interface {
 	// Load loads and returns the KubeletConfiguration from the storage layer, or an error if a configuration could not be loaded
 	Load() (*kubeletconfig.KubeletConfiguration, error)
+	// LoadIntoJSON loads and returns the KubeletConfiguration from the storage layer, or an error if a configuration could not be
+	// loaded. It returns the configuration as a JSON byte slice
+	LoadIntoJSON() ([]byte, error)
 }
 
 // fsLoader loads configuration from `configDir`
@@ -78,12 +81,26 @@ func (loader *fsLoader) Load() (*kubeletconfig.KubeletConfiguration, error) {
 	return kc, nil
 }
 
+func (loader *fsLoader) LoadIntoJSON() ([]byte, error) {
+	data, err := loader.fs.ReadFile(loader.kubeletFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read drop-in kubelet config file %q, error: %v", loader.kubeletFile, err)
+	}
+
+	// no configuration is an error, some parameters are required
+	if len(data) == 0 {
+		return nil, fmt.Errorf("kubelet config file %q was empty", loader.kubeletFile)
+	}
+
+	return utilcodec.DecodeKubeletConfigurationIntoJSON(loader.kubeletCodecs, data)
+}
+
 // resolveRelativePaths makes relative paths absolute by resolving them against `root`
 func resolveRelativePaths(paths []*string, root string) {
 	for _, path := range paths {
 		// leave empty paths alone, "no path" is a valid input
 		// do not attempt to resolve paths that are already absolute
-		if len(*path) > 0 && !filepath.IsAbs(*path) {
+		if len(*path) > 0 && !utilfs.IsAbs(*path) {
 			*path = filepath.Join(root, *path)
 		}
 	}

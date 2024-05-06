@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"regexp"
@@ -40,7 +39,6 @@ import (
 )
 
 var (
-	whitelistedUlimits      = [...]string{"max_open_files"}
 	referencedResetInterval = flag.Uint64("referenced_reset_interval", 0,
 		"Reset interval for referenced bytes (container_referenced_bytes metric), number of measurement cycles after which referenced bytes are cleared, if set to 0 referenced bytes are never cleared (default: 0)")
 
@@ -206,54 +204,56 @@ func parseUlimit(value string) (int64, error) {
 	return num, nil
 }
 
-func isUlimitWhitelisted(name string) bool {
-	for _, whitelist := range whitelistedUlimits {
-		if name == whitelist {
-			return true
-		}
-	}
-	return false
-}
-
 func processLimitsFile(fileData string) []info.UlimitSpec {
+	const maxOpenFilesLinePrefix = "Max open files"
+
 	limits := strings.Split(fileData, "\n")
 	ulimits := make([]info.UlimitSpec, 0, len(limits))
 	for _, lim := range limits {
 		// Skip any headers/footers
-		if strings.HasPrefix(lim, "Max") {
-
-			// Line format: Max open files            16384                16384                files
-			fields := regexp.MustCompile(`[\s]{2,}`).Split(lim, -1)
-			name := strings.Replace(strings.ToLower(strings.TrimSpace(fields[0])), " ", "_", -1)
-
-			found := isUlimitWhitelisted(name)
-			if !found {
-				continue
-			}
-
-			soft := strings.TrimSpace(fields[1])
-			softNum, softErr := parseUlimit(soft)
-
-			hard := strings.TrimSpace(fields[2])
-			hardNum, hardErr := parseUlimit(hard)
-
-			// Omit metric if there were any parsing errors
-			if softErr == nil && hardErr == nil {
-				ulimitSpec := info.UlimitSpec{
-					Name:      name,
-					SoftLimit: int64(softNum),
-					HardLimit: int64(hardNum),
-				}
-				ulimits = append(ulimits, ulimitSpec)
+		if strings.HasPrefix(lim, "Max open files") {
+			// Remove line prefix
+			ulimit, err := processMaxOpenFileLimitLine(
+				"max_open_files",
+				lim[len(maxOpenFilesLinePrefix):],
+			)
+			if err == nil {
+				ulimits = append(ulimits, ulimit)
 			}
 		}
 	}
 	return ulimits
 }
 
+// Any caller of processMaxOpenFileLimitLine must ensure that the name prefix is already removed from the limit line.
+// with the "Max open files" prefix.
+func processMaxOpenFileLimitLine(name, line string) (info.UlimitSpec, error) {
+	// Remove any leading whitespace
+	line = strings.TrimSpace(line)
+	// Split on whitespace
+	fields := strings.Fields(line)
+	if len(fields) != 3 {
+		return info.UlimitSpec{}, fmt.Errorf("unable to parse max open files line: %s", line)
+	}
+	// The first field is the soft limit, the second is the hard limit
+	soft, err := parseUlimit(fields[0])
+	if err != nil {
+		return info.UlimitSpec{}, err
+	}
+	hard, err := parseUlimit(fields[1])
+	if err != nil {
+		return info.UlimitSpec{}, err
+	}
+	return info.UlimitSpec{
+		Name:      name,
+		SoftLimit: soft,
+		HardLimit: hard,
+	}, nil
+}
+
 func processRootProcUlimits(rootFs string, rootPid int) []info.UlimitSpec {
 	filePath := path.Join(rootFs, "/proc", strconv.Itoa(rootPid), "limits")
-	out, err := ioutil.ReadFile(filePath)
+	out, err := os.ReadFile(filePath)
 	if err != nil {
 		klog.V(4).Infof("error while listing directory %q to read ulimits: %v", filePath, err)
 		return []info.UlimitSpec{}
@@ -264,14 +264,14 @@ func processRootProcUlimits(rootFs string, rootPid int) []info.UlimitSpec {
 func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.ProcessStats, error) {
 	var fdCount, socketCount uint64
 	filePath := path.Join(cgroupPath, "cgroup.procs")
-	out, err := ioutil.ReadFile(filePath)
+	out, err := os.ReadFile(filePath)
 	if err != nil {
 		return info.ProcessStats{}, fmt.Errorf("couldn't open cpu cgroup procs file %v : %v", filePath, err)
 	}
 
 	pids := strings.Split(string(out), "\n")
 
-	// EOL is also treated as a new line while reading "cgroup.procs" file with ioutil.ReadFile.
+	// EOL is also treated as a new line while reading "cgroup.procs" file with os.ReadFile.
 	// The last value is an empty string "". Ex: pids = ["22", "1223", ""]
 	// Trim the last value
 	if len(pids) != 0 && pids[len(pids)-1] == "" {
@@ -280,7 +280,7 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 
 	for _, pid := range pids {
 		dirPath := path.Join(rootFs, "/proc", pid, "fd")
-		fds, err := ioutil.ReadDir(dirPath)
+		fds, err := os.ReadDir(dirPath)
 		if err != nil {
 			klog.V(4).Infof("error while listing directory %q to measure fd count: %v", dirPath, err)
 			continue
@@ -324,7 +324,7 @@ func (h *Handler) schedulerStatsFromProcs() (info.CpuSchedstat, error) {
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't open scheduler statistics for process %d: %v", pid, err)
 		}
 		defer f.Close()
-		contents, err := ioutil.ReadAll(f)
+		contents, err := io.ReadAll(f)
 		if err != nil {
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't read scheduler statistics for process %d: %v", pid, err)
 		}
@@ -392,7 +392,7 @@ func getReferencedKBytes(pids []int) (uint64, error) {
 	foundMatch := false
 	for _, pid := range pids {
 		smapsFilePath := fmt.Sprintf(smapsFilePathPattern, pid)
-		smapsContent, err := ioutil.ReadFile(smapsFilePath)
+		smapsContent, err := os.ReadFile(smapsFilePath)
 		if err != nil {
 			klog.V(5).Infof("Cannot read %s file, err: %s", smapsFilePath, err)
 			if os.IsNotExist(err) {
@@ -468,7 +468,7 @@ func networkStatsFromProc(rootFs string, pid int) ([]info.InterfaceStats, error)
 	return ifaceStats, nil
 }
 
-var ignoredDevicePrefixes = []string{"lo", "veth", "docker"}
+var ignoredDevicePrefixes = []string{"lo", "veth", "docker", "nerdctl"}
 
 func isIgnoredDevice(ifName string) bool {
 	for _, prefix := range ignoredDevicePrefixes {
@@ -575,7 +575,7 @@ func advancedTCPStatsFromProc(rootFs string, pid int, file1, file2 string) (info
 }
 
 func scanAdvancedTCPStats(advancedStats *info.TcpAdvancedStat, advancedTCPStatsFile string) error {
-	data, err := ioutil.ReadFile(advancedTCPStatsFile)
+	data, err := os.ReadFile(advancedTCPStatsFile)
 	if err != nil {
 		return fmt.Errorf("failure opening %s: %v", advancedTCPStatsFile, err)
 	}
@@ -631,7 +631,7 @@ func scanAdvancedTCPStats(advancedStats *info.TcpAdvancedStat, advancedTCPStatsF
 func scanTCPStats(tcpStatsFile string) (info.TcpStat, error) {
 	var stats info.TcpStat
 
-	data, err := ioutil.ReadFile(tcpStatsFile)
+	data, err := os.ReadFile(tcpStatsFile)
 	if err != nil {
 		return stats, fmt.Errorf("failure opening %s: %v", tcpStatsFile, err)
 	}
@@ -802,6 +802,7 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.Usage = s.MemoryStats.Usage.Usage
 	ret.Memory.MaxUsage = s.MemoryStats.Usage.MaxUsage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
+	ret.Memory.KernelUsage = s.MemoryStats.KernelUsage.Usage
 
 	if cgroups.IsCgroup2UnifiedMode() {
 		ret.Memory.Cache = s.MemoryStats.Stats["file"]

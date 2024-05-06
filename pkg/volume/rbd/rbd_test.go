@@ -359,11 +359,6 @@ type testcase struct {
 }
 
 func TestPlugin(t *testing.T) {
-	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping test that fails on Windows")
-	}
-
 	tmpDir, err := utiltesting.MkTmpdir("rbd_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -374,10 +369,10 @@ func TestPlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedDevicePath := "/dev/rbd1"
+	expectedDevicePath := "/dev/rbd0"
 	if runtime.GOOS == "windows" {
 		// Windows expects Disk Numbers.
-		expectedDevicePath = "1"
+		expectedDevicePath = "0"
 	}
 
 	podUID := uuid.NewUUID()

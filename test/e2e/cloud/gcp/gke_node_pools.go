@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -29,16 +30,16 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("GKE node pools [Feature:GKENodePool]", func() {
+var _ = SIGDescribe("GKE node pools", feature.GKENodePool, func() {
 
 	f := framework.NewDefaultFramework("node-pools")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 	})
 
-	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func(ctx context.Context) {
+	f.It("should create a cluster with multiple node pools", feature.GKENodePool, func(ctx context.Context) {
 		framework.Logf("Start create node pool test")
 		testCreateDeleteNodePool(ctx, f, "test-pool")
 	})

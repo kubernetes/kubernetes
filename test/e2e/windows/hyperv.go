@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -34,13 +36,13 @@ var (
 	WindowsHyperVContainerRuntimeClass = "runhcs-wcow-hypervisor"
 )
 
-var _ = SIGDescribe("[Feature:WindowsHyperVContainers] HyperV containers", func() {
+var _ = sigDescribe(feature.WindowsHyperVContainers, "HyperV containers", skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	f := framework.NewDefaultFramework("windows-hyperv-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should start a hyperv isolated container", func(ctx context.Context) {
 
@@ -93,7 +95,8 @@ var _ = SIGDescribe("[Feature:WindowsHyperVContainers] HyperV containers", func(
 		pc.Create(ctx, hypervPod)
 		ginkgo.By("waiting for the pod to be running")
 		timeout := 3 * time.Minute
-		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, timeout)
+		err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, timeout)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a host process container in another pod to verify the pod is running hyperv isolated containers")
 
@@ -140,6 +143,6 @@ var _ = SIGDescribe("[Feature:WindowsHyperVContainers] HyperV containers", func(
 			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
 		}
 
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded, "pod should have succeeded")
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "pod should have succeeded")
 	})
-})
+}))

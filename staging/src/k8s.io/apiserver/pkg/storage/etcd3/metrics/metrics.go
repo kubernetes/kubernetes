@@ -17,11 +17,14 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
 /*
@@ -47,23 +50,42 @@ var (
 		},
 		[]string{"operation", "type"},
 	)
+	etcdRequestCounts = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "etcd_requests_total",
+			Help:           "Etcd request counts for each operation and object type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"operation", "type"},
+	)
+	etcdRequestErrorCounts = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "etcd_request_errors_total",
+			Help:           "Etcd failed request counts for each operation and object type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"operation", "type"},
+	)
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_storage_objects",
-			Help:           "Number of stored objects at the time of last check split by kind.",
+			Help:           "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
 			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"resource"},
 	)
 	dbTotalSize = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Subsystem:      "apiserver",
-			Name:           "storage_db_total_size_in_bytes",
-			Help:           "Total size of the storage database file physically allocated in bytes.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Subsystem:         "apiserver",
+			Name:              "storage_db_total_size_in_bytes",
+			Help:              "Total size of the storage database file physically allocated in bytes.",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.28.0",
 		},
 		[]string{"endpoint"},
 	)
+	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"storage_cluster_id"}, nil, compbasemetrics.STABLE, "")
+	storageMonitor           = &monitorCollector{monitorGetter: func() ([]Monitor, error) { return nil, nil }}
 	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      "apiserver",
@@ -140,8 +162,12 @@ func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
+		legacyregistry.MustRegister(etcdRequestCounts)
+		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
+		legacyregistry.CustomMustRegister(storageMonitor)
+		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
 		legacyregistry.MustRegister(listStorageCount)
@@ -157,9 +183,15 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 	objectCounts.WithLabelValues(resourcePrefix).Set(float64(count))
 }
 
-// RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
-func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
-	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
+// RecordEtcdRequest updates and sets the etcd_request_duration_seconds,
+// etcd_request_total, etcd_request_errors_total metrics.
+func RecordEtcdRequest(verb, resource string, err error, startTime time.Time) {
+	v := []string{verb, resource}
+	etcdRequestLatency.WithLabelValues(v...).Observe(sinceInSeconds(startTime))
+	etcdRequestCounts.WithLabelValues(v...).Inc()
+	if err != nil {
+		etcdRequestErrorCounts.WithLabelValues(v...).Inc()
+	}
 }
 
 // RecordEtcdEvent updated the etcd_events_received_total metric.
@@ -183,13 +215,21 @@ func Reset() {
 }
 
 // sinceInSeconds gets the time since the specified start in seconds.
-func sinceInSeconds(start time.Time) float64 {
+//
+// This is a variable to facilitate testing.
+var sinceInSeconds = func(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
 
 // UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
+// Deprecated: Metric etcd_db_total_size_in_bytes will be replaced with apiserver_storage_size_bytes
 func UpdateEtcdDbSize(ep string, size int64) {
 	dbTotalSize.WithLabelValues(ep).Set(float64(size))
+}
+
+// SetStorageMonitorGetter sets monitor getter to allow monitoring etcd stats.
+func SetStorageMonitorGetter(getter func() ([]Monitor, error)) {
+	storageMonitor.setGetter(getter)
 }
 
 // UpdateLeaseObjectCount sets the etcd_lease_object_counts metric.
@@ -205,4 +245,65 @@ func RecordStorageListMetrics(resource string, numFetched, numEvald, numReturned
 	listStorageNumFetched.WithLabelValues(resource).Add(float64(numFetched))
 	listStorageNumSelectorEvals.WithLabelValues(resource).Add(float64(numEvald))
 	listStorageNumReturned.WithLabelValues(resource).Add(float64(numReturned))
+}
+
+type Monitor interface {
+	Monitor(ctx context.Context) (StorageMetrics, error)
+	Close() error
+}
+
+type StorageMetrics struct {
+	Size int64
+}
+
+type monitorCollector struct {
+	compbasemetrics.BaseStableCollector
+
+	mutex         sync.Mutex
+	monitorGetter func() ([]Monitor, error)
+}
+
+func (m *monitorCollector) setGetter(monitorGetter func() ([]Monitor, error)) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.monitorGetter = monitorGetter
+}
+
+func (m *monitorCollector) getGetter() func() ([]Monitor, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.monitorGetter
+}
+
+// DescribeWithStability implements compbasemetrics.StableColletor
+func (c *monitorCollector) DescribeWithStability(ch chan<- *compbasemetrics.Desc) {
+	ch <- storageSizeDescription
+}
+
+// CollectWithStability implements compbasemetrics.StableColletor
+func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric) {
+	monitors, err := c.getGetter()()
+	if err != nil {
+		return
+	}
+
+	for i, m := range monitors {
+		storageClusterID := fmt.Sprintf("etcd-%d", i)
+
+		klog.V(4).InfoS("Start collecting storage metrics", "storage_cluster_id", storageClusterID)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		metrics, err := m.Monitor(ctx)
+		cancel()
+		m.Close()
+		if err != nil {
+			klog.InfoS("Failed to get storage metrics", "storage_cluster_id", storageClusterID, "err", err)
+			continue
+		}
+
+		metric, err := compbasemetrics.NewConstMetric(storageSizeDescription, compbasemetrics.GaugeValue, float64(metrics.Size), storageClusterID)
+		if err != nil {
+			klog.ErrorS(err, "Failed to create metric", "storage_cluster_id", storageClusterID)
+		}
+		ch <- metric
+	}
 }

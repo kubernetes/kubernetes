@@ -141,6 +141,15 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		fakeClock.Step(time.Millisecond * 100)
 		tracker.RecordImageFinishedPulling(podInit.UID)
 
+		podState, ok := tracker.pods[podInit.UID]
+		if !ok {
+			t.Errorf("expected to track pod: %s, but pod not found", podInit.UID)
+		}
+		if !podState.lastFinishedPulling.Equal(podState.firstStartedPulling.Add(time.Millisecond * 100)) {
+			t.Errorf("expected pod firstStartedPulling: %s and lastFinishedPulling: %s but got firstStartedPulling: %s and lastFinishedPulling: %s",
+				podState.firstStartedPulling, podState.firstStartedPulling.Add(time.Millisecond*100), podState.firstStartedPulling, podState.lastFinishedPulling)
+		}
+
 		podStarted := buildRunningPod()
 		tracker.RecordStatusUpdated(podStarted)
 
@@ -225,6 +234,19 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		fakeClock.SetTime(frozenTime.Add(time.Second * 20))
 		tracker.RecordImageFinishedPulling(podInitializing.UID)
 
+		podState, ok := tracker.pods[podInitializing.UID]
+		if !ok {
+			t.Errorf("expected to track pod: %s, but pod not found", podInitializing.UID)
+		}
+		if !podState.firstStartedPulling.Equal(frozenTime.Add(time.Second * 10)) { // second and third image start pulling should not affect pod firstStartedPulling
+			t.Errorf("expected pod firstStartedPulling: %s but got firstStartedPulling: %s",
+				podState.firstStartedPulling.Add(time.Second*10), podState.firstStartedPulling)
+		}
+		if !podState.lastFinishedPulling.Equal(frozenTime.Add(time.Second * 20)) { // should be updated when the pod's last image finished pulling
+			t.Errorf("expected pod lastFinishedPulling: %s but got lastFinishedPulling: %s",
+				podState.lastFinishedPulling.Add(time.Second*20), podState.lastFinishedPulling)
+		}
+
 		// pod started
 		podStarted := buildRunningPod()
 		tracker.RecordStatusUpdated(podStarted)
@@ -246,6 +268,69 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		// cleanup
+		tracker.DeletePodStartupState(podStarted.UID)
+
+		assert.Empty(t, tracker.pods)
+		metrics.PodStartSLIDuration.Reset()
+	})
+}
+
+func TestFirstNetworkPodMetrics(t *testing.T) {
+
+	t.Run("first network pod; started in 30s, image pulling between 10th and 20th seconds", func(t *testing.T) {
+
+		wants := `
+# HELP kubelet_first_network_pod_start_sli_duration_seconds [INTERNAL] Duration in seconds to start the first network pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch
+# TYPE kubelet_first_network_pod_start_sli_duration_seconds gauge
+kubelet_first_network_pod_start_sli_duration_seconds 30
+`
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:  map[types.UID]*perPodState{},
+			clock: fakeClock,
+		}
+
+		// hostNetwork pods should not be tracked
+		hostNetworkPodInitializing := buildInitializingPod()
+		hostNetworkPodInitializing.UID = "11111-22222"
+		hostNetworkPodInitializing.Spec.HostNetwork = true
+		tracker.ObservedPodOnWatch(hostNetworkPodInitializing, frozenTime)
+
+		hostNetworkPodStarted := buildRunningPod()
+		hostNetworkPodStarted.UID = "11111-22222"
+		hostNetworkPodStarted.Spec.HostNetwork = true
+		tracker.RecordStatusUpdated(hostNetworkPodStarted)
+
+		// track only the first pod with network
+		podInitializing := buildInitializingPod()
+		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
+
+		// pod started
+		podStarted := buildRunningPod()
+		tracker.RecordStatusUpdated(podStarted)
+
+		// at 30s observe the same pod on watch
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
+
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// any new pod observations should not impact the metrics, as the pod should be recorder only once
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*150))
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
+
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// cleanup
+		tracker.DeletePodStartupState(hostNetworkPodStarted.UID)
 		tracker.DeletePodStartupState(podStarted.UID)
 
 		assert.Empty(t, tracker.pods)

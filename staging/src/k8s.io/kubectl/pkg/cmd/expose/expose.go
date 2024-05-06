@@ -34,10 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -122,7 +122,7 @@ type ExposeServiceOptions struct {
 	CanBeExposed              polymorphichelpers.CanBeExposedFunc
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
-	ProtocolsForObject        func(runtime.Object) (map[string]string, error)
+	ProtocolsForObject        polymorphichelpers.MultiProtocolsWithForObjectFunc
 
 	Namespace string
 	Mapper    meta.RESTMapper
@@ -131,13 +131,36 @@ type ExposeServiceOptions struct {
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	Recorder genericclioptions.Recorder
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-// NewExposeServiceOptions creates a new ExposeServiceOptions and return a pointer to the
-// struct
-func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServiceOptions {
-	return &ExposeServiceOptions{
+// exposeServiceFlags is a struct that contains the user input flags to the command.
+type ExposeServiceFlags struct {
+	cmdutil.OverrideOptions
+	PrintFlags  *genericclioptions.PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
+
+	fieldManager string
+	Protocol     string
+
+	// Port will be used if a user specifies --port OR the exposed object as one port
+	Port            string
+	Type            string
+	LoadBalancerIP  string
+	Selector        string
+	Labels          string
+	TargetPort      string
+	ExternalIP      string
+	Name            string
+	SessionAffinity string
+	ClusterIP       string
+	Recorder        genericclioptions.Recorder
+	FilenameOptions resource.FilenameOptions
+	genericiooptions.IOStreams
+}
+
+func NewExposeFlags(ioStreams genericiooptions.IOStreams) *ExposeServiceFlags {
+	return &ExposeServiceFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		PrintFlags:  genericclioptions.NewPrintFlags("exposed").WithTypeSetter(scheme.Scheme),
 
@@ -147,8 +170,8 @@ func NewExposeServiceOptions(ioStreams genericclioptions.IOStreams) *ExposeServi
 }
 
 // NewCmdExposeService is a command to expose the service from user's input
-func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewExposeServiceOptions(streams)
+func NewCmdExposeService(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+	flags := NewExposeFlags(streams)
 
 	validArgs := []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
@@ -164,61 +187,95 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example:               exposeExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
+			o, err := flags.ToOptions(cmd, args)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Complete(f))
 			cmdutil.CheckErr(o.RunExpose(cmd, args))
 		},
 	}
 
-	o.RecordFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
-
-	cmd.Flags().StringVar(&o.Protocol, "protocol", o.Protocol, i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
-	cmd.Flags().StringVar(&o.Port, "port", o.Port, i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
-	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
-	cmd.Flags().StringVar(&o.LoadBalancerIP, "load-balancer-ip", o.LoadBalancerIP, i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
-	cmd.Flags().StringVar(&o.Selector, "selector", o.Selector, i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
-	cmd.Flags().StringVarP(&o.Labels, "labels", "l", o.Labels, "Labels to apply to the service created by this call.")
-	cmd.Flags().StringVar(&o.TargetPort, "target-port", o.TargetPort, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
-	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
-	cmd.Flags().StringVar(&o.Name, "name", o.Name, i18n.T("The name for the newly created object."))
-	cmd.Flags().StringVar(&o.SessionAffinity, "session-affinity", o.SessionAffinity, i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
-	cmd.Flags().StringVar(&o.ClusterIP, "cluster-ip", o.ClusterIP, i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
-	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-expose")
-	o.AddOverrideFlags(cmd)
-
-	usage := "identifying the resource to expose a service"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddApplyAnnotationFlags(cmd)
+	flags.AddFlags(cmd)
 	return cmd
 }
 
+func (flags *ExposeServiceFlags) AddFlags(cmd *cobra.Command) {
+	flags.PrintFlags.AddFlags(cmd)
+	flags.RecordFlags.AddFlags(cmd)
+
+	cmd.Flags().StringVar(&flags.Protocol, "protocol", flags.Protocol, i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
+	cmd.Flags().StringVar(&flags.Port, "port", flags.Port, i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
+	cmd.Flags().StringVar(&flags.Type, "type", flags.Type, i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
+	cmd.Flags().StringVar(&flags.LoadBalancerIP, "load-balancer-ip", flags.LoadBalancerIP, i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
+	cmd.Flags().StringVar(&flags.Selector, "selector", flags.Selector, i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
+	cmd.Flags().StringVarP(&flags.Labels, "labels", "l", flags.Labels, "Labels to apply to the service created by this call.")
+	cmd.Flags().StringVar(&flags.TargetPort, "target-port", flags.TargetPort, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
+	cmd.Flags().StringVar(&flags.ExternalIP, "external-ip", flags.ExternalIP, i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
+	cmd.Flags().StringVar(&flags.Name, "name", flags.Name, i18n.T("The name for the newly created object."))
+	cmd.Flags().StringVar(&flags.SessionAffinity, "session-affinity", flags.SessionAffinity, i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
+	cmd.Flags().StringVar(&flags.ClusterIP, "cluster-ip", flags.ClusterIP, i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
+
+	cmdutil.AddFieldManagerFlagVar(cmd, &flags.fieldManager, "kubectl-expose")
+	flags.AddOverrideFlags(cmd)
+
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddApplyAnnotationFlags(cmd)
+
+	usage := "identifying the resource to expose a service"
+	cmdutil.AddFilenameOptionFlags(cmd, &flags.FilenameOptions, usage)
+}
+
+func (flags *ExposeServiceFlags) ToOptions(cmd *cobra.Command, args []string) (*ExposeServiceOptions, error) {
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStrategy)
+	printer, err := flags.PrintFlags.ToPrinter()
+	if err != nil {
+		return nil, err
+	}
+
+	flags.RecordFlags.Complete(cmd)
+	recorder, err := flags.RecordFlags.ToRecorder()
+	if err != nil {
+		return nil, err
+	}
+
+	e := &ExposeServiceOptions{
+		DryRunStrategy:  dryRunStrategy,
+		PrintObj:        printer.PrintObj,
+		Recorder:        recorder,
+		IOStreams:       flags.IOStreams,
+		fieldManager:    flags.fieldManager,
+		PrintFlags:      flags.PrintFlags,
+		RecordFlags:     flags.RecordFlags,
+		FilenameOptions: flags.FilenameOptions,
+		Protocol:        flags.Protocol,
+		Port:            flags.Port,
+		Type:            flags.Type,
+		LoadBalancerIP:  flags.LoadBalancerIP,
+		Selector:        flags.Selector,
+		Labels:          flags.Labels,
+		TargetPort:      flags.TargetPort,
+		ExternalIP:      flags.ExternalIP,
+		Name:            flags.Name,
+		SessionAffinity: flags.SessionAffinity,
+		ClusterIP:       flags.ClusterIP,
+		OverrideOptions: flags.OverrideOptions,
+	}
+	return e, nil
+}
+
 // Complete loads data from the command line environment
-func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *ExposeServiceOptions) Complete(f cmdutil.Factory) error {
 	var err error
-	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
-
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
-	printer, err := o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-	o.PrintObj = printer.PrintObj
-
-	o.RecordFlags.Complete(cmd)
-	o.Recorder, err = o.RecordFlags.ToRecorder()
-	if err != nil {
-		return err
-	}
 
 	o.Builder = f.NewBuilder()
 	o.ClientForMapping = f.ClientForMapping
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
 	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
-	o.ProtocolsForObject = polymorphichelpers.ProtocolsForObjectFn
+	o.ProtocolsForObject = polymorphichelpers.MultiProtocolsForObjectFn
 	o.PortsForObject = polymorphichelpers.PortsForObjectFn
 
 	o.Mapper, err = f.ToRESTMapper()
@@ -303,7 +360,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		if err != nil {
 			return fmt.Errorf("couldn't find protocol via introspection: %v", err)
 		}
-		if protocols := generate.MakeProtocols(protocolsMap); !generate.IsZero(protocols) {
+		if protocols := makeProtocols(protocolsMap); len(protocols) > 0 {
 			o.Protocols = protocols
 		}
 
@@ -317,13 +374,11 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 		// Generate new object
 		service, err := o.createService()
-
 		if err != nil {
 			return err
 		}
 
 		overrideService, err := o.NewOverrider(&corev1.Service{}).Apply(service)
-
 		if err != nil {
 			return err
 		}
@@ -367,7 +422,6 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		if err != nil {
 			return err
 		}
-
 		return o.PrintObj(actualObject, o.Out)
 	})
 	return err
@@ -398,7 +452,7 @@ func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 		}
 	}
 
-	var portProtocolMap map[string]string
+	var portProtocolMap map[string][]string
 	if o.Protocols != "" {
 		portProtocolMap, err = parseProtocols(o.Protocols)
 		if err != nil {
@@ -442,8 +496,20 @@ func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 			case len(protocol) == 0 && len(portProtocolMap) > 0:
 				// no --protocol and we expose a multiprotocol resource
 				protocol = "TCP" // have the default so we can stay sane
-				if exposeProtocol, found := portProtocolMap[stillPortString]; found {
-					protocol = exposeProtocol
+				if exposeProtocols, found := portProtocolMap[stillPortString]; found {
+					if len(exposeProtocols) == 1 {
+						protocol = exposeProtocols[0]
+						break
+					}
+					for _, exposeProtocol := range exposeProtocols {
+						name := fmt.Sprintf("port-%d-%s", i+1, strings.ToLower(exposeProtocol))
+						ports = append(ports, corev1.ServicePort{
+							Name:     name,
+							Port:     int32(port),
+							Protocol: corev1.Protocol(exposeProtocol),
+						})
+					}
+					continue
 				}
 			}
 			ports = append(ports, corev1.ServicePort{
@@ -466,12 +532,7 @@ func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 	}
 	targetPortString := o.TargetPort
 	if len(targetPortString) > 0 {
-		var targetPort intstr.IntOrString
-		if portNum, err := strconv.Atoi(targetPortString); err != nil {
-			targetPort = intstr.FromString(targetPortString)
-		} else {
-			targetPort = intstr.FromInt(portNum)
-		}
+		targetPort := intstr.Parse(targetPortString)
 		// Use the same target-port for every port
 		for i := range service.Spec.Ports {
 			service.Spec.Ports[i].TargetPort = targetPort
@@ -481,7 +542,7 @@ func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 		// should be the same as Port
 		for i := range service.Spec.Ports {
 			port := service.Spec.Ports[i].Port
-			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
+			service.Spec.Ports[i].TargetPort = intstr.FromInt32(port)
 		}
 	}
 	if len(o.ExternalIP) > 0 {
@@ -533,12 +594,22 @@ func parseLabels(labelSpec string) (map[string]string, error) {
 	return labels, nil
 }
 
+func makeProtocols(protocols map[string][]string) string {
+	var out []string
+	for key, value := range protocols {
+		for _, s := range value {
+			out = append(out, fmt.Sprintf("%s/%s", key, s))
+		}
+	}
+	return strings.Join(out, ",")
+}
+
 // parseProtocols turns a string representation of a protocols set into a map[string]string
-func parseProtocols(protocols string) (map[string]string, error) {
+func parseProtocols(protocols string) (map[string][]string, error) {
 	if len(protocols) == 0 {
 		return nil, fmt.Errorf("no protocols passed")
 	}
-	portProtocolMap := map[string]string{}
+	portProtocolMap := map[string][]string{}
 	protocolsSlice := strings.Split(protocols, ",")
 	for ix := range protocolsSlice {
 		portProtocol := strings.Split(protocolsSlice[ix], "/")
@@ -551,7 +622,8 @@ func parseProtocols(protocols string) (map[string]string, error) {
 		if len(portProtocol[1]) == 0 {
 			return nil, fmt.Errorf("unexpected empty protocol")
 		}
-		portProtocolMap[portProtocol[0]] = portProtocol[1]
+		port := portProtocol[0]
+		portProtocolMap[port] = append(portProtocolMap[port], portProtocol[1])
 	}
 	return portProtocolMap, nil
 }

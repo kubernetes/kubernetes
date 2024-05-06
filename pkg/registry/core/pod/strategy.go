@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
@@ -47,7 +50,7 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	netutils "k8s.io/utils/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -88,7 +91,9 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	podutil.DropDisabledPodFields(pod, nil)
 
-	applyWaitingForSchedulingGatesCondition(pod)
+	applySchedulingGatedCondition(pod)
+	mutatePodAffinity(pod)
+	applyAppArmorVersionSkew(ctx, pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -112,6 +117,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
+	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodCreate(pod, opts)
 }
 
@@ -141,6 +147,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
@@ -225,6 +232,7 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	pod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, &oldPod.Spec, &pod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
 
 	return corevalidation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
@@ -264,6 +272,7 @@ func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, o
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
 	return corevalidation.ValidatePodEphemeralContainersUpdate(newPod, oldPod, opts)
 }
 
@@ -283,11 +292,15 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+	var indexFields = []string{"spec.nodeName"}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+		indexFields = append(indexFields, "metadata.namespace")
+	}
 	return storage.SelectionPredicate{
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
-		IndexFields: []string{"spec.nodeName"},
+		IndexFields: indexFields,
 	}
 }
 
@@ -305,11 +318,24 @@ func NodeNameIndexFunc(obj interface{}) ([]string, error) {
 	return []string{pod.Spec.NodeName}, nil
 }
 
+// NamespaceIndexFunc return value name of given object.
+func NamespaceIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Namespace}, nil
+}
+
 // Indexers returns the indexers for pod storage.
 func Indexers() *cache.Indexers {
-	return &cache.Indexers{
+	var indexers = cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
+	}
+	return &indexers
 }
 
 // ToSelectableFields returns a field set that represents the object
@@ -319,11 +345,17 @@ func ToSelectableFields(pod *api.Pod) fields.Set {
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
-	podSpecificFieldsSet := make(fields.Set, 9)
+	podSpecificFieldsSet := make(fields.Set, 10)
 	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
 	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
+	if pod.Spec.SecurityContext != nil {
+		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.SecurityContext.HostNetwork)
+	} else {
+		// default to false
+		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(false)
+	}
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
 	// TODO: add podIPs as a downward API value(s) with proper format
 	podIP := ""
@@ -388,8 +420,8 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 		}
 	}
 	podIP := getPodIP(pod)
-	if err := proxyutil.IsProxyableIP(podIP); err != nil {
-		return nil, nil, errors.NewBadRequest(err.Error())
+	if ip := netutils.ParseIPSloppy(podIP); ip == nil || !ip.IsGlobalUnicast() {
+		return nil, nil, errors.NewBadRequest("address not allowed")
 	}
 
 	loc := &url.URL{
@@ -658,11 +690,60 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 	return container, nil
 }
 
-// applyWaitingForSchedulingGatesCondition adds a {type:PodScheduled, reason:WaitingForGates} condition
+// applyLabelKeysToLabelSelector obtains the label value from the given label set by the key in labelKeys,
+// and merge to LabelSelector with the given operator:
+func applyLabelKeysToLabelSelector(labelSelector *metav1.LabelSelector, labelKeys []string, operator metav1.LabelSelectorOperator, podLabels map[string]string) {
+	for _, key := range labelKeys {
+		if value, ok := podLabels[key]; ok {
+			labelSelector.MatchExpressions = append(labelSelector.MatchExpressions, metav1.LabelSelectorRequirement{
+				Key:      key,
+				Operator: operator,
+				Values:   []string{value},
+			})
+		}
+	}
+}
+
+// applyMatchLabelKeysAndMismatchLabelKeys obtains the labels from the pod labels by the key in matchLabelKeys or mismatchLabelKeys,
+// and merge to LabelSelector of PodAffinityTerm depending on field:
+// - If matchLabelKeys, key in (value) is merged with LabelSelector.
+// - If mismatchLabelKeys, key notin (value) is merged with LabelSelector.
+func applyMatchLabelKeysAndMismatchLabelKeys(term *api.PodAffinityTerm, label map[string]string) {
+	if (len(term.MatchLabelKeys) == 0 && len(term.MismatchLabelKeys) == 0) || term.LabelSelector == nil {
+		// If LabelSelector is nil, we don't need to apply label keys to it because nil-LabelSelector is match none.
+		return
+	}
+
+	applyLabelKeysToLabelSelector(term.LabelSelector, term.MatchLabelKeys, metav1.LabelSelectorOpIn, label)
+	applyLabelKeysToLabelSelector(term.LabelSelector, term.MismatchLabelKeys, metav1.LabelSelectorOpNotIn, label)
+}
+
+func mutatePodAffinity(pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodAffinity) || pod.Spec.Affinity == nil {
+		return
+	}
+	if affinity := pod.Spec.Affinity.PodAffinity; affinity != nil {
+		for i := range affinity.PreferredDuringSchedulingIgnoredDuringExecution {
+			applyMatchLabelKeysAndMismatchLabelKeys(&affinity.PreferredDuringSchedulingIgnoredDuringExecution[i].PodAffinityTerm, pod.Labels)
+		}
+		for i := range affinity.RequiredDuringSchedulingIgnoredDuringExecution {
+			applyMatchLabelKeysAndMismatchLabelKeys(&affinity.RequiredDuringSchedulingIgnoredDuringExecution[i], pod.Labels)
+		}
+	}
+	if affinity := pod.Spec.Affinity.PodAntiAffinity; affinity != nil {
+		for i := range affinity.PreferredDuringSchedulingIgnoredDuringExecution {
+			applyMatchLabelKeysAndMismatchLabelKeys(&affinity.PreferredDuringSchedulingIgnoredDuringExecution[i].PodAffinityTerm, pod.Labels)
+		}
+		for i := range affinity.RequiredDuringSchedulingIgnoredDuringExecution {
+			applyMatchLabelKeysAndMismatchLabelKeys(&affinity.RequiredDuringSchedulingIgnoredDuringExecution[i], pod.Labels)
+		}
+	}
+}
+
+// applySchedulingGatedCondition adds a {type:PodScheduled, reason:SchedulingGated} condition
 // to a new-created Pod if necessary.
-func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) ||
-		len(pod.Spec.SchedulingGates) == 0 {
+func applySchedulingGatedCondition(pod *api.Pod) {
+	if len(pod.Spec.SchedulingGates) == 0 {
 		return
 	}
 
@@ -676,7 +757,134 @@ func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
 	pod.Status.Conditions = append(pod.Status.Conditions, api.PodCondition{
 		Type:    api.PodScheduled,
 		Status:  api.ConditionFalse,
-		Reason:  api.PodReasonSchedulingGated,
+		Reason:  apiv1.PodReasonSchedulingGated,
 		Message: "Scheduling is blocked due to non-empty scheduling gates",
 	})
+}
+
+// applyAppArmorVersionSkew implements the version skew behavior described in:
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/24-apparmor#version-skew-strategy
+func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields) {
+		return
+	}
+
+	if pod.Spec.OS != nil && pod.Spec.OS.Name == api.Windows {
+		return
+	}
+
+	var podProfile *api.AppArmorProfile
+	if pod.Spec.SecurityContext != nil {
+		podProfile = pod.Spec.SecurityContext.AppArmorProfile
+	}
+
+	// Handle the containers of the pod
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(),
+		func(ctr *api.Container, _ podutil.ContainerType) bool {
+			// get possible annotation and field
+			key := api.DeprecatedAppArmorAnnotationKeyPrefix + ctr.Name
+			annotation, hasAnnotation := pod.Annotations[key]
+
+			var containerProfile *api.AppArmorProfile
+			if ctr.SecurityContext != nil {
+				containerProfile = ctr.SecurityContext.AppArmorProfile
+			}
+
+			// sync field and annotation
+			if !hasAnnotation {
+				newAnnotation := ""
+				if containerProfile != nil {
+					newAnnotation = appArmorAnnotationForField(containerProfile)
+				} else if podProfile != nil {
+					newAnnotation = appArmorAnnotationForField(podProfile)
+				}
+
+				if newAnnotation != "" {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[key] = newAnnotation
+				}
+			} else if containerProfile == nil {
+				newField := apparmorFieldForAnnotation(annotation)
+				if errs := corevalidation.ValidateAppArmorProfileField(newField, &field.Path{}); len(errs) > 0 {
+					// Skip copying invalid value.
+					newField = nil
+				}
+
+				// warn if we had an annotation that we couldn't derive a valid field from
+				deprecationWarning := newField == nil
+
+				// Only copy the annotation to the field if it is different from the pod-level profile.
+				if newField != nil && !apiequality.Semantic.DeepEqual(newField, podProfile) {
+					if ctr.SecurityContext == nil {
+						ctr.SecurityContext = &api.SecurityContext{}
+					}
+					ctr.SecurityContext.AppArmorProfile = newField
+					// warn if there was an annotation without a corresponding field
+					deprecationWarning = true
+				}
+
+				if deprecationWarning {
+					// Note: annotation deprecation warning must be added here rather than the
+					// typical WarningsOnCreate path to emit the warning before syncing the
+					// annotations & fields.
+					fldPath := field.NewPath("metadata", "annotations").Key(key)
+					warning.AddWarning(ctx, "", fmt.Sprintf(`%s: deprecated since v1.30; use the "appArmorProfile" field instead`, fldPath))
+				}
+			}
+
+			return true
+		})
+}
+
+// appArmorFieldForAnnotation takes a pod apparmor profile field and returns the
+// converted annotation value
+func appArmorAnnotationForField(field *api.AppArmorProfile) string {
+	// If only apparmor fields are specified, add the corresponding annotations.
+	// This ensures that the fields are enforced even if the node version
+	// trails the API version
+	switch field.Type {
+	case api.AppArmorProfileTypeUnconfined:
+		return api.DeprecatedAppArmorAnnotationValueUnconfined
+
+	case api.AppArmorProfileTypeRuntimeDefault:
+		return api.DeprecatedAppArmorAnnotationValueRuntimeDefault
+
+	case api.AppArmorProfileTypeLocalhost:
+		if field.LocalhostProfile != nil {
+			return api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + *field.LocalhostProfile
+		}
+	}
+
+	// we can only reach this code path if the LocalhostProfile is nil but the
+	// provided field type is AppArmorProfileTypeLocalhost or if an unrecognized
+	// type is specified
+	return ""
+}
+
+// apparmorFieldForAnnotation takes a pod annotation and returns the converted
+// apparmor profile field.
+func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
+	if annotation == api.DeprecatedAppArmorAnnotationValueUnconfined {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
+	}
+
+	if annotation == api.DeprecatedAppArmorAnnotationValueRuntimeDefault {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
+	}
+
+	if strings.HasPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix)
+		if localhostProfile != "" {
+			return &api.AppArmorProfile{
+				Type:             api.AppArmorProfileTypeLocalhost,
+				LocalhostProfile: &localhostProfile,
+			}
+		}
+	}
+
+	// we can only reach this code path if the localhostProfile name has a zero
+	// length or if the annotation has an unrecognized value
+	return nil
 }

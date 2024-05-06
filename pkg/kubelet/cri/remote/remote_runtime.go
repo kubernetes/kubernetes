@@ -27,18 +27,18 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/logs/logreduction"
 	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
+
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -53,6 +53,11 @@ type remoteRuntimeService struct {
 const (
 	// How frequently to report identical errors
 	identicalErrorDelay = 1 * time.Minute
+
+	// connection parameters
+	maxBackoffDelay      = 3 * time.Second
+	baseBackoffDelay     = 100 * time.Millisecond
+	minConnectionTimeout = 5 * time.Second
 )
 
 // CRIVersion is the type for valid Container Runtime Interface (CRI) API
@@ -77,13 +82,15 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	dialOpts := []grpc.DialOption{}
+	var dialOpts []grpc.DialOption
 	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithAuthority("localhost"),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+	if tp != nil {
 		tracingOpts := []otelgrpc.Option{
+			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
 			otelgrpc.WithPropagators(tracing.Propagators()),
 			otelgrpc.WithTracerProvider(tp),
 		}
@@ -93,6 +100,17 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
 			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
 	}
+
+	connParams := grpc.ConnectParams{
+		Backoff: backoff.DefaultConfig,
+	}
+	connParams.MinConnectTimeout = minConnectionTimeout
+	connParams.Backoff.BaseDelay = baseBackoffDelay
+	connParams.Backoff.MaxDelay = maxBackoffDelay
+	dialOpts = append(dialOpts,
+		grpc.WithConnectParams(connParams),
+	)
+
 	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		klog.ErrorS(err, "Connect remote runtime failed", "address", addr)
@@ -655,9 +673,7 @@ func (r *remoteRuntimeService) containerStatsV1(ctx context.Context, containerID
 // ListContainerStats returns the list of ContainerStats given the filter.
 func (r *remoteRuntimeService) ListContainerStats(ctx context.Context, filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	klog.V(10).InfoS("[RemoteRuntimeService] ListContainerStats", "filter", filter)
-	// Do not set timeout, because writable layer stats collection takes time.
-	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	return r.listContainerStatsV1(ctx, filter)
@@ -790,11 +806,16 @@ func (r *remoteRuntimeService) CheckpointContainer(ctx context.Context, options 
 	return nil
 }
 
-func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	containerEventsStreamingClient, err := r.runtimeClient.GetContainerEvents(context.Background(), &runtimeapi.GetEventsRequest{})
 	if err != nil {
 		klog.ErrorS(err, "GetContainerEvents failed to get streaming client")
 		return err
+	}
+
+	if connectionEstablishedCallback != nil {
+		// The connection is successfully established and we have a streaming client ready for use.
+		connectionEstablishedCallback(containerEventsStreamingClient)
 	}
 
 	for {
@@ -842,4 +863,19 @@ func (r *remoteRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*ru
 	klog.V(10).InfoS("[RemoteRuntimeService] ListPodSandboxMetrics Response", "stats", resp.GetPodMetrics())
 
 	return resp.GetPodMetrics(), nil
+}
+
+// RuntimeConfig returns the configuration information of the runtime.
+func (r *remoteRuntimeService) RuntimeConfig(ctx context.Context) (*runtimeapi.RuntimeConfigResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.RuntimeConfig(ctx, &runtimeapi.RuntimeConfigRequest{})
+	if err != nil {
+		klog.ErrorS(err, "RuntimeConfig from runtime service failed")
+		return nil, err
+	}
+	klog.V(10).InfoS("[RemoteRuntimeService] RuntimeConfigResponse", "linuxConfig", resp.GetLinux())
+
+	return resp, nil
 }

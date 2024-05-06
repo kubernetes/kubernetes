@@ -81,7 +81,7 @@ var _ types.GomegaMatcher = &matcher[string]{}
 // assertions. The difference is that failed assertions are returned as an
 // error:
 //
-//	if err := Gomega().Expect(pod.Status.Phase).To(gomega.BeEqual(v1.Running)); err != nil {
+//	if err := Gomega().Expect(pod.Status.Phase).To(gomega.Equal(v1.Running)); err != nil {
 //	    return fmt.Errorf("test pod not running: %w", err)
 //	}
 //
@@ -212,8 +212,9 @@ func newAsyncAssertion(ctx context.Context, args []interface{}, consistently boo
 		args: args,
 		// PodStart is used as default because waiting for a pod is the
 		// most common operation.
-		timeout:  TestContext.timeouts.PodStart,
-		interval: TestContext.timeouts.Poll,
+		timeout:      TestContext.timeouts.PodStart,
+		interval:     TestContext.timeouts.Poll,
+		consistently: consistently,
 	}
 }
 
@@ -292,20 +293,6 @@ func (f *FailureError) backtrace() {
 //	}
 var ErrFailure error = FailureError{}
 
-// ExpectEqual expects the specified two are the same, otherwise an exception raises
-//
-// Deprecated: use gomega.Expect().To(gomega.BeEqual())
-func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
-}
-
-// ExpectNotEqual expects the specified two are not the same, otherwise an exception raises
-//
-// Deprecated: use gomega.Expect().ToNot(gomega.BeEqual())
-func ExpectNotEqual(actual interface{}, extra interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).NotTo(gomega.Equal(extra), explain...)
-}
-
 // ExpectError expects an error happens, otherwise an exception raises
 //
 // Deprecated: use gomega.Expect().To(gomega.HaveOccurred()) or (better!) check
@@ -356,30 +343,9 @@ func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	// because it is not included in the failure message.
 	var failure FailureError
 	if errors.As(err, &failure) && failure.Backtrace() != "" {
-		Logf("Failed inside E2E framework:\n    %s", strings.ReplaceAll(failure.Backtrace(), "\n", "\n    "))
+		log(offset+1, fmt.Sprintf("Failed inside E2E framework:\n    %s", strings.ReplaceAll(failure.Backtrace(), "\n", "\n    ")))
 	} else if !errors.Is(err, ErrFailure) {
-		Logf("Unexpected error: %s\n%s", prefix, format.Object(err, 1))
+		log(offset+1, fmt.Sprintf("Unexpected error: %s\n%s", prefix, format.Object(err, 1)))
 	}
 	Fail(prefix+err.Error(), 1+offset)
-}
-
-// ExpectConsistOf expects actual contains precisely the extra elements.  The ordering of the elements does not matter.
-//
-// Deprecated: use gomega.Expect().To(gomega.ConsistOf()) instead
-func ExpectConsistOf(actual interface{}, extra interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).To(gomega.ConsistOf(extra), explain...)
-}
-
-// ExpectHaveKey expects the actual map has the key in the keyset
-//
-// Deprecated: use gomega.Expect().To(gomega.HaveKey()) instead
-func ExpectHaveKey(actual interface{}, key interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).To(gomega.HaveKey(key), explain...)
-}
-
-// ExpectEmpty expects actual is empty
-//
-// Deprecated: use gomega.Expect().To(gomega.BeEmpty()) instead
-func ExpectEmpty(actual interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).To(gomega.BeEmpty(), explain...)
 }

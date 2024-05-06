@@ -18,6 +18,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -95,4 +96,63 @@ func TestEventCompatibility(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+}
+
+func TestEventSeries(t *testing.T) {
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "default",
+			UID:       "bar",
+		},
+	}
+
+	regarding, err := ref.GetReference(scheme.Scheme, testPod)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	related, err := ref.GetPartialReference(scheme.Scheme, testPod, ".spec.containers[0]")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	defer broadcaster.Shutdown()
+	recorder := broadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-scheduler")
+	broadcaster.StartRecordingToSink(stopCh)
+	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
+	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
+	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
+		events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		if len(events.Items) != 1 {
+			return false, nil
+		}
+
+		if events.Items[0].Series == nil {
+			return false, nil
+		}
+
+		if events.Items[0].Series.Count != 2 {
+			return false, fmt.Errorf("expected EventSeries to have a starting count of 2, got: %d", events.Items[0].Series.Count)
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("error waiting for an Event with a non nil Series to be created: %v", err)
+	}
+
 }

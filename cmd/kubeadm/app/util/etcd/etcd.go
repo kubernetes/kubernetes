@@ -34,6 +34,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -45,13 +46,9 @@ import (
 
 const etcdTimeout = 2 * time.Second
 
-// Exponential backoff for etcd operations (up to ~200 seconds)
-var etcdBackoff = wait.Backoff{
-	Steps:    18,
-	Duration: 100 * time.Millisecond,
-	Factor:   1.5,
-	Jitter:   0.1,
-}
+// ErrNoMemberIDForPeerURL is returned when it is not possible to obtain a member ID
+// from a given peer URL
+var ErrNoMemberIDForPeerURL = errors.New("no member id found for peer URL")
 
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
@@ -66,28 +63,74 @@ type ClusterInterrogator interface {
 	RemoveMember(id uint64) ([]Member, error)
 }
 
+type etcdClient interface {
+	// Close shuts down the client's etcd connections.
+	Close() error
+
+	// Endpoints lists the registered endpoints for the client.
+	Endpoints() []string
+
+	// MemberList lists the current cluster membership.
+	MemberList(ctx context.Context) (*clientv3.MemberListResponse, error)
+
+	// MemberAdd adds a new member into the cluster.
+	MemberAdd(ctx context.Context, peerAddrs []string) (*clientv3.MemberAddResponse, error)
+
+	// MemberAddAsLearner adds a new learner member into the cluster.
+	MemberAddAsLearner(ctx context.Context, peerAddrs []string) (*clientv3.MemberAddResponse, error)
+
+	// MemberRemove removes an existing member from the cluster.
+	MemberRemove(ctx context.Context, id uint64) (*clientv3.MemberRemoveResponse, error)
+
+	// MemberPromote promotes a member from raft learner (non-voting) to raft voting member.
+	MemberPromote(ctx context.Context, id uint64) (*clientv3.MemberPromoteResponse, error)
+
+	// Status gets the status of the endpoint.
+	Status(ctx context.Context, endpoint string) (*clientv3.StatusResponse, error)
+
+	// Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
+	Sync(ctx context.Context) error
+}
+
 // Client provides connection parameters for an etcd cluster
 type Client struct {
 	Endpoints []string
-	TLS       *tls.Config
+
+	newEtcdClient func(endpoints []string) (etcdClient, error)
+
+	listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
 }
 
 // New creates a new EtcdCluster client
 func New(endpoints []string, ca, cert, key string) (*Client, error) {
 	client := Client{Endpoints: endpoints}
 
+	var err error
+	var tlsConfig *tls.Config
 	if ca != "" || cert != "" || key != "" {
 		tlsInfo := transport.TLSInfo{
 			CertFile:      cert,
 			KeyFile:       key,
 			TrustedCAFile: ca,
 		}
-		tlsConfig, err := tlsInfo.ClientConfig()
+		tlsConfig, err = tlsInfo.ClientConfig()
 		if err != nil {
 			return nil, err
 		}
-		client.TLS = tlsConfig
 	}
+
+	client.newEtcdClient = func(endpoints []string) (etcdClient, error) {
+		return clientv3.New(clientv3.Config{
+			Endpoints:   endpoints,
+			DialTimeout: etcdTimeout,
+			DialOptions: []grpc.DialOption{
+				grpc.WithBlock(), // block until the underlying connection is up
+			},
+			TLS: tlsConfig,
+		})
+	}
+
+	client.listMembersFunc = client.listMembers
 
 	return &client, nil
 }
@@ -128,31 +171,33 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 
 // getEtcdEndpoints returns the list of etcd endpoints.
 func getEtcdEndpoints(client clientset.Interface) ([]string, error) {
-	return getEtcdEndpointsWithBackoff(client, constants.StaticPodMirroringDefaultRetry)
+	return getEtcdEndpointsWithRetry(client,
+		constants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration)
 }
 
-func getEtcdEndpointsWithBackoff(client clientset.Interface, backoff wait.Backoff) ([]string, error) {
-	return getRawEtcdEndpointsFromPodAnnotation(client, backoff)
+func getEtcdEndpointsWithRetry(client clientset.Interface, interval, timeout time.Duration) ([]string, error) {
+	return getRawEtcdEndpointsFromPodAnnotation(client, interval, timeout)
 }
 
 // getRawEtcdEndpointsFromPodAnnotation returns the list of endpoints as reported on etcd's pod annotations using the given backoff
-func getRawEtcdEndpointsFromPodAnnotation(client clientset.Interface, backoff wait.Backoff) ([]string, error) {
+func getRawEtcdEndpointsFromPodAnnotation(client clientset.Interface, interval, timeout time.Duration) ([]string, error) {
 	etcdEndpoints := []string{}
 	var lastErr error
 	// Let's tolerate some unexpected transient failures from the API server or load balancers. Also, if
 	// static pods were not yet mirrored into the API server we want to wait for this propagation.
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		var overallEtcdPodCount int
-		if etcdEndpoints, overallEtcdPodCount, lastErr = getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client); lastErr != nil {
-			return false, nil
-		}
-		if len(etcdEndpoints) == 0 || overallEtcdPodCount != len(etcdEndpoints) {
-			klog.V(4).Infof("found a total of %d etcd pods and the following endpoints: %v; retrying",
-				overallEtcdPodCount, etcdEndpoints)
-			return false, nil
-		}
-		return true, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true,
+		func(_ context.Context) (bool, error) {
+			var overallEtcdPodCount int
+			if etcdEndpoints, overallEtcdPodCount, lastErr = getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client); lastErr != nil {
+				return false, nil
+			}
+			if len(etcdEndpoints) == 0 || overallEtcdPodCount != len(etcdEndpoints) {
+				klog.V(4).Infof("found a total of %d etcd pods and the following endpoints: %v; retrying",
+					overallEtcdPodCount, etcdEndpoints)
+				return false, nil
+			}
+			return true, nil
+		})
 	if err != nil {
 		const message = "could not retrieve the list of etcd endpoints"
 		if lastErr != nil {
@@ -179,6 +224,16 @@ func getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client clientset.Interface
 	}
 	etcdEndpoints := []string{}
 	for _, pod := range podList.Items {
+		podIsReady := false
+		for _, c := range pod.Status.Conditions {
+			if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
+				podIsReady = true
+				break
+			}
+		}
+		if !podIsReady {
+			klog.V(3).Infof("etcd pod %q is not ready", pod.ObjectMeta.Name)
+		}
 		etcdEndpoint, ok := pod.ObjectMeta.Annotations[constants.EtcdAdvertiseClientUrlsAnnotationKey]
 		if !ok {
 			klog.V(3).Infof("etcd Pod %q is missing the %q annotation; cannot infer etcd advertise client URL using the Pod annotation", pod.ObjectMeta.Name, constants.EtcdAdvertiseClientUrlsAnnotationKey)
@@ -192,34 +247,27 @@ func getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client clientset.Interface
 // Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
 func (c *Client) Sync() error {
 	// Syncs the list of endpoints
-	var cli *clientv3.Client
+	var cli etcdClient
 	var lastError error
-	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		var err error
-		cli, err = clientv3.New(clientv3.Config{
-			Endpoints:   c.Endpoints,
-			DialTimeout: etcdTimeout,
-			DialOptions: []grpc.DialOption{
-				grpc.WithBlock(), // block until the underlying connection is up
-			},
-			TLS: c.TLS,
-		})
-		if err != nil {
+	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+		true, func(_ context.Context) (bool, error) {
+			var err error
+			cli, err = c.newEtcdClient(c.Endpoints)
+			if err != nil {
+				lastError = err
+				return false, nil
+			}
+			defer func() { _ = cli.Close() }()
+			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+			err = cli.Sync(ctx)
+			cancel()
+			if err == nil {
+				return true, nil
+			}
+			klog.V(5).Infof("Failed to sync etcd endpoints: %v", err)
 			lastError = err
 			return false, nil
-		}
-		defer cli.Close()
-
-		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-		err = cli.Sync(ctx)
-		cancel()
-		if err == nil {
-			return true, nil
-		}
-		klog.V(5).Infof("Failed to sync etcd endpoints: %v", err)
-		lastError = err
-		return false, nil
-	})
+		})
 	if err != nil {
 		return lastError
 	}
@@ -236,35 +284,32 @@ type Member struct {
 	PeerURL string
 }
 
-func (c *Client) listMembers() (*clientv3.MemberListResponse, error) {
+func (c *Client) listMembers(timeout time.Duration) (*clientv3.MemberListResponse, error) {
 	// Gets the member list
 	var lastError error
 	var resp *clientv3.MemberListResponse
-	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   c.Endpoints,
-			DialTimeout: etcdTimeout,
-			DialOptions: []grpc.DialOption{
-				grpc.WithBlock(), // block until the underlying connection is up
-			},
-			TLS: c.TLS,
-		})
-		if err != nil {
+	if timeout == 0 {
+		timeout = constants.EtcdAPICallTimeout
+	}
+	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, timeout,
+		true, func(_ context.Context) (bool, error) {
+			cli, err := c.newEtcdClient(c.Endpoints)
+			if err != nil {
+				lastError = err
+				return false, nil
+			}
+			defer func() { _ = cli.Close() }()
+
+			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+			resp, err = cli.MemberList(ctx)
+			cancel()
+			if err == nil {
+				return true, nil
+			}
+			klog.V(5).Infof("Failed to get etcd member list: %v", err)
 			lastError = err
 			return false, nil
-		}
-		defer cli.Close()
-
-		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-		resp, err = cli.MemberList(ctx)
-		cancel()
-		if err == nil {
-			return true, nil
-		}
-		klog.V(5).Infof("Failed to get etcd member list: %v", err)
-		lastError = err
-		return false, nil
-	})
+		})
 	if err != nil {
 		return nil, lastError
 	}
@@ -273,7 +318,7 @@ func (c *Client) listMembers() (*clientv3.MemberListResponse, error) {
 
 // GetMemberID returns the member ID of the given peer URL
 func (c *Client) GetMemberID(peerURL string) (uint64, error) {
-	resp, err := c.listMembers()
+	resp, err := c.listMembersFunc(0)
 	if err != nil {
 		return 0, err
 	}
@@ -283,12 +328,12 @@ func (c *Client) GetMemberID(peerURL string) (uint64, error) {
 			return member.GetID(), nil
 		}
 	}
-	return 0, nil
+	return 0, ErrNoMemberIDForPeerURL
 }
 
 // ListMembers returns the member list.
 func (c *Client) ListMembers() ([]Member, error) {
-	resp, err := c.listMembers()
+	resp, err := c.listMembersFunc(0)
 	if err != nil {
 		return nil, err
 	}
@@ -305,39 +350,40 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	// Remove an existing member from the cluster
 	var lastError error
 	var resp *clientv3.MemberRemoveResponse
-	err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		cli, err := clientv3.New(clientv3.Config{
-			Endpoints:   c.Endpoints,
-			DialTimeout: etcdTimeout,
-			DialOptions: []grpc.DialOption{
-				grpc.WithBlock(), // block until the underlying connection is up
-			},
-			TLS: c.TLS,
-		})
-		if err != nil {
+	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+		true, func(_ context.Context) (bool, error) {
+			cli, err := c.newEtcdClient(c.Endpoints)
+			if err != nil {
+				lastError = err
+				return false, nil
+			}
+			defer func() { _ = cli.Close() }()
+
+			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+			resp, err = cli.MemberRemove(ctx, id)
+			cancel()
+			if err == nil {
+				return true, nil
+			}
+			if errors.Is(rpctypes.ErrMemberNotFound, err) {
+				klog.V(5).Infof("Member was already removed, because member %s was not found", strconv.FormatUint(id, 16))
+				return true, nil
+			}
+			klog.V(5).Infof("Failed to remove etcd member: %v", err)
 			lastError = err
 			return false, nil
-		}
-		defer cli.Close()
-
-		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-		resp, err = cli.MemberRemove(ctx, id)
-		cancel()
-		if err == nil {
-			return true, nil
-		}
-		klog.V(5).Infof("Failed to remove etcd member: %v", err)
-		lastError = err
-		return false, nil
-	})
+		})
 	if err != nil {
 		return nil, lastError
 	}
 
 	// Returns the updated list of etcd members
 	ret := []Member{}
-	for _, m := range resp.Members {
-		ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+	if resp != nil {
+		for _, m := range resp.Members {
+			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+		}
+
 	}
 
 	return ret, nil
@@ -365,18 +411,11 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		return nil, errors.Wrapf(err, "error parsing peer address %s", peerAddrs)
 	}
 
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: etcdTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
+	cli, err := c.newEtcdClient(c.Endpoints)
 	if err != nil {
 		return nil, err
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// Adds a new member to the cluster
 	var (
@@ -385,46 +424,47 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		learnerID   uint64
 		resp        *clientv3.MemberAddResponse
 	)
-	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-		defer cancel()
-		if isLearner {
-			// if learnerID is set, it means the etcd member is already added successfully.
-			if learnerID == 0 {
-				klog.V(1).Infof("[etcd] Adding etcd member as learner: %016x", peerAddrs)
-				resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
-				if err != nil {
-					lastError = err
-					return false, nil
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+		true, func(_ context.Context) (bool, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+			defer cancel()
+			if isLearner {
+				// if learnerID is set, it means the etcd member is already added successfully.
+				if learnerID == 0 {
+					klog.V(1).Info("[etcd] Adding etcd member as learner")
+					resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
+					if err != nil {
+						lastError = err
+						return false, nil
+					}
+					learnerID = resp.Member.ID
 				}
-				learnerID = resp.Member.ID
-			}
-			respMembers = resp.Members
-			return true, nil
-		}
-
-		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
-		if err == nil {
-			respMembers = resp.Members
-			return true, nil
-		}
-
-		// If the error indicates that the peer already exists, exit early. In this situation, resp is nil, so
-		// call out to MemberList to fetch all the members before returning.
-		if errors.Is(err, rpctypes.ErrPeerURLExist) {
-			klog.V(5).Info("The peer URL for the added etcd member already exists. Fetching the existing etcd members")
-			var listResp *clientv3.MemberListResponse
-			listResp, err = cli.MemberList(ctx)
-			if err == nil {
-				respMembers = listResp.Members
+				respMembers = resp.Members
 				return true, nil
 			}
-		}
 
-		klog.V(5).Infof("Failed to add etcd member: %v", err)
-		lastError = err
-		return false, nil
-	})
+			resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
+			if err == nil {
+				respMembers = resp.Members
+				return true, nil
+			}
+
+			// If the error indicates that the peer already exists, exit early. In this situation, resp is nil, so
+			// call out to MemberList to fetch all the members before returning.
+			if errors.Is(err, rpctypes.ErrPeerURLExist) {
+				klog.V(5).Info("The peer URL for the added etcd member already exists. Fetching the existing etcd members")
+				var listResp *clientv3.MemberListResponse
+				listResp, err = cli.MemberList(ctx)
+				if err == nil {
+					respMembers = listResp.Members
+					return true, nil
+				}
+			}
+
+			klog.V(5).Infof("Failed to add etcd member: %v", err)
+			lastError = err
+			return false, nil
+		})
 	if err != nil {
 		return nil, lastError
 	}
@@ -456,7 +496,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 
 // isLearner returns true if the given member ID is a learner.
 func (c *Client) isLearner(memberID uint64) (bool, error) {
-	resp, err := c.listMembers()
+	resp, err := c.listMembersFunc(0)
 	if err != nil {
 		return false, err
 	}
@@ -477,23 +517,16 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 		return err
 	}
 	if !isLearner {
-		klog.V(1).Infof("[etcd] Member %016x already promoted.", learnerID)
+		klog.V(1).Infof("[etcd] Member %s already promoted.", strconv.FormatUint(learnerID, 16))
 		return nil
 	}
 
-	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %016x", learnerID)
-	cli, err := clientv3.New(clientv3.Config{
-		Endpoints:   c.Endpoints,
-		DialTimeout: etcdTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: c.TLS,
-	})
+	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %s", strconv.FormatUint(learnerID, 16))
+	cli, err := c.newEtcdClient(c.Endpoints)
 	if err != nil {
 		return err
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// TODO: warning logs from etcd client should be removed.
 	// The warning logs are printed by etcd client code for several reasons, including
@@ -504,19 +537,20 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 	var (
 		lastError error
 	)
-	err = wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-		defer cancel()
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+		true, func(_ context.Context) (bool, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+			defer cancel()
 
-		_, err = cli.MemberPromote(ctx, learnerID)
-		if err == nil {
-			klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %016x", learnerID)
-			return true, nil
-		}
-		klog.V(5).Infof("[etcd] Promoting the learner %016x failed: %v", learnerID, err)
-		lastError = err
-		return false, nil
-	})
+			_, err = cli.MemberPromote(ctx, learnerID)
+			if err == nil {
+				klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %s", strconv.FormatUint(learnerID, 16))
+				return true, nil
+			}
+			klog.V(5).Infof("[etcd] Promoting the learner %s failed: %v", strconv.FormatUint(learnerID, 16), err)
+			lastError = err
+			return false, nil
+		})
 	if err != nil {
 		return lastError
 	}
@@ -536,31 +570,25 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 		// Gets the member status
 		var lastError error
 		var resp *clientv3.StatusResponse
-		err := wait.ExponentialBackoff(etcdBackoff, func() (bool, error) {
-			cli, err := clientv3.New(clientv3.Config{
-				Endpoints:   c.Endpoints,
-				DialTimeout: etcdTimeout,
-				DialOptions: []grpc.DialOption{
-					grpc.WithBlock(), // block until the underlying connection is up
-				},
-				TLS: c.TLS,
-			})
-			if err != nil {
+		err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+			true, func(_ context.Context) (bool, error) {
+				cli, err := c.newEtcdClient(c.Endpoints)
+				if err != nil {
+					lastError = err
+					return false, nil
+				}
+				defer func() { _ = cli.Close() }()
+
+				ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+				resp, err = cli.Status(ctx, ep)
+				cancel()
+				if err == nil {
+					return true, nil
+				}
+				klog.V(5).Infof("Failed to get etcd status for %s: %v", ep, err)
 				lastError = err
 				return false, nil
-			}
-			defer cli.Close()
-
-			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
-			resp, err = cli.Status(ctx, ep)
-			cancel()
-			if err == nil {
-				return true, nil
-			}
-			klog.V(5).Infof("Failed to get etcd status for %s: %v", ep, err)
-			lastError = err
-			return false, nil
-		})
+			})
 		if err != nil {
 			return nil, lastError
 		}

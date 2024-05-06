@@ -43,20 +43,22 @@ var fischersKind = v1alpha1.SchemeGroupVersion.WithKind("Fischer")
 
 // Get takes name of the fischer, and returns the corresponding fischer object, and an error if there is any.
 func (c *FakeFischers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Fischer, err error) {
+	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(fischersResource, name), &v1alpha1.Fischer{})
+		Invokes(testing.NewRootGetAction(fischersResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Fischer), err
 }
 
 // List takes label and field selectors, and returns the list of Fischers that match those selectors.
 func (c *FakeFischers) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FischerList, err error) {
+	emptyResult := &v1alpha1.FischerList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(fischersResource, fischersKind, opts), &v1alpha1.FischerList{})
+		Invokes(testing.NewRootListAction(fischersResource, fischersKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,20 +82,22 @@ func (c *FakeFischers) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 
 // Create takes the representation of a fischer and creates it.  Returns the server's representation of the fischer, and an error, if there is any.
 func (c *FakeFischers) Create(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.CreateOptions) (result *v1alpha1.Fischer, err error) {
+	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(fischersResource, fischer), &v1alpha1.Fischer{})
+		Invokes(testing.NewRootCreateAction(fischersResource, fischer), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Fischer), err
 }
 
 // Update takes the representation of a fischer and updates it. Returns the server's representation of the fischer, and an error, if there is any.
 func (c *FakeFischers) Update(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.UpdateOptions) (result *v1alpha1.Fischer, err error) {
+	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(fischersResource, fischer), &v1alpha1.Fischer{})
+		Invokes(testing.NewRootUpdateAction(fischersResource, fischer), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Fischer), err
 }
@@ -115,10 +119,11 @@ func (c *FakeFischers) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 
 // Patch applies the patch and returns the patched fischer.
 func (c *FakeFischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error) {
+	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, name, pt, data, subresources...), &v1alpha1.Fischer{})
+		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Fischer), err
 }
@@ -136,10 +141,11 @@ func (c *FakeFischers) Apply(ctx context.Context, fischer *wardlev1alpha1.Fische
 	if name == nil {
 		return nil, fmt.Errorf("fischer.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, *name, types.ApplyPatchType, data), &v1alpha1.Fischer{})
+		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.Fischer), err
 }

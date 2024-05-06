@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/utils/exec"
@@ -155,7 +154,7 @@ func TestMerge(t *testing.T) {
 			if err != nil {
 				t.Errorf("testcase[%d], unexpected error: %v", i, err)
 			} else if !apiequality.Semantic.DeepEqual(test.expected, out) {
-				t.Errorf("\n\ntestcase[%d]\nexpected:\n%s", i, diff.ObjectReflectDiff(test.expected, out))
+				t.Errorf("\n\ntestcase[%d]\nexpected:\n%s", i, cmp.Diff(test.expected, out))
 			}
 		}
 		if test.expectErr && err == nil {
@@ -238,7 +237,7 @@ func TestStrategicMerge(t *testing.T) {
 			if err != nil {
 				t.Errorf("testcase[%d], unexpected error: %v", i, err)
 			} else if !apiequality.Semantic.DeepEqual(test.expected, out) {
-				t.Errorf("\n\ntestcase[%d]\nexpected:\n%s", i, diff.ObjectReflectDiff(test.expected, out))
+				t.Errorf("\n\ntestcase[%d]\nexpected:\n%s", i, cmp.Diff(test.expected, out))
 			}
 		}
 		if test.expectErr && err == nil {
@@ -290,6 +289,26 @@ func TestJSONPatch(t *testing.T) {
 			fragment:  `[ {"op": "add", "path": "/metadata/labels/foo", "value": "bar"} ]`,
 			expectErr: true,
 		},
+		{
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "foo",
+					Finalizers: []string{"foo", "bar", "test"},
+				},
+			},
+			fragment: `[ {"op": "replace", "path": "/metadata/finalizers/-1", "value": "baz"} ]`,
+			expected: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "foo",
+					Finalizers: []string{"foo", "bar", "baz"},
+				},
+				Spec: corev1.PodSpec{},
+			},
+		},
 	}
 
 	codec := runtime.NewCodec(scheme.DefaultJSONEncoder(),
@@ -300,7 +319,7 @@ func TestJSONPatch(t *testing.T) {
 			if err != nil {
 				t.Errorf("testcase[%d], unexpected error: %v", i, err)
 			} else if !apiequality.Semantic.DeepEqual(test.expected, out) {
-				t.Errorf("\n\ntestcase[%d]\nexpected:\n%s", i, diff.ObjectReflectDiff(test.expected, out))
+				t.Errorf("\n\ntestcase[%d]\nexpected:\n%s", i, cmp.Diff(test.expected, out))
 			}
 		}
 		if test.expectErr && err == nil {

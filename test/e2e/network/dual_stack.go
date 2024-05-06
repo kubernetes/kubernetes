@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -44,9 +45,9 @@ import (
 )
 
 // Tests for ipv4-ipv6 dual-stack feature
-var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
+var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 	f := framework.NewDefaultFramework("dualstack")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var podClient *e2epod.PodClient
@@ -65,7 +66,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			// get all internal ips for node
 			internalIPs := e2enode.GetAddresses(&node, v1.NodeInternalIP)
 
-			framework.ExpectEqual(len(internalIPs), 2)
+			gomega.Expect(internalIPs).To(gomega.HaveLen(2))
 			// assert 2 ips belong to different families
 			if netutils.IsIPv4String(internalIPs[0]) == netutils.IsIPv4String(internalIPs[1]) {
 				framework.Failf("both internalIPs %s and %s belong to the same families", internalIPs[0], internalIPs[1])
@@ -98,12 +99,50 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		gomega.Expect(p.Status.PodIPs).ShouldNot(gomega.BeNil())
 
 		// validate there are 2 ips in podIPs
-		framework.ExpectEqual(len(p.Status.PodIPs), 2)
+		gomega.Expect(p.Status.PodIPs).To(gomega.HaveLen(2))
 		// validate first ip in PodIPs is same as PodIP
-		framework.ExpectEqual(p.Status.PodIP, p.Status.PodIPs[0].IP)
+		gomega.Expect(p.Status.PodIP).To(gomega.Equal(p.Status.PodIPs[0].IP))
 		// assert 2 pod ips belong to different families
 		if netutils.IsIPv4String(p.Status.PodIPs[0].IP) == netutils.IsIPv4String(p.Status.PodIPs[1].IP) {
 			framework.Failf("both internalIPs %s and %s belong to the same families", p.Status.PodIPs[0].IP, p.Status.PodIPs[1].IP)
+		}
+
+		ginkgo.By("deleting the pod")
+		err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(30))
+		framework.ExpectNoError(err, "failed to delete pod")
+	})
+
+	f.It("should create pod, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
+		podName := "pod-dualstack-ips"
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"test": "dualstack-host-ips"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "dualstack-host-ips",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					},
+				},
+			},
+		}
+
+		ginkgo.By("submitting the pod to kubernetes")
+		p := podClient.CreateSync(ctx, pod)
+
+		gomega.Expect(p.Status.HostIP).ShouldNot(gomega.BeEquivalentTo(""))
+		gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
+
+		// validate there are 2 ips in hostIPs
+		gomega.Expect(p.Status.HostIPs).To(gomega.HaveLen(2))
+		// validate first ip in hostIPs is same as HostIP
+		gomega.Expect(p.Status.HostIP).To(gomega.Equal(p.Status.HostIPs[0].IP))
+		// assert 2 host ips belong to different families
+		if netutils.IsIPv4String(p.Status.HostIPs[0].IP) == netutils.IsIPv4String(p.Status.HostIPs[1].IP) {
+			framework.Failf("both internalIPs %s and %s belong to the same families", p.Status.HostIPs[0], p.Status.HostIPs[1])
 		}
 
 		ginkgo.By("deleting the pod")
@@ -118,9 +157,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 
 		// get all schedulable nodes to determine the number of replicas for pods
 		// this is to ensure connectivity from all nodes on cluster
-		// FIXME: tests may be run in large clusters. This test is O(n^2) in the
-		// number of nodes used. It should use GetBoundedReadySchedulableNodes().
-		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, cs)
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 3)
 		framework.ExpectNoError(err)
 
 		replicas := int32(len(nodeList.Items))
@@ -462,7 +499,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
+		f.It("should function for pod-Service: sctp", feature.SCTPConnectivity, func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer(ctx, "sctp", config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())

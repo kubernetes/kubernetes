@@ -85,15 +85,21 @@ func (v *validatingAdmissionPolicyBindingStrategy) authorize(ctx context.Context
 		}
 	}
 
-	paramRef := binding.Spec.ParamRef
+	var attrs authorizer.AttributesRecord
 
-	// require that the user can read (verb "get") the referred resource.
-	attrs := authorizer.AttributesRecord{
+	paramRef := binding.Spec.ParamRef
+	verb := "get"
+
+	if len(paramRef.Name) == 0 {
+		verb = "list"
+	}
+
+	attrs = authorizer.AttributesRecord{
 		User:            user,
-		Verb:            "get",
+		Verb:            verb,
 		ResourceRequest: true,
 		Name:            paramRef.Name,
-		Namespace:       paramRef.Namespace,
+		Namespace:       paramRef.Namespace, // if empty, no namespace indicates get across all namespaces
 		APIGroup:        apiGroup,
 		APIVersion:      apiVersion,
 		Resource:        resource,
@@ -104,7 +110,8 @@ func (v *validatingAdmissionPolicyBindingStrategy) authorize(ctx context.Context
 		return err
 	}
 	if d != authorizer.DecisionAllow {
-		return fmt.Errorf(`user %v does not have "get" permission on the object referenced by paramRef`, user)
+		return fmt.Errorf(`user %v does not have "%v" permission on the object referenced by paramRef`, verb, user)
 	}
+
 	return nil
 }

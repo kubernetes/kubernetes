@@ -31,7 +31,7 @@ type nodeRegistrar struct {
 }
 
 // startRegistrar returns a running instance.
-func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptor grpc.UnaryServerInterceptor, driverName string, endpoint string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
+func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, endpoint string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
 	n := &nodeRegistrar{
 		logger: logger,
 		registrationServer: registrationServer{
@@ -40,7 +40,7 @@ func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptor grpc.Unar
 			supportedVersions: []string{"1.0.0"}, // TODO: is this correct?
 		},
 	}
-	s, err := startGRPCServer(logger, grpcVerbosity, interceptor, pluginRegistrationEndpoint, func(grpcServer *grpc.Server) {
+	s, err := startGRPCServer(logger, grpcVerbosity, interceptors, streamInterceptors, pluginRegistrationEndpoint, func(grpcServer *grpc.Server) {
 		registerapi.RegisterRegistrationServer(grpcServer, n)
 	})
 	if err != nil {

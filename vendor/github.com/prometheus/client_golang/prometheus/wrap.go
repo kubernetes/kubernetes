@@ -17,12 +17,10 @@ import (
 	"fmt"
 	"sort"
 
-	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/client_golang/prometheus/internal"
 
 	dto "github.com/prometheus/client_model/go"
-
-	"github.com/prometheus/client_golang/prometheus/internal"
+	"google.golang.org/protobuf/proto"
 )
 
 // WrapRegistererWith returns a Registerer wrapping the provided
@@ -206,7 +204,7 @@ func wrapDesc(desc *Desc, prefix string, labels Labels) *Desc {
 		constLabels[ln] = lv
 	}
 	// NewDesc will do remaining validations.
-	newDesc := NewDesc(prefix+desc.fqName, desc.help, desc.variableLabels, constLabels)
+	newDesc := V2.NewDesc(prefix+desc.fqName, desc.help, desc.variableLabels, constLabels)
 	// Propagate errors if there was any. This will override any errer
 	// created by NewDesc above, i.e. earlier errors get precedence.
 	if desc.err != nil {

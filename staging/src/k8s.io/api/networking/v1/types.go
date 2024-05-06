@@ -38,10 +38,10 @@ type NetworkPolicy struct {
 	// +optional
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// status represents the current state of the NetworkPolicy.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Status NetworkPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	// Status is tombstoned to show why 3 is a reserved protobuf tag.
+	// This commented field should remain, so in the future if we decide to reimplement
+	// NetworkPolicyStatus a different protobuf name and tag SHOULD be used!
+	// Status NetworkPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // PolicyType string describes the NetworkPolicy type
@@ -74,6 +74,7 @@ type NetworkPolicySpec struct {
 	// this field is empty then this NetworkPolicy does not allow any traffic (and serves
 	// solely to ensure that the pods it selects are isolated by default)
 	// +optional
+	// +listType=atomic
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
 	// egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
@@ -84,6 +85,7 @@ type NetworkPolicySpec struct {
 	// solely to ensure that the pods it selects are isolated by default).
 	// This field is beta-level in 1.8
 	// +optional
+	// +listType=atomic
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// policyTypes is a list of rule types that the NetworkPolicy relates to.
@@ -97,6 +99,7 @@ type NetworkPolicySpec struct {
 	// an egress section and would otherwise default to just [ "Ingress" ]).
 	// This field is beta-level in 1.8
 	// +optional
+	// +listType=atomic
 	PolicyTypes []PolicyType `json:"policyTypes,omitempty" protobuf:"bytes,4,rep,name=policyTypes,casttype=PolicyType"`
 }
 
@@ -109,6 +112,7 @@ type NetworkPolicyIngressRule struct {
 	// If this field is present and contains at least one item, then this rule allows
 	// traffic only if the traffic matches at least one port in the list.
 	// +optional
+	// +listType=atomic
 	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
 
 	// from is a list of sources which should be able to access the pods selected for this rule.
@@ -117,6 +121,7 @@ type NetworkPolicyIngressRule struct {
 	// source). If this field is present and contains at least one item, this rule
 	// allows traffic only if the traffic matches at least one item in the from list.
 	// +optional
+	// +listType=atomic
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
 }
 
@@ -130,6 +135,7 @@ type NetworkPolicyEgressRule struct {
 	// If this field is present and contains at least one item, then this rule allows
 	// traffic only if the traffic matches at least one port in the list.
 	// +optional
+	// +listType=atomic
 	Ports []NetworkPolicyPort `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
 
 	// to is a list of destinations for outgoing traffic of pods selected for this rule.
@@ -138,6 +144,7 @@ type NetworkPolicyEgressRule struct {
 	// destination). If this field is present and contains at least one item, this rule
 	// allows traffic only if the traffic matches at least one item in the to list.
 	// +optional
+	// +listType=atomic
 	To []NetworkPolicyPeer `json:"to,omitempty" protobuf:"bytes,2,rep,name=to"`
 }
 
@@ -175,6 +182,7 @@ type IPBlock struct {
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// Except values will be rejected if they are outside the cidr range
 	// +optional
+	// +listType=atomic
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`
 }
 
@@ -203,48 +211,6 @@ type NetworkPolicyPeer struct {
 	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
-}
-
-// NetworkPolicyConditionType is the type for status conditions on
-// a NetworkPolicy. This type should be used with the
-// NetworkPolicyStatus.Conditions field.
-type NetworkPolicyConditionType string
-
-const (
-	// NetworkPolicyConditionStatusAccepted represents status of a Network Policy that could be properly parsed by
-	// the Network Policy provider and will be implemented in the cluster
-	NetworkPolicyConditionStatusAccepted NetworkPolicyConditionType = "Accepted"
-
-	// NetworkPolicyConditionStatusPartialFailure represents status of a Network Policy that could be partially
-	// parsed by the Network Policy provider and may not be completely implemented due to a lack of a feature or some
-	// other condition
-	NetworkPolicyConditionStatusPartialFailure NetworkPolicyConditionType = "PartialFailure"
-
-	// NetworkPolicyConditionStatusFailure represents status of a Network Policy that could not be parsed by the
-	// Network Policy provider and will not be implemented in the cluster
-	NetworkPolicyConditionStatusFailure NetworkPolicyConditionType = "Failure"
-)
-
-// NetworkPolicyConditionReason defines the set of reasons that explain why a
-// particular NetworkPolicy condition type has been raised.
-type NetworkPolicyConditionReason string
-
-const (
-	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
-	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
-	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
-)
-
-// NetworkPolicyStatus describes the current state of the NetworkPolicy.
-type NetworkPolicyStatus struct {
-	// conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
-	// Current service state
-	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -371,6 +337,7 @@ type IngressStatus struct {
 type IngressLoadBalancerStatus struct {
 	// ingress is a list containing ingress points for the load-balancer.
 	// +optional
+	// +listType=atomic
 	Ingress []IngressLoadBalancerIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
 }
 

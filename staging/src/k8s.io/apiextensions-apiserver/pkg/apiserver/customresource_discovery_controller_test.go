@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -125,12 +125,13 @@ var coolBarCRD = &v1.CustomResourceDefinition{
 	},
 }
 
-var coolFooDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2beta1.APIVersionDiscovery{
-	Version: "v1",
-	Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
+var coolFooDiscovery apidiscoveryv2.APIVersionDiscovery = apidiscoveryv2.APIVersionDiscovery{
+	Version:   "v1",
+	Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+	Resources: []apidiscoveryv2.APIResourceDiscovery{
 		{
 			Resource:         "coolfoos",
-			Scope:            apidiscoveryv2beta1.ScopeCluster,
+			Scope:            apidiscoveryv2.ScopeCluster,
 			SingularResource: "coolfoo",
 			Verbs:            []string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 			ShortNames:       []string{"foo"},
@@ -140,7 +141,7 @@ var coolFooDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2bet
 				Version: "v1",
 				Kind:    "CoolFoo",
 			},
-			Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+			Subresources: []apidiscoveryv2.APISubresourceDiscovery{
 				{
 					Subresource:   "status",
 					Verbs:         []string{"get", "patch", "update"},
@@ -156,12 +157,13 @@ var coolFooDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2bet
 	},
 }
 
-var mergedDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2beta1.APIVersionDiscovery{
-	Version: "v1",
-	Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
+var mergedDiscovery apidiscoveryv2.APIVersionDiscovery = apidiscoveryv2.APIVersionDiscovery{
+	Version:   "v1",
+	Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+	Resources: []apidiscoveryv2.APIResourceDiscovery{
 		{
 			Resource:         "coolbars",
-			Scope:            apidiscoveryv2beta1.ScopeCluster,
+			Scope:            apidiscoveryv2.ScopeCluster,
 			SingularResource: "coolbar",
 			Verbs:            []string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 			ShortNames:       []string{"bar"},
@@ -173,7 +175,7 @@ var mergedDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2beta
 			},
 		}, {
 			Resource:         "coolfoos",
-			Scope:            apidiscoveryv2beta1.ScopeCluster,
+			Scope:            apidiscoveryv2.ScopeCluster,
 			SingularResource: "coolfoo",
 			Verbs:            []string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"},
 			ShortNames:       []string{"foo"},
@@ -183,7 +185,7 @@ var mergedDiscovery apidiscoveryv2beta1.APIVersionDiscovery = apidiscoveryv2beta
 				Version: "v1",
 				Kind:    "CoolFoo",
 			},
-			Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{
+			Subresources: []apidiscoveryv2.APISubresourceDiscovery{
 				{
 					Subresource:   "status",
 					Verbs:         []string{"get", "patch", "update"},

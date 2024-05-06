@@ -17,15 +17,23 @@ limitations under the License.
 package aggregated
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"sort"
 	"sync"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
+	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
+
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 
 	"sync/atomic"
 
@@ -35,13 +43,22 @@ import (
 	"k8s.io/klog/v2"
 )
 
+type Source uint
+
+// The GroupVersion from the lowest Source takes precedence
+const (
+	AggregatorSource Source = 0
+	BuiltinSource    Source = 100
+	CRDSource        Source = 200
+)
+
 // This handler serves the /apis endpoint for an aggregated list of
 // api resources indexed by their group version.
 type ResourceManager interface {
 	// Adds knowledge of the given groupversion to the discovery document
 	// If it was already being tracked, updates the stored APIVersionDiscovery
 	// Thread-safe
-	AddGroupVersion(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery)
+	AddGroupVersion(groupName string, value apidiscoveryv2.APIVersionDiscovery)
 
 	// Sets a priority to be used while sorting a specific group and
 	// group-version. If two versions report different priorities for
@@ -62,9 +79,55 @@ type ResourceManager interface {
 	// Resets the manager's known list of group-versions and replaces them
 	// with the given groups
 	// Thread-Safe
-	SetGroups([]apidiscoveryv2beta1.APIGroupDiscovery)
+	SetGroups([]apidiscoveryv2.APIGroupDiscovery)
+
+	// Returns the same resource manager using a different source
+	// The source is used to decide how to de-duplicate groups.
+	// The group from the least-numbered source is used
+	WithSource(source Source) ResourceManager
 
 	http.Handler
+}
+
+type resourceManager struct {
+	source Source
+	*resourceDiscoveryManager
+}
+
+func (rm resourceManager) AddGroupVersion(groupName string, value apidiscoveryv2.APIVersionDiscovery) {
+	rm.resourceDiscoveryManager.AddGroupVersion(rm.source, groupName, value)
+}
+func (rm resourceManager) SetGroupVersionPriority(gv metav1.GroupVersion, grouppriority, versionpriority int) {
+	rm.resourceDiscoveryManager.SetGroupVersionPriority(rm.source, gv, grouppriority, versionpriority)
+}
+func (rm resourceManager) RemoveGroup(groupName string) {
+	rm.resourceDiscoveryManager.RemoveGroup(rm.source, groupName)
+}
+func (rm resourceManager) RemoveGroupVersion(gv metav1.GroupVersion) {
+	rm.resourceDiscoveryManager.RemoveGroupVersion(rm.source, gv)
+}
+func (rm resourceManager) SetGroups(groups []apidiscoveryv2.APIGroupDiscovery) {
+	rm.resourceDiscoveryManager.SetGroups(rm.source, groups)
+}
+
+func (rm resourceManager) WithSource(source Source) ResourceManager {
+	return resourceManager{
+		source:                   source,
+		resourceDiscoveryManager: rm.resourceDiscoveryManager,
+	}
+}
+
+type groupKey struct {
+	name string
+
+	// Source identifies where this group came from and dictates which group
+	// among duplicates is chosen to be used for discovery.
+	source Source
+}
+
+type groupVersionKey struct {
+	metav1.GroupVersion
+	source Source
 }
 
 type resourceDiscoveryManager struct {
@@ -72,11 +135,13 @@ type resourceDiscoveryManager struct {
 	// cache is an atomic pointer to avoid the use of locks
 	cache atomic.Pointer[cachedGroupList]
 
+	serveHTTPFunc http.HandlerFunc
+
 	// Writes protected by the lock.
 	// List of all apigroups & resources indexed by the resource manager
 	lock              sync.RWMutex
-	apiGroups         map[string]*apidiscoveryv2beta1.APIGroupDiscovery
-	versionPriorities map[metav1.GroupVersion]priorityInfo
+	apiGroups         map[groupKey]*apidiscoveryv2.APIGroupDiscovery
+	versionPriorities map[groupVersionKey]priorityInfo
 }
 
 type priorityInfo struct {
@@ -84,25 +149,50 @@ type priorityInfo struct {
 	VersionPriority      int
 }
 
-func NewResourceManager() ResourceManager {
+func NewResourceManager(path string) ResourceManager {
 	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
+	utilruntime.Must(apidiscoveryv2.AddToScheme(scheme))
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
-	return &resourceDiscoveryManager{serializer: codecs, versionPriorities: make(map[metav1.GroupVersion]priorityInfo)}
+	// Register conversion for apidiscovery
+	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(scheme))
+
+	codecs := serializer.NewCodecFactory(scheme)
+	rdm := &resourceDiscoveryManager{
+		serializer:        codecs,
+		versionPriorities: make(map[groupVersionKey]priorityInfo),
+	}
+	rdm.serveHTTPFunc = metrics.InstrumentHandlerFunc("GET",
+		/* group = */ "",
+		/* version = */ "",
+		/* resource = */ "",
+		/* subresource = */ path,
+		/* scope = */ "",
+		/* component = */ metrics.APIServerComponent,
+		/* deprecated */ false,
+		/* removedRelease */ "",
+		rdm.serveHTTP)
+	return resourceManager{
+		source:                   BuiltinSource,
+		resourceDiscoveryManager: rdm,
+	}
 }
 
-func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(gv metav1.GroupVersion, groupPriorityMinimum, versionPriority int) {
+func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(source Source, gv metav1.GroupVersion, groupPriorityMinimum, versionPriority int) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
-	rdm.versionPriorities[gv] = priorityInfo{
+	key := groupVersionKey{
+		GroupVersion: gv,
+		source:       source,
+	}
+	rdm.versionPriorities[key] = priorityInfo{
 		GroupPriorityMinimum: groupPriorityMinimum,
 		VersionPriority:      versionPriority,
 	}
 	rdm.cache.Store(nil)
 }
 
-func (rdm *resourceDiscoveryManager) SetGroups(groups []apidiscoveryv2beta1.APIGroupDiscovery) {
+func (rdm *resourceDiscoveryManager) SetGroups(source Source, groups []apidiscoveryv2.APIGroupDiscovery) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
@@ -111,13 +201,17 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []apidiscoveryv2beta1.APIG
 
 	for _, group := range groups {
 		for _, version := range group.Versions {
-			rdm.addGroupVersionLocked(group.Name, version)
+			rdm.addGroupVersionLocked(source, group.Name, version)
 		}
 	}
 
 	// Filter unused out priority entries
 	for gv := range rdm.versionPriorities {
-		entry, exists := rdm.apiGroups[gv.Group]
+		key := groupKey{
+			source: source,
+			name:   gv.Group,
+		}
+		entry, exists := rdm.apiGroups[key]
 		if !exists {
 			delete(rdm.versionPriorities, gv)
 			continue
@@ -138,21 +232,25 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []apidiscoveryv2beta1.APIG
 	}
 }
 
-func (rdm *resourceDiscoveryManager) AddGroupVersion(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
+func (rdm *resourceDiscoveryManager) AddGroupVersion(source Source, groupName string, value apidiscoveryv2.APIVersionDiscovery) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
-	rdm.addGroupVersionLocked(groupName, value)
+	rdm.addGroupVersionLocked(source, groupName, value)
 }
 
-func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
-	klog.Infof("Adding GroupVersion %s %s to ResourceManager", groupName, value.Version)
+func (rdm *resourceDiscoveryManager) addGroupVersionLocked(source Source, groupName string, value apidiscoveryv2.APIVersionDiscovery) {
 
 	if rdm.apiGroups == nil {
-		rdm.apiGroups = make(map[string]*apidiscoveryv2beta1.APIGroupDiscovery)
+		rdm.apiGroups = make(map[groupKey]*apidiscoveryv2.APIGroupDiscovery)
 	}
 
-	if existing, groupExists := rdm.apiGroups[groupName]; groupExists {
+	key := groupKey{
+		source: source,
+		name:   groupName,
+	}
+
+	if existing, groupExists := rdm.apiGroups[key]; groupExists {
 		// If this version already exists, replace it
 		versionExists := false
 
@@ -165,6 +263,7 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 				if reflect.DeepEqual(existing.Versions[i], value) {
 					return
 				}
+
 				existing.Versions[i] = value
 				versionExists = true
 				break
@@ -176,18 +275,23 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 		}
 
 	} else {
-		group := &apidiscoveryv2beta1.APIGroupDiscovery{
+		group := &apidiscoveryv2.APIGroupDiscovery{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: groupName,
 			},
-			Versions: []apidiscoveryv2beta1.APIVersionDiscovery{value},
+			Versions: []apidiscoveryv2.APIVersionDiscovery{value},
 		}
-		rdm.apiGroups[groupName] = group
+		rdm.apiGroups[key] = group
 	}
+	klog.Infof("Adding GroupVersion %s %s to ResourceManager", groupName, value.Version)
 
 	gv := metav1.GroupVersion{Group: groupName, Version: value.Version}
-	if _, ok := rdm.versionPriorities[gv]; !ok {
-		rdm.versionPriorities[gv] = priorityInfo{
+	gvKey := groupVersionKey{
+		GroupVersion: gv,
+		source:       source,
+	}
+	if _, ok := rdm.versionPriorities[gvKey]; !ok {
+		rdm.versionPriorities[gvKey] = priorityInfo{
 			GroupPriorityMinimum: 1000,
 			VersionPriority:      15,
 		}
@@ -197,10 +301,16 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 	rdm.cache.Store(nil)
 }
 
-func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVersion) {
+func (rdm *resourceDiscoveryManager) RemoveGroupVersion(source Source, apiGroup metav1.GroupVersion) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
-	group, exists := rdm.apiGroups[apiGroup.Group]
+
+	key := groupKey{
+		source: source,
+		name:   apiGroup.Group,
+	}
+
+	group, exists := rdm.apiGroups[key]
 	if !exists {
 		return
 	}
@@ -218,23 +328,33 @@ func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVer
 		return
 	}
 
-	delete(rdm.versionPriorities, apiGroup)
+	gvKey := groupVersionKey{
+		GroupVersion: apiGroup,
+		source:       source,
+	}
+
+	delete(rdm.versionPriorities, gvKey)
 	if len(group.Versions) == 0 {
-		delete(rdm.apiGroups, group.Name)
+		delete(rdm.apiGroups, key)
 	}
 
 	// Reset response document so it is recreated lazily
 	rdm.cache.Store(nil)
 }
 
-func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
+func (rdm *resourceDiscoveryManager) RemoveGroup(source Source, groupName string) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
-	delete(rdm.apiGroups, groupName)
+	key := groupKey{
+		source: source,
+		name:   groupName,
+	}
+
+	delete(rdm.apiGroups, key)
 
 	for k := range rdm.versionPriorities {
-		if k.Group == groupName {
+		if k.Group == groupName && k.source == source {
 			delete(rdm.versionPriorities, k)
 		}
 	}
@@ -245,20 +365,67 @@ func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
 
 // Prepares the api group list for serving by converting them from map into
 // list and sorting them according to insertion order
-func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2beta1.APIGroupDiscovery {
+func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2.APIGroupDiscovery {
+	regenerationCounter.Inc()
 	// Re-order the apiGroups by their priority.
-	groups := []apidiscoveryv2beta1.APIGroupDiscovery{}
-	for _, group := range rdm.apiGroups {
-		copied := *group.DeepCopy()
+	groups := []apidiscoveryv2.APIGroupDiscovery{}
+
+	groupsToUse := map[string]apidiscoveryv2.APIGroupDiscovery{}
+	sourcesUsed := map[metav1.GroupVersion]Source{}
+
+	for key, group := range rdm.apiGroups {
+		if existing, ok := groupsToUse[key.name]; ok {
+			for _, v := range group.Versions {
+				gv := metav1.GroupVersion{Group: key.name, Version: v.Version}
+
+				// Skip groupversions we've already seen before. Only DefaultSource
+				// takes precedence
+				if usedSource, seen := sourcesUsed[gv]; seen && key.source >= usedSource {
+					continue
+				} else if seen {
+					// Find the index of the duplicate version and replace
+					for i := 0; i < len(existing.Versions); i++ {
+						if existing.Versions[i].Version == v.Version {
+							existing.Versions[i] = v
+							break
+						}
+					}
+
+				} else {
+					// New group-version, just append
+					existing.Versions = append(existing.Versions, v)
+				}
+
+				sourcesUsed[gv] = key.source
+				groupsToUse[key.name] = existing
+			}
+			// Check to see if we have overlapping versions. If we do, take the one
+			// with highest source precedence
+		} else {
+			groupsToUse[key.name] = *group.DeepCopy()
+			for _, v := range group.Versions {
+				gv := metav1.GroupVersion{Group: key.name, Version: v.Version}
+				sourcesUsed[gv] = key.source
+			}
+		}
+	}
+
+	for _, group := range groupsToUse {
 
 		// Re-order versions based on their priority. Use kube-aware string
 		// comparison as a tie breaker
-		sort.SliceStable(copied.Versions, func(i, j int) bool {
-			iVersion := copied.Versions[i].Version
-			jVersion := copied.Versions[j].Version
+		sort.SliceStable(group.Versions, func(i, j int) bool {
+			iVersion := group.Versions[i].Version
+			jVersion := group.Versions[j].Version
 
-			iPriority := rdm.versionPriorities[metav1.GroupVersion{Group: group.Name, Version: iVersion}].VersionPriority
-			jPriority := rdm.versionPriorities[metav1.GroupVersion{Group: group.Name, Version: jVersion}].VersionPriority
+			iGV := metav1.GroupVersion{Group: group.Name, Version: iVersion}
+			jGV := metav1.GroupVersion{Group: group.Name, Version: jVersion}
+
+			iSource := sourcesUsed[iGV]
+			jSource := sourcesUsed[jGV]
+
+			iPriority := rdm.versionPriorities[groupVersionKey{iGV, iSource}].VersionPriority
+			jPriority := rdm.versionPriorities[groupVersionKey{jGV, jSource}].VersionPriority
 
 			// Sort by version string comparator if priority is equal
 			if iPriority == jPriority {
@@ -269,13 +436,16 @@ func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2
 			return iPriority > jPriority
 		})
 
-		groups = append(groups, *copied.DeepCopy())
-
+		groups = append(groups, group)
 	}
 
 	// For each group, determine the highest minimum group priority and use that
 	priorities := map[string]int{}
 	for gv, info := range rdm.versionPriorities {
+		if source := sourcesUsed[gv.GroupVersion]; source != gv.source {
+			continue
+		}
+
 		if existing, exists := priorities[gv.Group]; exists {
 			if existing < info.GroupPriorityMinimum {
 				priorities[gv.Group] = info.GroupPriorityMinimum
@@ -316,7 +486,7 @@ func (rdm *resourceDiscoveryManager) fetchFromCache() *cachedGroupList {
 	if cacheLoad != nil {
 		return cacheLoad
 	}
-	response := apidiscoveryv2beta1.APIGroupDiscoveryList{
+	response := apidiscoveryv2.APIGroupDiscoveryList{
 		Items: rdm.calculateAPIGroupsLocked(),
 	}
 	etag, err := calculateETag(response)
@@ -333,20 +503,49 @@ func (rdm *resourceDiscoveryManager) fetchFromCache() *cachedGroupList {
 }
 
 type cachedGroupList struct {
-	cachedResponse     apidiscoveryv2beta1.APIGroupDiscoveryList
+	cachedResponse apidiscoveryv2.APIGroupDiscoveryList
+	// etag is calculated based on a SHA hash of only the JSON object.
+	// A response via different Accept encodings (eg: protobuf, json) will
+	// yield the same etag. This is okay because Accept is part of the Vary header.
+	// Per RFC7231 a client must only cache a response etag pair if the header field
+	// matches as indicated by the Vary field. Thus, protobuf and json and other Accept
+	// encodings will not be cached as the same response despite having the same etag.
 	cachedResponseETag string
 }
 
 func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	rdm.serveHTTPFunc(resp, req)
+}
+
+func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *http.Request) {
 	cache := rdm.fetchFromCache()
 	response := cache.cachedResponse
 	etag := cache.cachedResponseETag
+
+	mediaType, _, err := negotiation.NegotiateOutputMediaType(req, rdm.serializer, DiscoveryEndpointRestrictions)
+	if err != nil {
+		// Should never happen. wrapper.go will only proxy requests to this
+		// handler if the media type passes DiscoveryEndpointRestrictions
+		utilruntime.HandleError(err)
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var targetGV schema.GroupVersion
+	if mediaType.Convert == nil ||
+		(mediaType.Convert.GroupVersion() != apidiscoveryv2.SchemeGroupVersion &&
+			mediaType.Convert.GroupVersion() != apidiscoveryv2beta1.SchemeGroupVersion) {
+		utilruntime.HandleError(fmt.Errorf("expected aggregated discovery group version, got group: %s, version %s", mediaType.Convert.Group, mediaType.Convert.Version))
+		resp.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	targetGV = mediaType.Convert.GroupVersion()
 
 	if len(etag) > 0 {
 		// Use proper e-tag headers if one is available
 		ServeHTTPWithETag(
 			&response,
 			etag,
+			targetGV,
 			rdm.serializer,
 			resp,
 			req,
@@ -357,7 +556,7 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 		responsewriters.WriteObjectNegotiated(
 			rdm.serializer,
 			DiscoveryEndpointRestrictions,
-			AggregatedDiscoveryGV,
+			targetGV,
 			resp,
 			req,
 			http.StatusOK,

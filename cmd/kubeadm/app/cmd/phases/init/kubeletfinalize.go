@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -38,6 +39,9 @@ var (
 		# Updates settings relevant to the kubelet after TLS bootstrap"
 		kubeadm init phase kubelet-finalize all --config
 		`)
+	// TODO: remove with 'experimental-cert-rotation'.
+	// https://github.com/kubernetes/kubeadm/issues/3046
+	enableClientCertRotationRun = false
 )
 
 // NewKubeletFinalizePhase creates a kubeadm workflow phase that updates settings
@@ -56,19 +60,48 @@ func NewKubeletFinalizePhase() workflow.Phase {
 				RunAllSiblings: true,
 			},
 			{
-				Name:         "experimental-cert-rotation",
+				Name:         "enable-client-cert-rotation",
 				Short:        "Enable kubelet client certificate rotation",
 				InheritFlags: []string{options.CfgPath, options.CertificatesDir, options.DryRun},
-				Run:          runKubeletFinalizeCertRotation,
+				Run:          runKubeletFinalizeEnableClientCertRotation,
+			},
+			// TODO: remove this phase in 1.32.
+			// also remove the "enableClientCertRotationRun" variable.
+			// https://github.com/kubernetes/kubeadm/issues/3046
+			{
+				Name:         "experimental-cert-rotation",
+				Short:        "Enable kubelet client certificate rotation (DEPRECATED: use 'enable-client-cert-rotation' instead)",
+				InheritFlags: []string{options.CfgPath, options.CertificatesDir, options.DryRun},
+				Run:          runKubeletFinalizeEnableClientCertRotationWrapped,
 			},
 		},
 	}
 }
 
-// runKubeletFinalizeCertRotation detects if the kubelet certificate rotation is enabled
+// runKubeletFinalizeEnableClientCertRotationWrapped wraps runKubeletFinalizeEnableClientCertRotation
+// and prints a deprecation message when the phase is executed directly. If 'all' is used this
+// function should just return nil because 'enable-client-cert-rotation' sets 'enableClientCertRotationRun'.
+// TODO: remove in 1.32.
+// https://github.com/kubernetes/kubeadm/issues/3046
+func runKubeletFinalizeEnableClientCertRotationWrapped(c workflow.RunData) error {
+	if enableClientCertRotationRun {
+		return nil
+	}
+	klog.Warning("The phase 'experimental-cert-rotation' is deprecated and will be removed in a future release. " +
+		"Use 'enable-client-cert-rotation' instead")
+	return runKubeletFinalizeEnableClientCertRotation(c)
+}
+
+// runKubeletFinalizeEnableClientCertRotation detects if the kubelet certificate rotation is enabled
 // and updates the kubelet.conf file to point to a rotatable certificate and key for the
 // Node user.
-func runKubeletFinalizeCertRotation(c workflow.RunData) error {
+func runKubeletFinalizeEnableClientCertRotation(c workflow.RunData) error {
+	// Set 'enableClientCertRotationRun' to make sure that if 'all' is called,
+	// runKubeletFinalizeEnableClientCertRotationWrapped will return nil early.
+	// TODO: remove in 1.32.
+	// https://github.com/kubernetes/kubeadm/issues/3046
+	enableClientCertRotationRun = true
+
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-finalize phase invoked with an invalid data struct")
@@ -78,8 +111,8 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	// If yes, use that path, else use the kubeadm provided value.
 	cfg := data.Cfg()
 	pkiPath := filepath.Join(data.KubeletDir(), "pki")
-	val, ok := cfg.NodeRegistration.KubeletExtraArgs["cert-dir"]
-	if ok {
+	val, idx := kubeadmapi.GetArgValue(cfg.NodeRegistration.KubeletExtraArgs, "cert-dir", -1)
+	if idx > -1 {
 		pkiPath = val
 	}
 
@@ -113,7 +146,17 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	}
 
 	// Perform basic validation. The errors here can only happen if the kubelet.conf was corrupted.
-	userName := fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name)
+	if len(kubeconfig.CurrentContext) == 0 {
+		return errors.Errorf("the file %q does not have current context set", kubeconfigPath)
+	}
+	currentContext, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]
+	if !ok {
+		return errors.Errorf("the file %q is not a valid kubeconfig: %q set as current-context, but not found in context list", kubeconfigPath, kubeconfig.CurrentContext)
+	}
+	userName := currentContext.AuthInfo
+	if len(userName) == 0 {
+		return errors.Errorf("the file %q is not a valid kubeconfig: empty username for current context", kubeconfigPath)
+	}
 	info, ok := kubeconfig.AuthInfos[userName]
 	if !ok {
 		return errors.Errorf("the file %q does not contain authentication for user %q", kubeconfigPath, cfg.NodeRegistration.Name)

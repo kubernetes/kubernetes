@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -32,13 +33,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f := framework.NewDefaultFramework("mirror-pod-with-grace-period")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func(ctx context.Context) {
@@ -46,7 +48,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			staticPodName = "graceful-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = kubeletCfg.StaticPodPath
 
 			ginkgo.By("create the static pod")
 			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)
@@ -58,7 +60,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("mirror pod termination should satisfy grace period when static pod is deleted [NodeConformance]", func(ctx context.Context) {
+		f.It("mirror pod termination should satisfy grace period when static pod is deleted", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -76,7 +78,7 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("mirror pod termination should satisfy grace period when static pod is updated [NodeConformance]", func(ctx context.Context) {
+		f.It("mirror pod termination should satisfy grace period when static pod is updated", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -100,11 +102,11 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pod.Spec.Containers), 1)
-			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
+			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(1))
+			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
 
-		ginkgo.It("should update a static pod when the static pod is updated multiple times during the graceful termination period [NodeConformance]", func(ctx context.Context) {
+		f.It("should update a static pod when the static pod is updated multiple times during the graceful termination period", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -129,11 +131,35 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pod.Spec.Containers), 1)
-			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
+			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(1))
+			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
 
-		ginkgo.Context("and the container runtime is temporarily down during pod termination [NodeConformance] [Serial] [Disruptive]", func() {
+		f.Context("and the container runtime is temporarily down during pod termination", f.WithNodeConformance(), f.WithSerial(), f.WithDisruptive(), func() {
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				// Ensure that prior to the test starting, no other pods are running or in the process of being terminated other than the mirror pod.
+				// This is necessary as the test verifies metrics that assume that there is only one pod (the static pod) being run, and all other pods have been terminated.
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					podList, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						return fmt.Errorf("failed listing pods while waiting for all pods to be terminated: %v", err)
+					}
+					var remainingPods []string
+
+					for _, pod := range podList.Items {
+						// The mirror pod is the only expected pod to be running
+						if pod.Name == mirrorPodName && pod.Namespace == ns {
+							continue
+						}
+						remainingPods = append(remainingPods, fmt.Sprintf("(%s/%s)", pod.Namespace, pod.Name))
+					}
+
+					if len(remainingPods) > 0 {
+						return fmt.Errorf("not all pods are terminated yet prior to starting mirror pod test: %v pods that still exist: %v", len(remainingPods), strings.Join(remainingPods, ","))
+					}
+					return nil
+				}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.Succeed())
+			})
 			ginkgo.It("the mirror pod should terminate successfully", func(ctx context.Context) {
 				ginkgo.By("verifying the pod is described as syncing in metrics")
 				gomega.Eventually(ctx, getKubeletMetrics, 5*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{

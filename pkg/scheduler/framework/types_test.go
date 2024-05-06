@@ -19,7 +19,6 @@ package framework
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,6 +30,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewResource(t *testing.T) {
@@ -210,49 +211,30 @@ func TestSetMaxResource(t *testing.T) {
 	}
 }
 
-type testingMode interface {
-	Fatalf(format string, args ...interface{})
-}
-
-func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, ports []v1.ContainerPort, volumes []v1.Volume) *v1.Pod {
-	req := v1.ResourceList{}
-	if cpu != "" {
-		req = v1.ResourceList{
-			v1.ResourceCPU:    resource.MustParse(cpu),
-			v1.ResourceMemory: resource.MustParse(mem),
-		}
-		if extended != "" {
-			parts := strings.Split(extended, ":")
-			if len(parts) != 2 {
-				t.Fatalf("Invalid extended resource string: \"%s\"", extended)
-			}
-			req[v1.ResourceName(parts[0])] = resource.MustParse(parts[1])
-		}
-	}
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       types.UID(objName),
-			Namespace: "node_info_cache_test",
-			Name:      objName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Resources: v1.ResourceRequirements{
-					Requests: req,
-				},
-				Ports: ports,
-			}},
-			NodeName: nodeName,
-			Volumes:  volumes,
-		},
-	}
-}
-
 func TestNewNodeInfo(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}, nil),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
+		st.MakePod().UID("test-1").Namespace("node_info_cache_test").Name("test-1").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "500",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 80,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
+
+		st.MakePod().UID("test-2").Namespace("node_info_cache_test").Name("test-2").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "200m",
+				v1.ResourceMemory: "1Ki",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 8080,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
 	}
 
 	expected := &NodeInfo{
@@ -513,7 +495,7 @@ func TestNodeInfoClone(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			ni := test.nodeInfo.Clone()
+			ni := test.nodeInfo.Snapshot()
 			// Modify the field to check if the result is a clone of the origin one.
 			test.nodeInfo.Generation += 10
 			test.nodeInfo.UsedPorts.Remove("127.0.0.1", "TCP", 80)
@@ -841,10 +823,28 @@ func TestNodeInfoAddPod(t *testing.T) {
 func TestNodeInfoRemovePod(t *testing.T) {
 	nodeName := "test-node"
 	pods := []*v1.Pod{
-		makeBasePod(t, nodeName, "test-1", "100m", "500", "",
-			[]v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}},
-			[]v1.Volume{{VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}}}}),
-		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}, nil),
+		st.MakePod().UID("test-1").Namespace("node_info_cache_test").Name("test-1").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "100m",
+				v1.ResourceMemory: "500",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 80,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Volumes([]v1.Volume{{VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "pvc-1"}}}}).
+			Obj(),
+
+		st.MakePod().UID("test-2").Namespace("node_info_cache_test").Name("test-2").Node(nodeName).
+			Containers([]v1.Container{st.MakeContainer().ResourceRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "200m",
+				v1.ResourceMemory: "1Ki",
+			}).ContainerPort([]v1.ContainerPort{{
+				HostIP:   "127.0.0.1",
+				HostPort: 8080,
+				Protocol: "TCP",
+			}}).Obj()}).
+			Obj(),
 	}
 
 	// add pod Overhead
@@ -861,7 +861,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 		expectedNodeInfo *NodeInfo
 	}{
 		{
-			pod:         makeBasePod(t, nodeName, "non-exist", "0", "0", "", []v1.ContainerPort{{}}, []v1.Volume{}),
+			pod:         st.MakePod().UID("non-exist").Namespace("node_info_cache_test").Node(nodeName).Obj(),
 			errExpected: true,
 			expectedNodeInfo: &NodeInfo{
 				node: &v1.Node{
@@ -1084,10 +1084,11 @@ func TestNodeInfoRemovePod(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			ni := fakeNodeInfo(pods...)
 
 			gen := ni.Generation
-			err := ni.RemovePod(test.pod)
+			err := ni.RemovePod(logger, test.pod)
 			if err != nil {
 				if test.errExpected {
 					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
@@ -1339,26 +1340,26 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 	tests := []struct {
 		name string
 		term *v1.PodAffinityTerm
-		want sets.String
+		want sets.Set[string]
 	}{
 		{
 			name: "podAffinityTerm_namespace_empty",
 			term: &v1.PodAffinityTerm{},
-			want: sets.String{metav1.NamespaceDefault: sets.Empty{}},
+			want: sets.Set[string]{metav1.NamespaceDefault: sets.Empty{}},
 		},
 		{
 			name: "podAffinityTerm_namespace_not_empty",
 			term: &v1.PodAffinityTerm{
 				Namespaces: []string{metav1.NamespacePublic, metav1.NamespaceSystem},
 			},
-			want: sets.NewString(metav1.NamespacePublic, metav1.NamespaceSystem),
+			want: sets.New(metav1.NamespacePublic, metav1.NamespaceSystem),
 		},
 		{
 			name: "podAffinityTerm_namespace_selector_not_nil",
 			term: &v1.PodAffinityTerm{
 				NamespaceSelector: &metav1.LabelSelector{},
 			},
-			want: sets.String{},
+			want: sets.Set[string]{},
 		},
 	}
 
@@ -1390,8 +1391,32 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
 			},
 			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter.",
+		},
+		{
+			name:        "nodes failed Prefilter plugin and the preemption also failed",
+			numAllNodes: 3,
+			diagnosis: Diagnosis{
+				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
+				NodeToStatusMap: NodeToStatusMap{
+					// They're inserted by the framework.
+					// We don't include them in the reason message because they'd be just duplicates.
+					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				},
+				// PostFilterMsg will be included.
+				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
+			},
+			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter. Error running PostFilter plugin FailedPostFilter",
 		},
 		{
 			name:        "nodes failed one Filter plugin with an empty PostFilterMsg",
@@ -1418,7 +1443,7 @@ func TestFitError_Error(t *testing.T) {
 				},
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
-			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
+			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
 		},
 		{
 			name:        "nodes failed two Filter plugins with an empty PostFilterMsg",
@@ -1445,7 +1470,29 @@ func TestFitError_Error(t *testing.T) {
 				},
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
-			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter.",
+			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
+		},
+		{
+			name:        "failed to Permit on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Permit plugin Permit-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
+		},
+		{
+			name:        "failed to Reserve on node",
+			numAllNodes: 1,
+			diagnosis: Diagnosis{
+				NodeToStatusMap: NodeToStatusMap{
+					// There should be only one node here.
+					"node1": NewStatus(Unschedulable, "Node failed Reserve plugin Reserve-1"),
+				},
+			},
+			wantReasonMsg: "0/1 nodes are available: 1 Node failed Reserve plugin Reserve-1.",
 		},
 	}
 	for _, tt := range tests {
@@ -1463,7 +1510,7 @@ func TestFitError_Error(t *testing.T) {
 }
 
 func TestCalculatePodResourcesWithResize(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	cpu500m := resource.MustParse("500m")
 	mem500M := resource.MustParse("500Mi")
 	cpu700m := resource.MustParse("700m")
@@ -1488,7 +1535,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			ContainerStatuses: []v1.ContainerStatus{
 				{
 					Name:               "c1",
-					ResourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 				},
 			},
 		},
@@ -1497,7 +1544,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 	tests := []struct {
 		name               string
 		requests           v1.ResourceList
-		resourcesAllocated v1.ResourceList
+		allocatedResources v1.ResourceList
 		resizeStatus       v1.PodResizeStatus
 		expectedResource   Resource
 		expectedNon0CPU    int64
@@ -1506,7 +1553,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with no pending resize",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       "",
 			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
@@ -1515,7 +1562,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with resize in progress",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusInProgress,
 			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
@@ -1524,7 +1571,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with deferred resize",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusDeferred,
 			expectedResource:   Resource{MilliCPU: cpu700m.MilliValue(), Memory: mem800M.Value()},
 			expectedNon0CPU:    cpu700m.MilliValue(),
@@ -1533,7 +1580,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		{
 			name:               "Pod with infeasible resize",
 			requests:           v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			resourcesAllocated: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			allocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			resizeStatus:       v1.PodResizeStatusInfeasible,
 			expectedResource:   Resource{MilliCPU: cpu500m.MilliValue(), Memory: mem500M.Value()},
 			expectedNon0CPU:    cpu500m.MilliValue(),
@@ -1545,7 +1592,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pod := testpod.DeepCopy()
 			pod.Spec.Containers[0].Resources.Requests = tt.requests
-			pod.Status.ContainerStatuses[0].ResourcesAllocated = tt.resourcesAllocated
+			pod.Status.ContainerStatuses[0].AllocatedResources = tt.allocatedResources
 			pod.Status.Resize = tt.resizeStatus
 
 			res, non0CPU, non0Mem := calculateResource(pod)
@@ -1557,6 +1604,55 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			}
 			if non0Mem != tt.expectedNon0Mem {
 				t.Errorf("Test: %s expected non0Mem: %d, got: %d", tt.name, tt.expectedNon0Mem, non0Mem)
+			}
+		})
+	}
+}
+
+func TestCloudEvent_Match(t *testing.T) {
+	testCases := []struct {
+		name        string
+		event       ClusterEvent
+		comingEvent ClusterEvent
+		wantResult  bool
+	}{
+		{
+			name:        "wildcard event matches with all kinds of coming events",
+			event:       ClusterEvent{Resource: WildCard, ActionType: All},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = '*' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = '*' matching with coming events carries different actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeAllocatable},
+			wantResult:  false,
+		},
+		{
+			name:        "event matching with coming events carries '*' resources",
+			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			wantResult:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.event.Match(tc.comingEvent)
+			if got != tc.wantResult {
+				t.Fatalf("unexpected result")
 			}
 		})
 	}

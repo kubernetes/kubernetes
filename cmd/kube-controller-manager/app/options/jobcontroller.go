@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
@@ -32,6 +34,8 @@ func (o *JobControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
+
+	fs.Int32Var(&o.ConcurrentJobSyncs, "concurrent-job-syncs", o.ConcurrentJobSyncs, "The number of job objects that are allowed to sync concurrently. Larger number = more responsive jobs, but more CPU (and network) load")
 }
 
 // ApplyTo fills up JobController config with options.
@@ -52,5 +56,8 @@ func (o *JobControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentJobSyncs < 1 {
+		errs = append(errs, fmt.Errorf("concurrent-job-syncs must be greater than 0, but got %d", o.ConcurrentJobSyncs))
+	}
 	return errs
 }

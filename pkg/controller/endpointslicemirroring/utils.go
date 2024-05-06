@@ -27,8 +27,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	netutils "k8s.io/utils/net"
 )
 
@@ -38,7 +38,7 @@ type addrTypePortMapKey string
 
 // newAddrTypePortMapKey generates a PortMapKey from endpoint ports.
 func newAddrTypePortMapKey(endpointPorts []discovery.EndpointPort, addrType discovery.AddressType) addrTypePortMapKey {
-	pmk := fmt.Sprintf("%s-%s", addrType, endpointutil.NewPortMapKey(endpointPorts))
+	pmk := fmt.Sprintf("%s-%s", addrType, endpointsliceutil.NewPortMapKey(endpointPorts))
 	return addrTypePortMapKey(pmk)
 }
 

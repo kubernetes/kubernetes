@@ -30,8 +30,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -103,17 +103,6 @@ func AddCRISocketFlag(flagSet *pflag.FlagSet, criSocket *string) {
 	)
 }
 
-// DefaultInitConfiguration return default InitConfiguration. Avoid running the CRI auto-detection
-// code as we don't need it.
-func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
-	initCfg := &kubeadmapiv1.InitConfiguration{
-		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
-			CRISocket: kubeadmconstants.UnknownCRISocket, // avoid CRI detection
-		},
-	}
-	return initCfg
-}
-
 // InteractivelyConfirmAction asks the user whether they _really_ want to take the action.
 func InteractivelyConfirmAction(action, question string, r io.Reader) error {
 	fmt.Printf("[%s] %s [y/N]: ", action, question)
@@ -140,4 +129,25 @@ func GetClientSet(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
+}
+
+// ValueFromFlagsOrConfig checks if the "name" flag has been set. If yes, it returns the value of the flag, otherwise it returns the value from config.
+func ValueFromFlagsOrConfig(flagSet *pflag.FlagSet, name string, cfgValue interface{}, flagValue interface{}) interface{} {
+	if flagSet.Changed(name) {
+		return flagValue
+	}
+
+	// covert the nil to false if this is a bool, this will help to get rid of nil dereference error.
+	cfg, ok := cfgValue.(*bool)
+	if ok && cfg == nil {
+		return ptr.To(false)
+	}
+
+	// assume config has all the defaults set correctly.
+	return cfgValue
+}
+
+// TypeMismatchErr return an error which indicates how the type is mismatched.
+func TypeMismatchErr(opt, rType string) error {
+	return errors.Errorf("type mismatch, %s is expected to be a pointer to %s", opt, rType)
 }

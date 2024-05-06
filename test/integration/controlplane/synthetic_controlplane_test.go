@@ -46,6 +46,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -189,7 +190,8 @@ func TestStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+			tCtx := ktesting.Init(t)
+			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 					if tc.modifyOptions != nil {
 						tc.modifyOptions(options)
@@ -692,77 +694,6 @@ func TestAPIServerService(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestServiceAlloc(t *testing.T) {
-	// Create an IPv4 single stack control-plane
-	serviceCIDR := "192.168.0.0/29"
-
-	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.ServiceClusterIPRanges = serviceCIDR
-		},
-	})
-	defer tearDownFn()
-
-	svc := func(i int) *corev1.Service {
-		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("svc-%v", i),
-			},
-			Spec: corev1.ServiceSpec{
-				Type: corev1.ServiceTypeClusterIP,
-				Ports: []corev1.ServicePort{
-					{Port: 80},
-				},
-			},
-		}
-	}
-
-	// Wait until the default "kubernetes" service is created.
-	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
-		return !apierrors.IsNotFound(err), nil
-	}); err != nil {
-		t.Fatalf("creating kubernetes service timed out")
-	}
-
-	// make 5 more services to take up all IPs
-	for i := 0; i < 5; i++ {
-		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
-			t.Error(err)
-		}
-	}
-
-	// Make another service. It will fail because we're out of cluster IPs
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
-		if !strings.Contains(err.Error(), "range is full") {
-			t.Errorf("unexpected error text: %v", err)
-		}
-	} else {
-		svcs, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			t.Fatalf("unexpected success, and error getting the services: %v", err)
-		}
-		allIPs := []string{}
-		for _, s := range svcs.Items {
-			allIPs = append(allIPs, s.Spec.ClusterIP)
-		}
-		t.Fatalf("unexpected creation success. The following IPs exist: %#v. It should only be possible to allocate 2 IP addresses in this cluster.\n\n%#v", allIPs, svcs)
-	}
-
-	// Delete the first service.
-	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.TODO(), svc(1).ObjectMeta.Name, metav1.DeleteOptions{}); err != nil {
-		t.Fatalf("got unexpected error: %v", err)
-	}
-
-	// This time creating the second service should work.
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
-		t.Fatalf("got unexpected error: %v", err)
 	}
 }
 

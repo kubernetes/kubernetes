@@ -20,8 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
-
+	"github.com/google/go-cmp/cmp"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -163,7 +162,7 @@ func TestHorizontalPodAutoscalerAnnotations(t *testing.T) {
 			t.Fatalf("unexpected object: %v", obj)
 		}
 		if !reflect.DeepEqual(*hpa, hpaBeforeMuatate) {
-			t.Errorf("diff: %v", diff.ObjectDiff(*hpa, hpaBeforeMuatate))
+			t.Errorf("diff: %v", cmp.Diff(*hpa, hpaBeforeMuatate))
 			t.Errorf("expected: %#v\n actual:   %#v", *hpa, hpaBeforeMuatate)
 		}
 

@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/google/cadvisor/container/crio"
 	cadvisorfs "github.com/google/cadvisor/fs"
 )
 
@@ -37,7 +38,7 @@ func TestImageFsInfoLabel(t *testing.T) {
 		expectedError   error
 	}{{
 		description:     "LabelCrioImages should be returned",
-		runtimeEndpoint: CrioSocket,
+		runtimeEndpoint: crio.CrioSocket,
 		expectedLabel:   cadvisorfs.LabelCrioImages,
 		expectedError:   nil,
 	}, {
@@ -51,6 +52,35 @@ func TestImageFsInfoLabel(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			infoProvider := NewImageFsInfoProvider(tc.runtimeEndpoint)
 			label, err := infoProvider.ImageFsInfoLabel()
+			assert.Equal(t, tc.expectedLabel, label)
+			assert.Equal(t, tc.expectedError, err)
+		})
+	}
+}
+
+func TestContainerFsInfoLabel(t *testing.T) {
+	testcases := []struct {
+		description     string
+		runtime         string
+		runtimeEndpoint string
+		expectedLabel   string
+		expectedError   error
+	}{{
+		description:     "LabelCrioWriteableImages should be returned",
+		runtimeEndpoint: crio.CrioSocket,
+		expectedLabel:   cadvisorfs.LabelCrioContainers,
+		expectedError:   nil,
+	}, {
+		description:     "Cannot find valid imagefs label",
+		runtimeEndpoint: "",
+		expectedLabel:   "",
+		expectedError:   fmt.Errorf("no containerfs label for configured runtime"),
+	}}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			infoProvider := NewImageFsInfoProvider(tc.runtimeEndpoint)
+			label, err := infoProvider.ContainerFsInfoLabel()
 			assert.Equal(t, tc.expectedLabel, label)
 			assert.Equal(t, tc.expectedError, err)
 		})

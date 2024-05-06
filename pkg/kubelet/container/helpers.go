@@ -59,7 +59,7 @@ type RuntimeHelper interface {
 	GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64
 
 	// GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-	GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error)
+	GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error)
 
 	// PrepareDynamicResources prepares resources for a pod.
 	PrepareDynamicResources(pod *v1.Pod) error
@@ -273,6 +273,8 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 			Name:                 containerStatus.Name,
 			Image:                containerStatus.Image,
 			ImageID:              containerStatus.ImageID,
+			ImageRef:             containerStatus.ImageRef,
+			ImageRuntimeHandler:  containerStatus.ImageRuntimeHandler,
 			Hash:                 containerStatus.Hash,
 			HashWithoutResources: containerStatus.HashWithoutResources,
 			State:                containerStatus.State,
@@ -396,4 +398,28 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 		names[name] = struct{}{}
 	}
 	return
+}
+
+// HasAnyRegularContainerStarted returns true if any regular container has
+// started, which indicates all init containers have been initialized.
+func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStatus) bool {
+	if len(statuses) == 0 {
+		return false
+	}
+
+	containerNames := make(map[string]struct{})
+	for _, c := range spec.Containers {
+		containerNames[c.Name] = struct{}{}
+	}
+
+	for _, status := range statuses {
+		if _, ok := containerNames[status.Name]; !ok {
+			continue
+		}
+		if status.State.Running != nil || status.State.Terminated != nil {
+			return true
+		}
+	}
+
+	return false
 }

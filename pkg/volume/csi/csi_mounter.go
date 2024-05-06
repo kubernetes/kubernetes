@@ -105,6 +105,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
 	}
 
@@ -333,7 +335,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
 
 		// fullPluginName helps to distinguish different driver from csi plugin
-		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
+		err := volume.SetVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
 		if err != nil {
 			// At this point mount operation is successful:
 			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
@@ -419,7 +421,9 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		return errors.New(log("Unmounter.TearDownAt failed to get CSI client: %v", err))
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return volumetypes.NewTransientOperationFailure(log("Unmounter.TearDownAt failed to get CSI client: %v", err))
 	}
 
 	// Could not get spec info on whether this is a migrated operation because c.spec is nil
@@ -430,11 +434,16 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return errors.New(log("Unmounter.TearDownAt failed: %v", err))
 	}
 
-	// Deprecation: Removal of target_path provided in the NodePublish RPC call
+	// Removal of target_path provided in the NodePublish RPC call
 	// (in this case location `dir`) MUST be done by the CSI plugin according
-	// to the spec. This will no longer be done directly as part of TearDown
-	// by the kubelet in the future. Kubelet will only be responsible for
-	// removal of json data files it creates and parent directories.
+	// to the spec.
+	//
+	// Kubelet should only be responsible for removal of json data files it
+	// creates and parent directories.
+	//
+	// However, some CSI plugins maybe buggy and don't adhere to the standard,
+	// so we still need to remove the target_path here if it's unmounted and
+	// empty.
 	if err := removeMountDir(c.plugin, dir); err != nil {
 		return errors.New(log("Unmounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 	}

@@ -1,7 +1,6 @@
 # ttrpc
 
 [![Build Status](https://github.com/containerd/ttrpc/workflows/CI/badge.svg)](https://github.com/containerd/ttrpc/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/containerd/ttrpc/branch/main/graph/badge.svg)](https://codecov.io/gh/containerd/ttrpc)
 
 GRPC for low-memory environments.
 
@@ -20,13 +19,17 @@ Please note that while this project supports generating either end of the
 protocol, the generated service definitions will be incompatible with regular
 GRPC services, as they do not speak the same protocol.
 
+# Protocol
+
+See the [protocol specification](./PROTOCOL.md).
+
 # Usage
 
 Create a gogo vanity binary (see
 [`cmd/protoc-gen-gogottrpc/main.go`](cmd/protoc-gen-gogottrpc/main.go) for an
 example with the ttrpc plugin enabled.
 
-It's recommended to use [`protobuild`](https://github.com//stevvooe/protobuild)
+It's recommended to use [`protobuild`](https://github.com/containerd/protobuild)
 to build the protobufs for this project, but this will work with protoc
 directly, if required.
 
@@ -37,13 +40,11 @@ directly, if required.
 - The client and server interface are identical whereas in GRPC there is a
   client and server interface that are different.
 - The Go stdlib context package is used instead.
-- No support for streams yet.
 
 # Status
 
 TODO:
 
-- [ ] Document protocol layout
 - [ ] Add testing under concurrent load to ensure
 - [ ] Verify connection error handling
 

@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -49,7 +52,7 @@ func TestFakeIPTables(t *testing.T) {
 		*mangle
 		COMMIT
 		`, "\n"))
-	if string(buf.Bytes()) != expected {
+	if buf.String() != expected {
 		t.Fatalf("bad initial dump. expected:\n%s\n\ngot:\n%s\n", expected, buf.Bytes())
 	}
 
@@ -143,7 +146,7 @@ func TestFakeIPTables(t *testing.T) {
 		*mangle
 		COMMIT
 		`, "\n"))
-	if string(buf.Bytes()) != expected {
+	if buf.String() != expected {
 		t.Fatalf("bad sanity-check dump. expected:\n%s\n\ngot:\n%s\n", expected, buf.Bytes())
 	}
 
@@ -214,7 +217,7 @@ func TestFakeIPTables(t *testing.T) {
 		*mangle
 		COMMIT
 		`, "\n"))
-	if string(buf.Bytes()) != expected {
+	if buf.String() != expected {
 		t.Fatalf("bad post-restore dump. expected:\n%s\n\ngot:\n%s\n", expected, buf.Bytes())
 	}
 
@@ -282,7 +285,7 @@ func TestFakeIPTables(t *testing.T) {
 		*mangle
 		COMMIT
 		`, "\n"))
-	if string(buf.Bytes()) != expected {
+	if buf.String() != expected {
 		t.Fatalf("bad post-second-restore dump. expected:\n%s\n\ngot:\n%s\n", expected, buf.Bytes())
 	}
 
@@ -339,7 +342,7 @@ func TestFakeIPTables(t *testing.T) {
 		*mangle
 		COMMIT
 		`, "\n"))
-	if string(buf.Bytes()) != expected {
+	if buf.String() != expected {
 		t.Fatalf("bad post-restore-all dump. expected:\n%s\n\ngot:\n%s\n", expected, buf.Bytes())
 	}
 }

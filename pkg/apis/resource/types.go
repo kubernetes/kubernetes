@@ -18,6 +18,7 @@ package resource
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
@@ -97,9 +98,9 @@ type ResourceClaimStatus struct {
 	// +optional
 	DriverName string
 
-	// Allocation is set by the resource driver once a resource has been
-	// allocated successfully. If this is not specified, the resource is
-	// not yet allocated.
+	// Allocation is set by the resource driver once a resource or set of
+	// resources has been allocated successfully. If this is not specified, the
+	// resources have not been allocated yet.
 	// +optional
 	Allocation *AllocationResult
 
@@ -128,21 +129,28 @@ type ResourceClaimStatus struct {
 // claim.status.reservedFor.
 const ResourceClaimReservedForMaxSize = 32
 
-// AllocationResult contains attributed of an allocated resource.
+// AllocationResult contains attributes of an allocated resource.
 type AllocationResult struct {
-	// ResourceHandle contains arbitrary data returned by the driver after a
-	// successful allocation. This is opaque for
-	// Kubernetes. Driver documentation may explain to users how to
-	// interpret this data if needed.
+	// ResourceHandles contain the state associated with an allocation that
+	// should be maintained throughout the lifetime of a claim. Each
+	// ResourceHandle contains data that should be passed to a specific kubelet
+	// plugin once it lands on a node. This data is returned by the driver
+	// after a successful allocation and is opaque to Kubernetes. Driver
+	// documentation may explain to users how to interpret this data if needed.
 	//
-	// The maximum size of this field is 16KiB. This may get
-	// increased in the future, but not reduced.
+	// Setting this field is optional. It has a maximum size of 32 entries.
+	// If null (or empty), it is assumed this allocation will be processed by a
+	// single kubelet plugin with no ResourceHandle data attached. The name of
+	// the kubelet plugin invoked will match the DriverName set in the
+	// ResourceClaimStatus this AllocationResult is embedded in.
+	//
+	// +listType=atomic
 	// +optional
-	ResourceHandle string
+	ResourceHandles []ResourceHandle
 
-	// This field will get set by the resource driver after it has
-	// allocated the resource driver to inform the scheduler where it can
-	// schedule Pods using the ResourceClaim.
+	// This field will get set by the resource driver after it has allocated
+	// the resource to inform the scheduler where it can schedule Pods using
+	// the ResourceClaim.
 	//
 	// Setting this field is optional. If null, the resource is available
 	// everywhere.
@@ -155,8 +163,71 @@ type AllocationResult struct {
 	Shareable bool
 }
 
-// ResourceHandleMaxSize is the maximum size of allocation.resourceHandle.
-const ResourceHandleMaxSize = 16 * 1024
+// AllocationResultResourceHandlesMaxSize represents the maximum number of
+// entries in allocation.resourceHandles.
+const AllocationResultResourceHandlesMaxSize = 32
+
+// ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.
+type ResourceHandle struct {
+	// DriverName specifies the name of the resource driver whose kubelet
+	// plugin should be invoked to process this ResourceHandle's data once it
+	// lands on a node. This may differ from the DriverName set in
+	// ResourceClaimStatus this ResourceHandle is embedded in.
+	DriverName string
+
+	// Data contains the opaque data associated with this ResourceHandle. It is
+	// set by the controller component of the resource driver whose name
+	// matches the DriverName set in the ResourceClaimStatus this
+	// ResourceHandle is embedded in. It is set at allocation time and is
+	// intended for processing by the kubelet plugin whose name matches
+	// the DriverName set in this ResourceHandle.
+	//
+	// The maximum size of this field is 16KiB. This may get increased in the
+	// future, but not reduced.
+	// +optional
+	Data string
+
+	// If StructuredData is set, then it needs to be used instead of Data.
+	StructuredData *StructuredResourceHandle
+}
+
+// ResourceHandleDataMaxSize represents the maximum size of resourceHandle.data.
+const ResourceHandleDataMaxSize = 16 * 1024
+
+// StructuredResourceHandle is the in-tree representation of the allocation result.
+type StructuredResourceHandle struct {
+	// VendorClassParameters are the per-claim configuration parameters
+	// from the resource class at the time that the claim was allocated.
+	VendorClassParameters runtime.Object
+
+	// VendorClaimParameters are the per-claim configuration parameters
+	// from the resource claim parameters at the time that the claim was
+	// allocated.
+	VendorClaimParameters runtime.Object
+
+	// NodeName is the name of the node providing the necessary resources
+	// if the resources are local to a node.
+	NodeName string
+
+	// Results lists all allocated driver resources.
+	Results []DriverAllocationResult
+}
+
+// DriverAllocationResult contains vendor parameters and the allocation result for
+// one request.
+type DriverAllocationResult struct {
+	// VendorRequestParameters are the per-request configuration parameters
+	// from the time that the claim was allocated.
+	VendorRequestParameters runtime.Object
+
+	AllocationResultModel
+}
+
+// AllocationResultModel must have one and only one field set.
+type AllocationResultModel struct {
+	// NamedResources describes the allocation result when using the named resources model.
+	NamedResources *NamedResourcesAllocationResult
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -173,27 +244,27 @@ type ResourceClaimList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodScheduling objects hold information that is needed to schedule
+// PodSchedulingContext objects hold information that is needed to schedule
 // a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
 // mode.
 //
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
-type PodScheduling struct {
+type PodSchedulingContext struct {
 	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec describes where resources for the Pod are needed.
-	Spec PodSchedulingSpec
+	Spec PodSchedulingContextSpec
 
 	// Status describes where resources for the Pod can be allocated.
-	Status PodSchedulingStatus
+	Status PodSchedulingContextStatus
 }
 
-// PodSchedulingSpec describes where resources for the Pod are needed.
-type PodSchedulingSpec struct {
+// PodSchedulingContextSpec describes where resources for the Pod are needed.
+type PodSchedulingContextSpec struct {
 	// SelectedNode is the node for which allocation of ResourceClaims that
 	// are referenced by the Pod and that use "WaitForFirstConsumer"
 	// allocation is to be attempted.
@@ -209,8 +280,8 @@ type PodSchedulingSpec struct {
 	PotentialNodes []string
 }
 
-// PodSchedulingStatus describes where resources for the Pod can be allocated.
-type PodSchedulingStatus struct {
+// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
+type PodSchedulingContextStatus struct {
 	// ResourceClaims describes resource availability for each
 	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
 	// uses "WaitForFirstConsumer" allocation mode.
@@ -239,21 +310,21 @@ type ResourceClaimSchedulingStatus struct {
 }
 
 // PodSchedulingNodeListMaxSize defines the maximum number of entries in the
-// node lists that are stored in PodScheduling objects. This limit is part
+// node lists that are stored in PodSchedulingContext objects. This limit is part
 // of the API.
 const PodSchedulingNodeListMaxSize = 128
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PodSchedulingList is a collection of Pod scheduling objects.
-type PodSchedulingList struct {
+// PodSchedulingContextList is a collection of Pod scheduling objects.
+type PodSchedulingContextList struct {
 	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta
 
-	// Items is the list of PodScheduling objects.
-	Items []PodScheduling
+	// Items is the list of PodSchedulingContext objects.
+	Items []PodSchedulingContext
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -291,6 +362,10 @@ type ResourceClass struct {
 	// Setting this field is optional. If null, all nodes are candidates.
 	// +optional
 	SuitableNodes *core.NodeSelector
+
+	// If and only if allocation of claims using this class is handled
+	// via structured parameters, then StructuredParameters must be set to true.
+	StructuredParameters *bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -401,4 +476,174 @@ type ResourceClaimTemplateList struct {
 
 	// Items is the list of resource claim templates.
 	Items []ResourceClaimTemplate
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSlice provides information about available
+// resources on individual nodes.
+type ResourceSlice struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	metav1.ObjectMeta
+
+	// NodeName identifies the node which provides the resources
+	// if they are local to a node.
+	//
+	// A field selector can be used to list only ResourceSlice
+	// objects with a certain node name.
+	NodeName string
+
+	// DriverName identifies the DRA driver providing the capacity information.
+	// A field selector can be used to list only ResourceSlice
+	// objects with a certain driver name.
+	DriverName string
+
+	ResourceModel
+}
+
+// ResourceModel must have one and only one field set.
+type ResourceModel struct {
+	// NamedResources describes available resources using the named resources model.
+	NamedResources *NamedResourcesResources
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSliceList is a collection of ResourceSlices.
+type ResourceSliceList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	metav1.ListMeta
+
+	// Items is the list of node resource capacity objects.
+	Items []ResourceSlice
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceClaimParameters defines resource requests for a ResourceClaim in an
+// in-tree format understood by Kubernetes.
+type ResourceClaimParameters struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	metav1.ObjectMeta
+
+	// If this object was created from some other resource, then this links
+	// back to that resource. This field is used to find the in-tree representation
+	// of the claim parameters when the parameter reference of the claim refers
+	// to some unknown type.
+	GeneratedFrom *ResourceClaimParametersReference
+
+	// Shareable indicates whether the allocated claim is meant to be shareable
+	// by multiple consumers at the same time.
+	Shareable bool
+
+	// DriverRequests describes all resources that are needed for the
+	// allocated claim. A single claim may use resources coming from
+	// different drivers. For each driver, this array has at most one
+	// entry which then may have one or more per-driver requests.
+	//
+	// May be empty, in which case the claim can always be allocated.
+	DriverRequests []DriverRequests
+}
+
+// DriverRequests describes all resources that are needed from one particular driver.
+type DriverRequests struct {
+	// DriverName is the name used by the DRA driver kubelet plugin.
+	DriverName string
+
+	// VendorParameters are arbitrary setup parameters for all requests of the
+	// claim. They are ignored while allocating the claim.
+	VendorParameters runtime.Object
+
+	// Requests describes all resources that are needed from the driver.
+	Requests []ResourceRequest
+}
+
+// ResourceRequest is a request for resources from one particular driver.
+type ResourceRequest struct {
+	// VendorParameters are arbitrary setup parameters for the requested
+	// resource. They are ignored while allocating a claim.
+	VendorParameters runtime.Object
+
+	ResourceRequestModel
+}
+
+// ResourceRequestModel must have one and only one field set.
+type ResourceRequestModel struct {
+	// NamedResources describes a request for resources with the named resources model.
+	NamedResources *NamedResourcesRequest
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceClaimParametersList is a collection of ResourceClaimParameters.
+type ResourceClaimParametersList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	metav1.ListMeta
+
+	// Items is the list of node resource capacity objects.
+	Items []ResourceClaimParameters
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceClassParameters defines resource requests for a ResourceClass in an
+// in-tree format understood by Kubernetes.
+type ResourceClassParameters struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	metav1.ObjectMeta
+
+	// If this object was created from some other resource, then this links
+	// back to that resource. This field is used to find the in-tree representation
+	// of the class parameters when the parameter reference of the class refers
+	// to some unknown type.
+	GeneratedFrom *ResourceClassParametersReference
+
+	// VendorParameters are arbitrary setup parameters for all claims using
+	// this class. They are ignored while allocating the claim. There must
+	// not be more than one entry per driver.
+	VendorParameters []VendorParameters
+
+	// Filters describes additional contraints that must be met when using the class.
+	Filters []ResourceFilter
+}
+
+// ResourceFilter is a filter for resources from one particular driver.
+type ResourceFilter struct {
+	// DriverName is the name used by the DRA driver kubelet plugin.
+	DriverName string
+
+	ResourceFilterModel
+}
+
+// ResourceFilterModel must have one and only one field set.
+type ResourceFilterModel struct {
+	// NamedResources describes a resource filter using the named resources model.
+	NamedResources *NamedResourcesFilter
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceClassParametersList is a collection of ResourceClassParameters.
+type ResourceClassParametersList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	metav1.ListMeta
+
+	// Items is the list of node resource capacity objects.
+	Items []ResourceClassParameters
+}
+
+// VendorParameters are opaque parameters for one particular driver.
+type VendorParameters struct {
+	// DriverName is the name used by the DRA driver kubelet plugin.
+	DriverName string
+
+	// Parameters can be arbitrary setup parameters. They are ignored while
+	// allocating a claim.
+	Parameters runtime.Object
 }

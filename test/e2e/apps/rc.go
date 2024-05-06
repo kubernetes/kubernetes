@@ -19,6 +19,7 @@ package apps
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -51,7 +52,7 @@ import (
 
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var ns string
 	var dc dynamic.Interface
@@ -66,8 +67,8 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Testname: Replication Controller, run basic image
 		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
 	*/
-	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func(ctx context.Context) {
-		TestReplicationControllerServeImageOrFail(ctx, f, "basic", framework.ServeHostnameImage)
+	framework.ConformanceIt("should serve a basic image on each replica with a public image", func(ctx context.Context) {
+		TestReplicationControllerServeImageOrFail(ctx, f, "basic", imageutils.GetE2EImage(imageutils.Agnhost))
 	})
 
 	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
@@ -205,7 +206,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			ginkgo.By("patching ReplicationController")
 			testRcPatched, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(ctx, testRcName, types.StrategicMergePatchType, []byte(rcLabelPatchPayload), metav1.PatchOptions{})
 			framework.ExpectNoError(err, "Failed to patch ReplicationController")
-			framework.ExpectEqual(testRcPatched.ObjectMeta.Labels["test-rc"], "patched", "failed to patch RC")
+			gomega.Expect(testRcPatched.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-rc", "patched"), "failed to patch RC")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
 			ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
@@ -235,7 +236,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			ginkgo.By("patching ReplicationController status")
 			rcStatus, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Patch(ctx, testRcName, types.StrategicMergePatchType, []byte(rcStatusPatchPayload), metav1.PatchOptions{}, "status")
 			framework.ExpectNoError(err, "Failed to patch ReplicationControllerStatus")
-			framework.ExpectEqual(rcStatus.Status.ReadyReplicas, int32(0), "ReplicationControllerStatus's readyReplicas does not equal 0")
+			gomega.Expect(rcStatus.Status.ReadyReplicas).To(gomega.Equal(int32(0)), "ReplicationControllerStatus's readyReplicas does not equal 0")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
 			ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
@@ -281,7 +282,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			rcStatusUjson, err := json.Marshal(rcStatusUnstructured)
 			framework.ExpectNoError(err, "Failed to marshal json of replicationcontroller label patch")
 			json.Unmarshal(rcStatusUjson, &rcStatus)
-			framework.ExpectEqual(rcStatus.Status.Replicas, testRcInitialReplicaCount, "ReplicationController ReplicaSet cound does not match initial Replica count")
+			gomega.Expect(rcStatus.Status.Replicas).To(gomega.Equal(testRcInitialReplicaCount), "ReplicationController ReplicaSet cound does not match initial Replica count")
 
 			rcScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
 				Spec: autoscalingv1.ScaleSpec{
@@ -338,7 +339,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			ginkgo.By("fetching ReplicationController; ensuring that it's patched")
 			rc, err := f.ClientSet.CoreV1().ReplicationControllers(testRcNamespace).Get(ctx, testRcName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to fetch ReplicationController")
-			framework.ExpectEqual(rc.ObjectMeta.Labels["test-rc"], "patched", "ReplicationController is missing a label from earlier patch")
+			gomega.Expect(rc.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-rc", "patched"), "ReplicationController is missing a label from earlier patch")
 
 			rcStatusUpdatePayload := rc
 			rcStatusUpdatePayload.Status.AvailableReplicas = 1
@@ -432,13 +433,13 @@ var _ = SIGDescribe("ReplicationController", func() {
 		_, err := rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
 
-		err = wait.PollImmediateWithContext(ctx, 1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, initialRCReplicaCount))
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, checkReplicationControllerStatusReplicaCount(f, rcName, initialRCReplicaCount))
 		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
 
 		ginkgo.By(fmt.Sprintf("Getting scale subresource for ReplicationController %q", rcName))
 		scale, err := rcClient.GetScale(ctx, rcName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get scale subresource: %v", err)
-		framework.ExpectEqual(scale.Status.Replicas, initialRCReplicaCount, "Failed to get the current replica count")
+		gomega.Expect(scale.Status.Replicas).To(gomega.Equal(initialRCReplicaCount), "Failed to get the current replica count")
 
 		ginkgo.By("Updating a scale subresource")
 		scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -447,7 +448,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		framework.ExpectNoError(err, "Failed to update scale subresource: %v", err)
 
 		ginkgo.By(fmt.Sprintf("Verifying replicas where modified for replication controller %q", rcName))
-		err = wait.PollImmediateWithContext(ctx, 1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, expectedRCReplicaCount))
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, checkReplicationControllerStatusReplicaCount(f, rcName, expectedRCReplicaCount))
 		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
 	})
 })
@@ -501,7 +502,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 	pods, err := e2epod.PodsCreated(ctx, f.ClientSet, f.Namespace.Name, name, replicas)
 	framework.ExpectNoError(err)
 
-	// Wait for the pods to enter the running state. Waiting loops until the pods
+	// Wait for the pods to enter the running state and are Ready. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
 	framework.Logf("Ensuring all pods for ReplicationController %q are running", name)
 	running := int32(0)
@@ -509,7 +510,7 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+		err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout)
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 			if getErr == nil {
@@ -519,12 +520,12 @@ func TestReplicationControllerServeImageOrFail(ctx context.Context, f *framework
 			}
 		}
 		framework.ExpectNoError(err)
-		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		framework.Logf("Pod %q is running and ready(conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
 	// Sanity check
-	framework.ExpectEqual(running, replicas, "unexpected number of running pods: %+v", pods.Items)
+	gomega.Expect(running).To(gomega.Equal(replicas), "unexpected number of running and ready pods: %+v", pods.Items)
 
 	// Verify that something is listening.
 	framework.Logf("Trying to dial the pod")
@@ -554,7 +555,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 		quantity := resource.MustParse("2")
 		return (&podQuota).Cmp(quantity) == 0, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("resource quota %q never synced", name)
 	}
 	framework.ExpectNoError(err)
@@ -581,7 +582,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond != nil, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rc manager never added the failure condition for rc %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
@@ -610,7 +611,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 		cond := replication.GetCondition(rc.Status, v1.ReplicationControllerReplicaFailure)
 		return cond == nil, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("rc manager never removed the failure condition for rc %q: %#v", name, conditions)
 	}
 	framework.ExpectNoError(err)
@@ -732,7 +733,7 @@ func updateReplicationControllerWithRetries(ctx context.Context, c clientset.Int
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
 	}
 	return rc, pollErr
@@ -778,7 +779,7 @@ func watchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, condit
 				}
 
 			case <-ctx.Done():
-				return lastEvent, wait.ErrWaitTimeout
+				return lastEvent, wait.ErrorInterrupted(errors.New("timed out waiting for the condition"))
 			}
 		}
 	}

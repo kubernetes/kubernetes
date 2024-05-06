@@ -18,28 +18,22 @@ package storage
 
 import (
 	"testing"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
-	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, networking.GroupName)
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -47,11 +41,11 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "networkpolicies",
 	}
-	rest, status, err := NewREST(restOptions)
+	rest, err := NewREST(restOptions)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
-	return rest, status, server
+	return rest, server
 }
 
 func validNetworkPolicy() *networking.NetworkPolicy {
@@ -76,12 +70,11 @@ func validNetworkPolicy() *networking.NetworkPolicy {
 				},
 			},
 		},
-		Status: networking.NetworkPolicyStatus{},
 	}
 }
 
 func TestCreate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
@@ -99,7 +92,7 @@ func TestCreate(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	protocolICMP := api.Protocol("ICMP")
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
@@ -142,7 +135,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
@@ -150,7 +143,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
@@ -158,7 +151,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
@@ -166,7 +159,7 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
@@ -191,84 +184,9 @@ func TestWatch(t *testing.T) {
 }
 
 func TestShortNames(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	expected := []string{"netpol"}
 	registrytest.AssertShortNames(t, storage, expected)
-}
-
-func TestStatusUpdate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyStatus, true)()
-	storage, statusStorage, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-	key := "/networkpolicies/" + metav1.NamespaceDefault + "/foo"
-	validNetPolObject := validNetworkPolicy()
-	if err := storage.Storage.Create(ctx, key, validNetPolObject, nil, 0, false); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("failed to get netpol: %v", err)
-	}
-
-	obtainedNetPol := obj.(*networking.NetworkPolicy)
-
-	transition := time.Now().Add(-5 * time.Minute)
-	update := networking.NetworkPolicy{
-		ObjectMeta: obtainedNetPol.ObjectMeta,
-		Spec:       obtainedNetPol.Spec,
-		Status: networking.NetworkPolicyStatus{
-			Conditions: []metav1.Condition{
-				{
-					Type:   string(networking.NetworkPolicyConditionStatusAccepted),
-					Status: metav1.ConditionTrue,
-					LastTransitionTime: metav1.Time{
-						Time: transition,
-					},
-					Reason:             "RuleApplied",
-					Message:            "rule was successfully applied",
-					ObservedGeneration: 2,
-				},
-			},
-		},
-	}
-
-	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	obj, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	netpol := obj.(*networking.NetworkPolicy)
-	if len(netpol.Status.Conditions) != 1 {
-		t.Fatalf("we expected 1 condition to exist in status but %d occurred", len(netpol.Status.Conditions))
-	}
-
-	condition := netpol.Status.Conditions[0]
-	if condition.Type != string(networking.NetworkPolicyConditionStatusAccepted) {
-		t.Errorf("we expected condition type to be %s but %s was returned", string(networking.NetworkPolicyConditionStatusAccepted), condition.Type)
-	}
-
-	if condition.Status != metav1.ConditionTrue {
-		t.Errorf("we expected condition status to be true, but it returned false")
-	}
-
-	if condition.Reason != "RuleApplied" {
-		t.Errorf("we expected condition reason to be RuleApplied, but %s was returned", condition.Reason)
-	}
-
-	if condition.Message != "rule was successfully applied" {
-		t.Errorf("we expected message to be 'rule was successfully applied', but %s was returned", condition.Message)
-	}
-
-	if condition.ObservedGeneration != 2 {
-		t.Errorf("we expected observedGeneration to be 2, but %d was returned", condition.ObservedGeneration)
-	}
-
 }

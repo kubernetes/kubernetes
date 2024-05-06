@@ -1,7 +1,7 @@
-linux/amd64=busybox:1.29
-linux/arm=arm32v6/busybox:1.29
-linux/arm64=arm64v8/busybox:1.29
-linux/ppc64le=ppc64le/busybox:1.29
-linux/s390x=s390x/busybox:1.29
+linux/amd64=busybox:1.36.1
+linux/arm=arm32v6/busybox:1.36.1
+linux/arm64=arm64v8/busybox:1.36.1
+linux/ppc64le=ppc64le/busybox:1.36.1
+linux/s390x=s390x/busybox:1.36.1
 windows/amd64/1809=mcr.microsoft.com/windows/nanoserver:1809
 windows/amd64/ltsc2022=mcr.microsoft.com/windows/nanoserver:ltsc2022

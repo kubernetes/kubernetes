@@ -31,7 +31,8 @@ func NewRequest(httpRequest *http.Request) *Request {
 // a "Unable to unmarshal content of type:" response is returned.
 // Valid values are restful.MIME_JSON and restful.MIME_XML
 // Example:
-// 	restful.DefaultRequestContentType(restful.MIME_JSON)
+//
+//	restful.DefaultRequestContentType(restful.MIME_JSON)
 func DefaultRequestContentType(mime string) {
 	defaultRequestContentType = mime
 }
@@ -48,7 +49,7 @@ func (r *Request) PathParameters() map[string]string {
 
 // QueryParameter returns the (first) Query parameter value by its name
 func (r *Request) QueryParameter(name string) string {
-	return r.Request.FormValue(name)
+	return r.Request.URL.Query().Get(name)
 }
 
 // QueryParameters returns the all the query parameters values by name

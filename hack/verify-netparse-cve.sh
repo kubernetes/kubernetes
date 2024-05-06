@@ -34,15 +34,12 @@ rc=0
 find_files() {
   find . -not \( \
       \( \
-        -wholename './output' \
-        -o -wholename './.git' \
+        -wholename './.git' \
         -o -wholename './_output' \
-        -o -wholename './_gopath' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
-        -o -wholename './staging/src/k8s.io/client-go/*vendor/*' \
       \) -prune \
     \) -name '*.go'
 }

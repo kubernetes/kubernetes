@@ -87,8 +87,9 @@ network_closure.sh
 /_tmp/
 /doc_tmp/
 
-# Test artifacts produced by Jenkins jobs
+# Test artifacts produced by Prow/kubetest2 jobs
 /_artifacts/
+/_rundir/
 
 # Go dependencies installed on Jenkins
 /_gopath/

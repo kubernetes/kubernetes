@@ -157,3 +157,231 @@ type TracingConfiguration struct {
 	// Embed the component config tracing configuration struct
 	tracingapi.TracingConfiguration
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AuthenticationConfiguration provides versioned configuration for authentication.
+type AuthenticationConfiguration struct {
+	metav1.TypeMeta
+
+	JWT []JWTAuthenticator
+}
+
+// JWTAuthenticator provides the configuration for a single JWT authenticator.
+type JWTAuthenticator struct {
+	Issuer               Issuer
+	ClaimValidationRules []ClaimValidationRule
+	ClaimMappings        ClaimMappings
+	UserValidationRules  []UserValidationRule
+}
+
+// Issuer provides the configuration for an external provider's specific settings.
+type Issuer struct {
+	// url points to the issuer URL in a format https://url or https://url/path.
+	// This must match the "iss" claim in the presented JWT, and the issuer returned from discovery.
+	// Same value as the --oidc-issuer-url flag.
+	// Discovery information is fetched from "{url}/.well-known/openid-configuration" unless overridden by discoveryURL.
+	// Required to be unique across all JWT authenticators.
+	// Note that egress selection configuration is not used for this network connection.
+	// +required
+	URL string
+	// discoveryURL, if specified, overrides the URL used to fetch discovery
+	// information instead of using "{url}/.well-known/openid-configuration".
+	// The exact value specified is used, so "/.well-known/openid-configuration"
+	// must be included in discoveryURL if needed.
+	//
+	// The "issuer" field in the fetched discovery information must match the "issuer.url" field
+	// in the AuthenticationConfiguration and will be used to validate the "iss" claim in the presented JWT.
+	// This is for scenarios where the well-known and jwks endpoints are hosted at a different
+	// location than the issuer (such as locally in the cluster).
+	//
+	// Example:
+	// A discovery url that is exposed using kubernetes service 'oidc' in namespace 'oidc-namespace'
+	// and discovery information is available at '/.well-known/openid-configuration'.
+	// discoveryURL: "https://oidc.oidc-namespace/.well-known/openid-configuration"
+	// certificateAuthority is used to verify the TLS connection and the hostname on the leaf certificate
+	// must be set to 'oidc.oidc-namespace'.
+	//
+	// curl https://oidc.oidc-namespace/.well-known/openid-configuration (.discoveryURL field)
+	// {
+	//     issuer: "https://oidc.example.com" (.url field)
+	// }
+	//
+	// discoveryURL must be different from url.
+	// Required to be unique across all JWT authenticators.
+	// Note that egress selection configuration is not used for this network connection.
+	// +optional
+	DiscoveryURL         string
+	CertificateAuthority string
+	Audiences            []string
+	AudienceMatchPolicy  AudienceMatchPolicyType
+}
+
+// AudienceMatchPolicyType is a set of valid values for Issuer.AudienceMatchPolicy
+type AudienceMatchPolicyType string
+
+// Valid types for AudienceMatchPolicyType
+const (
+	AudienceMatchPolicyMatchAny AudienceMatchPolicyType = "MatchAny"
+)
+
+// ClaimValidationRule provides the configuration for a single claim validation rule.
+type ClaimValidationRule struct {
+	Claim         string
+	RequiredValue string
+
+	Expression string
+	Message    string
+}
+
+// ClaimMappings provides the configuration for claim mapping
+type ClaimMappings struct {
+	Username PrefixedClaimOrExpression
+	Groups   PrefixedClaimOrExpression
+	UID      ClaimOrExpression
+	Extra    []ExtraMapping
+}
+
+// PrefixedClaimOrExpression provides the configuration for a single prefixed claim or expression.
+type PrefixedClaimOrExpression struct {
+	Claim  string
+	Prefix *string
+
+	Expression string
+}
+
+// ClaimOrExpression provides the configuration for a single claim or expression.
+type ClaimOrExpression struct {
+	Claim      string
+	Expression string
+}
+
+// ExtraMapping provides the configuration for a single extra mapping.
+type ExtraMapping struct {
+	Key             string
+	ValueExpression string
+}
+
+// UserValidationRule provides the configuration for a single user validation rule.
+type UserValidationRule struct {
+	Expression string
+	Message    string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type AuthorizationConfiguration struct {
+	metav1.TypeMeta
+
+	// Authorizers is an ordered list of authorizers to
+	// authorize requests against.
+	// This is similar to the --authorization-modes kube-apiserver flag
+	// Must be at least one.
+	Authorizers []AuthorizerConfiguration `json:"authorizers"`
+}
+
+const (
+	TypeWebhook                                          AuthorizerType = "Webhook"
+	FailurePolicyNoOpinion                               string         = "NoOpinion"
+	FailurePolicyDeny                                    string         = "Deny"
+	AuthorizationWebhookConnectionInfoTypeKubeConfigFile string         = "KubeConfigFile"
+	AuthorizationWebhookConnectionInfoTypeInCluster      string         = "InClusterConfig"
+)
+
+type AuthorizerType string
+
+type AuthorizerConfiguration struct {
+	// Type refers to the type of the authorizer
+	// "Webhook" is supported in the generic API server
+	// Other API servers may support additional authorizer
+	// types like Node, RBAC, ABAC, etc.
+	Type AuthorizerType
+
+	// Name used to describe the webhook
+	// This is explicitly used in monitoring machinery for metrics
+	// Note: Names must be DNS1123 labels like `myauthorizername` or
+	//		 subdomains like `myauthorizer.example.domain`
+	// Required, with no default
+	Name string
+
+	// Webhook defines the configuration for a Webhook authorizer
+	// Must be defined when Type=Webhook
+	Webhook *WebhookConfiguration
+}
+
+type WebhookConfiguration struct {
+	// The duration to cache 'authorized' responses from the webhook
+	// authorizer.
+	// Same as setting `--authorization-webhook-cache-authorized-ttl` flag
+	// Default: 5m0s
+	AuthorizedTTL metav1.Duration
+	// The duration to cache 'unauthorized' responses from the webhook
+	// authorizer.
+	// Same as setting `--authorization-webhook-cache-unauthorized-ttl` flag
+	// Default: 30s
+	UnauthorizedTTL metav1.Duration
+	// Timeout for the webhook request
+	// Maximum allowed value is 30s.
+	// Required, no default value.
+	Timeout metav1.Duration
+	// The API version of the authorization.k8s.io SubjectAccessReview to
+	// send to and expect from the webhook.
+	// Same as setting `--authorization-webhook-version` flag
+	// Valid values: v1beta1, v1
+	// Required, no default value
+	SubjectAccessReviewVersion string
+	// MatchConditionSubjectAccessReviewVersion specifies the SubjectAccessReview
+	// version the CEL expressions are evaluated against
+	// Valid values: v1
+	// Required, no default value
+	MatchConditionSubjectAccessReviewVersion string
+	// Controls the authorization decision when a webhook request fails to
+	// complete or returns a malformed response or errors evaluating
+	// matchConditions.
+	// Valid values:
+	//   - NoOpinion: continue to subsequent authorizers to see if one of
+	//     them allows the request
+	//   - Deny: reject the request without consulting subsequent authorizers
+	// Required, with no default.
+	FailurePolicy string
+
+	// ConnectionInfo defines how we talk to the webhook
+	ConnectionInfo WebhookConnectionInfo
+
+	// matchConditions is a list of conditions that must be met for a request to be sent to this
+	// webhook. An empty list of matchConditions matches all requests.
+	// There are a maximum of 64 match conditions allowed.
+	//
+	// The exact matching logic is (in order):
+	//   1. If at least one matchCondition evaluates to FALSE, then the webhook is skipped.
+	//   2. If ALL matchConditions evaluate to TRUE, then the webhook is called.
+	//   3. If at least one matchCondition evaluates to an error (but none are FALSE):
+	//      - If failurePolicy=Deny, then the webhook rejects the request
+	//      - If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
+	MatchConditions []WebhookMatchCondition
+}
+
+type WebhookConnectionInfo struct {
+	// Controls how the webhook should communicate with the server.
+	// Valid values:
+	// - KubeConfigFile: use the file specified in kubeConfigFile to locate the
+	//   server.
+	// - InClusterConfig: use the in-cluster configuration to call the
+	//   SubjectAccessReview API hosted by kube-apiserver. This mode is not
+	//   allowed for kube-apiserver.
+	Type string
+
+	// Path to KubeConfigFile for connection info
+	// Required, if connectionInfo.Type is KubeConfig
+	KubeConfigFile *string
+}
+
+type WebhookMatchCondition struct {
+	// expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+	// CEL expressions have access to the contents of the SubjectAccessReview in v1 version.
+	// If version specified by subjectAccessReviewVersion in the request variable is v1beta1,
+	// the contents would be converted to the v1 version before evaluating the CEL expression.
+	//
+	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
+	Expression string
+}

@@ -87,7 +87,8 @@ func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler, op
 		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	if code {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -95,23 +96,22 @@ func InstrumentHandlerDuration(obs prometheus.ObserverVec, next http.Handler, op
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
 
-			observeWithExemplar(
-				obs.With(labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)),
-				time.Since(now).Seconds(),
-				hOpts.getExemplarFn(r.Context()),
-			)
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
 		}
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		next.ServeHTTP(w, r)
-
-		observeWithExemplar(
-			obs.With(labels(code, method, r.Method, 0, hOpts.extraMethods...)),
-			time.Since(now).Seconds(),
-			hOpts.getExemplarFn(r.Context()),
-		)
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
 	}
 }
 
@@ -138,28 +138,30 @@ func InstrumentHandlerCounter(counter *prometheus.CounterVec, next http.Handler,
 		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(counter)
+	// Curry the counter with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(counter.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	if code {
 		return func(w http.ResponseWriter, r *http.Request) {
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
 
-			addWithExemplar(
-				counter.With(labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)),
-				1,
-				hOpts.getExemplarFn(r.Context()),
-			)
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
 		}
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
-		addWithExemplar(
-			counter.With(labels(code, method, r.Method, 0, hOpts.extraMethods...)),
-			1,
-			hOpts.getExemplarFn(r.Context()),
-		)
+
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		addWithExemplar(counter.With(l), 1, hOpts.getExemplarFn(r.Context()))
 	}
 }
 
@@ -191,16 +193,17 @@ func InstrumentHandlerTimeToWriteHeader(obs prometheus.ObserverVec, next http.Ha
 		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		d := newDelegator(w, func(status int) {
-			observeWithExemplar(
-				obs.With(labels(code, method, r.Method, status, hOpts.extraMethods...)),
-				time.Since(now).Seconds(),
-				hOpts.getExemplarFn(r.Context()),
-			)
+			l := labels(code, method, r.Method, status, hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), time.Since(now).Seconds(), hOpts.getExemplarFn(r.Context()))
 		})
 		next.ServeHTTP(d, r)
 	}
@@ -231,28 +234,32 @@ func InstrumentHandlerRequestSize(obs prometheus.ObserverVec, next http.Handler,
 		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
+
 	if code {
 		return func(w http.ResponseWriter, r *http.Request) {
 			d := newDelegator(w, nil)
 			next.ServeHTTP(d, r)
 			size := computeApproximateRequestSize(r)
-			observeWithExemplar(
-				obs.With(labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)),
-				float64(size),
-				hOpts.getExemplarFn(r.Context()),
-			)
+
+			l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+			for label, resolve := range hOpts.extraLabelsFromCtx {
+				l[label] = resolve(r.Context())
+			}
+			observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
 		}
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		next.ServeHTTP(w, r)
 		size := computeApproximateRequestSize(r)
-		observeWithExemplar(
-			obs.With(labels(code, method, r.Method, 0, hOpts.extraMethods...)),
-			float64(size),
-			hOpts.getExemplarFn(r.Context()),
-		)
+
+		l := labels(code, method, r.Method, 0, hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), float64(size), hOpts.getExemplarFn(r.Context()))
 	}
 }
 
@@ -281,16 +288,18 @@ func InstrumentHandlerResponseSize(obs prometheus.ObserverVec, next http.Handler
 		o.apply(hOpts)
 	}
 
-	code, method := checkLabels(obs)
+	// Curry the observer with dynamic labels before checking the remaining labels.
+	code, method := checkLabels(obs.MustCurryWith(hOpts.emptyDynamicLabels()))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		d := newDelegator(w, nil)
 		next.ServeHTTP(d, r)
-		observeWithExemplar(
-			obs.With(labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)),
-			float64(d.Written()),
-			hOpts.getExemplarFn(r.Context()),
-		)
+
+		l := labels(code, method, r.Method, d.Status(), hOpts.extraMethods...)
+		for label, resolve := range hOpts.extraLabelsFromCtx {
+			l[label] = resolve(r.Context())
+		}
+		observeWithExemplar(obs.With(l), float64(d.Written()), hOpts.getExemplarFn(r.Context()))
 	})
 }
 
@@ -380,15 +389,12 @@ func isLabelCurried(c prometheus.Collector, label string) bool {
 	return true
 }
 
-// emptyLabels is a one-time allocation for non-partitioned metrics to avoid
-// unnecessary allocations on each request.
-var emptyLabels = prometheus.Labels{}
-
 func labels(code, method bool, reqMethod string, status int, extraMethods ...string) prometheus.Labels {
-	if !(code || method) {
-		return emptyLabels
-	}
 	labels := prometheus.Labels{}
+
+	if !(code || method) {
+		return labels
+	}
 
 	if code {
 		labels["code"] = sanitizeCode(status)

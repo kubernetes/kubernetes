@@ -76,7 +76,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			ClientQPS: -1.0,
 		}
 		f := framework.NewFramework("proxy", options, nil)
-		f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+		f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 		prefix := "/api/" + version
 
 		/*
@@ -98,7 +98,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Testname: Proxy, logs service endpoint
 			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
 		*/
-		framework.ConformanceIt("should proxy through a service and a pod ", func(ctx context.Context) {
+		framework.ConformanceIt("should proxy through a service and a pod", func(ctx context.Context) {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
 			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, &v1.Service{
@@ -116,7 +116,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 						{
 							Name:       "portname2",
 							Port:       81,
-							TargetPort: intstr.FromInt(162),
+							TargetPort: intstr.FromInt32(162),
 						},
 						{
 							Name:       "tlsportname1",
@@ -126,7 +126,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 						{
 							Name:       "tlsportname2",
 							Port:       444,
-							TargetPort: intstr.FromInt(462),
+							TargetPort: intstr.FromInt32(462),
 						},
 					},
 				},
@@ -166,7 +166,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				ReadinessProbe: &v1.Probe{
 					ProbeHandler: v1.ProbeHandler{
 						HTTPGet: &v1.HTTPGetAction{
-							Port: intstr.FromInt(80),
+							Port: intstr.FromInt32(80),
 						},
 					},
 					InitialDelaySeconds: 1,
@@ -324,7 +324,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
 						Port:       80,
-						TargetPort: intstr.FromInt(80),
+						TargetPort: intstr.FromInt32(80),
 						Protocol:   v1.ProtocolTCP,
 					}},
 					Selector: map[string]string{
@@ -418,7 +418,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				Spec: v1.ServiceSpec{
 					Ports: []v1.ServicePort{{
 						Port:       80,
-						TargetPort: intstr.FromInt(80),
+						TargetPort: intstr.FromInt32(80),
 						Protocol:   v1.ProtocolTCP,
 					}},
 					Selector: map[string]string{
@@ -485,7 +485,7 @@ func validateRedirectRequest(client *http.Client, redirectVerb string, urlString
 	defer resp.Body.Close()
 
 	framework.Logf("http.Client request:%s StatusCode:%d", redirectVerb, resp.StatusCode)
-	framework.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
+	gomega.Expect(resp.StatusCode).To(gomega.Equal(301), "The resp.StatusCode returned: %d", resp.StatusCode)
 }
 
 // validateProxyVerbRequest checks that a http request to a pod
@@ -587,7 +587,7 @@ func nodeProxyTest(ctx context.Context, f *framework.Framework, prefix, nodeDest
 			serviceUnavailableErrors++
 		} else {
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(status, http.StatusOK)
+			gomega.Expect(status).To(gomega.Equal(http.StatusOK))
 			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}

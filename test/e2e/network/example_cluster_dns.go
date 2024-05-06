@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -58,9 +59,9 @@ try:
 except:
 	print('err')`
 
-var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
+var _ = common.SIGDescribe("ClusterDns", feature.Example, func() {
 	f := framework.NewDefaultFramework("cluster-dns")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var c clientset.Interface
 	ginkgo.BeforeEach(func() {
@@ -171,7 +172,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 func waitForServiceResponding(ctx context.Context, c clientset.Interface, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("trying to dial the service %s.%s via the proxy", ns, name))
 
-	return wait.PollImmediateWithContext(ctx, framework.Poll, RespondingTimeout, func(ctx context.Context) (done bool, err error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, RespondingTimeout, true, func(ctx context.Context) (done bool, err error) {
 		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("Failed to get services proxy request: %v:", errProxy)

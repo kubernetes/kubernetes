@@ -23,9 +23,9 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -156,7 +156,7 @@ func TestDefaultRuleResolver(t *testing.T) {
 		sort.Sort(byHash(tc.effectiveRules))
 
 		if !reflect.DeepEqual(rules, tc.effectiveRules) {
-			ruleDiff := diff.ObjectDiff(rules, tc.effectiveRules)
+			ruleDiff := cmp.Diff(rules, tc.effectiveRules)
 			t.Errorf("case %d: %s", i, ruleDiff)
 		}
 	}

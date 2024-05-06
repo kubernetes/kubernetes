@@ -21,7 +21,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -300,7 +300,7 @@ func TestProxyTransport(t *testing.T) {
 			}
 			return
 		}
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", name, err)
 			return
@@ -342,12 +342,12 @@ func TestRewriteResponse(t *testing.T) {
 				gzw.Write([]byte(ept))
 				gzw.Flush()
 				return &http.Response{
-					Body: ioutil.NopCloser(gzipbuf),
+					Body: io.NopCloser(gzipbuf),
 				}
 			},
 			reader: func(rep *http.Response) string {
 				reader, _ := gzip.NewReader(rep.Body)
-				s, _ := ioutil.ReadAll(reader)
+				s, _ := io.ReadAll(reader)
 				return string(s)
 			},
 		},
@@ -360,12 +360,12 @@ func TestRewriteResponse(t *testing.T) {
 				flw.Write([]byte(ept))
 				flw.Flush()
 				return &http.Response{
-					Body: ioutil.NopCloser(flatebuf),
+					Body: io.NopCloser(flatebuf),
 				}
 			},
 			reader: func(rep *http.Response) string {
 				reader := flate.NewReader(rep.Body)
-				s, _ := ioutil.ReadAll(reader)
+				s, _ := io.ReadAll(reader)
 				return string(s)
 			},
 		},

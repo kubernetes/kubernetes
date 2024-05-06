@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/fields"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -62,7 +62,7 @@ import (
 	testutil "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -86,7 +86,7 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 
 	f := framework.NewDefaultFramework("deployment")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -184,6 +184,7 @@ var _ = SIGDescribe("Deployment", func() {
 	*/
 	framework.ConformanceIt("should run the lifecycle of a Deployment", func(ctx context.Context) {
 		one := int64(1)
+		two := int64(2)
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
 		testDeploymentName := "test-deployment"
@@ -193,6 +194,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentDefaultReplicas := int32(2)
 		testDeploymentMinimumReplicas := int32(1)
 		testDeploymentNoReplicas := int32(0)
+		testDeploymentAvailableReplicas := int32(0)
 		testDeploymentLabels := map[string]string{"test-deployment-static": "true"}
 		testDeploymentLabelsFlat := "test-deployment-static=true"
 		w := &cache.ListWatch{
@@ -259,7 +261,7 @@ var _ = SIGDescribe("Deployment", func() {
 				"replicas": testDeploymentMinimumReplicas,
 				"template": map[string]interface{}{
 					"spec": map[string]interface{}{
-						"TerminationGracePeriodSeconds": &one,
+						"terminationGracePeriodSeconds": &two,
 						"containers": [1]map[string]interface{}{{
 							"name":  testDeploymentName,
 							"image": testDeploymentPatchImage,
@@ -301,7 +303,8 @@ var _ = SIGDescribe("Deployment", func() {
 					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas &&
 					deployment.Status.UpdatedReplicas == testDeploymentMinimumReplicas &&
 					deployment.Status.UnavailableReplicas == 0 &&
-					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage
+					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage &&
+					*deployment.Spec.Template.Spec.TerminationGracePeriodSeconds == two
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
 				}
@@ -370,8 +373,8 @@ var _ = SIGDescribe("Deployment", func() {
 		deploymentGet := appsv1.Deployment{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentGetUnstructured.Object, &deploymentGet)
 		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
-		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
-		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
+		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "failed to update image")
+		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "failed to update labels")
 
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
 		defer cancel()
@@ -397,14 +400,14 @@ var _ = SIGDescribe("Deployment", func() {
 				"labels": map[string]string{"test-deployment": "patched-status"},
 			},
 			"status": map[string]interface{}{
-				"readyReplicas": testDeploymentNoReplicas,
+				"readyReplicas":     testDeploymentNoReplicas,
+				"availableReplicas": testDeploymentAvailableReplicas,
 			},
 		})
 		framework.ExpectNoError(err, "failed to Marshal Deployment JSON patch")
-		// This test is broken, patching fails with:
-		// Deployment.apps "test-deployment" is invalid: status.availableReplicas: Invalid value: 2: cannot be greater than readyReplicas
-		// https://github.com/kubernetes/kubernetes/issues/113259
-		_, _ = dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
+
+		_, err = dc.Resource(deploymentResource).Namespace(testNamespaceName).Patch(ctx, testDeploymentName, types.StrategicMergePatchType, []byte(deploymentStatusPatch), metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err)
 
 		ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
@@ -429,8 +432,9 @@ var _ = SIGDescribe("Deployment", func() {
 		deploymentGet = appsv1.Deployment{}
 		err = runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentGetUnstructured.Object, &deploymentGet)
 		framework.ExpectNoError(err, "failed to convert the unstructured response to a Deployment")
-		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
-		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
+		gomega.Expect(deploymentGet.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(testDeploymentUpdateImage), "failed to update image")
+		gomega.Expect(deploymentGet.ObjectMeta.Labels).To(gomega.HaveKeyWithValue("test-deployment", "updated"), "failed to update labels")
+
 		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodStart)
 		defer cancel()
 		_, err = watchtools.Until(ctxUntil, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
@@ -626,7 +630,7 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 	for i := range deployments.Items {
 		d := deployments.Items[i]
 
-		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
+		framework.Logf("Deployment %q:\n%s\n", d.Name, dump.Pretty(d))
 		_, allOldRSs, newRS, err := testutil.GetAllReplicaSets(&d, c)
 		if err != nil {
 			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
@@ -650,7 +654,7 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 		return
 	}
 	for _, rs := range rss.Items {
-		framework.Logf(spew.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
+		framework.Logf("ReplicaSet %q:\n%s\n", rs.Name, dump.Pretty(rs))
 		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
@@ -662,14 +666,9 @@ func failureTrap(ctx context.Context, c clientset.Interface, ns string) {
 			continue
 		}
 		for _, pod := range podList.Items {
-			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
+			framework.Logf("pod: %q:\n%s\n", pod.Name, dump.Pretty(pod))
 		}
 	}
-}
-
-func intOrStrP(num int) *intstr.IntOrString {
-	intstr := intstr.FromInt(num)
-	return &intstr
 }
 
 func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentName string) {
@@ -682,17 +681,14 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 
 	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(ctx, deployment.Name, metav1.GetOptions{})
-	framework.ExpectError(err)
-	if !apierrors.IsNotFound(err) {
-		framework.Failf("Expected deployment %s to be deleted", deploymentName)
-	}
+	gomega.Expect(err).To(gomega.MatchError(apierrors.IsNotFound, fmt.Sprintf("Expected deployment %s to be deleted", deploymentName)))
 	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	framework.ExpectNoError(err)
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rss, err := c.AppsV1().ReplicaSets(ns).List(ctx, options)
 	framework.ExpectNoError(err)
-	gomega.Expect(rss.Items).Should(gomega.HaveLen(0))
+	gomega.Expect(rss.Items).Should(gomega.BeEmpty())
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
 	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
@@ -734,7 +730,7 @@ func testDeleteDeployment(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 	newRS, err := testutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
-	framework.ExpectNotEqual(newRS, nilRs)
+	gomega.Expect(newRS).NotTo(gomega.Equal(nilRs))
 	stopDeployment(ctx, c, ns, deploymentName)
 }
 
@@ -784,7 +780,7 @@ func testRollingUpdateDeployment(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 	_, allOldRSs, err := testutil.GetOldReplicaSets(deployment, c)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(allOldRSs), 1)
+	gomega.Expect(allOldRSs).To(gomega.HaveLen(1))
 }
 
 func testRecreateDeployment(ctx context.Context, f *framework.Framework) {
@@ -832,7 +828,7 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	}
 	rsName := "test-cleanup-controller"
 	replicas := int32(1)
-	revisionHistoryLimit := utilpointer.Int32(0)
+	revisionHistoryLimit := ptr.To[int32](0)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -925,8 +921,8 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 	framework.Logf("Creating deployment %q", deploymentName)
 	newDeployment := e2edeployment.NewDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
 	newDeployment.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{
-		MaxUnavailable: intOrStrP(0),
-		MaxSurge:       intOrStrP(1),
+		MaxUnavailable: ptr.To(intstr.FromInt32(0)),
+		MaxSurge:       ptr.To(intstr.FromInt32(1)),
 	}
 	newDeployment.Spec.MinReadySeconds = int32(10)
 	_, err = c.AppsV1().Deployments(ns).Create(ctx, newDeployment, metav1.CreateOptions{})
@@ -986,8 +982,8 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 }
 
 func ensureReplicas(rs *appsv1.ReplicaSet, replicas int32) {
-	framework.ExpectEqual(*rs.Spec.Replicas, replicas)
-	framework.ExpectEqual(rs.Status.Replicas, replicas)
+	gomega.Expect(*rs.Spec.Replicas).To(gomega.Equal(replicas))
+	gomega.Expect(rs.Status.Replicas).To(gomega.Equal(replicas))
 }
 
 func randomScale(d *appsv1.Deployment, i int) {
@@ -1143,7 +1139,7 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 
 	framework.Logf("Verifying Deployment %q has only one ReplicaSet", deploymentName)
 	rsList := listDeploymentReplicaSets(ctx, c, ns, podLabels)
-	framework.ExpectEqual(len(rsList.Items), 1)
+	gomega.Expect(rsList.Items).To(gomega.HaveLen(1))
 
 	framework.Logf("Obtaining the ReplicaSet's UID")
 	orphanedRSUID := rsList.Items[0].UID
@@ -1174,10 +1170,10 @@ func testDeploymentsControllerRef(ctx context.Context, f *framework.Framework) {
 
 	framework.Logf("Verifying no extra ReplicaSet is created (Deployment %q still has only one ReplicaSet after adoption)", deploymentName)
 	rsList = listDeploymentReplicaSets(ctx, c, ns, podLabels)
-	framework.ExpectEqual(len(rsList.Items), 1)
+	gomega.Expect(rsList.Items).To(gomega.HaveLen(1))
 
 	framework.Logf("Verifying the ReplicaSet has the same UID as the orphaned ReplicaSet")
-	framework.ExpectEqual(rsList.Items[0].UID, orphanedRSUID)
+	gomega.Expect(rsList.Items[0].UID).To(gomega.Equal(orphanedRSUID))
 }
 
 // testProportionalScalingDeployment tests that when a RollingUpdate Deployment is scaled in the middle
@@ -1194,8 +1190,8 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 	deploymentName := "webserver-deployment"
 	d := e2edeployment.NewDeployment(deploymentName, replicas, podLabels, WebserverImageName, WebserverImage, appsv1.RollingUpdateDeploymentStrategyType)
 	d.Spec.Strategy.RollingUpdate = new(appsv1.RollingUpdateDeployment)
-	d.Spec.Strategy.RollingUpdate.MaxSurge = intOrStrP(3)
-	d.Spec.Strategy.RollingUpdate.MaxUnavailable = intOrStrP(2)
+	d.Spec.Strategy.RollingUpdate.MaxSurge = ptr.To(intstr.FromInt32(3))
+	d.Spec.Strategy.RollingUpdate.MaxUnavailable = ptr.To(intstr.FromInt32(2))
 
 	framework.Logf("Creating deployment %q", deploymentName)
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
@@ -1260,7 +1256,7 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 
 	// Second rollout's replicaset should have 0 available replicas.
 	framework.Logf("Verifying that the second rollout's replicaset has .status.availableReplicas = 0")
-	framework.ExpectEqual(secondRS.Status.AvailableReplicas, int32(0))
+	gomega.Expect(secondRS.Status.AvailableReplicas).To(gomega.Equal(int32(0)))
 
 	// Second rollout's replicaset should have Deployment's (replicas + maxSurge - first RS's replicas) = 10 + 3 - 8 = 5 for .spec.replicas.
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas
@@ -1377,8 +1373,8 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(ctx context.Context
 	// performing a rollout.
 	setAffinities(d, false)
 	d.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{
-		MaxSurge:       intOrStrP(1),
-		MaxUnavailable: intOrStrP(0),
+		MaxSurge:       ptr.To(intstr.FromInt32(1)),
+		MaxUnavailable: ptr.To(intstr.FromInt32(0)),
 	}
 	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, d, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
@@ -1551,7 +1547,7 @@ func watchRecreateDeployment(ctx context.Context, c clientset.Interface, d *apps
 	ctxUntil, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_, err := watchtools.Until(ctxUntil, d.ResourceVersion, w, condition)
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("deployment %q never completed: %#v", d.Name, status)
 	}
 	return err
@@ -1575,7 +1571,7 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 		}
 		return len(oldRSs) == desiredRSNum, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("%d old replica sets were not cleaned up for deployment %q", len(oldRSs)-desiredRSNum, deploymentName)
 		testutil.LogReplicaSetsOfDeployment(d, oldRSs, nil, framework.Logf)
 	}
@@ -1585,14 +1581,14 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 // waitForReplicaSetDesiredReplicas waits until the replicaset has desired number of replicas.
 func waitForReplicaSetDesiredReplicas(ctx context.Context, rsClient appsclient.ReplicaSetsGetter, replicaSet *appsv1.ReplicaSet) error {
 	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, framework.PollShortTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PollShortTimeout, true, func(ctx context.Context) (bool, error) {
 		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(ctx, replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(replicaSet.Spec.Replicas) && rs.Status.Replicas == *(rs.Spec.Replicas), nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of replicas", replicaSet.Name)
 	}
 	return err
@@ -1601,14 +1597,14 @@ func waitForReplicaSetDesiredReplicas(ctx context.Context, rsClient appsclient.R
 // waitForReplicaSetTargetSpecReplicas waits for .spec.replicas of a RS to equal targetReplicaNum
 func waitForReplicaSetTargetSpecReplicas(ctx context.Context, c clientset.Interface, replicaSet *appsv1.ReplicaSet, targetReplicaNum int32) error {
 	desiredGeneration := replicaSet.Generation
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, framework.PollShortTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PollShortTimeout, true, func(ctx context.Context) (bool, error) {
 		rs, err := c.AppsV1().ReplicaSets(replicaSet.Namespace).Get(ctx, replicaSet.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		return rs.Status.ObservedGeneration >= desiredGeneration && *rs.Spec.Replicas == targetReplicaNum, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("replicaset %q never had desired number of .spec.replicas", replicaSet.Name)
 	}
 	return err
@@ -1666,8 +1662,8 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to get scale subresource: %v", err)
 	}
-	framework.ExpectEqual(scale.Spec.Replicas, int32(1))
-	framework.ExpectEqual(scale.Status.Replicas, int32(1))
+	gomega.Expect(scale.Spec.Replicas).To(gomega.Equal(int32(1)))
+	gomega.Expect(scale.Status.Replicas).To(gomega.Equal(int32(1)))
 
 	ginkgo.By("updating a scale subresource")
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -1676,14 +1672,14 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 	if err != nil {
 		framework.Failf("Failed to put scale subresource: %v", err)
 	}
-	framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
+	gomega.Expect(scaleResult.Spec.Replicas).To(gomega.Equal(int32(2)))
 
 	ginkgo.By("verifying the deployment Spec.Replicas was modified")
 	deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get deployment resource: %v", err)
 	}
-	framework.ExpectEqual(*(deployment.Spec.Replicas), int32(2))
+	gomega.Expect(*(deployment.Spec.Replicas)).To(gomega.Equal(int32(2)))
 
 	ginkgo.By("Patch a scale subresource")
 	scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -1700,5 +1696,5 @@ func testDeploymentSubresources(ctx context.Context, f *framework.Framework) {
 
 	deployment, err = c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Failed to get deployment resource: %v", err)
-	framework.ExpectEqual(*(deployment.Spec.Replicas), int32(4), "deployment should have 4 replicas")
+	gomega.Expect(*(deployment.Spec.Replicas)).To(gomega.Equal(int32(4)), "deployment should have 4 replicas")
 }

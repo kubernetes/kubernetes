@@ -21,7 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -182,17 +182,17 @@ func loadAndEncryptCert(certPath string, key []byte) ([]byte, error) {
 func certsToTransfer(cfg *kubeadmapi.InitConfiguration) map[string]string {
 	certsDir := cfg.CertificatesDir
 	certs := map[string]string{
-		kubeadmconstants.CACertName:                   path.Join(certsDir, kubeadmconstants.CACertName),
-		kubeadmconstants.CAKeyName:                    path.Join(certsDir, kubeadmconstants.CAKeyName),
-		kubeadmconstants.FrontProxyCACertName:         path.Join(certsDir, kubeadmconstants.FrontProxyCACertName),
-		kubeadmconstants.FrontProxyCAKeyName:          path.Join(certsDir, kubeadmconstants.FrontProxyCAKeyName),
-		kubeadmconstants.ServiceAccountPublicKeyName:  path.Join(certsDir, kubeadmconstants.ServiceAccountPublicKeyName),
-		kubeadmconstants.ServiceAccountPrivateKeyName: path.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName),
+		kubeadmconstants.CACertName:                   filepath.Join(certsDir, kubeadmconstants.CACertName),
+		kubeadmconstants.CAKeyName:                    filepath.Join(certsDir, kubeadmconstants.CAKeyName),
+		kubeadmconstants.FrontProxyCACertName:         filepath.Join(certsDir, kubeadmconstants.FrontProxyCACertName),
+		kubeadmconstants.FrontProxyCAKeyName:          filepath.Join(certsDir, kubeadmconstants.FrontProxyCAKeyName),
+		kubeadmconstants.ServiceAccountPublicKeyName:  filepath.Join(certsDir, kubeadmconstants.ServiceAccountPublicKeyName),
+		kubeadmconstants.ServiceAccountPrivateKeyName: filepath.Join(certsDir, kubeadmconstants.ServiceAccountPrivateKeyName),
 	}
 
 	if cfg.Etcd.External == nil {
-		certs[kubeadmconstants.EtcdCACertName] = path.Join(certsDir, kubeadmconstants.EtcdCACertName)
-		certs[kubeadmconstants.EtcdCAKeyName] = path.Join(certsDir, kubeadmconstants.EtcdCAKeyName)
+		certs[kubeadmconstants.EtcdCACertName] = filepath.Join(certsDir, kubeadmconstants.EtcdCACertName)
+		certs[kubeadmconstants.EtcdCAKeyName] = filepath.Join(certsDir, kubeadmconstants.EtcdCAKeyName)
 	} else {
 		certs[externalEtcdCA] = cfg.Etcd.External.CAFile
 		certs[externalEtcdCert] = cfg.Etcd.External.CertFile

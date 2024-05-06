@@ -297,6 +297,17 @@ func (s *EtcdServer) LeaseRevoke(ctx context.Context, r *pb.LeaseRevokeRequest) 
 
 func (s *EtcdServer) LeaseRenew(ctx context.Context, id lease.LeaseID) (int64, error) {
 	if s.isLeader() {
+		// If s.isLeader() returns true, but we fail to ensure the current
+		// member's leadership, there are a couple of possibilities:
+		//   1. current member gets stuck on writing WAL entries;
+		//   2. current member is in network isolation status;
+		//   3. current member isn't a leader anymore (possibly due to #1 above).
+		// In such case, we just return error to client, so that the client can
+		// switch to another member to continue the lease keep-alive operation.
+		if !s.ensureLeadership() {
+			return -1, lease.ErrNotPrimary
+		}
+
 		if err := s.waitAppliedIndex(); err != nil {
 			return 0, err
 		}
@@ -336,7 +347,32 @@ func (s *EtcdServer) LeaseRenew(ctx context.Context, id lease.LeaseID) (int64, e
 	return -1, ErrCanceled
 }
 
-func (s *EtcdServer) LeaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
+func (s *EtcdServer) checkLeaseTimeToLive(ctx context.Context, leaseID lease.LeaseID) (uint64, error) {
+	rev := s.AuthStore().Revision()
+	if !s.AuthStore().IsAuthEnabled() {
+		return rev, nil
+	}
+	authInfo, err := s.AuthInfoFromCtx(ctx)
+	if err != nil {
+		return rev, err
+	}
+	if authInfo == nil {
+		return rev, auth.ErrUserEmpty
+	}
+
+	l := s.lessor.Lookup(leaseID)
+	if l != nil {
+		for _, key := range l.Keys() {
+			if err := s.AuthStore().IsRangePermitted(authInfo, []byte(key), []byte{}); err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	return rev, nil
+}
+
+func (s *EtcdServer) leaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
 	if s.isLeader() {
 		if err := s.waitAppliedIndex(); err != nil {
 			return nil, err
@@ -386,6 +422,31 @@ func (s *EtcdServer) LeaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveR
 	return nil, ErrCanceled
 }
 
+func (s *EtcdServer) LeaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
+	var rev uint64
+	var err error
+	if r.Keys {
+		// check RBAC permission only if Keys is true
+		rev, err = s.checkLeaseTimeToLive(ctx, lease.LeaseID(r.ID))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	resp, err := s.leaseTimeToLive(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.Keys {
+		if s.AuthStore().IsAuthEnabled() && rev != s.AuthStore().Revision() {
+			return nil, auth.ErrAuthOldRevision
+		}
+	}
+	return resp, nil
+}
+
+// LeaseLeases is really ListLeases !???
 func (s *EtcdServer) LeaseLeases(ctx context.Context, r *pb.LeaseLeasesRequest) (*pb.LeaseLeasesResponse, error) {
 	ls := s.lessor.Leases()
 	lss := make([]*pb.LeaseStatus, len(ls))
@@ -453,6 +514,13 @@ func (s *EtcdServer) Authenticate(ctx context.Context, r *pb.AuthenticateRequest
 	}
 
 	lg := s.Logger()
+
+	// fix https://nvd.nist.gov/vuln/detail/CVE-2021-28235
+	defer func() {
+		if r != nil {
+			r.Password = ""
+		}
+	}()
 
 	var resp proto.Message
 	for {

@@ -142,4 +142,16 @@ const (
 
 	// CleanupTmpDir flag indicates whether reset will cleanup the tmp dir
 	CleanupTmpDir = "cleanup-tmp-dir"
+
+	// AllowExperimentalAPI flag can be used to allow experimental / work in progress APIs
+	AllowExperimentalAPI = "allow-experimental-api"
+
+	// AllowRCUpgrades enable this flag will allow upgrading to a release candidate version of Kubernetes.
+	AllowRCUpgrades = "allow-release-candidate-upgrades"
+
+	// AllowExperimentalUpgrades enable this flag will allow upgrading to an alpha/beta/release candidate version of Kubernetes.
+	AllowExperimentalUpgrades = "allow-experimental-upgrades"
+
+	// PrintConfig specifies whether the cluster configuration that will be used in the upgrade should be printed or not.
+	PrintConfig = "print-config"
 )

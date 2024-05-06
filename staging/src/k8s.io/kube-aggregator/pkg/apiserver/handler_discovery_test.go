@@ -18,9 +18,10 @@ package apiserver
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,12 +29,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/require"
+
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apidiscoveryv2scheme "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
@@ -60,24 +65,96 @@ func waitForQueueComplete(stopCh <-chan struct{}, dm *discoveryManager) bool {
 
 // Test that the discovery manager starts and aggregates from two local API services
 func TestBasic(t *testing.T) {
-	service1 := discoveryendpoint.NewResourceManager()
-	service2 := discoveryendpoint.NewResourceManager()
+	service1 := discoveryendpoint.NewResourceManager("apis")
+	service2 := discoveryendpoint.NewResourceManager("apis")
+	service3 := discoveryendpoint.NewResourceManager("apis")
 	apiGroup1 := fuzzAPIGroups(2, 5, 25)
 	apiGroup2 := fuzzAPIGroups(2, 5, 50)
+	apiGroup3 := apidiscoveryv2.APIGroupDiscoveryList{Items: []apidiscoveryv2.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "weird.example.com"},
+			Versions: []apidiscoveryv2.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: "Current",
+					Resources: []apidiscoveryv2.APIResourceDiscovery{
+						{
+							Resource: "parent-missing-kind",
+							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+								{Subresource: "subresource-missing-kind"},
+							},
+						},
+						{
+							Resource:     "parent-empty-kind",
+							ResponseKind: &metav1.GroupVersionKind{},
+							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+								{Subresource: "subresource-empty-kind", ResponseKind: &metav1.GroupVersionKind{}},
+							},
+						},
+						{
+							Resource:     "parent-with-kind",
+							ResponseKind: &metav1.GroupVersionKind{Kind: "ParentWithKind"},
+							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+								{Subresource: "subresource-with-kind", ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithKind"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
+	apiGroup3WithFixup := apidiscoveryv2.APIGroupDiscoveryList{Items: []apidiscoveryv2.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "weird.example.com"},
+			Versions: []apidiscoveryv2.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: "Current",
+					Resources: []apidiscoveryv2.APIResourceDiscovery{
+						{
+							Resource:     "parent-missing-kind",
+							ResponseKind: &metav1.GroupVersionKind{}, // defaulted by aggregator
+							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+								{Subresource: "subresource-missing-kind", ResponseKind: &metav1.GroupVersionKind{}}, // defaulted by aggregator
+							},
+						},
+						{
+							Resource:     "parent-empty-kind",
+							ResponseKind: &metav1.GroupVersionKind{},
+							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+								{Subresource: "subresource-empty-kind", ResponseKind: &metav1.GroupVersionKind{}},
+							},
+						},
+						{
+							Resource:     "parent-with-kind",
+							ResponseKind: &metav1.GroupVersionKind{Kind: "ParentWithKind"},
+							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+								{Subresource: "subresource-with-kind", ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithKind"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
 	service1.SetGroups(apiGroup1.Items)
 	service2.SetGroups(apiGroup2.Items)
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
+	service3.SetGroups(apiGroup3.Items)
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
 	for _, g := range apiGroup1.Items {
+		versionPriority := int32(len(g.Versions) + 1)
 		for _, v := range g.Versions {
+			versionPriority--
 			aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v.Version + "." + g.Name,
 				},
 				Spec: apiregistrationv1.APIServiceSpec{
-					Group:   g.Name,
-					Version: v.Version,
+					Group:           g.Name,
+					Version:         v.Version,
+					VersionPriority: versionPriority,
 					Service: &apiregistrationv1.ServiceReference{
 						Name: "service1",
 					},
@@ -87,14 +164,17 @@ func TestBasic(t *testing.T) {
 	}
 
 	for _, g := range apiGroup2.Items {
+		versionPriority := int32(len(g.Versions) + 1)
 		for _, v := range g.Versions {
+			versionPriority--
 			aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: v.Version + "." + g.Name,
 				},
 				Spec: apiregistrationv1.APIServiceSpec{
-					Group:   g.Name,
-					Version: v.Version,
+					Group:           g.Name,
+					Version:         v.Version,
+					VersionPriority: versionPriority,
 					Service: &apiregistrationv1.ServiceReference{
 						Name: "service2",
 					},
@@ -103,10 +183,30 @@ func TestBasic(t *testing.T) {
 		}
 	}
 
+	for _, g := range apiGroup3.Items {
+		versionPriority := int32(len(g.Versions) + 1)
+		for _, v := range g.Versions {
+			versionPriority--
+			aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: v.Version + "." + g.Name,
+				},
+				Spec: apiregistrationv1.APIServiceSpec{
+					Group:           g.Name,
+					Version:         v.Version,
+					VersionPriority: versionPriority,
+					Service: &apiregistrationv1.ServiceReference{
+						Name: "service3",
+					},
+				},
+			}, service3)
+		}
+	}
+
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
-	go aggregatedManager.Run(testCtx.Done())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
@@ -116,9 +216,11 @@ func TestBasic(t *testing.T) {
 	}
 	checkAPIGroups(t, apiGroup1, parsed)
 	checkAPIGroups(t, apiGroup2, parsed)
+	checkAPIGroups(t, apiGroup3WithFixup, parsed)
 }
 
-func checkAPIGroups(t *testing.T, api apidiscoveryv2beta1.APIGroupDiscoveryList, response *apidiscoveryv2beta1.APIGroupDiscoveryList) {
+func checkAPIGroups(t *testing.T, api apidiscoveryv2.APIGroupDiscoveryList, response *apidiscoveryv2.APIGroupDiscoveryList) {
+	t.Helper()
 	if len(response.Items) < len(api.Items) {
 		t.Errorf("expected to check for at least %d groups, only have %d groups in response", len(api.Items), len(response.Items))
 	}
@@ -128,6 +230,10 @@ func checkAPIGroups(t *testing.T, api apidiscoveryv2beta1.APIGroupDiscoveryList,
 			if knownGroup.Name == possibleGroup.Name {
 				t.Logf("found %s", knownGroup.Name)
 				found = true
+				diff := cmp.Diff(knownGroup, possibleGroup)
+				if len(diff) > 0 {
+					t.Error(diff)
+				}
 			}
 		}
 		if found == false {
@@ -136,12 +242,185 @@ func checkAPIGroups(t *testing.T, api apidiscoveryv2beta1.APIGroupDiscoveryList,
 	}
 }
 
+// TestInitialRunHasAllAPIServices tests that when discovery is ready, all APIService
+// are present and ones that have not synced are in the list as Stale.
+func TestInitialRunHasAllAPIServices(t *testing.T) {
+	neverReturnCh := make(chan struct{})
+	defer close(neverReturnCh)
+	service := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-neverReturnCh
+		service.ServeHTTP(w, r)
+	}))
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	initialSyncedCh := make(chan struct{})
+	go aggregatedManager.Run(testCtx.Done(), initialSyncedCh)
+	select {
+	case <-initialSyncedCh:
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for initial sync")
+	}
+
+	response, _, parsed := fetchPath(aggregatedResourceManager, "")
+	if response.StatusCode != 200 {
+		t.Fatalf("unexpected status code %d", response.StatusCode)
+	}
+
+	apiGroup := apidiscoveryv2.APIGroupDiscoveryList{Items: []apidiscoveryv2.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "stable.example.com"},
+			Versions: []apidiscoveryv2.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: "Stale",
+				},
+			},
+		},
+	}}
+
+	checkAPIGroups(t, apiGroup, parsed)
+}
+
+func TestServiceGC(t *testing.T) {
+	service := discoveryendpoint.NewResourceManager("apis")
+
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done(), nil)
+
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, service)
+
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+
+	// Lookup size of cache
+	getCacheLen := func() int {
+		aggregatedManager.resultsLock.Lock()
+		defer aggregatedManager.resultsLock.Unlock()
+		return len(aggregatedManager.cachedResults)
+	}
+
+	require.Equal(t, 1, getCacheLen())
+
+	// Change the service of the same APIService a bit to create duplicate entry
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service-changed",
+			},
+		},
+	}, service)
+
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+	require.Equal(t, 1, getCacheLen())
+}
+
+// TestV2Beta1Skew tests that aggregated apiservers that only serve V2Beta1
+// are still supported
+func TestV2Beta1Skew(t *testing.T) {
+	apiGroup := apidiscoveryv2.APIGroupDiscoveryList{Items: []apidiscoveryv2.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "stable.example.com"},
+			Versions: []apidiscoveryv2.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: "Current",
+					Resources: []apidiscoveryv2.APIResourceDiscovery{
+						{
+							Resource:     "parent-with-kind",
+							ResponseKind: &metav1.GroupVersionKind{Kind: "ParentWithKind"},
+							Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+								{Subresource: "subresource-with-kind", ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithKind"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}}
+
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Force a v2beta1 response from the aggregated apiserver
+		v2b := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+		err := apidiscoveryv2scheme.Convertv2APIGroupDiscoveryListTov2beta1APIGroupDiscoveryList(&apiGroup, &v2b, nil)
+		require.NoError(t, err)
+		converted, err := json.Marshal(v2b)
+		require.NoError(t, err)
+		w.Header().Set("Content-Type", "application/json;"+"g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
+		w.WriteHeader(200)
+		_, err = w.Write(converted)
+		require.NoError(t, err)
+	}))
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done(), nil)
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+
+	response, _, parsed := fetchPath(aggregatedResourceManager, "")
+	if response.StatusCode != 200 {
+		t.Fatalf("unexpected status code %d", response.StatusCode)
+	}
+
+	checkAPIGroups(t, apiGroup, parsed)
+}
+
 // Test that a handler associated with an APIService gets pinged after the
 // APIService has been marked as dirty
 func TestDirty(t *testing.T) {
 	var pinged atomic.Bool
-	service := discoveryendpoint.NewResourceManager()
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
+	service := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
 
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
@@ -163,7 +442,7 @@ func TestDirty(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// immediately check for ping, since Run() should block for local services
@@ -176,8 +455,8 @@ func TestDirty(t *testing.T) {
 // complete by artificially making the sync handler take a long time
 func TestWaitForSync(t *testing.T) {
 	pinged := atomic.Bool{}
-	service := discoveryendpoint.NewResourceManager()
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
+	service := discoveryendpoint.NewResourceManager("apis")
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
 
 	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
 
@@ -200,7 +479,7 @@ func TestWaitForSync(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// immediately check for ping, since Run() should block for local services
@@ -212,8 +491,8 @@ func TestWaitForSync(t *testing.T) {
 // Show that an APIService can be removed and that its group no longer remains
 // if there are no versions
 func TestRemoveAPIService(t *testing.T) {
-	aggyService := discoveryendpoint.NewResourceManager()
-	service := discoveryendpoint.NewResourceManager()
+	aggyService := discoveryendpoint.NewResourceManager("apis")
+	service := discoveryendpoint.NewResourceManager("apis")
 	apiGroup := fuzzAPIGroups(2, 3, 10)
 	service.SetGroups(apiGroup.Items)
 
@@ -247,7 +526,7 @@ func TestRemoveAPIService(t *testing.T) {
 	testCtx, testCancel := context.WithCancel(context.Background())
 	defer testCancel()
 
-	go aggregatedManager.Run(testCtx.Done())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 
 	for _, s := range apiServices {
 		aggregatedManager.RemoveAPIService(s.Name)
@@ -265,7 +544,7 @@ func TestRemoveAPIService(t *testing.T) {
 }
 
 func TestLegacyFallbackNoCache(t *testing.T) {
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
 	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
 
 	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
@@ -286,6 +565,10 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 			{
 				GroupVersion: "stable.example.com/v1alpha1",
 				Version:      "v1alpha1",
+			},
+			{
+				GroupVersion: "stable.example.com/v2alpha1",
+				Version:      "v2alpha1",
 			},
 		},
 	})
@@ -347,6 +630,17 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 			legacyResourceHandlerV1Beta1.ServeHTTP(w, r)
 		} else if r.URL.Path == "/apis/stable.example.com/v1alpha1" {
 			legacyResourceHandlerV1Alpha1.ServeHTTP(w, r)
+		} else if r.URL.Path == "/apis/stable.example.com/v2alpha1" {
+			// serve the most minimal discovery doc that could have worked prior to aggregated discovery
+			json.NewEncoder(w).Encode(&metav1.APIResourceList{
+				GroupVersion: "stable.example.com/v2alpha1",
+				APIResources: []metav1.APIResource{
+					{Name: "parent-without-kind"},
+					{Name: "missing-parent/subresource-without-parent", Kind: "SubresourceWithoutParent"},
+					{Name: "parent-without-kind/subresource", Kind: "Subresource"},
+					{Name: "parent-without-kind/subresource-without-kind"},
+				},
+			})
 		} else if r.URL.Path == "/apis" {
 			rootAPIsHandler.ServeHTTP(w, r)
 		} else {
@@ -392,52 +686,93 @@ func TestLegacyFallbackNoCache(t *testing.T) {
 			},
 		},
 	}, handlerFunc)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v2alpha1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v2alpha1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, handlerFunc)
 
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// At this point external services have synced. Check if discovery document
 	// includes the legacy resources
 	_, _, doc := fetchPath(aggregatedResourceManager, "")
 
-	aggregatedVersions := []apidiscoveryv2beta1.APIVersionDiscovery{}
-	for _, resource := range resources {
-		converted, err := endpoints.ConvertGroupVersionIntoToDiscovery([]metav1.APIResource{resource})
+	mustConvert := func(r []metav1.APIResource) []apidiscoveryv2.APIResourceDiscovery {
+		converted, err := endpoints.ConvertGroupVersionIntoToDiscovery(r)
 		require.NoError(t, err)
-		aggregatedVersions = append(aggregatedVersions, apidiscoveryv2beta1.APIVersionDiscovery{
-			Version:   resource.Version,
-			Resources: converted,
-			Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
-		})
+		return converted
 	}
-	sort.Sort(byVersion(aggregatedVersions))
-	aggregatedDiscovery := []apidiscoveryv2beta1.APIGroupDiscovery{{
+	expectAggregatedDiscovery := []apidiscoveryv2.APIGroupDiscovery{{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: resources["v1"].Group,
+			Name: "stable.example.com",
 		},
-		Versions: aggregatedVersions,
+		Versions: []apidiscoveryv2.APIVersionDiscovery{
+			{
+				Version:   "v1",
+				Resources: mustConvert([]metav1.APIResource{resources["v1"]}),
+				Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+			},
+			{
+				Version:   "v1beta1",
+				Resources: mustConvert([]metav1.APIResource{resources["v1beta1"]}),
+				Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+			},
+			{
+				Version: "v2alpha1",
+				Resources: []apidiscoveryv2.APIResourceDiscovery{
+					{
+						Resource:     "parent-without-kind",
+						ResponseKind: &metav1.GroupVersionKind{}, // defaulted
+						Scope:        "Cluster",
+						Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+							{
+								Subresource:  "subresource",
+								ResponseKind: &metav1.GroupVersionKind{Kind: "Subresource"},
+							},
+							{
+								Subresource:  "subresource-without-kind",
+								ResponseKind: &metav1.GroupVersionKind{}, // defaulted
+							},
+						},
+					},
+					{
+						Resource:     "missing-parent",
+						ResponseKind: &metav1.GroupVersionKind{}, // defaulted
+						Scope:        "Cluster",
+						Subresources: []apidiscoveryv2.APISubresourceDiscovery{
+							{
+								Subresource:  "subresource-without-parent",
+								ResponseKind: &metav1.GroupVersionKind{Kind: "SubresourceWithoutParent"},
+							},
+						},
+					},
+				},
+				Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+			},
+			{
+				Version:   "v1alpha1",
+				Resources: mustConvert([]metav1.APIResource{resources["v1alpha1"]}),
+				Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+			},
+		},
 	}}
-	require.Equal(t, doc.Items, aggregatedDiscovery)
+	require.Equal(t, doc.Items, expectAggregatedDiscovery)
 }
 
-type byVersion []apidiscoveryv2beta1.APIVersionDiscovery
-
-var versionMap = map[string]int{
-	"v1":       1,
-	"v1beta1":  2,
-	"v1alpha1": 3,
-}
-
-func (a byVersion) Len() int           { return len(a) }
-func (a byVersion) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byVersion) Less(i, j int) bool { return versionMap[a[i].Version] < versionMap[a[j].Version] }
-
-func TestLegacyFallback(t *testing.T) {
-	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
-	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
+func testLegacyFallbackWithCustomRootHandler(t *testing.T, rootHandlerFn func(http.ResponseWriter, *http.Request)) {
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
 
 	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
 		Name: "stable.example.com",
@@ -496,7 +831,7 @@ func TestLegacyFallback(t *testing.T) {
 			// defer to legacy discovery
 			legacyResourceHandler.ServeHTTP(w, r)
 		} else if r.URL.Path == "/apis" {
-			rootAPIsHandler.ServeHTTP(w, r)
+			rootHandlerFn(w, r)
 		} else {
 			// Unknown url
 			t.Fatalf("unexpected request sent to %v", r.URL.Path)
@@ -505,7 +840,7 @@ func TestLegacyFallback(t *testing.T) {
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
 
 	// At this point external services have synced. Check if discovery document
@@ -514,16 +849,92 @@ func TestLegacyFallback(t *testing.T) {
 
 	converted, err := endpoints.ConvertGroupVersionIntoToDiscovery([]metav1.APIResource{resource})
 	require.NoError(t, err)
-	require.Equal(t, []apidiscoveryv2beta1.APIGroupDiscovery{
+	require.Equal(t, []apidiscoveryv2.APIGroupDiscovery{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: resource.Group,
 			},
-			Versions: []apidiscoveryv2beta1.APIVersionDiscovery{
+			Versions: []apidiscoveryv2.APIVersionDiscovery{
 				{
 					Version:   resource.Version,
 					Resources: converted,
-					Freshness: apidiscoveryv2beta1.DiscoveryFreshnessCurrent,
+					Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+				},
+			},
+		},
+	}, doc.Items)
+}
+func TestLegacyFallback(t *testing.T) {
+	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
+	testCases := []struct {
+		name        string
+		rootHandler func(http.ResponseWriter, *http.Request)
+	}{
+		{
+			name:        "Default root handler (406)",
+			rootHandler: rootAPIsHandler.ServeHTTP,
+		},
+		{
+			name: "Root handler with non 200 status code",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(404)
+			},
+		},
+		{
+			name: "Root handler with 200 response code no content type",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(200)
+			},
+		},
+		{
+			name: "Root handler with 200 response code incorrect content type",
+			rootHandler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json;g=apidiscovery.k8s.io;v=v1alpha1;as=APIGroupDiscoveryList")
+				w.WriteHeader(200)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		testLegacyFallbackWithCustomRootHandler(t, tc.rootHandler)
+	}
+}
+
+func TestAPIServiceStale(t *testing.T) {
+	aggregatedResourceManager := discoveryendpoint.NewResourceManager("apis")
+	aggregatedManager := newDiscoveryManager(aggregatedResourceManager)
+	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.stable.example.com",
+		},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Group:   "stable.example.com",
+			Version: "v1",
+			Service: &apiregistrationv1.ServiceReference{
+				Name: "test-service",
+			},
+		},
+	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+	}))
+	testCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go aggregatedManager.Run(testCtx.Done(), nil)
+	require.True(t, waitForQueueComplete(testCtx.Done(), aggregatedManager))
+
+	// At this point external services have synced. Check if discovery document
+	// lists the APIService group version as Stale.
+	_, _, doc := fetchPath(aggregatedResourceManager, "")
+	require.Equal(t, []apidiscoveryv2.APIGroupDiscovery{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "stable.example.com",
+			},
+			Versions: []apidiscoveryv2.APIVersionDiscovery{
+				{
+					Version:   "v1",
+					Freshness: apidiscoveryv2.DiscoveryFreshnessStale,
 				},
 			},
 		},
@@ -534,8 +945,8 @@ func TestLegacyFallback(t *testing.T) {
 // This path in 1.26.0 would result in a deadlock if an aggregated APIService
 // returned a 304 Not Modified response for its own aggregated discovery document.
 func TestNotModified(t *testing.T) {
-	aggyService := discoveryendpoint.NewResourceManager()
-	service := discoveryendpoint.NewResourceManager()
+	aggyService := discoveryendpoint.NewResourceManager("apis")
+	service := discoveryendpoint.NewResourceManager("apis")
 	apiGroup := fuzzAPIGroups(2, 3, 10)
 	service.SetGroups(apiGroup.Items)
 
@@ -571,7 +982,7 @@ func TestNotModified(t *testing.T) {
 	testCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go aggregatedManager.Run(testCtx.Done())
+	go aggregatedManager.Run(testCtx.Done(), nil)
 
 	// Important to wait here to ensure we prime the cache with the initial list
 	// of documents in order to exercise 304 Not Modified
@@ -590,29 +1001,34 @@ func TestNotModified(t *testing.T) {
 }
 
 // copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v2/handler_test.go
-func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv2beta1.APIGroupDiscoveryList {
+func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv2.APIGroupDiscoveryList {
 	fuzzer := fuzz.NewWithSeed(seed)
 	fuzzer.NumElements(atLeastNumGroups, maxNumGroups)
 	fuzzer.NilChance(0)
-	fuzzer.Funcs(func(o *apidiscoveryv2beta1.APIGroupDiscovery, c fuzz.Continue) {
+	fuzzer.Funcs(func(o *apidiscoveryv2.APIGroupDiscovery, c fuzz.Continue) {
 		c.FuzzNoCustom(o)
 
 		// The ResourceManager will just not serve the group if its versions
 		// list is empty
-		atLeastOne := apidiscoveryv2beta1.APIVersionDiscovery{}
+		atLeastOne := apidiscoveryv2.APIVersionDiscovery{}
 		c.Fuzz(&atLeastOne)
 		o.Versions = append(o.Versions, atLeastOne)
 
-		o.TypeMeta = metav1.TypeMeta{
-			Kind:       "APIGroupDiscovery",
-			APIVersion: "v1",
+		// clear invalid fuzzed values
+		o.TypeMeta = metav1.TypeMeta{}
+		// truncate object meta to just name
+		o.ObjectMeta = metav1.ObjectMeta{Name: o.ObjectMeta.Name}
+		// fix version freshness value, make versions unique and non-empty
+		for i := range o.Versions {
+			o.Versions[i].Freshness = "Current"
+			o.Versions[i].Version = fmt.Sprintf("v%d", i+1)
 		}
 	})
 
-	var apis []apidiscoveryv2beta1.APIGroupDiscovery
+	var apis []apidiscoveryv2.APIGroupDiscovery
 	fuzzer.Fuzz(&apis)
 
-	return apidiscoveryv2beta1.APIGroupDiscoveryList{
+	return apidiscoveryv2.APIGroupDiscoveryList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "APIGroupDiscoveryList",
 			APIVersion: "v1",
@@ -623,13 +1039,13 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 }
 
 // copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v2/handler_test.go
-func fetchPath(handler http.Handler, etag string) (*http.Response, []byte, *apidiscoveryv2beta1.APIGroupDiscoveryList) {
+func fetchPath(handler http.Handler, etag string) (*http.Response, []byte, *apidiscoveryv2.APIGroupDiscoveryList) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/apis", nil)
 
 	// Ask for JSON response
-	req.Header.Set("Accept", runtime.ContentTypeJSON+";g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
+	req.Header.Set("Accept", runtime.ContentTypeJSON+";g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList,"+runtime.ContentTypeJSON+";g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
 
 	if etag != "" {
 		// Quote provided etag if unquoted
@@ -643,9 +1059,9 @@ func fetchPath(handler http.Handler, etag string) (*http.Response, []byte, *apid
 	handler.ServeHTTP(w, req)
 
 	bytes := w.Body.Bytes()
-	var decoded *apidiscoveryv2beta1.APIGroupDiscoveryList
+	var decoded *apidiscoveryv2.APIGroupDiscoveryList
 	if len(bytes) > 0 {
-		decoded = &apidiscoveryv2beta1.APIGroupDiscoveryList{}
+		decoded = &apidiscoveryv2.APIGroupDiscoveryList{}
 		runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), bytes, decoded)
 	}
 

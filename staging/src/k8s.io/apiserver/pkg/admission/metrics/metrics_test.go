@@ -176,6 +176,121 @@ func TestObserveWebhookFailOpen(t *testing.T) {
 	expectCounterValue(t, "apiserver_admission_webhook_fail_open_count", wantLabelsCounterValidate, 1)
 }
 
+func TestObserveMatchConditionEvalError(t *testing.T) {
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
+	Metrics.ObserveMatchConditionEvalError(context.TODO(), "x", kindWebhook, stepAdmit, string(admission.Create))
+	Metrics.ObserveMatchConditionEvalError(context.TODO(), "x", kindWebhook, stepValidate, string(admission.Create))
+	Metrics.ObserveMatchConditionEvalError(context.TODO(), "x", kindPolicy, stepAdmit, string(admission.Create))
+	Metrics.ObserveMatchConditionEvalError(context.TODO(), "x", kindPolicy, stepValidate, string(admission.Create))
+	wantLabelsCounterPolicyAdmit := map[string]string{
+		"name":      "x",
+		"type":      "admit",
+		"kind":      "policy",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterPolicyValidate := map[string]string{
+		"name":      "x",
+		"type":      "validate",
+		"kind":      "policy",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterWebhookAdmit := map[string]string{
+		"name":      "x",
+		"type":      "admit",
+		"kind":      "webhook",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterWebhookValidate := map[string]string{
+		"name":      "x",
+		"type":      "validate",
+		"kind":      "webhook",
+		"operation": string(admission.Create),
+	}
+	expectCounterValue(t, "apiserver_admission_match_condition_evaluation_errors_total", wantLabelsCounterPolicyAdmit, 1)
+	expectCounterValue(t, "apiserver_admission_match_condition_evaluation_errors_total", wantLabelsCounterPolicyValidate, 1)
+	expectCounterValue(t, "apiserver_admission_match_condition_evaluation_errors_total", wantLabelsCounterWebhookAdmit, 1)
+	expectCounterValue(t, "apiserver_admission_match_condition_evaluation_errors_total", wantLabelsCounterWebhookValidate, 1)
+}
+
+func TestObserveMatchConditionExclusion(t *testing.T) {
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
+	Metrics.ObserveMatchConditionExclusion(context.TODO(), "x", kindWebhook, stepAdmit, string(admission.Create))
+	Metrics.ObserveMatchConditionExclusion(context.TODO(), "x", kindWebhook, stepValidate, string(admission.Create))
+	Metrics.ObserveMatchConditionExclusion(context.TODO(), "x", kindPolicy, stepAdmit, string(admission.Create))
+	Metrics.ObserveMatchConditionExclusion(context.TODO(), "x", kindPolicy, stepValidate, string(admission.Create))
+	wantLabelsCounterPolicyAdmit := map[string]string{
+		"name":      "x",
+		"type":      "admit",
+		"kind":      "policy",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterPolicyValidate := map[string]string{
+		"name":      "x",
+		"type":      "validate",
+		"kind":      "policy",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterWebhookAdmit := map[string]string{
+		"name":      "x",
+		"type":      "admit",
+		"kind":      "webhook",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterWebhookValidate := map[string]string{
+		"name":      "x",
+		"type":      "validate",
+		"kind":      "webhook",
+		"operation": string(admission.Create),
+	}
+	metrics, _ := legacyregistry.DefaultGatherer.Gather()
+	for _, mf := range metrics {
+		t.Logf("%v", *mf.Name)
+	}
+	expectCounterValue(t, "apiserver_admission_match_condition_exclusions_total", wantLabelsCounterPolicyAdmit, 1)
+	expectCounterValue(t, "apiserver_admission_match_condition_exclusions_total", wantLabelsCounterPolicyValidate, 1)
+	expectCounterValue(t, "apiserver_admission_match_condition_exclusions_total", wantLabelsCounterWebhookAdmit, 1)
+	expectCounterValue(t, "apiserver_admission_match_condition_exclusions_total", wantLabelsCounterWebhookValidate, 1)
+}
+
+func TestObserveMatchConditionEvaluationTime(t *testing.T) {
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
+	Metrics.ObserveMatchConditionEvaluationTime(context.TODO(), 2*time.Second, "x", kindPolicy, stepAdmit, string(admission.Create))
+	Metrics.ObserveMatchConditionEvaluationTime(context.TODO(), 2*time.Second, "x", kindPolicy, stepValidate, string(admission.Create))
+	Metrics.ObserveMatchConditionEvaluationTime(context.TODO(), 2*time.Second, "x", kindWebhook, stepAdmit, string(admission.Create))
+	Metrics.ObserveMatchConditionEvaluationTime(context.TODO(), 2*time.Second, "x", kindWebhook, stepValidate, string(admission.Create))
+	wantLabelsCounterPolicyAdmit := map[string]string{
+		"name":      "x",
+		"type":      "admit",
+		"kind":      "policy",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterPolicyValidate := map[string]string{
+		"name":      "x",
+		"type":      "validate",
+		"kind":      "policy",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterWebhookAdmit := map[string]string{
+		"name":      "x",
+		"type":      "admit",
+		"kind":      "webhook",
+		"operation": string(admission.Create),
+	}
+	wantLabelsCounterWebhookValidate := map[string]string{
+		"name":      "x",
+		"type":      "validate",
+		"kind":      "webhook",
+		"operation": string(admission.Create),
+	}
+	expectHistogramCountTotal(t, "apiserver_admission_match_condition_evaluation_seconds", wantLabelsCounterPolicyAdmit, 1)
+	expectHistogramCountTotal(t, "apiserver_admission_match_condition_evaluation_seconds", wantLabelsCounterPolicyValidate, 1)
+	expectHistogramCountTotal(t, "apiserver_admission_match_condition_evaluation_seconds", wantLabelsCounterWebhookAdmit, 1)
+	expectHistogramCountTotal(t, "apiserver_admission_match_condition_evaluation_seconds", wantLabelsCounterWebhookValidate, 1)
+}
+
 func TestWithMetrics(t *testing.T) {
 	defer Metrics.reset()
 	defer legacyregistry.Reset()

@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -49,12 +49,6 @@ func testKubeletConfigMap(contents string) *v1.ConfigMap {
 }
 
 func TestKubeletDefault(t *testing.T) {
-	var resolverConfig *string
-	if isSystemdResolvedActive, _ := isServiceActive("systemd-resolved"); isSystemdResolvedActive {
-		// If systemd-resolved is active, we need to set the default resolver config
-		resolverConfig = pointer.String(kubeletSystemdResolverConfig)
-	}
-
 	tests := []struct {
 		name       string
 		clusterCfg kubeadmapi.ClusterConfiguration
@@ -73,19 +67,18 @@ func TestKubeletDefault(t *testing.T) {
 							ClientCAFile: constants.CACertName,
 						},
 						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationAnonymousEnabled),
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
 						},
 						Webhook: kubeletconfig.KubeletWebhookAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationWebhookEnabled),
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
 						},
 					},
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
 					HealthzBindAddress: kubeletHealthzBindAddress,
-					HealthzPort:        pointer.Int32(constants.KubeletHealthzPort),
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -107,19 +100,18 @@ func TestKubeletDefault(t *testing.T) {
 							ClientCAFile: constants.CACertName,
 						},
 						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationAnonymousEnabled),
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
 						},
 						Webhook: kubeletconfig.KubeletWebhookAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationWebhookEnabled),
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
 						},
 					},
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
 					HealthzBindAddress: kubeletHealthzBindAddress,
-					HealthzPort:        pointer.Int32(constants.KubeletHealthzPort),
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -141,19 +133,18 @@ func TestKubeletDefault(t *testing.T) {
 							ClientCAFile: constants.CACertName,
 						},
 						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationAnonymousEnabled),
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
 						},
 						Webhook: kubeletconfig.KubeletWebhookAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationWebhookEnabled),
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
 						},
 					},
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
 					HealthzBindAddress: kubeletHealthzBindAddress,
-					HealthzPort:        pointer.Int32(constants.KubeletHealthzPort),
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -176,19 +167,18 @@ func TestKubeletDefault(t *testing.T) {
 							ClientCAFile: constants.CACertName,
 						},
 						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationAnonymousEnabled),
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
 						},
 						Webhook: kubeletconfig.KubeletWebhookAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationWebhookEnabled),
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
 						},
 					},
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
 					HealthzBindAddress: kubeletHealthzBindAddress,
-					HealthzPort:        pointer.Int32(constants.KubeletHealthzPort),
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
@@ -208,19 +198,18 @@ func TestKubeletDefault(t *testing.T) {
 							ClientCAFile: filepath.Join("/path/to/certs", constants.CACertName),
 						},
 						Anonymous: kubeletconfig.KubeletAnonymousAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationAnonymousEnabled),
+							Enabled: ptr.To(kubeletAuthenticationAnonymousEnabled),
 						},
 						Webhook: kubeletconfig.KubeletWebhookAuthentication{
-							Enabled: pointer.Bool(kubeletAuthenticationWebhookEnabled),
+							Enabled: ptr.To(kubeletAuthenticationWebhookEnabled),
 						},
 					},
 					Authorization: kubeletconfig.KubeletAuthorization{
 						Mode: kubeletconfig.KubeletAuthorizationModeWebhook,
 					},
 					HealthzBindAddress: kubeletHealthzBindAddress,
-					HealthzPort:        pointer.Int32(constants.KubeletHealthzPort),
+					HealthzPort:        ptr.To[int32](constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
-					ResolverConfig:     resolverConfig,
 					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},

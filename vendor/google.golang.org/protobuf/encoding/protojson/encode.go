@@ -31,7 +31,7 @@ func Format(m proto.Message) string {
 	return MarshalOptions{Multiline: true}.Format(m)
 }
 
-// Marshal writes the given proto.Message in JSON format using default options.
+// Marshal writes the given [proto.Message] in JSON format using default options.
 // Do not depend on the output being stable. It may change over time across
 // different versions of the program.
 func Marshal(m proto.Message) ([]byte, error) {
@@ -81,6 +81,25 @@ type MarshalOptions struct {
 	//  ╚═══════╧════════════════════════════╝
 	EmitUnpopulated bool
 
+	// EmitDefaultValues specifies whether to emit default-valued primitive fields,
+	// empty lists, and empty maps. The fields affected are as follows:
+	//  ╔═══════╤════════════════════════════════════════╗
+	//  ║ JSON  │ Protobuf field                         ║
+	//  ╠═══════╪════════════════════════════════════════╣
+	//  ║ false │ non-optional scalar boolean fields     ║
+	//  ║ 0     │ non-optional scalar numeric fields     ║
+	//  ║ ""    │ non-optional scalar string/byte fields ║
+	//  ║ []    │ empty repeated fields                  ║
+	//  ║ {}    │ empty map fields                       ║
+	//  ╚═══════╧════════════════════════════════════════╝
+	//
+	// Behaves similarly to EmitUnpopulated, but does not emit "null"-value fields,
+	// i.e. presence-sensing fields that are omitted will remain omitted to preserve
+	// presence-sensing.
+	// EmitUnpopulated takes precedence over EmitDefaultValues since the former generates
+	// a strict superset of the latter.
+	EmitDefaultValues bool
+
 	// Resolver is used for looking up types when expanding google.protobuf.Any
 	// messages. If nil, this defaults to using protoregistry.GlobalTypes.
 	Resolver interface {
@@ -102,17 +121,23 @@ func (o MarshalOptions) Format(m proto.Message) string {
 	return string(b)
 }
 
-// Marshal marshals the given proto.Message in the JSON format using options in
+// Marshal marshals the given [proto.Message] in the JSON format using options in
 // MarshalOptions. Do not depend on the output being stable. It may change over
 // time across different versions of the program.
 func (o MarshalOptions) Marshal(m proto.Message) ([]byte, error) {
-	return o.marshal(m)
+	return o.marshal(nil, m)
+}
+
+// MarshalAppend appends the JSON format encoding of m to b,
+// returning the result.
+func (o MarshalOptions) MarshalAppend(b []byte, m proto.Message) ([]byte, error) {
+	return o.marshal(b, m)
 }
 
 // marshal is a centralized function that all marshal operations go through.
 // For profiling purposes, avoid changing the name of this function or
 // introducing other code paths for marshal that do not go through this.
-func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
+func (o MarshalOptions) marshal(b []byte, m proto.Message) ([]byte, error) {
 	if o.Multiline && o.Indent == "" {
 		o.Indent = defaultIndent
 	}
@@ -120,7 +145,7 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 		o.Resolver = protoregistry.GlobalTypes
 	}
 
-	internalEnc, err := json.NewEncoder(o.Indent)
+	internalEnc, err := json.NewEncoder(b, o.Indent)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +153,7 @@ func (o MarshalOptions) marshal(m proto.Message) ([]byte, error) {
 	// Treat nil message interface as an empty message,
 	// in which case the output in an empty JSON object.
 	if m == nil {
-		return []byte("{}"), nil
+		return append(b, '{', '}'), nil
 	}
 
 	enc := encoder{internalEnc, o}
@@ -172,7 +197,11 @@ func (m typeURLFieldRanger) Range(f func(protoreflect.FieldDescriptor, protorefl
 
 // unpopulatedFieldRanger wraps a protoreflect.Message and modifies its Range
 // method to additionally iterate over unpopulated fields.
-type unpopulatedFieldRanger struct{ protoreflect.Message }
+type unpopulatedFieldRanger struct {
+	protoreflect.Message
+
+	skipNull bool
+}
 
 func (m unpopulatedFieldRanger) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
 	fds := m.Descriptor().Fields()
@@ -186,6 +215,9 @@ func (m unpopulatedFieldRanger) Range(f func(protoreflect.FieldDescriptor, proto
 		isProto2Scalar := fd.Syntax() == protoreflect.Proto2 && fd.Default().IsValid()
 		isSingularMessage := fd.Cardinality() != protoreflect.Repeated && fd.Message() != nil
 		if isProto2Scalar || isSingularMessage {
+			if m.skipNull {
+				continue
+			}
 			v = protoreflect.Value{} // use invalid value to emit null
 		}
 		if !f(fd, v) {
@@ -211,8 +243,11 @@ func (e encoder) marshalMessage(m protoreflect.Message, typeURL string) error {
 	defer e.EndObject()
 
 	var fields order.FieldRanger = m
-	if e.opts.EmitUnpopulated {
-		fields = unpopulatedFieldRanger{m}
+	switch {
+	case e.opts.EmitUnpopulated:
+		fields = unpopulatedFieldRanger{Message: m, skipNull: false}
+	case e.opts.EmitDefaultValues:
+		fields = unpopulatedFieldRanger{Message: m, skipNull: true}
 	}
 	if typeURL != "" {
 		fields = typeURLFieldRanger{fields, typeURL}

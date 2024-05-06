@@ -21,12 +21,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -53,11 +55,11 @@ var (
 		by creating a dockercfg secret and attaching it to your service account.`))
 
 	secretForDockerRegistryExample = templates.Examples(i18n.T(`
-		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
+		  # If you do not already have a .dockercfg file, create a dockercfg secret directly
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
 
 		  # Create a new secret named my-secret from ~/.docker/config.json
-		  kubectl create secret docker-registry my-secret --from-file=.dockerconfigjson=path/to/.docker/config.json`))
+		  kubectl create secret docker-registry my-secret --from-file=path/to/.docker/config.json`))
 )
 
 // DockerConfigJSON represents a local docker auth config file
@@ -111,11 +113,11 @@ type CreateSecretDockerRegistryOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewSecretDockerRegistryOptions creates a new *CreateSecretDockerRegistryOptions with default value
-func NewSecretDockerRegistryOptions(ioStreams genericclioptions.IOStreams) *CreateSecretDockerRegistryOptions {
+func NewSecretDockerRegistryOptions(ioStreams genericiooptions.IOStreams) *CreateSecretDockerRegistryOptions {
 	return &CreateSecretDockerRegistryOptions{
 		Server:     "https://index.docker.io/v1/",
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -124,7 +126,7 @@ func NewSecretDockerRegistryOptions(ioStreams genericclioptions.IOStreams) *Crea
 }
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSecretDockerRegistryOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -151,7 +153,11 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	cmd.Flags().StringVar(&o.Email, "docker-email", o.Email, i18n.T("Email for Docker registry"))
 	cmd.Flags().StringVar(&o.Server, "docker-server", o.Server, i18n.T("Server location for Docker registry"))
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
-	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
+	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, "+
+		"in which case a default name of "+corev1.DockerConfigJsonKey+" will be given to them, "+
+		"or optionally with a name and file path, in which case the given name will be used. "+
+		"Specifying a directory will iterate each named file in the directory that is a valid secret key. "+
+		"For this command, the key should always be "+corev1.DockerConfigJsonKey+".")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
@@ -203,6 +209,11 @@ func (o *CreateSecretDockerRegistryOptions) Complete(f cmdutil.Factory, cmd *cob
 		return err
 	}
 
+	for i := range o.FileSources {
+		if !strings.Contains(o.FileSources[i], "=") {
+			o.FileSources[i] = corev1.DockerConfigJsonKey + "=" + o.FileSources[i]
+		}
+	}
 	return nil
 }
 

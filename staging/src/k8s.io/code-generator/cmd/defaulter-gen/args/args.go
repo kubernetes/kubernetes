@@ -20,34 +20,33 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/examples/defaulter-gen/generators"
 )
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs generators.CustomArgs
+type Args struct {
+	OutputFile    string
+	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
+	GoHeaderFile  string
+}
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	customArgs := &CustomArgs{}
-	genericArgs.CustomArgs = (*generators.CustomArgs)(customArgs) // convert to upstream type to make type-casts work there
-	genericArgs.OutputFileBaseName = "zz_generated.defaults"
-	return genericArgs, customArgs
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{}
 }
 
 // AddFlags add the generator flags to the flag set.
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	pflag.CommandLine.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputFile, "output-file", "generated.defaults.go",
+		"the name of the file to be generated")
+	fs.StringSliceVar(&args.ExtraPeerDirs, "extra-peer-dirs", args.ExtraPeerDirs,
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*generators.CustomArgs)
-
-	if len(genericArgs.OutputFileBaseName) == 0 {
-		return fmt.Errorf("output file base name cannot be empty")
+func (args *Args) Validate() error {
+	if len(args.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
 	}
 
 	return nil

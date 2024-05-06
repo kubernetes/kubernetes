@@ -17,8 +17,10 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/spf13/pflag"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -96,6 +98,66 @@ func TestGetKubeConfigPath(t *testing.T) {
 			if actualResult != tt.expected {
 				t.Errorf(
 					"failed GetKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
+					tt.expected,
+					actualResult,
+				)
+			}
+		})
+	}
+}
+
+func TestValueFromFlagsOrConfig(t *testing.T) {
+	var tests = []struct {
+		name      string
+		flag      string
+		cfg       interface{}
+		flagValue interface{}
+		expected  interface{}
+	}{
+		{
+			name:      "string: config is overridden by the flag",
+			flag:      "foo",
+			cfg:       "foo_cfg",
+			flagValue: "foo_flag",
+			expected:  "foo_flag",
+		},
+		{
+			name:      "bool: config is overridden by the flag",
+			flag:      "bar",
+			cfg:       true,
+			flagValue: false,
+			expected:  false,
+		},
+		{
+			name:      "nil bool is converted to false",
+			cfg:       (*bool)(nil),
+			flagValue: false,
+			expected:  false,
+		},
+	}
+	for _, tt := range tests {
+		type options struct {
+			foo string
+			bar bool
+		}
+		fakeOptions := &options{}
+		fs := pflag.FlagSet{}
+		fs.StringVar(&fakeOptions.foo, "foo", "", "")
+		fs.BoolVar(&fakeOptions.bar, "bar", false, "")
+
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.flag != "" {
+				if err := fs.Set(tt.flag, fmt.Sprintf("%v", tt.flagValue)); err != nil {
+					t.Fatalf("failed to set the value of the flag %v", tt.flagValue)
+				}
+			}
+			actualResult := ValueFromFlagsOrConfig(&fs, tt.flag, tt.cfg, tt.flagValue)
+			if result, ok := actualResult.(*bool); ok {
+				actualResult = *result
+			}
+			if actualResult != tt.expected {
+				t.Errorf(
+					"failed ValueFromFlagsOrConfig:\n\texpected: %s\n\t  actual: %s",
 					tt.expected,
 					actualResult,
 				)

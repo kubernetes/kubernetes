@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -47,9 +48,10 @@ type DeleteFlags struct {
 	Wait              *bool
 	Output            *string
 	Raw               *string
+	Interactive       *bool
 }
 
-func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) (*DeleteOptions, error) {
+func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericiooptions.IOStreams) (*DeleteOptions, error) {
 	options := &DeleteOptions{
 		DynamicClient: dynamicClient,
 		IOStreams:     streams,
@@ -105,6 +107,9 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.Raw != nil {
 		options.Raw = *f.Raw
 	}
+	if f.Interactive != nil {
+		options.Interactive = *f.Interactive
+	}
 
 	return options, nil
 }
@@ -155,6 +160,9 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Raw != nil {
 		cmd.Flags().StringVar(f.Raw, "raw", *f.Raw, "Raw URI to DELETE to the server.  Uses the transport specified by the kubeconfig file.")
 	}
+	if f.Interactive != nil {
+		cmd.Flags().BoolVarP(f.Interactive, "interactive", "i", *f.Interactive, "If true, delete resource only when user confirms.")
+	}
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
@@ -174,6 +182,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	timeout := time.Duration(0)
 	wait := true
 	raw := ""
+	interactive := false
 
 	filenames := []string{}
 	recursive := false
@@ -197,6 +206,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		Wait:           &wait,
 		Output:         &output,
 		Raw:            &raw,
+		Interactive:    &interactive,
 	}
 }
 
@@ -226,7 +236,7 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	}
 }
 
-func parseCascadingFlag(streams genericclioptions.IOStreams, cascadingFlag string) (metav1.DeletionPropagation, error) {
+func parseCascadingFlag(streams genericiooptions.IOStreams, cascadingFlag string) (metav1.DeletionPropagation, error) {
 	boolValue, err := strconv.ParseBool(cascadingFlag)
 	// The flag is not a boolean
 	if err != nil {

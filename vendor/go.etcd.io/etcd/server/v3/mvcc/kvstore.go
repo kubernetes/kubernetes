@@ -175,7 +175,7 @@ func (s *store) hashByRev(rev int64) (hash KeyValueHash, currentRev int64, err e
 	compactRev, currentRev = s.compactMainRev, s.currentRev
 	s.revMu.RUnlock()
 
-	if rev > 0 && rev <= compactRev {
+	if rev > 0 && rev < compactRev {
 		s.mu.RUnlock()
 		return KeyValueHash{}, 0, ErrCompacted
 	} else if rev > 0 && rev > currentRev {
@@ -227,7 +227,17 @@ func (s *store) updateCompactRev(rev int64) (<-chan struct{}, int64, error) {
 	return nil, compactMainRev, nil
 }
 
-func (s *store) compact(trace *traceutil.Trace, rev, prevCompactRev int64) (<-chan struct{}, error) {
+// checkPrevCompactionCompleted checks whether the previous scheduled compaction is completed.
+func (s *store) checkPrevCompactionCompleted() bool {
+	tx := s.b.ReadTx()
+	tx.Lock()
+	defer tx.Unlock()
+	scheduledCompact, scheduledCompactFound := UnsafeReadScheduledCompact(tx)
+	finishedCompact, finishedCompactFound := UnsafeReadFinishedCompact(tx)
+	return scheduledCompact == finishedCompact && scheduledCompactFound == finishedCompactFound
+}
+
+func (s *store) compact(trace *traceutil.Trace, rev, prevCompactRev int64, prevCompactionCompleted bool) (<-chan struct{}, error) {
 	ch := make(chan struct{})
 	var j = func(ctx context.Context) {
 		if ctx.Err() != nil {
@@ -240,7 +250,13 @@ func (s *store) compact(trace *traceutil.Trace, rev, prevCompactRev int64) (<-ch
 			s.compactBarrier(context.TODO(), ch)
 			return
 		}
-		s.hashes.Store(hash)
+		// Only store the hash value if the previous hash is completed, i.e. this compaction
+		// hashes every revision from last compaction. For more details, see #15919.
+		if prevCompactionCompleted {
+			s.hashes.Store(hash)
+		} else {
+			s.lg.Info("previous compaction was interrupted, skip storing compaction hash value")
+		}
 		close(ch)
 	}
 
@@ -250,17 +266,19 @@ func (s *store) compact(trace *traceutil.Trace, rev, prevCompactRev int64) (<-ch
 }
 
 func (s *store) compactLockfree(rev int64) (<-chan struct{}, error) {
+	prevCompactionCompleted := s.checkPrevCompactionCompleted()
 	ch, prevCompactRev, err := s.updateCompactRev(rev)
 	if err != nil {
 		return ch, err
 	}
 
-	return s.compact(traceutil.TODO(), rev, prevCompactRev)
+	return s.compact(traceutil.TODO(), rev, prevCompactRev, prevCompactionCompleted)
 }
 
 func (s *store) Compact(trace *traceutil.Trace, rev int64) (<-chan struct{}, error) {
 	s.mu.Lock()
 
+	prevCompactionCompleted := s.checkPrevCompactionCompleted()
 	ch, prevCompactRev, err := s.updateCompactRev(rev)
 	trace.Step("check and update compact revision")
 	if err != nil {
@@ -269,7 +287,7 @@ func (s *store) Compact(trace *traceutil.Trace, rev int64) (<-chan struct{}, err
 	}
 	s.mu.Unlock()
 
-	return s.compact(trace, rev, prevCompactRev)
+	return s.compact(trace, rev, prevCompactRev, prevCompactionCompleted)
 }
 
 func (s *store) Commit() {
@@ -315,10 +333,10 @@ func (s *store) restore() error {
 	tx := s.b.ReadTx()
 	tx.Lock()
 
-	_, finishedCompactBytes := tx.UnsafeRange(buckets.Meta, finishedCompactKeyName, nil, 0)
-	if len(finishedCompactBytes) != 0 {
+	finishedCompact, found := UnsafeReadFinishedCompact(tx)
+	if found {
 		s.revMu.Lock()
-		s.compactMainRev = bytesToRev(finishedCompactBytes[0]).main
+		s.compactMainRev = finishedCompact
 
 		s.lg.Info(
 			"restored last compact revision",
@@ -328,11 +346,7 @@ func (s *store) restore() error {
 		)
 		s.revMu.Unlock()
 	}
-	_, scheduledCompactBytes := tx.UnsafeRange(buckets.Meta, scheduledCompactKeyName, nil, 0)
-	scheduledCompact := int64(0)
-	if len(scheduledCompactBytes) != 0 {
-		scheduledCompact = bytesToRev(scheduledCompactBytes[0]).main
-	}
+	scheduledCompact, _ := UnsafeReadScheduledCompact(tx)
 
 	// index keys concurrently as they're loaded in from tx
 	keysGauge.Set(0)

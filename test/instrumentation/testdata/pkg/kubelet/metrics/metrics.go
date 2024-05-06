@@ -132,6 +132,27 @@ var (
 		},
 		testLabels,
 	)
+	// healthcheck is a Prometheus Gauge metrics used for recording the results of a k8s healthcheck.
+	healthcheck = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Namespace:      "kubernetes",
+			Name:           "healthcheck",
+			Help:           "This metric records the result of a single healthcheck.",
+			StabilityLevel: metrics.BETA,
+		},
+		[]string{"name", "type"},
+	)
+
+	// healthchecksTotal is a Prometheus Counter metrics used for counting the results of a k8s healthcheck.
+	healthchecksTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      "kubernetes",
+			Name:           "healthchecks_total",
+			Help:           "This metric records the results of all healthcheck.",
+			StabilityLevel: metrics.BETA,
+		},
+		[]string{"name", "type", "status"},
+	)
 	// PodWorkerDuration is a Histogram that tracks the duration (in seconds) in takes to sync a single pod.
 	// Broken down by the operation type.
 	SummaryMaxAge = metrics.NewSummary(
@@ -172,8 +193,8 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           CgroupManagerOperationsKey,
 			Help:           "Duration in seconds for cgroup manager operations. Broken down by method.",
-			Buckets:        metrics.DefBuckets,
-			StabilityLevel: metrics.ALPHA,
+			Buckets:        metrics.ExponentialBucketsRange(0.01, 10, 10),
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"operation_type"},
 	)
@@ -567,6 +588,8 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)
+		legacyregistry.MustRegister(healthcheck)
+		legacyregistry.MustRegister(healthchecksTotal)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(ContainersPerPodCount)

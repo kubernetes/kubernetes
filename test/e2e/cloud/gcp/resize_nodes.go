@@ -44,10 +44,10 @@ func resizeRC(ctx context.Context, c clientset.Interface, ns, name string, repli
 	return err
 }
 
-var _ = SIGDescribe("Nodes [Disruptive]", func() {
+var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("resize-nodes")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var systemPodsNo int32
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	var systemPodsNo int
 	var c clientset.Interface
 	var ns string
 	var group string
@@ -57,7 +57,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		ns = f.Namespace.Name
 		systemPods, err := e2epod.GetPodsInNamespace(ctx, c, ns, map[string]string{})
 		framework.ExpectNoError(err)
-		systemPodsNo = int32(len(systemPods))
+		systemPodsNo = len(systemPods)
 		if strings.Contains(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
@@ -66,11 +66,11 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	})
 
 	// Slow issue #13323 (8 min)
-	ginkgo.Describe("Resize [Slow]", func() {
+	f.Describe("Resize", framework.WithSlow(), func() {
 		var originalNodeCount int32
 
 		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
+			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				ginkgo.By("restoring the original node instance group size")
@@ -99,7 +99,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 				// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 				// the cluster is restored to health.
 				ginkgo.By("waiting for system pods to successfully restart")
-				err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout)
+				err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout)
 				framework.ExpectNoError(err)
 			})
 		})

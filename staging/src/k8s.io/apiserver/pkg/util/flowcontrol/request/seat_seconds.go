@@ -38,7 +38,7 @@ const MinSeatSeconds = SeatSeconds(0)
 // This is intended only to produce small values, increments in work
 // rather than amount of work done since process start.
 func SeatsTimesDuration(seats float64, duration time.Duration) SeatSeconds {
-	return SeatSeconds(math.Round(seats * float64(duration/time.Nanosecond) / (1e9 / ssScale)))
+	return SeatSeconds(int64(math.Round(seats * float64(duration/time.Nanosecond) / (1e9 / ssScale))))
 }
 
 // ToFloat converts to a floating-point representation.

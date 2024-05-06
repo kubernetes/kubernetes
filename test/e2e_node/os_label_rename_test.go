@@ -38,9 +38,9 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("OSArchLabelReconciliation [Serial] [Slow] [Disruptive]", func() {
+var _ = SIGDescribe("OSArchLabelReconciliation", framework.WithSerial(), framework.WithSlow(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("node-label-reconciliation")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("Kubelet", func() {
 		ginkgo.It("should reconcile the OS and Arch labels when restarted", func(ctx context.Context) {
 			node := getLocalNode(ctx, f)

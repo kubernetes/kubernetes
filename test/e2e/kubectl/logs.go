@@ -33,6 +33,7 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -55,12 +56,12 @@ func testingPod(name, value, defaultContainerName string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "container-1",
-					Image: agnhostImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"logs-generator", "--log-lines-total", "10", "--run-duration", "5s"},
 				},
 				{
 					Name:  defaultContainerName,
-					Image: agnhostImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"logs-generator", "--log-lines-total", "20", "--run-duration", "5s"},
 				},
 			},
@@ -71,7 +72,7 @@ func testingPod(name, value, defaultContainerName string) v1.Pod {
 
 var _ = SIGDescribe("Kubectl logs", func() {
 	f := framework.NewDefaultFramework("kubectl-logs")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	defer ginkgo.GinkgoRecover()
 
 	var c clientset.Interface
@@ -94,7 +95,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("creating an pod")
 			// Agnhost image generates logs for a total of 100 lines over 20s.
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, "--restart=Never", podRunningTimeoutArg, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+imageutils.GetE2EImage(imageutils.Agnhost), "--restart=Never", podRunningTimeoutArg, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
 		})
 		ginkgo.AfterEach(func() {
 			e2ekubectl.RunKubectlOrDie(ns, "delete", "pod", podName)
@@ -111,7 +112,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				'kubectl --since=1s' should output logs that are only 1 second older from now
 				'kubectl --since=24h' should output logs that are only 1 day older from now
 		*/
-		framework.ConformanceIt("should be able to retrieve and filter logs ", func(ctx context.Context) {
+		framework.ConformanceIt("should be able to retrieve and filter logs", func(ctx context.Context) {
 
 			ginkgo.By("Waiting for log generator to start.")
 			if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, c, ns, []string{podName}, framework.PodStartTimeout) {
@@ -126,19 +127,19 @@ var _ = SIGDescribe("Kubectl logs", func() {
 			out := e2ekubectl.RunKubectlOrDie(ns, "logs", podName, containerName, "--tail=1")
 			framework.Logf("got output %q", out)
 			gomega.Expect(out).NotTo(gomega.BeEmpty())
-			framework.ExpectEqual(len(lines(out)), 1)
+			gomega.Expect(lines(out)).To(gomega.HaveLen(1))
 
 			ginkgo.By("limiting log bytes")
 			out = e2ekubectl.RunKubectlOrDie(ns, "logs", podName, containerName, "--limit-bytes=1")
 			framework.Logf("got output %q", out)
-			framework.ExpectEqual(len(lines(out)), 1)
-			framework.ExpectEqual(len(out), 1)
+			gomega.Expect(lines(out)).To(gomega.HaveLen(1))
+			gomega.Expect(out).To(gomega.HaveLen(1))
 
 			ginkgo.By("exposing timestamps")
 			out = e2ekubectl.RunKubectlOrDie(ns, "logs", podName, containerName, "--tail=1", "--timestamps")
 			framework.Logf("got output %q", out)
 			l := lines(out)
-			framework.ExpectEqual(len(l), 1)
+			gomega.Expect(l).To(gomega.HaveLen(1))
 			words := strings.Split(l[0], " ")
 			gomega.Expect(len(words)).To(gomega.BeNumerically(">", 1))
 			if _, err := time.Parse(time.RFC3339Nano, words[0]); err != nil {
@@ -192,18 +193,18 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", podName, "-c", "container-1")
 				framework.Logf("got output %q", out)
 				gomega.Expect(out).NotTo(gomega.BeEmpty())
-				framework.ExpectEqual(len(lines(out)), 10)
+				gomega.Expect(lines(out)).To(gomega.HaveLen(10))
 
 				ginkgo.By("log all containers log lines")
 				out = e2ekubectl.RunKubectlOrDie(ns, "logs", podName, "--all-containers")
 				framework.Logf("got output %q", out)
 				gomega.Expect(out).NotTo(gomega.BeEmpty())
-				framework.ExpectEqual(len(lines(out)), 30)
+				gomega.Expect(lines(out)).To(gomega.HaveLen(30))
 
 				ginkgo.By("default container logs")
 				out = e2ekubectl.RunKubectlOrDie(ns, "logs", podName)
 				framework.Logf("got output %q", out)
-				framework.ExpectEqual(len(lines(out)), 20)
+				gomega.Expect(lines(out)).To(gomega.HaveLen(20))
 			})
 		})
 	})

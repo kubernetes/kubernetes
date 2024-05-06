@@ -51,6 +51,7 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestInsecurePodLogs(t *testing.T) {
@@ -77,7 +78,8 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 -----END CERTIFICATE-----
 `))
 
-	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	clientSet, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			// I have no idea what this cert is, but it doesn't matter, we just want something that always fails validation
@@ -92,7 +94,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 	}))
 	defer fakeKubeletServer.Close()
 
-	pod := prepareFakeNodeAndPod(context.TODO(), t, clientSet, fakeKubeletServer)
+	pod := prepareFakeNodeAndPod(tCtx, t, clientSet, fakeKubeletServer)
 
 	insecureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{InsecureSkipTLSVerifyBackend: true}).Do(context.TODO())
 	if err := insecureResult.Error(); err != nil {
@@ -104,7 +106,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 		t.Fatal(insecureStatusCode)
 	}
 
-	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).Do(context.TODO())
+	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).Do(tCtx)
 	if err := secureResult.Error(); err == nil || !strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
 		t.Fatal(err)
 	}
@@ -238,6 +240,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			}),
 			nil,
+			nil,
 		),
 	)
 	fakeKubeletServer.TLS = &tls.Config{ClientAuth: tls.RequestClientCert}
@@ -249,7 +252,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 		Bytes: fakeKubeletServer.Certificate().Raw,
 	}))
 
-	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+	clientSet, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			opts.KubeletConfig.TLSClientConfig.CAFile = kubeletCA
@@ -277,7 +280,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	}
 
 	// wait until the kubelet observes the new CA
-	if err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		_, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
 		if errors.IsUnauthorized(errLog) {
 			return true, nil
@@ -296,7 +299,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	}
 
 	// confirm that the API server observes the new client cert and closes existing connections to use it
-	if err := wait.PollImmediateUntilWithContext(ctx, time.Second, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
 		fixedPodLogs, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
 		if errors.IsUnauthorized(errLog) {
 			t.Log("api server has not observed new client cert")
@@ -340,11 +343,12 @@ func generateClientCert(t *testing.T) testCerts {
 		t.Fatal(err)
 	}
 
-	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
+	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
+	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	serial = new(big.Int).Add(serial, big.NewInt(1))
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName: "the-api-server-user",

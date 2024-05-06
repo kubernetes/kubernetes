@@ -102,7 +102,7 @@ func BootstrapTokenToSecret(bt *BootstrapToken) *v1.Secret {
 			Name:      bootstraputil.BootstrapTokenSecretName(bt.Token.ID),
 			Namespace: metav1.NamespaceSystem,
 		},
-		Type: v1.SecretType(bootstrapapi.SecretTypeBootstrapToken),
+		Type: bootstrapapi.SecretTypeBootstrapToken,
 		Data: encodeTokenSecretData(bt, time.Now()),
 	}
 }

@@ -60,7 +60,7 @@ const (
 type pvTopology struct {
 	pvName string
 	key    string
-	values sets.String
+	values sets.Set[string]
 }
 
 // the state is initialized in PreFilter phase. because we save the pointer in
@@ -81,6 +81,16 @@ var topologyLabels = []string{
 	v1.LabelFailureDomainBetaRegion,
 	v1.LabelTopologyZone,
 	v1.LabelTopologyRegion,
+}
+
+func translateToGALabel(label string) string {
+	if label == v1.LabelFailureDomainBetaRegion {
+		return v1.LabelTopologyRegion
+	}
+	if label == v1.LabelFailureDomainBetaZone {
+		return v1.LabelTopologyZone
+	}
+	return label
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -107,6 +117,7 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 }
 
 func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, *framework.Status) {
+	logger := klog.FromContext(ctx)
 	podPVTopologies := make([]pvTopology, 0)
 
 	for i := range pod.Spec.Volumes {
@@ -154,13 +165,13 @@ func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology
 			if value, ok := pv.ObjectMeta.Labels[key]; ok {
 				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
 				if err != nil {
-					klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
 					continue
 				}
 				podPVTopologies = append(podPVTopologies, pvTopology{
 					pvName: pv.Name,
 					key:    key,
-					values: volumeVSet,
+					values: sets.Set[string](volumeVSet),
 				})
 			}
 		}
@@ -190,6 +201,7 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
 func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
 	if len(pod.Spec.Volumes) == 0 {
@@ -225,8 +237,12 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 
 	for _, pvTopology := range podPVTopologies {
 		v, ok := node.Labels[pvTopology.key]
+		if !ok {
+			// if we can't match the beta label, try to match pv's beta label with node's ga label
+			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
+		}
 		if !ok || !pvTopology.values.Has(v) {
-			klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
+			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 		}
 	}
@@ -258,23 +274,32 @@ func getErrorAsStatus(err error) *framework.Status {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeZone) EventsToRegister() []framework.ClusterEvent {
-	return []framework.ClusterEvent{
+func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Resource: framework.StorageClass, ActionType: framework.Add},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}},
 		// A new node or updating a node's volume zone labels may make a pod schedulable.
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+		//
+		// A note about UpdateNodeTaint event:
+		// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
+		// As a common problematic scenario,
+		// when a node is added but not ready, NodeAdd event is filtered out by preCheck and doesn't arrive.
+		// In such cases, this plugin may miss some events that actually make pods schedulable.
+		// As a workaround, we add UpdateNodeTaint event to catch the case.
+		// We can remove UpdateNodeTaint when we remove the preCheck feature.
+		// See: https://github.com/kubernetes/kubernetes/issues/110175
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 		// A new pvc may make a pod schedulable.
 		// Due to fields are immutable except `spec.resources`, pvc update events are ignored.
-		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
-		{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
 	}
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()

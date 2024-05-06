@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -98,11 +99,11 @@ type ConfigMapOptions struct {
 	DryRunStrategy      cmdutil.DryRunStrategy
 	ValidationDirective string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewConfigMapOptions creates a new *ConfigMapOptions with default value
-func NewConfigMapOptions(ioStreams genericclioptions.IOStreams) *ConfigMapOptions {
+func NewConfigMapOptions(ioStreams genericiooptions.IOStreams) *ConfigMapOptions {
 	return &ConfigMapOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -110,7 +111,7 @@ func NewConfigMapOptions(ioStreams genericclioptions.IOStreams) *ConfigMapOption
 }
 
 // NewCmdCreateConfigMap creates the `create configmap` Cobra command
-func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewConfigMapOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -319,7 +320,7 @@ func handleConfigMapFromFileSources(configMap *corev1.ConfigMap, fileSources []s
 				return fmt.Errorf("error listing files in %s: %v", filePath, err)
 			}
 			for _, item := range fileList {
-				itemPath := path.Join(filePath, item.Name())
+				itemPath := filepath.Join(filePath, item.Name())
 				if item.Type().IsRegular() {
 					keyName = item.Name()
 					err = addKeyFromFileToConfigMap(configMap, keyName, itemPath)

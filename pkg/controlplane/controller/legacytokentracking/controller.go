@@ -22,20 +22,19 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
 
@@ -61,9 +60,6 @@ type Controller struct {
 	configMapSynced   cache.InformerSynced
 	queue             workqueue.RateLimitingInterface
 
-	// enabled controls the behavior of the controller: if enabled is true, the
-	//configmap will be created; otherwise, the configmap will be deleted.
-	enabled bool
 	// rate limiter controls the rate limit of the creation of the configmap.
 	// this is useful in multi-apiserver cluster to prevent config existing in a
 	// cluster with mixed enabled/disabled controllers. otherwise, those
@@ -89,7 +85,6 @@ func newController(cs kubernetes.Interface, cl clock.Clock, limiter *rate.Limite
 		configMapInformer:   informer,
 		configMapCache:      informer.GetIndexer(),
 		configMapSynced:     informer.HasSynced,
-		enabled:             utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenTracking),
 		creationRatelimiter: limiter,
 		clock:               cl,
 	}
@@ -162,50 +157,41 @@ func (c *Controller) syncConfigMap() error {
 	}
 
 	now := c.clock.Now()
-	switch {
-	case c.enabled:
-		if !exists {
-			r := c.creationRatelimiter.ReserveN(now, 1)
-			if delay := r.DelayFrom(now); delay > 0 {
-				c.queue.AddAfter(queueKey, delay)
-				r.CancelAt(now)
-				return nil
-			}
-
-			if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
-				Data:       map[string]string{ConfigMapDataKey: now.UTC().Format(dateFormat)},
-			}, metav1.CreateOptions{}); err != nil {
-				if apierrors.IsAlreadyExists(err) {
-					return nil
-				}
-				// don't consume the creationRatelimiter for an unsuccessful attempt
-				r.CancelAt(now)
-				return err
-			}
-		} else {
-			configMap := obj.(*corev1.ConfigMap)
-			if _, err = time.Parse(dateFormat, configMap.Data[ConfigMapDataKey]); err != nil {
-				configMap := configMap.DeepCopy()
-				configMap.Data[ConfigMapDataKey] = now.UTC().Format(dateFormat)
-				if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), configMap, metav1.UpdateOptions{}); err != nil {
-					if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
-						return nil
-					}
-					return err
-				}
-			}
+	if !exists {
+		r := c.creationRatelimiter.ReserveN(now, 1)
+		if delay := r.DelayFrom(now); delay > 0 {
+			c.queue.AddAfter(queueKey, delay)
+			r.CancelAt(now)
+			return nil
 		}
 
-	case !c.enabled:
-		if exists && obj.(*corev1.ConfigMap).DeletionTimestamp == nil {
-			if err := c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), ConfigMapName, metav1.DeleteOptions{}); err != nil {
-				if apierrors.IsNotFound(err) {
+		if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: ConfigMapName},
+			Data:       map[string]string{ConfigMapDataKey: now.UTC().Format(dateFormat)},
+		}, metav1.CreateOptions{}); err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				return nil
+			}
+			// don't consume the creationRatelimiter for an unsuccessful attempt
+			r.CancelAt(now)
+			return err
+		}
+	} else {
+		configMap := obj.(*corev1.ConfigMap)
+		if _, err = time.Parse(dateFormat, configMap.Data[ConfigMapDataKey]); err != nil {
+			configMap := configMap.DeepCopy()
+			if configMap.Data == nil {
+				configMap.Data = map[string]string{}
+			}
+			configMap.Data[ConfigMapDataKey] = now.UTC().Format(dateFormat)
+			if _, err = c.configMapClient.ConfigMaps(metav1.NamespaceSystem).Update(context.TODO(), configMap, metav1.UpdateOptions{}); err != nil {
+				if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 					return nil
 				}
 				return err
 			}
 		}
 	}
+
 	return nil
 }

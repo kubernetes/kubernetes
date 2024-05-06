@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -87,6 +88,17 @@ func TestImageLocalityPriority(t *testing.T) {
 			{
 				Image: "gcr.io/40",
 			},
+		},
+	}
+
+	test30Init300 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/30",
+			},
+		},
+		InitContainers: []v1.Container{
+			{Image: "gcr.io/300"},
 		},
 	}
 
@@ -316,7 +328,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Pod: gcr.io/30 gcr.io/40
 
 			// Node1
-			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB gcr.io/40:latest 40MB
+			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB, gcr.io/40:latest 40MB
 			// Score: 100 * (30M + 40M * 1/2 - 23M) / (1000M * 2 - 23M) = 1
 
 			// Node2
@@ -327,18 +339,37 @@ func TestImageLocalityPriority(t *testing.T) {
 			expectedList: []framework.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
 			name:         "pod with multiple small images",
 		},
+		{
+			// Pod: gcr.io/30  InitContainers: gcr.io/300
+
+			// Node1
+			// Image: gcr.io/40:latest 40MB, gcr.io/300:latest 300MB, gcr.io/2000:latest 2000MB
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M * 2 - 23M) = 6
+
+			// Node2
+			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB, gcr.io/40:latest 40MB
+			// Score: 100 * (30M * 1/2  - 23M) / (1000M * 2 - 23M) = 0
+			pod:          &v1.Pod{Spec: test30Init300},
+			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node203040)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
+			name:         "include InitContainers: two images spread on two nodes, prefer the larger image one",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			snapshot := cache.NewSnapshot(nil, test.nodes)
 			state := framework.NewCycleState()
-			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
-			p, _ := New(nil, fh)
+			p, err := New(ctx, nil, fh)
+			if err != nil {
+				t.Fatalf("creating plugin: %v", err)
+			}
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name

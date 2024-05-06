@@ -38,7 +38,7 @@ var (
 			Name:           "job_sync_duration_seconds",
 			Help:           "The time it took to sync a job",
 			StabilityLevel: metrics.STABLE,
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.004, 2, 15),
 		},
 		[]string{"completion_mode", "result", "action"},
 	)
@@ -69,6 +69,20 @@ var (
 			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"completion_mode", "result", "reason"},
+	)
+
+	// JobByExternalControllerTotal tracks the number of Jobs that were created
+	// as managed by an external controller.
+	// The value of the label controller_name corresponds to the value of the
+	// managedBy field.
+	JobByExternalControllerTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      JobControllerSubsystem,
+			Name:           "jobs_by_external_controller_total",
+			Help:           "The number of Jobs managed by an external controller",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"controller_name"},
 	)
 
 	// JobPodsFinished records the number of finished Pods that the job controller
@@ -114,6 +128,35 @@ var (
 that have the finalizer batch.kubernetes.io/job-tracking
 The event label can be "add" or "delete".`,
 		}, []string{"event"})
+
+	// JobFinishedIndexesTotal records the number of finished indexes.
+	JobFinishedIndexesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "job_finished_indexes_total",
+			Help: `The number of finished indexes. Possible values for the
+			status label are: "succeeded", "failed". Possible values for the
+			backoffLimit label are: "perIndex" and "global"`,
+		},
+		[]string{"status", "backoffLimit"})
+
+	// JobPodsCreationTotal records the number of pods created by the job controller
+	// based on the reason for their creation (i.e. if PodReplacementPolicy was specified)
+	// and the status of the creation (i.e. if the Pod creation succeeded or failed).
+	// Possible label values:
+	//   reason: new, recreate_terminating_or_failed, recreate_failed
+	//   status: succeeded, failed
+	JobPodsCreationTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "job_pods_creation_total",
+			Help: `The number of Pods created by the Job controller labelled with a reason for the Pod creation.
+This metric also distinguishes between Pods created using different PodReplacementPolicy settings.
+Possible values of the "reason" label are:
+"new", "recreate_terminating_or_failed", "recreate_failed".
+Possible values of the "status" label are:
+"succeeded", "failed".`,
+		}, []string{"reason", "status"})
 )
 
 const (
@@ -136,7 +179,7 @@ const (
 	// parallelism.
 	JobSyncActionPodsDeleted = "pods_deleted"
 
-	// Possible values for "result" label in the above metrics.
+	// Possible values for "result" and "status" (job_pods_creation_total) labels in the above metrics.
 
 	Succeeded = "succeeded"
 	Failed    = "failed"
@@ -145,6 +188,12 @@ const (
 	// metric.
 	Add    = "add"
 	Delete = "delete"
+
+	// Possible values for "reason" label in the job_pods_creation_total metric.
+
+	PodCreateNew                   = "new"
+	PodRecreateTerminatingOrFailed = "recreate_terminating_or_failed"
+	PodRecreateFailed              = "recreate_failed"
 )
 
 var registerMetrics sync.Once
@@ -158,5 +207,8 @@ func Register() {
 		legacyregistry.MustRegister(JobPodsFinished)
 		legacyregistry.MustRegister(PodFailuresHandledByFailurePolicy)
 		legacyregistry.MustRegister(TerminatedPodsTrackingFinalizerTotal)
+		legacyregistry.MustRegister(JobFinishedIndexesTotal)
+		legacyregistry.MustRegister(JobPodsCreationTotal)
+		legacyregistry.MustRegister(JobByExternalControllerTotal)
 	})
 }

@@ -34,13 +34,13 @@ import (
 	. "k8s.io/kubernetes/pkg/apis/apps/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
-	maxUnavailable := intstr.FromInt(1)
-	maxSurge := intstr.FromInt(0)
+	maxUnavailable := intstr.FromInt32(1)
+	maxSurge := intstr.FromInt32(0)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -86,7 +86,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 							MaxSurge:       &maxSurge,
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 		},
@@ -99,7 +99,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				},
 				Spec: appsv1.DaemonSetSpec{
 					Template:             defaultTemplate,
-					RevisionHistoryLimit: utilpointer.Int32(1),
+					RevisionHistoryLimit: ptr.To[int32](1),
 				},
 			},
 			expected: &appsv1.DaemonSet{
@@ -117,7 +117,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 							MaxSurge:       &maxSurge,
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(1),
+					RevisionHistoryLimit: ptr.To[int32](1),
 				},
 			},
 		},
@@ -136,7 +136,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
 						Type: appsv1.OnDeleteDaemonSetStrategyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 		},
@@ -154,7 +154,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 							MaxSurge:       &maxSurge,
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 		},
@@ -173,15 +173,6 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
 		}
 	}
-}
-
-func getMaxUnavailable(maxUnavailable int) *intstr.IntOrString {
-	maxUnavailableIntOrStr := intstr.FromInt(maxUnavailable)
-	return &maxUnavailableIntOrStr
-}
-
-func getPartition(partition int32) *int32 {
-	return &partition
 }
 
 func TestSetDefaultStatefulSet(t *testing.T) {
@@ -233,7 +224,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 							Partition: &defaultPartition,
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 		},
@@ -259,7 +250,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.OnDeleteStatefulSetStrategyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 		},
@@ -286,7 +277,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 							Partition: &defaultPartition,
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 		},
@@ -317,7 +308,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 							Partition: &notTheDefaultPartition,
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 		},
@@ -346,7 +337,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enablePVCDeletionPolicy: true,
@@ -379,7 +370,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 						WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enablePVCDeletionPolicy: true,
@@ -412,7 +403,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 						WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 						WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enablePVCDeletionPolicy: true,
@@ -444,7 +435,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					PersistentVolumeClaimRetentionPolicy: &appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 						WhenScaled: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enablePVCDeletionPolicy: false,
@@ -467,10 +458,10 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition: getPartition(0),
+							Partition: ptr.To[int32](0),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enableMaxUnavailablePolicy: false,
@@ -483,7 +474,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 							Partition:      &defaultPartition,
-							MaxUnavailable: getMaxUnavailable(1),
+							MaxUnavailable: ptr.To(intstr.FromInt32(1)),
 						},
 					},
 				},
@@ -499,11 +490,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition:      getPartition(0),
-							MaxUnavailable: getMaxUnavailable(1),
+							Partition:      ptr.To[int32](0),
+							MaxUnavailable: ptr.To(intstr.FromInt32(1)),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enableMaxUnavailablePolicy: false,
@@ -516,7 +507,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 							Partition:      &notTheDefaultPartition,
-							MaxUnavailable: getMaxUnavailable(3),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
 				},
@@ -532,11 +523,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition:      getPartition(42),
-							MaxUnavailable: getMaxUnavailable(3),
+							Partition:      ptr.To[int32](42),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enableMaxUnavailablePolicy: false,
@@ -559,11 +550,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition:      getPartition(0),
-							MaxUnavailable: getMaxUnavailable(1),
+							Partition:      ptr.To[int32](0),
+							MaxUnavailable: ptr.To(intstr.FromInt32(1)),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enableMaxUnavailablePolicy: true,
@@ -576,7 +567,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 							Partition:      &notTheDefaultPartition,
-							MaxUnavailable: getMaxUnavailable(3),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
 				},
@@ -592,11 +583,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition:      getPartition(42),
-							MaxUnavailable: getMaxUnavailable(3),
+							Partition:      ptr.To[int32](42),
+							MaxUnavailable: ptr.To(intstr.FromInt32(3)),
 						},
 					},
-					RevisionHistoryLimit: utilpointer.Int32(10),
+					RevisionHistoryLimit: ptr.To[int32](10),
 				},
 			},
 			enableMaxUnavailablePolicy: true,
@@ -606,8 +597,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enablePVCDeletionPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enablePVCDeletionPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)
 
 			obj2 := roundTrip(t, runtime.Object(test.original))
 			got, ok := obj2.(*appsv1.StatefulSet)
@@ -624,7 +615,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 
 func TestSetDefaultDeployment(t *testing.T) {
 	defaultIntOrString := intstr.FromString("25%")
-	differentIntOrString := intstr.FromInt(5)
+	differentIntOrString := intstr.FromInt32(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -643,7 +634,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			original: &appsv1.Deployment{},
 			expected: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(1),
+					Replicas: ptr.To[int32](1),
 					Strategy: appsv1.DeploymentStrategy{
 						Type: appsv1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDeployment{
@@ -651,8 +642,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(10),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](10),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -660,7 +651,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1.DeploymentStrategy{
 						RollingUpdate: &appsv1.RollingUpdateDeployment{
 							MaxSurge: &differentIntOrString,
@@ -670,7 +661,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1.DeploymentStrategy{
 						Type: appsv1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDeployment{
@@ -678,8 +669,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(10),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](10),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -687,7 +678,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(3),
+					Replicas: ptr.To[int32](3),
 					Strategy: appsv1.DeploymentStrategy{
 						Type:          appsv1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: nil,
@@ -696,7 +687,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(3),
+					Replicas: ptr.To[int32](3),
 					Strategy: appsv1.DeploymentStrategy{
 						Type: appsv1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDeployment{
@@ -704,8 +695,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(10),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](10),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -713,21 +704,21 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1.DeploymentStrategy{
 						Type: appsv1.RecreateDeploymentStrategyType,
 					},
-					RevisionHistoryLimit: utilpointer.Int32(0),
+					RevisionHistoryLimit: ptr.To[int32](0),
 				},
 			},
 			expected: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1.DeploymentStrategy{
 						Type: appsv1.RecreateDeploymentStrategyType,
 					},
-					RevisionHistoryLimit:    utilpointer.Int32(0),
-					ProgressDeadlineSeconds: utilpointer.Int32(600),
+					RevisionHistoryLimit:    ptr.To[int32](0),
+					ProgressDeadlineSeconds: ptr.To[int32](600),
 					Template:                defaultTemplate,
 				},
 			},
@@ -735,22 +726,22 @@ func TestSetDefaultDeployment(t *testing.T) {
 		{
 			original: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1.DeploymentStrategy{
 						Type: appsv1.RecreateDeploymentStrategyType,
 					},
-					ProgressDeadlineSeconds: utilpointer.Int32(30),
-					RevisionHistoryLimit:    utilpointer.Int32(2),
+					ProgressDeadlineSeconds: ptr.To[int32](30),
+					RevisionHistoryLimit:    ptr.To[int32](2),
 				},
 			},
 			expected: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32(5),
+					Replicas: ptr.To[int32](5),
 					Strategy: appsv1.DeploymentStrategy{
 						Type: appsv1.RecreateDeploymentStrategyType,
 					},
-					ProgressDeadlineSeconds: utilpointer.Int32(30),
-					RevisionHistoryLimit:    utilpointer.Int32(2),
+					ProgressDeadlineSeconds: ptr.To[int32](30),
+					RevisionHistoryLimit:    ptr.To[int32](2),
 					Template:                defaultTemplate,
 				},
 			},
@@ -807,7 +798,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: appsv1.ReplicaSet{
 				Spec: appsv1.ReplicaSetSpec{
-					Replicas: utilpointer.Int32(0),
+					Replicas: ptr.To[int32](0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -822,7 +813,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: appsv1.ReplicaSet{
 				Spec: appsv1.ReplicaSetSpec{
-					Replicas: utilpointer.Int32(3),
+					Replicas: ptr.To[int32](3),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -865,7 +856,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	}
 	rs := &appsv1.ReplicaSet{
 		Spec: appsv1.ReplicaSetSpec{
-			Replicas: utilpointer.Int32(3),
+			Replicas: ptr.To[int32](3),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{

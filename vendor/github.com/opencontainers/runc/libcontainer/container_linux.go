@@ -40,7 +40,7 @@ type linuxContainer struct {
 	root                 string
 	config               *configs.Config
 	cgroupManager        cgroups.Manager
-	intelRdtManager      intelrdt.Manager
+	intelRdtManager      *intelrdt.Manager
 	initPath             string
 	initArgs             []string
 	initProcess          parentProcess
@@ -146,19 +146,21 @@ func (c *linuxContainer) OCIState() (*specs.State, error) {
 	return c.currentOCIState()
 }
 
-func (c *linuxContainer) Processes() ([]int, error) {
-	var pids []int
-	status, err := c.currentStatus()
-	if err != nil {
-		return pids, err
+// ignoreCgroupError filters out cgroup-related errors that can be ignored,
+// because the container is stopped and its cgroup is gone.
+func (c *linuxContainer) ignoreCgroupError(err error) error {
+	if err == nil {
+		return nil
 	}
-	// for systemd cgroup, the unit's cgroup path will be auto removed if container's all processes exited
-	if status == Stopped && !c.cgroupManager.Exists() {
-		return pids, nil
+	if errors.Is(err, os.ErrNotExist) && c.runType() == Stopped && !c.cgroupManager.Exists() {
+		return nil
 	}
+	return err
+}
 
-	pids, err = c.cgroupManager.GetAllPids()
-	if err != nil {
+func (c *linuxContainer) Processes() ([]int, error) {
+	pids, err := c.cgroupManager.GetAllPids()
+	if err = c.ignoreCgroupError(err); err != nil {
 		return nil, fmt.Errorf("unable to get all container pids: %w", err)
 	}
 	return pids, nil
@@ -351,6 +353,15 @@ func (c *linuxContainer) start(process *Process) (retErr error) {
 		}()
 	}
 
+	// Before starting "runc init", mark all non-stdio open files as O_CLOEXEC
+	// to make sure we don't leak any files into "runc init". Any files to be
+	// passed to "runc init" through ExtraFiles will get dup2'd by the Go
+	// runtime and thus their O_CLOEXEC flag will be cleared. This is some
+	// additional protection against attacks like CVE-2024-21626, by making
+	// sure we never leak files to "runc init" we didn't intend to.
+	if err := utils.CloseExecFrom(3); err != nil {
+		return fmt.Errorf("unable to mark non-stdio fds as cloexec: %w", err)
+	}
 	if err := parent.start(); err != nil {
 		return fmt.Errorf("unable to start container process: %w", err)
 	}
@@ -382,11 +393,12 @@ func (c *linuxContainer) Signal(s os.Signal, all bool) error {
 		return err
 	}
 	if all {
-		// for systemd cgroup, the unit's cgroup path will be auto removed if container's all processes exited
 		if status == Stopped && !c.cgroupManager.Exists() {
+			// Avoid calling signalAllProcesses which may print
+			// a warning trying to freeze a non-existing cgroup.
 			return nil
 		}
-		return signalAllProcesses(c.cgroupManager, s)
+		return c.ignoreCgroupError(signalAllProcesses(c.cgroupManager, s))
 	}
 	// to avoid a PID reuse attack
 	if status == Running || status == Created || status == Paused {
@@ -926,7 +938,7 @@ func (c *linuxContainer) criuSupportsExtNS(t configs.NamespaceType) bool {
 }
 
 func criuNsToKey(t configs.NamespaceType) string {
-	return "extRoot" + strings.Title(configs.NsName(t)) + "NS"
+	return "extRoot" + strings.Title(configs.NsName(t)) + "NS" //nolint:staticcheck // SA1019: strings.Title is deprecated
 }
 
 func (c *linuxContainer) handleCheckpointingExternalNamespaces(rpcOpts *criurpc.CriuOpts, t configs.NamespaceType) error {
@@ -2265,7 +2277,7 @@ func ignoreTerminateErrors(err error) error {
 
 func requiresRootOrMappingTool(c *configs.Config) bool {
 	gidMap := []configs.IDMap{
-		{ContainerID: 0, HostID: os.Getegid(), Size: 1},
+		{ContainerID: 0, HostID: int64(os.Getegid()), Size: 1},
 	}
 	return !reflect.DeepEqual(c.GidMappings, gidMap)
 }

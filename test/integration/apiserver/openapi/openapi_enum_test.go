@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	generated "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestEnablingOpenAPIEnumTypes(t *testing.T) {
@@ -54,7 +55,8 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)()
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)
 
 			getDefinitionsFn := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 				defs := generated.GetOpenAPIDefinitions(ref)
@@ -73,10 +75,10 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 				return defs
 			})
 
-			_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-					config.GenericConfig.OpenAPIConfig.GetDefinitions = getDefinitionsFn
+					config.ControlPlane.Generic.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+					config.ControlPlane.Generic.OpenAPIConfig.GetDefinitions = getDefinitionsFn
 				},
 			})
 			defer tearDownFn()

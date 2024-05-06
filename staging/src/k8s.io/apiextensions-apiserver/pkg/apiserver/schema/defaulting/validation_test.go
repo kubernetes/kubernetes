@@ -23,8 +23,13 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 )
 
 func jsonPtr(x interface{}) *apiextensions.JSON {
@@ -34,8 +39,9 @@ func jsonPtr(x interface{}) *apiextensions.JSON {
 
 func TestDefaultValidationWithCostBudget(t *testing.T) {
 	tests := []struct {
-		name  string
-		input apiextensions.CustomResourceValidation
+		name     string
+		input    apiextensions.CustomResourceValidation
+		features []featuregate.Feature
 	}{
 		{
 			name: "default cel validation",
@@ -98,6 +104,10 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 	for _, tt := range tests {
 		ctx := context.TODO()
 		t.Run(tt.name, func(t *testing.T) {
+			for _, f := range tt.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
+			}
+
 			schema := tt.input.OpenAPIV3Schema
 			ss, err := structuralschema.NewStructural(schema)
 			if err != nil {
@@ -145,6 +155,106 @@ func TestDefaultValidationWithCostBudget(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+		})
+	}
+}
+
+func TestDefaultValidationWithOptionalOldSelf(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  apiextensions.CustomResourceValidation
+		errors []string
+	}{
+		{
+			name: "invalid default",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"defaultFailsRatcheting": {
+							Type:    "string",
+							Default: jsonPtr("default"),
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:            "oldSelf.hasValue()",
+									OptionalOldSelf: ptr.To(true),
+									Message:         "foobarErrorMessage",
+								},
+							},
+						},
+					},
+				},
+			},
+			errors: []string{"foobarErrorMessage"},
+		},
+		{
+			name: "valid default",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"defaultFailsRatcheting": {
+							Type:    "string",
+							Default: jsonPtr("default"),
+							XValidations: apiextensions.ValidationRules{
+								{
+									Rule:            "oldSelf.orValue(self) == self",
+									OptionalOldSelf: ptr.To(true),
+									Message:         "foobarErrorMessage",
+								},
+							},
+						},
+					},
+				},
+			},
+			errors: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		ctx := context.TODO()
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
+			schema := tt.input.OpenAPIV3Schema
+			ss, err := structuralschema.NewStructural(schema)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			f := NewRootObjectFunc().WithTypeMeta(metav1.TypeMeta{APIVersion: "validation/v1", Kind: "Validation"})
+
+			// cost budget is large enough to pass all validation rules
+			allErrs, err, _ := validate(ctx, field.NewPath("test"), ss, ss, f, false, false, 10)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			for _, err := range allErrs {
+				found := false
+				for _, expected := range tt.errors {
+					if strings.Contains(err.Error(), expected) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+
+			for _, expected := range tt.errors {
+				found := false
+				for _, err := range allErrs {
+					if strings.Contains(err.Error(), expected) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error: %v", expected)
+				}
+			}
+
 		})
 	}
 }

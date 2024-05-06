@@ -21,16 +21,40 @@ import (
 )
 
 const (
-// Every feature gate should add method here following this template:
-//
-// // owner: @username
-// // alpha: v1.4
-// MyFeature featuregate.Feature = "MyFeature"
-//
-// Feature gates should be listed in alphabetical, case-sensitive
-// (upper before any lower case character) order. This reduces the risk
-// of code conflicts because changes are more likely to be scattered
-// across the file.
+	// Every feature gate should add method here following this template:
+	//
+	// // owner: @username
+	// // alpha: v1.4
+	// MyFeature featuregate.Feature = "MyFeature"
+	//
+	// Feature gates should be listed in alphabetical, case-sensitive
+	// (upper before any lower case character) order. This reduces the risk
+	// of code conflicts because changes are more likely to be scattered
+	// across the file.
+
+	// owner: @nckturner
+	// kep:  http://kep.k8s.io/2699
+	// alpha: v1.27
+	// Enable webhook in cloud controller manager
+	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
+
+	// owner: @danwinship
+	// alpha: v1.27
+	// beta: v1.29
+	// GA: v1.30
+	//
+	// Enables dual-stack values in the
+	// `alpha.kubernetes.io/provided-node-ip` annotation
+	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
+
+	// owner: @alexanderConstantinescu
+	// kep: http://kep.k8s.io/3458
+	// beta: v1.27
+	// GA: v1.30
+	//
+	// Enables less load balancer re-configurations by the service controller
+	// (KCCM) as an effect of changing node state.
+	StableLoadBalancerNodeSet featuregate.Feature = "StableLoadBalancerNodeSet"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableFeatureGate) error {
@@ -39,4 +63,8 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 
 // cloudPublicFeatureGates consists of cloud-specific feature keys.
 // To add a new feature, define a key for it at k8s.io/api/pkg/features and add it here.
-var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
+var cloudPublicFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	CloudControllerManagerWebhook: {Default: false, PreRelease: featuregate.Alpha},
+	CloudDualStackNodeIPs:         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
+	StableLoadBalancerNodeSet:     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30, remove in 1.31
+}

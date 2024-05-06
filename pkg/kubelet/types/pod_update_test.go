@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	systemPriority      = int32(scheduling.SystemCriticalPriority)
+	systemPriority      = scheduling.SystemCriticalPriority
 	systemPriorityUpper = systemPriority + 1000
 )
 

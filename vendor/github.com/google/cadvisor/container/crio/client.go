@@ -17,14 +17,17 @@ package crio
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"sync"
 	"syscall"
 	"time"
 )
+
+var crioClientTimeout = flag.Duration("crio_client_timeout", time.Duration(0), "CRI-O client timeout. Default is no timeout.")
 
 const (
 	CrioSocket            = "/var/run/crio/crio.sock"
@@ -41,6 +44,7 @@ var (
 type Info struct {
 	StorageDriver string `json:"storage_driver"`
 	StorageRoot   string `json:"storage_root"`
+	StorageImage  string `json:"storage_image"`
 }
 
 // ContainerInfo represents a given container information
@@ -89,6 +93,7 @@ func Client() (CrioClient, error) {
 		theClient = &crioClientImpl{
 			client: &http.Client{
 				Transport: tr,
+				Timeout:   *crioClientTimeout,
 			},
 		}
 	})
@@ -142,7 +147,7 @@ func (c *crioClientImpl) ContainerInfo(id string) (*ContainerInfo, error) {
 	// golang's http.Do doesn't return an error if non 200 response code is returned
 	// handle this case here, rather than failing to decode the body
 	if resp.StatusCode != http.StatusOK {
-		respBody, err := ioutil.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("Error finding container %s: Status %d", id, resp.StatusCode)
 		}

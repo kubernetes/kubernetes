@@ -38,8 +38,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -72,6 +70,7 @@ func NewPodClient(f *framework.Framework) *PodClient {
 	return &PodClient{
 		f:            f,
 		PodInterface: f.ClientSet.CoreV1().Pods(f.Namespace.Name),
+		namespace:    f.Namespace.Name,
 	}
 }
 
@@ -82,6 +81,7 @@ func PodClientNS(f *framework.Framework, namespace string) *PodClient {
 	return &PodClient{
 		f:            f,
 		PodInterface: f.ClientSet.CoreV1().Pods(namespace),
+		namespace:    namespace,
 	}
 }
 
@@ -89,6 +89,7 @@ func PodClientNS(f *framework.Framework, namespace string) *PodClient {
 type PodClient struct {
 	f *framework.Framework
 	v1core.PodInterface
+	namespace string
 }
 
 // Create creates a new pod according to the framework specifications (don't wait for it to start).
@@ -101,9 +102,8 @@ func (c *PodClient) Create(ctx context.Context, pod *v1.Pod) *v1.Pod {
 
 // CreateSync creates a new pod according to the framework specifications, and wait for it to start and be running and ready.
 func (c *PodClient) CreateSync(ctx context.Context, pod *v1.Pod) *v1.Pod {
-	namespace := c.f.Namespace.Name
 	p := c.Create(ctx, pod)
-	framework.ExpectNoError(WaitTimeoutForPodReadyInNamespace(ctx, c.f.ClientSet, p.Name, namespace, framework.PodStartTimeout))
+	framework.ExpectNoError(WaitTimeoutForPodReadyInNamespace(ctx, c.f.ClientSet, p.Name, c.namespace, framework.PodStartTimeout))
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(ctx, p.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -151,37 +151,45 @@ func (c *PodClient) Update(ctx context.Context, name string, updateFn func(pod *
 
 // AddEphemeralContainerSync adds an EphemeralContainer to a pod and waits for it to be running.
 func (c *PodClient) AddEphemeralContainerSync(ctx context.Context, pod *v1.Pod, ec *v1.EphemeralContainer, timeout time.Duration) error {
-	namespace := c.f.Namespace.Name
-
 	podJS, err := json.Marshal(pod)
-	framework.ExpectNoError(err, "error creating JSON for pod %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating JSON for pod %q", FormatPod(pod))
 
 	ecPod := pod.DeepCopy()
 	ecPod.Spec.EphemeralContainers = append(ecPod.Spec.EphemeralContainers, *ec)
 	ecJS, err := json.Marshal(ecPod)
-	framework.ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", FormatPod(pod))
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, ecJS, pod)
-	framework.ExpectNoError(err, "error creating patch to add ephemeral container %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating patch to add ephemeral container %q", FormatPod(pod))
 
 	// Clients may optimistically attempt to add an ephemeral container to determine whether the EphemeralContainers feature is enabled.
 	if _, err := c.Patch(ctx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers"); err != nil {
 		return err
 	}
 
-	framework.ExpectNoError(WaitForContainerRunning(ctx, c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
+	framework.ExpectNoError(WaitForContainerRunning(ctx, c.f.ClientSet, c.namespace, pod.Name, ec.Name, timeout))
 	return nil
+}
+
+// FormatPod returns a string representing a pod in a consistent human readable format,
+// with pod name, namespace and pod UID as part of the string.
+// This code is taken from k/k/pkg/kubelet/util/format/pod.go to remove
+// e2e framework -> k/k/pkg/kubelet dependency.
+func FormatPod(pod *v1.Pod) string {
+	if pod == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.UID)
 }
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't
 // disappear before the timeout, it will fail the test.
 func (c *PodClient) DeleteSync(ctx context.Context, name string, options metav1.DeleteOptions, timeout time.Duration) {
-	namespace := c.f.Namespace.Name
 	err := c.Delete(ctx, name, options)
 	if err != nil && !apierrors.IsNotFound(err) {
 		framework.Failf("Failed to delete pod %q: %v", name, err)
 	}
-	framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c.f.ClientSet, name, namespace, timeout), "wait for pod %q to disappear", name)
+	framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c.f.ClientSet, name, c.namespace, timeout), "wait for pod %q to disappear", name)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
@@ -223,8 +231,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 // WaitForSuccess waits for pod to succeed.
 // TODO(random-liu): Move pod wait function into this file
 func (c *PodClient) WaitForSuccess(ctx context.Context, name string, timeout time.Duration) {
-	f := c.f
-	gomega.Expect(WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
+	gomega.Expect(WaitForPodCondition(ctx, c.f.ClientSet, c.namespace, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -240,8 +247,7 @@ func (c *PodClient) WaitForSuccess(ctx context.Context, name string, timeout tim
 
 // WaitForFinish waits for pod to finish running, regardless of success or failure.
 func (c *PodClient) WaitForFinish(ctx context.Context, name string, timeout time.Duration) {
-	f := c.f
-	gomega.Expect(WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
+	gomega.Expect(WaitForPodCondition(ctx, c.f.ClientSet, c.namespace, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -303,10 +309,29 @@ func (c *PodClient) PodIsReady(ctx context.Context, name string) bool {
 	return podutils.IsPodReady(pod)
 }
 
-// RemovePodFinalizer removes the pod's finalizer
+// RemoveString returns a newly created []string that contains all items from slice
+// that are not equal to s.
+// This code is taken from k/k/pkg/util/slice/slice.go to remove
+// e2e/framework/pod -> k/k/pkg/util/slice dependency.
+func removeString(slice []string, s string) []string {
+	newSlice := make([]string, 0)
+	for _, item := range slice {
+		if item != s {
+			newSlice = append(newSlice, item)
+		}
+	}
+	if len(newSlice) == 0 {
+		// Sanitize for unit tests so we don't need to distinguish empty array
+		// and nil.
+		return nil
+	}
+	return newSlice
+}
+
+// RemoveFinalizer removes the pod's finalizer
 func (c *PodClient) RemoveFinalizer(ctx context.Context, podName string, finalizerName string) {
 	framework.Logf("Removing pod's %q finalizer: %q", podName, finalizerName)
 	c.Update(ctx, podName, func(pod *v1.Pod) {
-		pod.ObjectMeta.Finalizers = slice.RemoveString(pod.ObjectMeta.Finalizers, finalizerName, nil)
+		pod.ObjectMeta.Finalizers = removeString(pod.ObjectMeta.Finalizers, finalizerName)
 	})
 }

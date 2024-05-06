@@ -26,7 +26,9 @@ import (
 )
 
 // The VM interface is described at
-//   https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+//
+//	https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+//
 // Each setting is exposed as a single file.
 // Each file contains one line with a single numerical value, except lowmem_reserve_ratio which holds an array
 // and numa_zonelist_order (deprecated) which is a string.
@@ -84,7 +86,7 @@ func (fs FS) VM() (*VM, error) {
 		return nil, err
 	}
 	if !file.Mode().IsDir() {
-		return nil, fmt.Errorf("%s is not a directory", path)
+		return nil, fmt.Errorf("%w: %s is not a directory", ErrFileRead, path)
 	}
 
 	files, err := os.ReadDir(path)

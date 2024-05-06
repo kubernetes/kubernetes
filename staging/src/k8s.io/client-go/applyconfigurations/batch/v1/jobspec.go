@@ -31,13 +31,18 @@ type JobSpecApplyConfiguration struct {
 	Completions             *int32                                    `json:"completions,omitempty"`
 	ActiveDeadlineSeconds   *int64                                    `json:"activeDeadlineSeconds,omitempty"`
 	PodFailurePolicy        *PodFailurePolicyApplyConfiguration       `json:"podFailurePolicy,omitempty"`
+	SuccessPolicy           *SuccessPolicyApplyConfiguration          `json:"successPolicy,omitempty"`
 	BackoffLimit            *int32                                    `json:"backoffLimit,omitempty"`
+	BackoffLimitPerIndex    *int32                                    `json:"backoffLimitPerIndex,omitempty"`
+	MaxFailedIndexes        *int32                                    `json:"maxFailedIndexes,omitempty"`
 	Selector                *metav1.LabelSelectorApplyConfiguration   `json:"selector,omitempty"`
 	ManualSelector          *bool                                     `json:"manualSelector,omitempty"`
 	Template                *corev1.PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 	TTLSecondsAfterFinished *int32                                    `json:"ttlSecondsAfterFinished,omitempty"`
 	CompletionMode          *batchv1.CompletionMode                   `json:"completionMode,omitempty"`
 	Suspend                 *bool                                     `json:"suspend,omitempty"`
+	PodReplacementPolicy    *batchv1.PodReplacementPolicy             `json:"podReplacementPolicy,omitempty"`
+	ManagedBy               *string                                   `json:"managedBy,omitempty"`
 }
 
 // JobSpecApplyConfiguration constructs an declarative configuration of the JobSpec type for use with
@@ -78,11 +83,35 @@ func (b *JobSpecApplyConfiguration) WithPodFailurePolicy(value *PodFailurePolicy
 	return b
 }
 
+// WithSuccessPolicy sets the SuccessPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SuccessPolicy field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithSuccessPolicy(value *SuccessPolicyApplyConfiguration) *JobSpecApplyConfiguration {
+	b.SuccessPolicy = value
+	return b
+}
+
 // WithBackoffLimit sets the BackoffLimit field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the BackoffLimit field is set to the value of the last call.
 func (b *JobSpecApplyConfiguration) WithBackoffLimit(value int32) *JobSpecApplyConfiguration {
 	b.BackoffLimit = &value
+	return b
+}
+
+// WithBackoffLimitPerIndex sets the BackoffLimitPerIndex field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BackoffLimitPerIndex field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithBackoffLimitPerIndex(value int32) *JobSpecApplyConfiguration {
+	b.BackoffLimitPerIndex = &value
+	return b
+}
+
+// WithMaxFailedIndexes sets the MaxFailedIndexes field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxFailedIndexes field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithMaxFailedIndexes(value int32) *JobSpecApplyConfiguration {
+	b.MaxFailedIndexes = &value
 	return b
 }
 
@@ -131,5 +160,21 @@ func (b *JobSpecApplyConfiguration) WithCompletionMode(value batchv1.CompletionM
 // If called multiple times, the Suspend field is set to the value of the last call.
 func (b *JobSpecApplyConfiguration) WithSuspend(value bool) *JobSpecApplyConfiguration {
 	b.Suspend = &value
+	return b
+}
+
+// WithPodReplacementPolicy sets the PodReplacementPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PodReplacementPolicy field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithPodReplacementPolicy(value batchv1.PodReplacementPolicy) *JobSpecApplyConfiguration {
+	b.PodReplacementPolicy = &value
+	return b
+}
+
+// WithManagedBy sets the ManagedBy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ManagedBy field is set to the value of the last call.
+func (b *JobSpecApplyConfiguration) WithManagedBy(value string) *JobSpecApplyConfiguration {
+	b.ManagedBy = &value
 	return b
 }

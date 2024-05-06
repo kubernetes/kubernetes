@@ -16,6 +16,7 @@ package expfmt
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -24,7 +25,8 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/golang/protobuf/proto" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
+	"google.golang.org/protobuf/proto"
+
 	"github.com/prometheus/common/model"
 )
 
@@ -112,7 +114,7 @@ func (p *TextParser) TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricF
 	// stream. Turn this error into something nicer and more
 	// meaningful. (io.EOF is often used as a signal for the legitimate end
 	// of an input stream.)
-	if p.err == io.EOF {
+	if p.err != nil && errors.Is(p.err, io.EOF) {
 		p.parseError("unexpected end of input stream")
 	}
 	return p.metricFamiliesByName, p.err
@@ -142,9 +144,13 @@ func (p *TextParser) reset(in io.Reader) {
 func (p *TextParser) startOfLine() stateFn {
 	p.lineCount++
 	if p.skipBlankTab(); p.err != nil {
-		// End of input reached. This is the only case where
-		// that is not an error but a signal that we are done.
-		p.err = nil
+		// This is the only place that we expect to see io.EOF,
+		// which is not an error but the signal that we are done.
+		// Any other error that happens to align with the start of
+		// a line is still an error.
+		if errors.Is(p.err, io.EOF) {
+			p.err = nil
+		}
 		return nil
 	}
 	switch p.currentByte {

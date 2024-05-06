@@ -39,7 +39,7 @@ func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
 // ParseKindArg takes the common style of string which may be either `Kind.group.com` or `Kind.version.group.com`
 // and parses it out into both possibilities. This code takes no responsibility for knowing which representation was intended
 // but with a knowledge of all GroupKinds, calling code can take a very good guess. If there are only two segments, then
-// `*GroupVersionResource` is nil.
+// `*GroupVersionKind` is nil.
 // `Kind.group.com` -> `group=com, version=group, kind=Kind` and `group=group.com, kind=Kind`
 func ParseKindArg(arg string) (*GroupVersionKind, GroupKind) {
 	var gvk *GroupVersionKind

@@ -1,17 +1,17 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - fabriziopandini
-  - neolit123
-  - SataQiu
-reviewers:
-  - fabriziopandini
   - neolit123
   - SataQiu
   - pacoxu
-  - RA489
+  - chendave
+reviewers:
+  - neolit123
+  - SataQiu
+  - pacoxu
   - chendave
 emeritus_approvers:
+  - fabriziopandini
   - luxas
   - timothysc
   - rosti

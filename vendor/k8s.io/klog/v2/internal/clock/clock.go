@@ -39,16 +39,6 @@ type Clock interface {
 	// Sleep sleeps for the provided duration d.
 	// Consider making the sleep interruptible by using 'select' on a context channel and a timer channel.
 	Sleep(d time.Duration)
-	// Tick returns the channel of a new Ticker.
-	// This method does not allow to free/GC the backing ticker. Use
-	// NewTicker from WithTicker instead.
-	Tick(d time.Duration) <-chan time.Time
-}
-
-// WithTicker allows for injecting fake or real clocks into code that
-// needs to do arbitrary things based on time.
-type WithTicker interface {
-	Clock
 	// NewTicker returns a new Ticker.
 	NewTicker(time.Duration) Ticker
 }
@@ -66,7 +56,7 @@ type WithDelayedExecution interface {
 // WithTickerAndDelayedExecution allows for injecting fake or real clocks
 // into code that needs Ticker and AfterFunc functionality
 type WithTickerAndDelayedExecution interface {
-	WithTicker
+	Clock
 	// AfterFunc executes f in its own goroutine after waiting
 	// for d duration and returns a Timer whose channel can be
 	// closed by calling Stop() on the Timer.
@@ -79,7 +69,7 @@ type Ticker interface {
 	Stop()
 }
 
-var _ = WithTicker(RealClock{})
+var _ Clock = RealClock{}
 
 // RealClock really calls time.Now()
 type RealClock struct{}
@@ -113,13 +103,6 @@ func (RealClock) AfterFunc(d time.Duration, f func()) Timer {
 	return &realTimer{
 		timer: time.AfterFunc(d, f),
 	}
-}
-
-// Tick is the same as time.Tick(d)
-// This method does not allow to free/GC the backing ticker. Use
-// NewTicker instead.
-func (RealClock) Tick(d time.Duration) <-chan time.Time {
-	return time.Tick(d)
 }
 
 // NewTicker returns a new Ticker.

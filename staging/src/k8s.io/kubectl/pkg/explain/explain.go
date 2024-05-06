@@ -17,38 +17,65 @@ limitations under the License.
 package explain
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
-	"k8s.io/kube-openapi/pkg/util/proto"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 type fieldsPrinter interface {
 	PrintFields(proto.Schema) error
 }
 
-func splitDotNotation(model string) (string, []string) {
-	var fieldsPath []string
+// jsonPathParse gets back the inner list of nodes we want to work with
+func jsonPathParse(in string) ([]jsonpath.Node, error) {
+	// Remove trailing period just in case
+	in = strings.TrimSuffix(in, ".")
 
-	// ignore trailing period
-	model = strings.TrimSuffix(model, ".")
-
-	dotModel := strings.Split(model, ".")
-	if len(dotModel) >= 1 {
-		fieldsPath = dotModel[1:]
+	// Define initial jsonpath Parser
+	jpp, err := jsonpath.Parse("user", "{."+in+"}")
+	if err != nil {
+		return nil, err
 	}
-	return dotModel[0], fieldsPath
+
+	// Because of the way the jsonpath library works, the schema of the parser is [][]NodeList
+	// meaning we need to get the outer node list, make sure it's only length 1, then get the inner node
+	// list, and only then can we look at the individual nodes themselves.
+	outerNodeList := jpp.Root.Nodes
+	if len(outerNodeList) != 1 {
+		return nil, fmt.Errorf("must pass in 1 jsonpath string")
+	}
+
+	// The root node is always a list node so this type assertion is safe
+	return outerNodeList[0].(*jsonpath.ListNode).Nodes, nil
 }
 
 // SplitAndParseResourceRequest separates the users input into a model and fields
 func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (schema.GroupVersionResource, []string, error) {
-	inResource, fieldsPath := splitDotNotation(inResource)
-	gvr, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: inResource})
+	inResourceNodeList, err := jsonPathParse(inResource)
 	if err != nil {
 		return schema.GroupVersionResource{}, nil, err
+	}
+
+	if inResourceNodeList[0].Type() != jsonpath.NodeField {
+		return schema.GroupVersionResource{}, nil, fmt.Errorf("invalid jsonpath syntax, first node must be field node")
+	}
+	resource := inResourceNodeList[0].(*jsonpath.FieldNode).Value
+	gvr, err := mapper.ResourceFor(schema.GroupVersionResource{Resource: resource})
+	if err != nil {
+		return schema.GroupVersionResource{}, nil, err
+	}
+
+	var fieldsPath []string
+	for _, node := range inResourceNodeList[1:] {
+		if node.Type() != jsonpath.NodeField {
+			return schema.GroupVersionResource{}, nil, fmt.Errorf("invalid jsonpath syntax, all nodes must be field nodes")
+		}
+		fieldsPath = append(fieldsPath, node.(*jsonpath.FieldNode).Value)
 	}
 
 	return gvr, fieldsPath, nil
@@ -57,11 +84,18 @@ func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (sc
 // SplitAndParseResourceRequestWithMatchingPrefix separates the users input into a model and fields
 // while selecting gvr whose (resource, group) prefix matches the resource
 func SplitAndParseResourceRequestWithMatchingPrefix(inResource string, mapper meta.RESTMapper) (gvr schema.GroupVersionResource, fieldsPath []string, err error) {
-	// ignore trailing period
-	inResource = strings.TrimSuffix(inResource, ".")
-	dotParts := strings.Split(inResource, ".")
+	inResourceNodeList, err := jsonPathParse(inResource)
+	if err != nil {
+		return schema.GroupVersionResource{}, nil, err
+	}
 
-	gvrs, err := mapper.ResourcesFor(schema.GroupVersionResource{Resource: dotParts[0]})
+	// Get resource from first node of jsonpath
+	if inResourceNodeList[0].Type() != jsonpath.NodeField {
+		return schema.GroupVersionResource{}, nil, fmt.Errorf("invalid jsonpath syntax, first node must be field node")
+	}
+	resource := inResourceNodeList[0].(*jsonpath.FieldNode).Value
+
+	gvrs, err := mapper.ResourcesFor(schema.GroupVersionResource{Resource: resource})
 	if err != nil {
 		return schema.GroupVersionResource{}, nil, err
 	}
@@ -71,10 +105,22 @@ func SplitAndParseResourceRequestWithMatchingPrefix(inResource string, mapper me
 		groupResource := gvrItem.GroupResource().String()
 		if strings.HasPrefix(inResource, groupResource) {
 			resourceSuffix := inResource[len(groupResource):]
+			var fieldsPath []string
 			if len(resourceSuffix) > 0 {
-				dotParts := strings.Split(resourceSuffix, ".")
-				if len(dotParts) > 0 {
-					fieldsPath = dotParts[1:]
+				// Define another jsonpath Parser for the resource suffix
+				resourceSuffixNodeList, err := jsonPathParse(resourceSuffix)
+				if err != nil {
+					return schema.GroupVersionResource{}, nil, err
+				}
+
+				if len(resourceSuffixNodeList) > 0 {
+					nodeList := resourceSuffixNodeList[1:]
+					for _, node := range nodeList {
+						if node.Type() != jsonpath.NodeField {
+							return schema.GroupVersionResource{}, nil, fmt.Errorf("invalid jsonpath syntax, first node must be field node")
+						}
+						fieldsPath = append(fieldsPath, node.(*jsonpath.FieldNode).Value)
+					}
 				}
 			}
 			return gvrItem, fieldsPath, nil
@@ -82,9 +128,21 @@ func SplitAndParseResourceRequestWithMatchingPrefix(inResource string, mapper me
 	}
 
 	// If no match, take the first (the highest priority) gvr
+	fieldsPath = []string{}
 	if len(gvrs) > 0 {
 		gvr = gvrs[0]
-		_, fieldsPath = splitDotNotation(inResource)
+
+		fieldsPathNodeList, err := jsonPathParse(inResource)
+		if err != nil {
+			return schema.GroupVersionResource{}, nil, err
+		}
+
+		for _, node := range fieldsPathNodeList[1:] {
+			if node.Type() != jsonpath.NodeField {
+				return schema.GroupVersionResource{}, nil, fmt.Errorf("invalid jsonpath syntax, first node must be field node")
+			}
+			fieldsPath = append(fieldsPath, node.(*jsonpath.FieldNode).Value)
+		}
 	}
 
 	return gvr, fieldsPath, nil

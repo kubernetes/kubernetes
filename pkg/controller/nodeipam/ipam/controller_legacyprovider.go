@@ -67,6 +67,7 @@ type Controller struct {
 
 // NewController returns a new instance of the IPAM controller.
 func NewController(
+	ctx context.Context,
 	config *Config,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
@@ -89,7 +90,7 @@ func NewController(
 
 	c := &Controller{
 		config:  config,
-		adapter: newAdapter(kubeClient, gceCloud),
+		adapter: newAdapter(ctx, kubeClient, gceCloud),
 		syncers: make(map[string]*nodesync.NodeSync),
 		set:     set,
 	}
@@ -117,7 +118,8 @@ func NewController(
 func (c *Controller) Start(logger klog.Logger, nodeInformer informers.NodeInformer) error {
 	logger.Info("Starting IPAM controller", "config", c.config)
 
-	nodes, err := listNodes(logger, c.adapter.k8s)
+	ctx := klog.NewContext(context.TODO(), logger)
+	nodes, err := listNodes(ctx, c.adapter.k8s)
 	if err != nil {
 		return err
 	}
@@ -150,7 +152,7 @@ func (c *Controller) Start(logger klog.Logger, nodeInformer informers.NodeInform
 		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			return c.onUpdate(logger, newNode)
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			return c.onDelete(logger, node)
 		}),
 	})
@@ -163,17 +165,6 @@ func (c *Controller) Run(ctx context.Context) {
 
 	go c.adapter.Run(ctx)
 	<-ctx.Done()
-}
-
-// occupyServiceCIDR removes the service CIDR range from the cluster CIDR if it
-// intersects.
-func occupyServiceCIDR(set *cidrset.CidrSet, clusterCIDR, serviceCIDR *net.IPNet) error {
-	if clusterCIDR.Contains(serviceCIDR.IP) || serviceCIDR.Contains(clusterCIDR.IP) {
-		if err := set.Occupy(serviceCIDR); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 type nodeState struct {

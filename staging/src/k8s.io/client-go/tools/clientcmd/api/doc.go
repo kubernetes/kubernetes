@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 
-package api
+package api // import "k8s.io/client-go/tools/clientcmd/api"

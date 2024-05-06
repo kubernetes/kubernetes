@@ -24,14 +24,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/google/go-cmp/cmp"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/watch"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
@@ -260,7 +260,7 @@ func TestNewInformerWatcher(t *testing.T) {
 			sort.Sort(byEventTypeAndName(result))
 
 			if !reflect.DeepEqual(expected, result) {
-				t.Error(spew.Errorf("\nexpected: %#v,\ngot:      %#v,\ndiff: %s", expected, result, diff.ObjectReflectDiff(expected, result)))
+				t.Errorf("\nexpected: %s,\ngot:      %s,\ndiff: %s", dump.Pretty(expected), dump.Pretty(result), cmp.Diff(expected, result))
 				return
 			}
 
@@ -302,7 +302,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			return retval, nil
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			w := watch.NewFake()
+			w := watch.NewRaceFreeFake()
 			if options.ResourceVersion == "1" {
 				go func() {
 					// Close with a "Gone" error when trying to start a watch from the first list
@@ -315,6 +315,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 		},
 	}
 	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+	defer w.Stop()
 
 	// Expect secret add
 	select {

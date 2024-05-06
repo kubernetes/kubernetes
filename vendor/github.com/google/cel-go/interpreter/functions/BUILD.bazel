@@ -7,16 +7,11 @@ package(
 
 go_library(
     name = "go_default_library",
-    srcs = [
+    srcs = [ 
         "functions.go",
-        "standard.go",
     ],
     importpath = "github.com/google/cel-go/interpreter/functions",
     deps = [
-        "//common/operators:go_default_library",
-        "//common/overloads:go_default_library",
-        "//common/types:go_default_library",
-        "//common/types/ref:go_default_library",
-        "//common/types/traits:go_default_library",
+        "//common/functions:go_default_library",
     ],
 )

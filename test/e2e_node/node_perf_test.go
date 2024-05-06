@@ -80,9 +80,9 @@ func setKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletc
 
 // Serial because the test updates kubelet configuration.
 // Slow by design.
-var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
+var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("node-performance-testing")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var (
 		wl     workloads.NodePerfWorkload
 		oldCfg *kubeletconfig.KubeletConfiguration

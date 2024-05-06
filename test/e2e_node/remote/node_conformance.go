@@ -17,7 +17,10 @@ limitations under the License.
 package remote
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,7 +30,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/utils"
 )
@@ -35,9 +37,8 @@ import (
 // ConformanceRemote contains the specific functions in the node conformance test suite.
 type ConformanceRemote struct{}
 
-// InitConformanceRemote initializes the node conformance test suite.
-func InitConformanceRemote() TestSuite {
-	return &ConformanceRemote{}
+func init() {
+	RegisterTestSuite("conformance", &ConformanceRemote{})
 }
 
 // getConformanceDirectory gets node conformance test build directory.
@@ -108,7 +109,7 @@ func (c *ConformanceRemote) SetupTestPackage(tardir, systemSpecName string) erro
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := utils.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir(builder.IsDockerizedBuild(), builder.GetTargetBuildArch())
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}
@@ -281,7 +282,7 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFi
 		return "", err
 	}
 
-	bearerToken, err := framework.GenerateSecureToken(16)
+	bearerToken, err := generateSecureToken(16)
 	if err != nil {
 		return "", err
 	}
@@ -304,4 +305,19 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFi
 	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result -e TEST_ARGS=--report-prefix=%s -e EXTRA_ENVS=%s -e TEST_ARGS=--bearer-token=%s %s'",
 		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, extraEnvs, bearerToken, getConformanceTestImageName(systemSpecName))
 	return SSH(host, "sh", "-c", cmd)
+}
+
+// generateSecureToken returns a string of length tokenLen, consisting
+// of random bytes encoded as base64 for use as a Bearer Token during
+// communication with an APIServer
+func generateSecureToken(tokenLen int) (string, error) {
+	// Number of bytes to be tokenLen when base64 encoded.
+	tokenSize := math.Ceil(float64(tokenLen) * 6 / 8)
+	rawToken := make([]byte, int(tokenSize))
+	if _, err := rand.Read(rawToken); err != nil {
+		return "", err
+	}
+	encoded := base64.RawURLEncoding.EncodeToString(rawToken)
+	token := encoded[:tokenLen]
+	return token, nil
 }

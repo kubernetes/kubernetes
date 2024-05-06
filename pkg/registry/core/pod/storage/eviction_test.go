@@ -143,6 +143,19 @@ func TestEviction(t *testing.T) {
 			expectError:  "name in URL does not match name in Eviction object: BadRequest",
 			podName:      "t7",
 		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, empty selector",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{}},
+				Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 0},
+			}},
+			eviction:    &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t8", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError: "Cannot evict pod as it would violate the pod's disruption budget.: TooManyRequests: The disruption budget foo needs 0 healthy pods and has 0 currently",
+			podPhase:    api.PodRunning,
+			podName:     "t8",
+			policies:    []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget)}, // AlwaysAllow would terminate the pod since Running pods are not guarded by this policy
+		},
 	}
 
 	for _, unhealthyPodEvictionPolicy := range []*policyv1.UnhealthyPodEvictionPolicyType{nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget), unhealthyPolicyPtr(policyv1.AlwaysAllow)} {
@@ -152,7 +165,7 @@ func TestEviction(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)
 
 				// same test runs multiple times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
@@ -486,6 +499,28 @@ func TestEvictionIgnorePDB(t *testing.T) {
 				Status: api.ConditionFalse,
 			},
 		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, pod healthy, empty selector, pod not deleted by honoring the PDB",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     3,
+					DesiredHealthy:     3,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t11", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         "Cannot evict pod as it would violate the pod's disruption budget.: TooManyRequests: The disruption budget foo needs 3 healthy pods and has 3 currently",
+			podName:             "t11",
+			expectedDeleteCount: 0,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
+			},
+		},
 	}
 
 	for _, unhealthyPodEvictionPolicy := range []*policyv1.UnhealthyPodEvictionPolicyType{unhealthyPolicyPtr(policyv1.AlwaysAllow), nil, unhealthyPolicyPtr(policyv1.IfHealthyBudget)} {
@@ -495,7 +530,7 @@ func TestEvictionIgnorePDB(t *testing.T) {
 				continue
 			}
 			t.Run(fmt.Sprintf("%v with %v policy", tc.name, unhealthyPolicyStr(unhealthyPodEvictionPolicy)), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, true)
 
 				// same test runs 3 times, make copy of objects to have unique ones
 				evictionCopy := tc.eviction.DeepCopy()
@@ -709,6 +744,109 @@ func TestEvictionPDBStatus(t *testing.T) {
 	}
 }
 
+func TestAddConditionAndDelete(t *testing.T) {
+	cases := []struct {
+		name              string
+		initialPod        bool
+		makeDeleteOptions func(*api.Pod) *metav1.DeleteOptions
+		expectErr         string
+	}{
+		{
+			name:              "simple",
+			initialPod:        true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions { return &metav1.DeleteOptions{} },
+		},
+		{
+			name:              "missing",
+			initialPod:        false,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions { return &metav1.DeleteOptions{} },
+			expectErr:         "not found",
+		},
+		{
+			name:       "valid uid",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &pod.UID}}
+			},
+		},
+		{
+			name:       "invalid uid",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				badUID := pod.UID + "1"
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &badUID}}
+			},
+			expectErr: "The object might have been deleted and then recreated",
+		},
+		{
+			name:       "valid resourceVersion",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &pod.ResourceVersion}}
+			},
+		},
+		{
+			name:       "invalid resourceVersion",
+			initialPod: true,
+			makeDeleteOptions: func(pod *api.Pod) *metav1.DeleteOptions {
+				badRV := pod.ResourceVersion + "1"
+				return &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &badRV}}
+			},
+			expectErr: "The object might have been modified",
+		},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	client := fake.NewSimpleClientset()
+	evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
+
+	for _, tc := range cases {
+		for _, conditionsEnabled := range []bool{true, false} {
+			name := fmt.Sprintf("%s_conditions=%v", tc.name, conditionsEnabled)
+			t.Run(name, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, conditionsEnabled)
+				var deleteOptions *metav1.DeleteOptions
+				if tc.initialPod {
+					newPod := validNewPod()
+					createdObj, err := storage.Create(testContext, newPod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					t.Cleanup(func() {
+						zero := int64(0)
+						storage.Delete(testContext, newPod.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{GracePeriodSeconds: &zero})
+					})
+					deleteOptions = tc.makeDeleteOptions(createdObj.(*api.Pod))
+				} else {
+					deleteOptions = tc.makeDeleteOptions(nil)
+				}
+				if deleteOptions == nil {
+					deleteOptions = &metav1.DeleteOptions{}
+				}
+
+				err := addConditionAndDeletePod(evictionRest, testContext, "foo", rest.ValidateAllObjectFunc, deleteOptions)
+				if err == nil {
+					if tc.expectErr != "" {
+						t.Fatalf("expected err containing %q, got none", tc.expectErr)
+					}
+					return
+				}
+				if tc.expectErr == "" {
+					t.Fatalf("unexpected err: %v", err)
+				}
+				if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected err containing %q, got %v", tc.expectErr, err)
+				}
+			})
+		}
+	}
+}
+
 func resource(resource string) schema.GroupResource {
 	return schema.GroupResource{Group: "", Resource: resource}
 }
@@ -765,7 +903,7 @@ func (ms *mockStore) Watch(ctx context.Context, options *metainternalversion.Lis
 }
 
 func (ms *mockStore) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	return nil, false, nil
+	return ms.pod, false, nil
 }
 
 func (ms *mockStore) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {

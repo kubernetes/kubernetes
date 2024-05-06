@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
@@ -68,7 +68,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 				},
 			} {
 				testCase := testCase
-				ginkgo.It(testCase.description+" [NodeConformance]", func(ctx context.Context) {
+				f.It(testCase.description+"", f.WithNodeConformance(), func(ctx context.Context) {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := node.ConformanceContainer{

@@ -17,8 +17,9 @@ limitations under the License.
 package debugger
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,12 +80,12 @@ func testCompareNodes(actual, cached, missing, redundant []string, t *testing.T)
 
 	m, r := compare.CompareNodes(nodes, nodeInfo)
 
-	if !reflect.DeepEqual(m, missing) {
-		t.Errorf("missing expected to be %s; got %s", missing, m)
+	if diff := cmp.Diff(missing, m); diff != "" {
+		t.Errorf("Unexpected missing (-want, +got):\n%s", diff)
 	}
 
-	if !reflect.DeepEqual(r, redundant) {
-		t.Errorf("redundant expected to be %s; got %s", redundant, r)
+	if diff := cmp.Diff(redundant, r); diff != "" {
+		t.Errorf("Unexpected redundant (-want, +got):\n%s", diff)
 	}
 }
 
@@ -182,11 +183,11 @@ func testComparePods(actual, cached, queued, missing, redundant []string, t *tes
 
 	m, r := compare.ComparePods(pods, queuedPods, nodeInfo)
 
-	if !reflect.DeepEqual(m, missing) {
-		t.Errorf("missing expected to be %s; got %s", missing, m)
+	if diff := cmp.Diff(missing, m); diff != "" {
+		t.Errorf("Unexpected missing (-want, +got):\n%s", diff)
 	}
 
-	if !reflect.DeepEqual(r, redundant) {
-		t.Errorf("redundant expected to be %s; got %s", redundant, r)
+	if diff := cmp.Diff(redundant, r); diff != "" {
+		t.Errorf("Unexpected redundant (-want, +got):\n%s", diff)
 	}
 }

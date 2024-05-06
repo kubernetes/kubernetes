@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -159,7 +159,7 @@ func (w *waitingPod) Reject(pluginName, msg string) {
 	// The select clause works as a non-blocking send.
 	// If there is no receiver, it's a no-op (default case).
 	select {
-	case w.s <- framework.NewStatus(framework.Unschedulable, msg).WithFailedPlugin(pluginName):
+	case w.s <- framework.NewStatus(framework.Unschedulable, msg).WithPlugin(pluginName):
 	default:
 	}
 }

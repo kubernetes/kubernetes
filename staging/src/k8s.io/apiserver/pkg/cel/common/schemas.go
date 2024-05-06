@@ -165,7 +165,11 @@ func SchemaDeclType(s Schema, isResourceRoot bool) *apiservercel.DeclType {
 			// unicode code point can be up to 4 bytes long)
 			strWithMaxLength.MaxElements = zeroIfNegative(*s.MaxLength()) * 4
 		} else {
-			strWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
+			if len(s.Enum()) > 0 {
+				strWithMaxLength.MaxElements = estimateMaxStringEnumLength(s)
+			} else {
+				strWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
+			}
 		}
 		return strWithMaxLength
 	case "boolean":
@@ -237,6 +241,19 @@ func estimateMaxStringLengthPerRequest(s Schema) int64 {
 		// subtract 2 to account for ""
 		return maxRequestSizeBytes - 2
 	}
+}
+
+// estimateMaxStringLengthPerRequest estimates the maximum string length (in characters)
+// that has a set of enum values.
+// The result of the estimation is the length of the longest possible value.
+func estimateMaxStringEnumLength(s Schema) int64 {
+	var maxLength int64
+	for _, v := range s.Enum() {
+		if s, ok := v.(string); ok && int64(len(s)) > maxLength {
+			maxLength = int64(len(s))
+		}
+	}
+	return maxLength
 }
 
 // estimateMaxArrayItemsPerRequest estimates the maximum number of array items with

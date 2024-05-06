@@ -24,18 +24,25 @@ import (
 	"net"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"google.golang.org/grpc"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	resourceapiinformer "k8s.io/client-go/informers/resource/v1alpha2"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
@@ -48,8 +55,9 @@ import (
 )
 
 const (
-	NodePrepareResourceMethod   = "/v1alpha1.Node/NodePrepareResource"
-	NodeUnprepareResourceMethod = "/v1alpha1.Node/NodeUnprepareResource"
+	NodePrepareResourcesMethod      = "/v1alpha3.Node/NodePrepareResources"
+	NodeUnprepareResourcesMethod    = "/v1alpha3.Node/NodeUnprepareResources"
+	NodeListAndWatchResourcesMethod = "/v1alpha3.Node/NodeListAndWatchResources"
 )
 
 type Nodes struct {
@@ -78,8 +86,54 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 			nodes.NodeNames = append(nodes.NodeNames, node.Name)
 		}
 		framework.Logf("testing on nodes %v", nodes.NodeNames)
+
+		// Watch claims in the namespace. This is useful for monitoring a test
+		// and enables additional sanity checks.
+		claimInformer := resourceapiinformer.NewResourceClaimInformer(f.ClientSet, f.Namespace.Name, 100*time.Hour /* resync */, nil)
+		cancelCtx, cancel := context.WithCancelCause(context.Background())
+		var wg sync.WaitGroup
+		ginkgo.DeferCleanup(func() {
+			cancel(errors.New("test has completed"))
+			wg.Wait()
+		})
+		_, err = claimInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {
+				defer ginkgo.GinkgoRecover()
+				claim := obj.(*resourcev1alpha2.ResourceClaim)
+				framework.Logf("New claim:\n%s", format.Object(claim, 1))
+				validateClaim(claim)
+			},
+			UpdateFunc: func(oldObj, newObj any) {
+				defer ginkgo.GinkgoRecover()
+				oldClaim := oldObj.(*resourcev1alpha2.ResourceClaim)
+				newClaim := newObj.(*resourcev1alpha2.ResourceClaim)
+				framework.Logf("Updated claim:\n%s\nDiff:\n%s", format.Object(newClaim, 1), cmp.Diff(oldClaim, newClaim))
+				validateClaim(newClaim)
+			},
+			DeleteFunc: func(obj any) {
+				defer ginkgo.GinkgoRecover()
+				claim := obj.(*resourcev1alpha2.ResourceClaim)
+				framework.Logf("Deleted claim:\n%s", format.Object(claim, 1))
+			},
+		})
+		framework.ExpectNoError(err, "AddEventHandler")
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			claimInformer.Run(cancelCtx.Done())
+		}()
 	})
 	return nodes
+}
+
+func validateClaim(claim *resourcev1alpha2.ResourceClaim) {
+	// The apiserver doesn't enforce that a claim always has a finalizer
+	// while being allocated. This is a convention that whoever allocates a
+	// claim has to follow to prevent using a claim that is at risk of
+	// being deleted.
+	if claim.Status.Allocation != nil && len(claim.Finalizers) == 0 {
+		framework.Failf("Invalid claim: allocated without any finalizer:\n%s", format.Object(claim, 1))
+	}
 }
 
 // NewDriver sets up controller (as client of the cluster) and
@@ -87,9 +141,10 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 // up after the test.
 func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources) *Driver {
 	d := &Driver{
-		f:          f,
-		fail:       map[MethodInstance]bool{},
-		callCounts: map[MethodInstance]int64{},
+		f:            f,
+		fail:         map[MethodInstance]bool{},
+		callCounts:   map[MethodInstance]int64{},
+		NodeV1alpha3: true,
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -99,6 +154,7 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() a
 			// not run on all nodes.
 			resources.Nodes = nodes.NodeNames
 		}
+		ginkgo.DeferCleanup(d.IsGone) // Register first so it gets called last.
 		d.SetUp(nodes, resources)
 		ginkgo.DeferCleanup(d.TearDown)
 	})
@@ -121,15 +177,32 @@ type Driver struct {
 	Name       string
 	Nodes      map[string]*app.ExamplePlugin
 
+	parameterMode         parameterMode
+	parameterAPIGroup     string
+	parameterAPIVersion   string
+	claimParameterAPIKind string
+	classParameterAPIKind string
+
+	NodeV1alpha3 bool
+
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
 	callCounts map[MethodInstance]int64
 }
 
+type parameterMode string
+
+const (
+	parameterModeConfigMap  parameterMode = "configmap"  // ConfigMap parameters, control plane controller.
+	parameterModeStructured parameterMode = "structured" // No ConfigMaps, directly create and reference in-tree parameter objects.
+	parameterModeTranslated parameterMode = "translated" // Reference ConfigMaps in claim and class, generate in-tree parameter objects.
+)
+
 func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
 	d.Nodes = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
+	resources.DriverName = d.Name
 
 	ctx, cancel := context.WithCancel(context.Background())
 	if d.NameSuffix != "" {
@@ -140,19 +213,44 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
 
-	// The controller is easy: we simply connect to the API server.
-	d.Controller = app.NewController(d.f.ClientSet, d.Name, resources)
-	d.wg.Add(1)
-	go func() {
-		defer d.wg.Done()
-		d.Controller.Run(d.ctx, 5 /* workers */)
-	}()
+	switch d.parameterMode {
+	case "", parameterModeConfigMap:
+		// The controller is easy: we simply connect to the API server.
+		d.Controller = app.NewController(d.f.ClientSet, resources)
+		d.wg.Add(1)
+		go func() {
+			defer d.wg.Done()
+			d.Controller.Run(d.ctx, 5 /* workers */)
+		}()
+	}
 
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
 		// container names, etc.).
 		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
+	if d.parameterMode == "" {
+		d.parameterMode = parameterModeConfigMap
+	}
+	var numResourceInstances = -1 // disabled
+	if d.parameterMode != parameterModeConfigMap {
+		numResourceInstances = resources.MaxAllocations
+	}
+	switch d.parameterMode {
+	case parameterModeConfigMap, parameterModeTranslated:
+		d.parameterAPIGroup = ""
+		d.parameterAPIVersion = "v1"
+		d.claimParameterAPIKind = "ConfigMap"
+		d.classParameterAPIKind = "ConfigMap"
+	case parameterModeStructured:
+		d.parameterAPIGroup = "resource.k8s.io"
+		d.parameterAPIVersion = "v1alpha2"
+		d.claimParameterAPIKind = "ResourceClaimParameters"
+		d.classParameterAPIKind = "ResourceClassParameters"
+	default:
+		framework.Failf("unknown test driver parameter mode: %s", d.parameterMode)
+	}
+
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
@@ -185,6 +283,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			item.Spec.Template.Spec.Volumes[2].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
 			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
 			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
+		case *apiextensionsv1.CustomResourceDefinition:
+			item.Name = strings.ReplaceAll(item.Name, "dra.e2e.example.com", d.parameterAPIGroup)
+			item.Spec.Group = d.parameterAPIGroup
+
 		}
 		return nil
 	}, manifests...)
@@ -202,7 +304,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	selector := labels.NewSelector().Add(*requirement)
 	pods, err := d.f.ClientSet.CoreV1().Pods(d.f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "list proxy pods")
-	framework.ExpectEqual(numNodes, int32(len(pods.Items)), "number of proxy pods")
+	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
 
 	// Run registar and plugin for each of the pods.
 	for _, pod := range pods.Items {
@@ -211,24 +313,30 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		pod := pod
 		nodename := pod.Spec.NodeName
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
-		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
+		loggerCtx := klog.NewContext(ctx, logger)
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
-					ginkgo.By(fmt.Sprintf("creating CDI file %s on node %s:\n%s", name, nodename, string(content)))
+					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
 					return d.createFile(&pod, name, content)
 				},
 				Remove: func(name string) error {
-					ginkgo.By(fmt.Sprintf("deleting CDI file %s on node %s", name, nodename))
+					klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
 					return d.removeFile(&pod, name)
 				},
+				NumResourceInstances: numResourceInstances,
 			},
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 				return d.interceptor(nodename, ctx, req, info, handler)
 			}),
+			kubeletplugin.GRPCStreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+				return d.streamInterceptor(nodename, srv, ss, info, handler)
+			}),
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
+			kubeletplugin.NodeV1alpha3(d.NodeV1alpha3),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func() {
@@ -240,14 +348,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 
 	// Wait for registration.
 	ginkgo.By("wait for plugin registration")
-	gomega.Eventually(func() []string {
-		var notRegistered []string
+	gomega.Eventually(func() map[string][]app.GRPCCall {
+		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
-			if !plugin.IsRegistered() {
-				notRegistered = append(notRegistered, nodename)
+			calls := plugin.GetGRPCCalls()
+			if contains, err := app.BeRegistered.Match(calls); err != nil || !contains {
+				notRegistered[nodename] = calls
 			}
 		}
-		sort.Strings(notRegistered)
 		return notRegistered
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }
@@ -299,6 +407,16 @@ func (d *Driver) TearDown() {
 	d.wg.Wait()
 }
 
+func (d *Driver) IsGone(ctx context.Context) {
+	gomega.Eventually(ctx, func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
+		slices, err := d.f.ClientSet.ResourceV1alpha2().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: "driverName=" + d.Name})
+		if err != nil {
+			return nil, err
+		}
+		return slices.Items, err
+	}).Should(gomega.BeEmpty())
+}
+
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
@@ -310,6 +428,22 @@ func (d *Driver) interceptor(nodename string, ctx context.Context, req interface
 	}
 
 	return handler(ctx, req)
+}
+
+func (d *Driver) streamInterceptor(nodename string, srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	// Stream calls block for a long time. We must not hold the lock while
+	// they are running.
+	d.mutex.Lock()
+	m := MethodInstance{nodename, info.FullMethod}
+	d.callCounts[m]++
+	fail := d.fail[m]
+	d.mutex.Unlock()
+
+	if fail {
+		return errors.New("injected error")
+	}
+
+	return handler(srv, stream)
 }
 
 func (d *Driver) Fail(m MethodInstance, injectError bool) {

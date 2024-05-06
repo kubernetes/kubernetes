@@ -123,7 +123,6 @@ e2e test configuration for the latest environment variables.
 
 ```bash
 KUBE_GCE_ENABLE_IP_ALIASES=true KUBERNETES_NODE_PLATFORM=windows \
-  KUBELET_TEST_ARGS=--feature-gates=KubeletPodResources=false \
   LOGGING_STACKDRIVER_RESOURCE_TYPES=new NUM_NODES=2 \
   NUM_WINDOWS_NODES=3 WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
   ./hack/e2e-internal/e2e-up.sh

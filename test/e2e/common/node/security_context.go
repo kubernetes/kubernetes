@@ -26,13 +26,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -45,7 +48,7 @@ var (
 
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = e2epod.NewPodClient(f)
@@ -72,7 +75,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		ginkgo.It("must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// with hostUsers=false the pod must use a new user namespace
 			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
@@ -110,7 +113,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		ginkgo.It("must not create the user namespace if set to true [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// with hostUsers=true the pod must use the host user namespace
 			pod := makePod(true)
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
@@ -121,7 +124,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		ginkgo.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// Create all volume types supported: configmap, secret, downwardAPI, projected.
 
 			// Create configmap.
@@ -245,7 +248,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		ginkgo.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func(ctx context.Context) {
+		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -330,7 +333,7 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(ctx context.Context, userid int64) {
 			podName := fmt.Sprintf("busybox-user-%d-%s", userid, uuid.NewUUID())
 			podClient.Create(ctx, makeUserPod(podName,
-				framework.BusyBoxImage,
+				imageutils.GetE2EImage(imageutils.BusyBox),
 				[]string{"sh", "-c", fmt.Sprintf("test $(id -u) -eq %d", userid)},
 				userid,
 			))
@@ -344,7 +347,7 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Container is created with runAsUser option by passing uid 65534 to run as unpriviledged user. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			createAndWaitUserPod(ctx, 65534)
 		})
 
@@ -355,7 +358,7 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e can not be promoted to Conformance because a Conformant platform may not allow to run containers with 'uid 0' or running privileged operations.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		ginkgo.It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		f.It("should run the container with uid 0 [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			createAndWaitUserPod(ctx, 0)
 		})
 	})
@@ -405,7 +408,7 @@ var _ = SIGDescribe("Security Context", func() {
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
 			framework.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
 		ginkgo.It("should run with an image specified user ID", func(ctx context.Context) {
 			name := "implicit-nonroot-uid"
@@ -423,7 +426,7 @@ var _ = SIGDescribe("Security Context", func() {
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
 			framework.ExpectNoError(err)
 			gomega.Expect(ev).NotTo(gomega.BeNil())
-			framework.ExpectEqual(ev.Reason, events.FailedToCreateContainer)
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
 	})
 
@@ -451,7 +454,7 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(ctx context.Context, readOnlyRootFilesystem bool) string {
 			podName := fmt.Sprintf("busybox-readonly-%v-%s", readOnlyRootFilesystem, uuid.NewUUID())
 			podClient.Create(ctx, makeUserPod(podName,
-				framework.BusyBoxImage,
+				imageutils.GetE2EImage(imageutils.BusyBox),
 				[]string{"sh", "-c", "touch checkfile"},
 				readOnlyRootFilesystem,
 			))
@@ -473,7 +476,7 @@ var _ = SIGDescribe("Security Context", func() {
 			At this moment we are not considering this test for Conformance due to use of SecurityContext.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		ginkgo.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		f.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			createAndWaitUserPod(ctx, true)
 		})
 
@@ -483,7 +486,7 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Container is configured to run with readOnlyRootFilesystem to false.
 			Write operation MUST be allowed and Pod MUST be in Succeeded state.
 		*/
-		framework.ConformanceIt("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should run the container with writable rootfs when readOnlyRootFilesystem=false", f.WithNodeConformance(), func(ctx context.Context) {
 			createAndWaitUserPod(ctx, false)
 		})
 	})
@@ -512,7 +515,7 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(ctx context.Context, privileged bool) string {
 			podName := fmt.Sprintf("busybox-privileged-%v-%s", privileged, uuid.NewUUID())
 			podClient.Create(ctx, makeUserPod(podName,
-				framework.BusyBoxImage,
+				imageutils.GetE2EImage(imageutils.BusyBox),
 				[]string{"sh", "-c", "ip link add dummy0 type dummy || true"},
 				privileged,
 			))
@@ -525,7 +528,7 @@ var _ = SIGDescribe("Security Context", func() {
 			Description: Create a container to run in unprivileged mode by setting pod's SecurityContext Privileged option as false. Pod MUST be in Succeeded phase.
 			[LinuxOnly]: This test is marked as LinuxOnly since it runs a Linux-specific command.
 		*/
-		framework.ConformanceIt("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should run the container as unprivileged when false [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := createAndWaitUserPod(ctx, false)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -538,7 +541,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		ginkgo.It("should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]", func(ctx context.Context) {
+		f.It("should run the container as privileged when true [LinuxOnly]", nodefeature.HostAccess, func(ctx context.Context) {
 			podName := createAndWaitUserPod(ctx, true)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
@@ -591,7 +594,7 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and not all conformant platforms will require this behavior.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		f.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(ctx, podName, "Effective uid: 0", nil, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
@@ -606,7 +609,7 @@ var _ = SIGDescribe("Security Context", func() {
 			When the container is run, container's output MUST match with expected output verifying container ran with given uid i.e. uid=1000.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(ctx, podName, fmt.Sprintf("Effective uid: %d", nonRootTestUserID), &apeFalse, nonRootTestUserID); err != nil {
@@ -623,12 +626,45 @@ var _ = SIGDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and runtime may not allow to run.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		ginkgo.It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+		f.It("should allow privilege escalation when true [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(ctx, podName, "Effective uid: 0", &apeTrue, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
+		})
+	})
+})
+
+var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", func() {
+	f := framework.NewDefaultFramework("user-namespaces-pss-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelRestricted
+
+	ginkgo.Context("with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled", func() {
+		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, func(ctx context.Context) {
+			name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: v1.PodSpec{
+					RestartPolicy:   v1.RestartPolicyNever,
+					HostUsers:       ptr.To(false),
+					SecurityContext: &v1.PodSecurityContext{},
+					Containers: []v1.Container{
+						{
+							Name:    name,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"whoami"},
+							SecurityContext: &v1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+								SeccompProfile:           &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
+							},
+						},
+					},
+				},
+			}
+
+			e2epodoutput.TestContainerOutput(ctx, f, "RunAsUser-RunAsNonRoot", pod, 0, []string{"root"})
 		})
 	})
 })

@@ -34,6 +34,7 @@ type PersistentVolumeSpecApplyConfiguration struct {
 	MountOptions                             []string                              `json:"mountOptions,omitempty"`
 	VolumeMode                               *v1.PersistentVolumeMode              `json:"volumeMode,omitempty"`
 	NodeAffinity                             *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
+	VolumeAttributesClassName                *string                               `json:"volumeAttributesClassName,omitempty"`
 }
 
 // PersistentVolumeSpecApplyConfiguration constructs an declarative configuration of the PersistentVolumeSpec type for use with
@@ -283,5 +284,13 @@ func (b *PersistentVolumeSpecApplyConfiguration) WithVolumeMode(value v1.Persist
 // If called multiple times, the NodeAffinity field is set to the value of the last call.
 func (b *PersistentVolumeSpecApplyConfiguration) WithNodeAffinity(value *VolumeNodeAffinityApplyConfiguration) *PersistentVolumeSpecApplyConfiguration {
 	b.NodeAffinity = value
+	return b
+}
+
+// WithVolumeAttributesClassName sets the VolumeAttributesClassName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the VolumeAttributesClassName field is set to the value of the last call.
+func (b *PersistentVolumeSpecApplyConfiguration) WithVolumeAttributesClassName(value string) *PersistentVolumeSpecApplyConfiguration {
+	b.VolumeAttributesClassName = &value
 	return b
 }

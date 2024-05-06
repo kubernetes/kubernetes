@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -177,7 +176,6 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result))
 		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.String()).Inc()
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
@@ -365,17 +363,10 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 	if event.Type == watch.Bookmark {
 		e := &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
 		if !c.wasBookmarkAfterRvSent() {
-			objMeta, err := meta.Accessor(e.Object)
-			if err != nil {
+			if err := storage.AnnotateInitialEventsEndBookmark(e.Object); err != nil {
 				utilruntime.HandleError(fmt.Errorf("error while accessing object's metadata gr: %v, identifier: %v, obj: %#v, err: %v", c.groupResource, c.identifier, e.Object, err))
 				return nil
 			}
-			objAnnotations := objMeta.GetAnnotations()
-			if objAnnotations == nil {
-				objAnnotations = map[string]string{}
-			}
-			objAnnotations["k8s.io/initial-events-end"] = "true"
-			objMeta.SetAnnotations(objAnnotations)
 		}
 		return e
 	}
@@ -488,10 +479,19 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 			break
 		}
 		c.sendWatchCacheEvent(event)
+
 		// With some events already sent, update resourceVersion so that
 		// events that were buffered and not yet processed won't be delivered
 		// to this watcher second time causing going back in time.
-		resourceVersion = event.ResourceVersion
+		//
+		// There is one case where events are not necessary ordered by
+		// resourceVersion, being a case of watching from resourceVersion=0,
+		// which at the beginning returns the state of each objects.
+		// For the purpose of it, we need to max it with the resource version
+		// that we have so far.
+		if event.ResourceVersion > resourceVersion {
+			resourceVersion = event.ResourceVersion
+		}
 		initEventCount++
 	}
 

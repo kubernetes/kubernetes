@@ -37,7 +37,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,7 +52,7 @@ import (
 // either very timing-sensitive or slow to wait for real periodic sync.
 func TestControllerSync(t *testing.T) {
 	// Default enable the HonorPVReclaimPolicy feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	tests := []controllerTest{
 		// [Unit test set 5] - controller tests.
 		// We test the controller as if
@@ -310,7 +310,7 @@ func TestControllerSync(t *testing.T) {
 			},
 		},
 	}
-
+	logger, ctx := ktesting.NewTestContext(t)
 	doit := func(test controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
@@ -324,7 +324,7 @@ func TestControllerSync(t *testing.T) {
 		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		ctrl, err := newTestController(client, informers, true)
+		ctrl, err := newTestController(ctx, client, informers, true)
 		if err != nil {
 			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
 		}
@@ -341,7 +341,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
-		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
+		reactor := newVolumeReactor(ctx, client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
 			claim = claim.DeepCopy()
 			reactor.AddClaim(claim)
@@ -371,7 +371,7 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Test %q controller sync failed: %v", test.name, err)
 		}
-		klog.V(4).Infof("controller synced, starting test")
+		logger.V(4).Info("controller synced, starting test")
 
 		// Call the tested function
 		err = test.test(ctrl, reactor.VolumeReactor, test)
@@ -380,7 +380,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		// Simulate a periodic resync, just in case some events arrived in a
 		// wrong order.
-		ctrl.resync()
+		ctrl.resync(ctx)
 
 		err = reactor.waitTest(test)
 		if err != nil {
@@ -388,7 +388,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		cancel()
 
-		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
+		evaluateTestResults(ctx, ctrl, reactor.VolumeReactor, test, t)
 	}
 
 	for _, test := range tests {
@@ -402,7 +402,8 @@ func TestControllerSync(t *testing.T) {
 func storeVersion(t *testing.T, prefix string, c cache.Store, version string, expectedReturn bool) {
 	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
 	pv.ResourceVersion = version
-	ret, err := storeObjectUpdate(c, pv, "volume")
+	logger, _ := ktesting.NewTestContext(t)
+	ret, err := storeObjectUpdate(logger, c, pv, "volume")
 	if err != nil {
 		t.Errorf("%s: expected storeObjectUpdate to succeed, got: %v", prefix, err)
 	}
@@ -461,7 +462,8 @@ func TestControllerCacheParsingError(t *testing.T) {
 
 	pv := newVolume("pvName", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty)
 	pv.ResourceVersion = "xxx"
-	_, err := storeObjectUpdate(c, pv, "volume")
+	logger, _ := ktesting.NewTestContext(t)
+	_, err := storeObjectUpdate(logger, c, pv, "volume")
 	if err == nil {
 		t.Errorf("Expected parsing error, got nil instead")
 	}
@@ -572,19 +574,19 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 
 	translator := csitrans.New()
 	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
-
+	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.volumeAnnotations != nil {
 				ann := tc.volumeAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, false)
+				updateMigrationAnnotations(logger, cmpm, translator, ann, false)
 				if !reflect.DeepEqual(tc.expVolumeAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
 			}
 			if tc.claimAnnotations != nil {
 				ann := tc.claimAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, true)
+				updateMigrationAnnotations(logger, cmpm, translator, ann, true)
 				if !reflect.DeepEqual(tc.expClaimAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
@@ -600,7 +602,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	// in-tree plugin is used as migration is disabled. When that plugin is migrated, a different
 	// non-migrated one should be used. If all plugins are migrated this test can be removed. The
 	// gce in-tree plugin is used for a migrated driver as it is feature-locked as of 1.25.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	const nonmigratedDriver = "rbd.csi.ceph.com"
 	const migratedPlugin = "kubernetes.io/gce-pd"
 	const migratedDriver = "pd.csi.storage.gke.io"
@@ -732,13 +734,13 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 
 	translator := csitrans.New()
 	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
-
+	logger, _ := ktesting.NewTestContext(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.volumeAnnotations != nil {
 				tc.initialVolume.SetAnnotations(tc.volumeAnnotations)
 			}
-			modifiedFinalizers, modified := modifyDeletionFinalizers(cmpm, tc.initialVolume)
+			modifiedFinalizers, modified := modifyDeletionFinalizers(logger, cmpm, tc.initialVolume)
 			if modified != tc.expModified {
 				t.Errorf("got modified: %v, but expected: %v", modified, tc.expModified)
 			}
@@ -751,8 +753,6 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 }
 
 func TestRetroactiveStorageClassAssignment(t *testing.T) {
-	// Enable RetroactiveDefaultStorageClass feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()
 	tests := []struct {
 		storageClasses []*storagev1.StorageClass
 		tests          []controllerTest
@@ -881,7 +881,8 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 			},
 		},
 	}
+	_, ctx := ktesting.NewTestContext(t)
 	for _, test := range tests {
-		runSyncTests(t, test.tests, test.storageClasses, nil)
+		runSyncTests(t, ctx, test.tests, test.storageClasses, nil)
 	}
 }

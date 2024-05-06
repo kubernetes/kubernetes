@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -17,7 +20,7 @@ limitations under the License.
 package testing
 
 import (
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
+	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 )
 
 // ExpectedVirtualServer is the expected ipvs rules with VirtualServer and RealServer

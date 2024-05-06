@@ -100,13 +100,13 @@ func testPropagateStore(ctx context.Context, t *testing.T, store storage.Interfa
 	return key, setOutput
 }
 
-func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
+func expectNoDiff(t *testing.T, msg string, expected, actual interface{}) {
 	t.Helper()
-	if !reflect.DeepEqual(expected, got) {
-		if diff := cmp.Diff(expected, got); diff != "" {
+	if !reflect.DeepEqual(expected, actual) {
+		if diff := cmp.Diff(expected, actual); diff != "" {
 			t.Errorf("%s: %s", msg, diff)
 		} else {
-			t.Errorf("%s:\nexpected: %#v\ngot: %#v", msg, expected, got)
+			t.Errorf("%s:\nexpected: %#v\ngot: %#v", msg, expected, actual)
 		}
 	}
 }
@@ -139,7 +139,7 @@ func encodeContinueOrDie(key string, resourceVersion int64) string {
 	return token
 }
 
-func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
+func testCheckEventType(t *testing.T, w watch.Interface, expectEventType watch.EventType) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
@@ -150,27 +150,20 @@ func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
-	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
-		ExpectNoDiff(t, "incorrect object", expectObj, object)
-		return nil
+func testCheckResult(t *testing.T, w watch.Interface, expectEvent watch.Event) {
+	testCheckResultFunc(t, w, func(actualEvent watch.Event) {
+		expectNoDiff(t, "incorrect event", expectEvent, actualEvent)
 	})
 }
 
-func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
+func testCheckResultFunc(t *testing.T, w watch.Interface, check func(actualEvent watch.Event)) {
 	select {
 	case res := <-w.ResultChan():
-		if res.Type != expectEventType {
-			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
-			return
-		}
 		obj := res.Object
 		if co, ok := obj.(runtime.CacheableObject); ok {
-			obj = co.GetObject()
+			res.Object = co.GetObject()
 		}
-		if err := check(obj); err != nil {
-			t.Error(err)
-		}
+		check(res)
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
 	}
@@ -192,6 +185,30 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("time out after waiting 1s on ResultChan")
 	}
+}
+
+func testCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
+	for _, expectedEvent := range expectedEvents {
+		testCheckResult(t, w, expectedEvent)
+	}
+}
+
+func testCheckNoMoreResults(t *testing.T, w watch.Interface) {
+	select {
+	case e := <-w.ResultChan():
+		t.Errorf("Unexpected: %#v event received, expected no events", e)
+	// We consciously make the timeout short here to speed up tests.
+	case <-time.After(100 * time.Millisecond):
+		return
+	}
+}
+
+func toInterfaceSlice[T any](s []T) []interface{} {
+	result := make([]interface{}, len(s))
+	for i, v := range s {
+		result[i] = v
+	}
+	return result
 }
 
 // resourceVersionNotOlderThan returns a function to validate resource versions. Resource versions

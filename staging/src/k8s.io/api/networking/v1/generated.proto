@@ -84,6 +84,7 @@ message IPBlock {
   // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   // Except values will be rejected if they are outside the cidr range
   // +optional
+  // +listType=atomic
   repeated string except = 2;
 }
 
@@ -95,7 +96,7 @@ message Ingress {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the desired state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -120,7 +121,7 @@ message IngressBackend {
   // service.Port must not be specified.
   // This is a mutually exclusive setting with "Service".
   // +optional
-  optional k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
+  optional .k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
 }
 
 // IngressClass represents the class of the Ingress, referenced by the Ingress
@@ -132,7 +133,7 @@ message IngressClass {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the desired state of the IngressClass.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -144,7 +145,7 @@ message IngressClass {
 message IngressClassList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of IngressClasses.
   repeated IngressClass items = 2;
@@ -199,7 +200,7 @@ message IngressList {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of Ingress.
   repeated Ingress items = 2;
@@ -225,6 +226,7 @@ message IngressLoadBalancerIngress {
 message IngressLoadBalancerStatus {
   // ingress is a list containing ingress points for the load-balancer.
   // +optional
+  // +listType=atomic
   repeated IngressLoadBalancerIngress ingress = 1;
 }
 
@@ -379,16 +381,11 @@ message NetworkPolicy {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents the specification of the desired behavior for this NetworkPolicy.
   // +optional
   optional NetworkPolicySpec spec = 2;
-
-  // status represents the current state of the NetworkPolicy.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
-  optional NetworkPolicyStatus status = 3;
 }
 
 // NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
@@ -401,6 +398,7 @@ message NetworkPolicyEgressRule {
   // If this field is present and contains at least one item, then this rule allows
   // traffic only if the traffic matches at least one port in the list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPort ports = 1;
 
   // to is a list of destinations for outgoing traffic of pods selected for this rule.
@@ -409,6 +407,7 @@ message NetworkPolicyEgressRule {
   // destination). If this field is present and contains at least one item, this rule
   // allows traffic only if the traffic matches at least one item in the to list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPeer to = 2;
 }
 
@@ -421,6 +420,7 @@ message NetworkPolicyIngressRule {
   // If this field is present and contains at least one item, then this rule allows
   // traffic only if the traffic matches at least one port in the list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPort ports = 1;
 
   // from is a list of sources which should be able to access the pods selected for this rule.
@@ -429,6 +429,7 @@ message NetworkPolicyIngressRule {
   // source). If this field is present and contains at least one item, this rule
   // allows traffic only if the traffic matches at least one item in the from list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPeer from = 2;
 }
 
@@ -437,7 +438,7 @@ message NetworkPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of schema objects.
   repeated NetworkPolicy items = 2;
@@ -453,7 +454,7 @@ message NetworkPolicyPeer {
   // the pods matching podSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects the pods matching podSelector in the policy's own namespace.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // namespaceSelector selects namespaces using cluster-scoped labels. This field follows
   // standard label selector semantics; if present but empty, it selects all namespaces.
@@ -462,7 +463,7 @@ message NetworkPolicyPeer {
   // the pods matching podSelector in the namespaces selected by namespaceSelector.
   // Otherwise it selects all pods in the namespaces selected by namespaceSelector.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
 
   // ipBlock defines policy on a particular IPBlock. If this field is set then
   // neither of the other fields can be.
@@ -482,7 +483,7 @@ message NetworkPolicyPort {
   // numbers.
   // If present, only traffic on the specified protocol AND port will be matched.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // endPort indicates that the range of ports from port to endPort if set, inclusive,
   // should be allowed by the policy. This field cannot be defined if the port field
@@ -500,7 +501,7 @@ message NetworkPolicySpec {
   // the ingress rules for each are combined additively.
   // This field is NOT optional and follows standard label selector semantics.
   // An empty podSelector matches all pods in this namespace.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // ingress is a list of ingress rules to be applied to the selected pods.
   // Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
@@ -510,6 +511,7 @@ message NetworkPolicySpec {
   // this field is empty then this NetworkPolicy does not allow any traffic (and serves
   // solely to ensure that the pods it selects are isolated by default)
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyIngressRule ingress = 2;
 
   // egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
@@ -520,6 +522,7 @@ message NetworkPolicySpec {
   // solely to ensure that the pods it selects are isolated by default).
   // This field is beta-level in 1.8
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyEgressRule egress = 3;
 
   // policyTypes is a list of rule types that the NetworkPolicy relates to.
@@ -533,19 +536,8 @@ message NetworkPolicySpec {
   // an egress section and would otherwise default to just [ "Ingress" ]).
   // This field is beta-level in 1.8
   // +optional
+  // +listType=atomic
   repeated string policyTypes = 4;
-}
-
-// NetworkPolicyStatus describes the current state of the NetworkPolicy.
-message NetworkPolicyStatus {
-  // conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
-  // Current service state
-  // +optional
-  // +patchMergeKey=type
-  // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=type
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
 // ServiceBackendPort is the service port being referenced.

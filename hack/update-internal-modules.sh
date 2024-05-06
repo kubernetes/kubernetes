@@ -23,13 +23,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # These are "internal" modules.  For various reasons, we want them to be
 # decoupled from their parent modules.
-MODULES=(
-    hack/tools
-    staging/src/k8s.io/code-generator/examples
-)
-
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
+MODULES=()                                                                                                                                                                   
+kube::util::read-array MODULES < <(
+    git ls-files -cmo --exclude-standard -- ':!:vendor/*' ':(glob)*/**/go.work' \
+        | while read -r F; do \
+            dirname "${F}"; \
+        done
+    )
 
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
@@ -37,12 +37,10 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
   exit 1
 fi
 
-kube::golang::verify_go_version
+kube::golang::setup_env
 
 for mod in "${MODULES[@]}"; do
-  pushd "${KUBE_ROOT}/${mod}" >/dev/null
-    echo "=== tidying go.mod/go.sum in ${mod}"
-    go mod edit -fmt
-    go mod tidy
-  popd >/dev/null
+  echo "=== tidying go.mod/go.sum in ${mod}"
+  go -C "${KUBE_ROOT}/${mod}" mod edit -fmt
+  go -C "${KUBE_ROOT}/${mod}" mod tidy
 done

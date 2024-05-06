@@ -26,7 +26,7 @@ import (
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
-// DelegatingAuthorizerConfig is the minimal configuration needed to create an authenticator
+// DelegatingAuthorizerConfig is the minimal configuration needed to create an authorizer
 // built to delegate authorization to a kube API server
 type DelegatingAuthorizerConfig struct {
 	SubjectAccessReviewClient authorizationclient.AuthorizationV1Interface
@@ -54,9 +54,7 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		c.AllowCacheTTL,
 		c.DenyCacheTTL,
 		*c.WebhookRetryBackoff,
-		webhook.AuthorizerMetrics{
-			RecordRequestTotal:   RecordRequestTotal,
-			RecordRequestLatency: RecordRequestLatency,
-		},
+		authorizer.DecisionNoOpinion,
+		NewDelegatingAuthorizerMetrics(),
 	)
 }

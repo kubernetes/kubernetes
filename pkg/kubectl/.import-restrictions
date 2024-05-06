@@ -2,6 +2,7 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes/pkg
     allowedPrefixes:
       - k8s.io/kubernetes/pkg/api/legacyscheme
+      - k8s.io/kubernetes/pkg/api/v1/service
       - k8s.io/kubernetes/pkg/apis/admission
       - k8s.io/kubernetes/pkg/apis/admission/install
       - k8s.io/kubernetes/pkg/apis/admission/v1
@@ -59,7 +60,6 @@ rules:
       - k8s.io/kubernetes/pkg/apis/extensions/v1beta1
       - k8s.io/kubernetes/pkg/apis/flowcontrol
       - k8s.io/kubernetes/pkg/apis/flowcontrol/install
-      - k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1
       - k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1
       - k8s.io/kubernetes/pkg/apis/imagepolicy
       - k8s.io/kubernetes/pkg/apis/imagepolicy/install
@@ -80,7 +80,7 @@ rules:
       - k8s.io/kubernetes/pkg/apis/rbac/v1beta1
       - k8s.io/kubernetes/pkg/apis/resource
       - k8s.io/kubernetes/pkg/apis/resource/install
-      - k8s.io/kubernetes/pkg/apis/resource/v1alpha1
+      - k8s.io/kubernetes/pkg/apis/resource/v1alpha2
       - k8s.io/kubernetes/pkg/apis/scheduling
       - k8s.io/kubernetes/pkg/apis/scheduling/install
       - k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1

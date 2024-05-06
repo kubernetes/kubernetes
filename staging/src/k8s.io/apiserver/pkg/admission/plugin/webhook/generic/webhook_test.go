@@ -17,21 +17,26 @@ limitations under the License.
 package generic
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 func gvr(group, version, resource string) schema.GroupVersionResource {
@@ -42,8 +47,55 @@ func gvk(group, version, kind string) schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind}
 }
 
+var _ matchconditions.Matcher = &fakeMatcher{}
+
+type fakeMatcher struct {
+	throwError  error
+	matchResult bool
+}
+
+func (f *fakeMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) matchconditions.MatchResult {
+	if f.throwError != nil {
+		return matchconditions.MatchResult{
+			Matches:             true,
+			FailedConditionName: "",
+			Error:               f.throwError,
+		}
+	}
+	return matchconditions.MatchResult{
+		Matches:             f.matchResult,
+		FailedConditionName: "",
+	}
+}
+
+var _ webhook.WebhookAccessor = &fakeWebhookAccessor{}
+
+type fakeWebhookAccessor struct {
+	webhook.WebhookAccessor
+	throwError  error
+	matchResult bool
+}
+
+func (f *fakeWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler) matchconditions.Matcher {
+	return &fakeMatcher{
+		throwError:  f.throwError,
+		matchResult: f.matchResult,
+	}
+}
+
+var _ VersionedAttributeAccessor = &fakeVersionedAttributeAccessor{}
+
+type fakeVersionedAttributeAccessor struct{}
+
+func (v *fakeVersionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionKind) (*admission.VersionedAttributes, error) {
+	return nil, nil
+}
+
 func TestShouldCallHook(t *testing.T) {
-	a := &Webhook{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
+	a := &Webhook{
+		namespaceMatcher: &namespace.Matcher{},
+		objectMatcher:    &object.Matcher{},
+	}
 
 	allScopes := v1.AllScopes
 	exactMatch := v1.Exact
@@ -83,12 +135,15 @@ func TestShouldCallHook(t *testing.T) {
 		expectCallResource    schema.GroupVersionResource
 		expectCallSubresource string
 		expectCallKind        schema.GroupVersionKind
+		matchError            error
+		matchResult           bool
 	}{
 		{
-			name:       "no rules (just write)",
-			webhook:    &v1.ValidatingWebhook{NamespaceSelector: &metav1.LabelSelector{}, Rules: []v1.RuleWithOperations{}},
-			attrs:      admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectCall: false,
+			name:        "no rules (just write)",
+			webhook:     &v1.ValidatingWebhook{NamespaceSelector: &metav1.LabelSelector{}, Rules: []v1.RuleWithOperations{}},
+			attrs:       admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:  false,
+			matchResult: true,
 		},
 		{
 			name: "invalid kind lookup",
@@ -100,9 +155,10 @@ func TestShouldCallHook(t *testing.T) {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"example.com"}, APIVersions: []string{"v1"}, Resources: []string{"widgets"}, Scope: &allScopes},
 				}}},
-			attrs:      admission.NewAttributesRecord(nil, nil, gvk("example.com", "v2", "Widget"), "ns", "name", gvr("example.com", "v2", "widgets"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectCall: false,
-			expectErr:  "unknown kind",
+			attrs:       admission.NewAttributesRecord(nil, nil, gvk("example.com", "v2", "Widget"), "ns", "name", gvr("example.com", "v2", "widgets"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:  false,
+			expectErr:   "unknown kind",
+			matchResult: true,
 		},
 		{
 			name: "wildcard rule, match as requested",
@@ -118,6 +174,7 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallKind:        gvk("apps", "v1", "Deployment"),
 			expectCallResource:    gvr("apps", "v1", "deployments"),
 			expectCallSubresource: "",
+			matchResult:           true,
 		},
 		{
 			name: "specific rules, prefer exact match",
@@ -139,6 +196,7 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallKind:        gvk("apps", "v1", "Deployment"),
 			expectCallResource:    gvr("apps", "v1", "deployments"),
 			expectCallSubresource: "",
+			matchResult:           true,
 		},
 		{
 			name: "specific rules, match miss",
@@ -152,8 +210,9 @@ func TestShouldCallHook(t *testing.T) {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}}},
-			attrs:      admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectCall: false,
+			attrs:       admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:  false,
+			matchResult: true,
 		},
 		{
 			name: "specific rules, exact match miss",
@@ -168,8 +227,9 @@ func TestShouldCallHook(t *testing.T) {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 				}}},
-			attrs:      admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectCall: false,
+			attrs:       admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:  false,
+			matchResult: true,
 		},
 		{
 			name: "specific rules, equivalent match, prefer extensions",
@@ -189,6 +249,7 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallKind:        gvk("extensions", "v1beta1", "Deployment"),
 			expectCallResource:    gvr("extensions", "v1beta1", "deployments"),
 			expectCallSubresource: "",
+			matchResult:           true,
 		},
 		{
 			name: "specific rules, equivalent match, prefer apps",
@@ -208,6 +269,7 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallKind:        gvk("apps", "v1beta1", "Deployment"),
 			expectCallResource:    gvr("apps", "v1beta1", "deployments"),
 			expectCallSubresource: "",
+			matchResult:           true,
 		},
 
 		{
@@ -230,6 +292,7 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallKind:        gvk("autoscaling", "v1", "Scale"),
 			expectCallResource:    gvr("apps", "v1", "deployments"),
 			expectCallSubresource: "scale",
+			matchResult:           true,
 		},
 		{
 			name: "specific rules, subresource match miss",
@@ -243,8 +306,9 @@ func TestShouldCallHook(t *testing.T) {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}}},
-			attrs:      admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectCall: false,
+			attrs:       admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:  false,
+			matchResult: true,
 		},
 		{
 			name: "specific rules, subresource exact match miss",
@@ -259,8 +323,9 @@ func TestShouldCallHook(t *testing.T) {
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				}}},
-			attrs:      admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectCall: false,
+			attrs:       admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:  false,
+			matchResult: true,
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions",
@@ -280,6 +345,7 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallKind:        gvk("extensions", "v1beta1", "Scale"),
 			expectCallResource:    gvr("extensions", "v1beta1", "deployments"),
 			expectCallSubresource: "scale",
+			matchResult:           true,
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer apps",
@@ -299,12 +365,86 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallKind:        gvk("apps", "v1beta1", "Scale"),
 			expectCallResource:    gvr("apps", "v1beta1", "deployments"),
 			expectCallSubresource: "scale",
+			matchResult:           true,
+		},
+		{
+			name: "wildcard rule, match conditions also match",
+			webhook: &v1.ValidatingWebhook{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+				}},
+				MatchConditions: []v1.MatchCondition{
+					{
+						Name:       "test1",
+						Expression: "test expression",
+					},
+				},
+			},
+			attrs:                 admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:            true,
+			expectCallKind:        gvk("apps", "v1", "Deployment"),
+			expectCallResource:    gvr("apps", "v1", "deployments"),
+			expectCallSubresource: "",
+			matchResult:           true,
+		},
+		{
+			name: "wildcard rule, match conditions do not match",
+			webhook: &v1.ValidatingWebhook{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+				}},
+				MatchConditions: []v1.MatchCondition{
+					{
+						Name:       "test1",
+						Expression: "test expression",
+					},
+				},
+			},
+			attrs:       admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:  false,
+			matchResult: false,
+		},
+		{
+			name: "wildcard rule, match conditions error",
+			webhook: &v1.ValidatingWebhook{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+				}},
+				MatchConditions: []v1.MatchCondition{
+					{
+						Name:       "test1",
+						Expression: "test expression",
+					},
+				},
+			},
+			attrs:                 admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:            false,
+			expectErr:             "deployments.apps \"name\" is forbidden: test error",
+			expectCallKind:        gvk("apps", "v1", "Deployment"),
+			expectCallResource:    gvr("apps", "v1", "deployments"),
+			expectCallSubresource: "",
+			matchError:            errors.New("test error"),
 		},
 	}
 
 	for i, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			invocation, err := a.ShouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), fmt.Sprintf("webhook-cfg-%d", i), testcase.webhook), testcase.attrs, interfaces)
+			fakeWebhook := &fakeWebhookAccessor{
+				WebhookAccessor: webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), fmt.Sprintf("webhook-cfg-%d", i), testcase.webhook),
+				matchResult:     testcase.matchResult,
+				throwError:      testcase.matchError,
+			}
+
+			invocation, err := a.ShouldCallHook(context.TODO(), fakeWebhook, testcase.attrs, interfaces, &fakeVersionedAttributeAccessor{})
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
@@ -353,7 +493,7 @@ func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
 	if ok {
 		return ns, nil
 	}
-	return nil, errors.NewNotFound(corev1.Resource("namespaces"), name)
+	return nil, k8serrors.NewNotFound(corev1.Resource("namespaces"), name)
 }
 
 func BenchmarkShouldCallHookWithComplexSelector(b *testing.B) {
@@ -415,13 +555,16 @@ func BenchmarkShouldCallHookWithComplexSelector(b *testing.B) {
 		},
 	}
 
-	wbAccessor := webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb)
+	wbAccessor := &fakeWebhookAccessor{
+		WebhookAccessor: webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb),
+		matchResult:     true,
+	}
 	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	a := &Webhook{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		a.ShouldCallHook(wbAccessor, attrs, interfaces)
+		a.ShouldCallHook(context.TODO(), wbAccessor, attrs, interfaces, nil)
 	}
 }
 
@@ -483,13 +626,16 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 		wb.Rules = append(wb.Rules, rule)
 	}
 
-	wbAccessor := webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb)
+	wbAccessor := &fakeWebhookAccessor{
+		WebhookAccessor: webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb),
+		matchResult:     true,
+	}
 	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	a := &Webhook{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		a.ShouldCallHook(wbAccessor, attrs, interfaces)
+		a.ShouldCallHook(context.TODO(), wbAccessor, attrs, interfaces, &fakeVersionedAttributeAccessor{})
 	}
 }
 
@@ -556,12 +702,15 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 		wb.Rules = append(wb.Rules, rule)
 	}
 
-	wbAccessor := webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb)
+	wbAccessor := &fakeWebhookAccessor{
+		WebhookAccessor: webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb),
+		matchResult:     true,
+	}
 	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	a := &Webhook{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		a.ShouldCallHook(wbAccessor, attrs, interfaces)
+		a.ShouldCallHook(context.TODO(), wbAccessor, attrs, interfaces, nil)
 	}
 }

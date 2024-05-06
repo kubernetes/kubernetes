@@ -17,12 +17,19 @@ limitations under the License.
 package openapi
 
 import (
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/yaml"
 )
+
+// OpenAPIResourcesGetter represents a function to return
+// OpenAPI V2 resource specifications. Used for lazy-loading
+// these resource specifications.
+type OpenAPIResourcesGetter interface {
+	OpenAPISchema() (Resources, error)
+}
 
 // Resources interface describe a resources provider, that can give you
 // resource based on group-version-kind.

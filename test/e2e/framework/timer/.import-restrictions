@@ -1,9 +1,12 @@
 # This E2E framework sub-package is currently allowed to use arbitrary
-# dependencies, therefore we need to override the restrictions from
-# the parent .import-restrictions file.
+# dependencies except of k/k/pkg, therefore we need to override the
+# restrictions from the parent .import-restrictions file.
 #
 # At some point it may become useful to also check this package's
 # dependencies more careful.
 rules:
+  - selectorRegexp: "^k8s[.]io/kubernetes/pkg"
+    allowedPrefixes: []
+
   - selectorRegexp: ""
     allowedPrefixes: [ "" ]

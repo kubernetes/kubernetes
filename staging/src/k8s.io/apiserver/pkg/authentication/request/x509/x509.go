@@ -148,6 +148,33 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		}
 	}
 
+	/*
+			kubernetes mutual (2-way) x509 between client and apiserver:
+
+				1. apiserver sending its apiserver certificate along with its publickey to client
+				2. client verifies the apiserver certificate sent against its cluster certificate authority data
+				3. client sending its client certificate along with its public key to the apiserver
+				>4. apiserver verifies the client certificate sent against its cluster certificate authority data
+
+		    	description:
+					here, with this function,
+					client certificate and pub key sent during the handshake process
+					are verified by apiserver against its cluster certificate authority data
+
+				normal args related to this stage:
+					--client-ca-file string   If set, any request presenting a client certificate signed by
+						one of the authorities in the client-ca-file is authenticated with an identity
+						corresponding to the CommonName of the client certificate.
+
+					(retrievable from "kube-apiserver --help" command)
+					(suggested by @deads2k)
+
+				see also:
+					- for the step 1, see: staging/src/k8s.io/apiserver/pkg/server/options/serving.go
+					- for the step 2, see: staging/src/k8s.io/client-go/transport/transport.go
+					- for the step 3, see: staging/src/k8s.io/client-go/transport/transport.go
+	*/
+
 	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
 	clientCertificateExpirationHistogram.WithContext(req.Context()).Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)

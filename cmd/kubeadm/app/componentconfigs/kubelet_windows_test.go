@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 /*
 Copyright 2021 The Kubernetes Authors.
 
@@ -22,7 +25,7 @@ import (
 	"testing"
 
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestMutatePaths(t *testing.T) {
@@ -46,7 +49,7 @@ func TestMutatePaths(t *testing.T) {
 				},
 			},
 			expected: &kubeletconfig.KubeletConfiguration{
-				ResolverConfig: utilpointer.String(""),
+				ResolverConfig: ptr.To(""),
 				StaticPodPath:  filepath.Join(drive, "/foo/staticpods"),
 				Authentication: kubeletconfig.KubeletAuthentication{
 					X509: kubeletconfig.KubeletX509Authentication{
@@ -67,7 +70,7 @@ func TestMutatePaths(t *testing.T) {
 				},
 			},
 			expected: &kubeletconfig.KubeletConfiguration{
-				ResolverConfig: utilpointer.String(""),
+				ResolverConfig: ptr.To(""),
 				StaticPodPath:  "./foo/staticpods",
 				Authentication: kubeletconfig.KubeletAuthentication{
 					X509: kubeletconfig.KubeletX509Authentication{

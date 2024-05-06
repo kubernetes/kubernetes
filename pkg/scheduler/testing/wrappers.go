@@ -18,15 +18,16 @@ package testing
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var zero int64
@@ -255,7 +256,7 @@ func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *P
 			APIVersion: gvk.GroupVersion().String(),
 			Kind:       gvk.Kind,
 			Name:       name,
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	}
 	return p
@@ -413,6 +414,12 @@ func (p *PodWrapper) PVC(name string) *PodWrapper {
 // Volume creates volume and injects into the inner pod.
 func (p *PodWrapper) Volume(volume v1.Volume) *PodWrapper {
 	p.Spec.Volumes = append(p.Spec.Volumes, volume)
+	return p
+}
+
+// Volumes set the volumes and inject into the inner pod.
+func (p *PodWrapper) Volumes(volumes []v1.Volume) *PodWrapper {
+	p.Spec.Volumes = volumes
 	return p
 }
 
@@ -723,6 +730,15 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 	return n
 }
 
+// Annotation applies a {k,v} annotation pair to the inner node.
+func (n *NodeWrapper) Annotation(k, v string) *NodeWrapper {
+	if n.Annotations == nil {
+		n.Annotations = make(map[string]string)
+	}
+	metav1.SetMetaDataAnnotation(&n.ObjectMeta, k, v)
+	return n
+}
+
 // Capacity sets the capacity and the allocatable resources of the inner node.
 // Each entry in `resources` corresponds to a resource name and its quantity.
 // By default, the capacity and allocatable number of pods are set to 32.
@@ -751,6 +767,27 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 // Taints applies taints to the inner node.
 func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
 	n.Spec.Taints = taints
+	return n
+}
+
+// Unschedulable applies the unschedulable field.
+func (n *NodeWrapper) Unschedulable(unschedulable bool) *NodeWrapper {
+	n.Spec.Unschedulable = unschedulable
+	return n
+}
+
+// Condition applies the node condition.
+func (n *NodeWrapper) Condition(typ v1.NodeConditionType, status v1.ConditionStatus, message, reason string) *NodeWrapper {
+	n.Status.Conditions = []v1.NodeCondition{
+		{
+			Type:               typ,
+			Status:             status,
+			Message:            message,
+			Reason:             reason,
+			LastHeartbeatTime:  metav1.Time{Time: time.Now()},
+			LastTransitionTime: metav1.Time{Time: time.Now()},
+		},
+	}
 	return n
 }
 
@@ -801,7 +838,7 @@ func (p *PersistentVolumeClaimWrapper) AccessModes(accessModes []v1.PersistentVo
 
 // Resources sets `resources` as the resource requirements of the inner
 // PersistentVolumeClaim.
-func (p *PersistentVolumeClaimWrapper) Resources(resources v1.ResourceRequirements) *PersistentVolumeClaimWrapper {
+func (p *PersistentVolumeClaimWrapper) Resources(resources v1.VolumeResourceRequirements) *PersistentVolumeClaimWrapper {
 	p.PersistentVolumeClaim.Spec.Resources = resources
 	return p
 }
@@ -845,21 +882,35 @@ func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSou
 	return p
 }
 
+// NodeAffinityIn creates a HARD node affinity (with the operator In)
+// and injects into the pv.
+func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *PersistentVolumeWrapper {
+	if p.Spec.NodeAffinity == nil {
+		p.Spec.NodeAffinity = &v1.VolumeNodeAffinity{}
+	}
+	if p.Spec.NodeAffinity.Required == nil {
+		p.Spec.NodeAffinity.Required = &v1.NodeSelector{}
+	}
+	nodeSelector := MakeNodeSelector().In(key, vals).Obj()
+	p.Spec.NodeAffinity.Required.NodeSelectorTerms = append(p.Spec.NodeAffinity.Required.NodeSelectorTerms, nodeSelector.NodeSelectorTerms...)
+	return p
+}
+
 // ResourceClaimWrapper wraps a ResourceClaim inside.
-type ResourceClaimWrapper struct{ resourcev1alpha1.ResourceClaim }
+type ResourceClaimWrapper struct{ resourcev1alpha2.ResourceClaim }
 
 // MakeResourceClaim creates a ResourceClaim wrapper.
 func MakeResourceClaim() *ResourceClaimWrapper {
-	return &ResourceClaimWrapper{resourcev1alpha1.ResourceClaim{}}
+	return &ResourceClaimWrapper{resourcev1alpha2.ResourceClaim{}}
 }
 
 // FromResourceClaim creates a ResourceClaim wrapper from some existing object.
-func FromResourceClaim(other *resourcev1alpha1.ResourceClaim) *ResourceClaimWrapper {
+func FromResourceClaim(other *resourcev1alpha2.ResourceClaim) *ResourceClaimWrapper {
 	return &ResourceClaimWrapper{*other.DeepCopy()}
 }
 
 // Obj returns the inner ResourceClaim.
-func (wrapper *ResourceClaimWrapper) Obj() *resourcev1alpha1.ResourceClaim {
+func (wrapper *ResourceClaimWrapper) Obj() *resourcev1alpha2.ResourceClaim {
 	return &wrapper.ResourceClaim
 }
 
@@ -889,15 +940,25 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 			Kind:       gvk.Kind,
 			Name:       name,
 			UID:        types.UID(uid),
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	}
 	return wrapper
 }
 
 // AllocationMode sets the allocation mode of the inner object.
-func (wrapper *ResourceClaimWrapper) AllocationMode(a resourcev1alpha1.AllocationMode) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) AllocationMode(a resourcev1alpha2.AllocationMode) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Spec.AllocationMode = a
+	return wrapper
+}
+
+// ParametersRef sets a reference to a ResourceClaimParameters.resource.k8s.io.
+func (wrapper *ResourceClaimWrapper) ParametersRef(name string) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Spec.ParametersRef = &resourcev1alpha2.ResourceClaimParametersReference{
+		Name:     name,
+		Kind:     "ResourceClaimParameters",
+		APIGroup: "resource.k8s.io",
+	}
 	return wrapper
 }
 
@@ -908,8 +969,57 @@ func (wrapper *ResourceClaimWrapper) ResourceClassName(name string) *ResourceCla
 }
 
 // Allocation sets the allocation of the inner object.
-func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourcev1alpha1.AllocationResult) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) Allocation(driverName string, allocation *resourcev1alpha2.AllocationResult) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Status.DriverName = driverName
 	wrapper.ResourceClaim.Status.Allocation = allocation
+	return wrapper
+}
+
+// Structured turns a "normal" claim into one which was allocated via structured parameters.
+// This modifies the allocation result and adds the reserved finalizer if the claim
+// is allocated. The claim has to become local to a node. The assumption is that
+// "named resources" are used.
+func (wrapper *ResourceClaimWrapper) Structured(nodeName string, namedResourcesInstances ...string) *ResourceClaimWrapper {
+	if wrapper.ResourceClaim.Status.Allocation != nil {
+		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourcev1alpha2.Finalizer)
+		for i, resourceHandle := range wrapper.ResourceClaim.Status.Allocation.ResourceHandles {
+			resourceHandle.Data = ""
+			resourceHandle.StructuredData = &resourcev1alpha2.StructuredResourceHandle{
+				NodeName: nodeName,
+			}
+			wrapper.ResourceClaim.Status.Allocation.ResourceHandles[i] = resourceHandle
+		}
+		if len(wrapper.ResourceClaim.Status.Allocation.ResourceHandles) == 0 {
+			wrapper.ResourceClaim.Status.Allocation.ResourceHandles = []resourcev1alpha2.ResourceHandle{{
+				DriverName: wrapper.ResourceClaim.Status.DriverName,
+				StructuredData: &resourcev1alpha2.StructuredResourceHandle{
+					NodeName: nodeName,
+				},
+			}}
+		}
+		for _, resourceHandle := range wrapper.ResourceClaim.Status.Allocation.ResourceHandles {
+			for _, name := range namedResourcesInstances {
+				result := resourcev1alpha2.DriverAllocationResult{
+					AllocationResultModel: resourcev1alpha2.AllocationResultModel{
+						NamedResources: &resourcev1alpha2.NamedResourcesAllocationResult{
+							Name: name,
+						},
+					},
+				}
+				resourceHandle.StructuredData.Results = append(resourceHandle.StructuredData.Results, result)
+			}
+		}
+		wrapper.ResourceClaim.Status.Allocation.Shareable = true
+		wrapper.ResourceClaim.Status.Allocation.AvailableOnNodes = &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchExpressions: []v1.NodeSelectorRequirement{{
+					Key:      "kubernetes.io/hostname",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{nodeName},
+				}},
+			}},
+		}
+	}
 	return wrapper
 }
 
@@ -920,27 +1030,34 @@ func (wrapper *ResourceClaimWrapper) DeallocationRequested(deallocationRequested
 }
 
 // ReservedFor sets that field of the inner object.
-func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourcev1alpha1.ResourceClaimConsumerReference) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourcev1alpha2.ResourceClaimConsumerReference) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Status.ReservedFor = consumers
 	return wrapper
 }
 
-// PodSchedulingWrapper wraps a PodScheduling inside.
-type PodSchedulingWrapper struct{ resourcev1alpha1.PodScheduling }
-
-// MakePodScheduling creates a PodScheduling wrapper.
-func MakePodScheduling() *PodSchedulingWrapper {
-	return &PodSchedulingWrapper{resourcev1alpha1.PodScheduling{}}
+// ReservedFor sets that field of the inner object given information about one pod.
+func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types.UID) *ResourceClaimWrapper {
+	return wrapper.ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
 }
 
-// FromPodScheduling creates a PodScheduling wrapper from some existing object.
-func FromPodScheduling(other *resourcev1alpha1.PodScheduling) *PodSchedulingWrapper {
+// PodSchedulingWrapper wraps a PodSchedulingContext inside.
+type PodSchedulingWrapper struct {
+	resourcev1alpha2.PodSchedulingContext
+}
+
+// MakePodSchedulingContexts creates a PodSchedulingContext wrapper.
+func MakePodSchedulingContexts() *PodSchedulingWrapper {
+	return &PodSchedulingWrapper{resourcev1alpha2.PodSchedulingContext{}}
+}
+
+// FromPodSchedulingContexts creates a PodSchedulingContext wrapper from an existing object.
+func FromPodSchedulingContexts(other *resourcev1alpha2.PodSchedulingContext) *PodSchedulingWrapper {
 	return &PodSchedulingWrapper{*other.DeepCopy()}
 }
 
 // Obj returns the inner object.
-func (wrapper *PodSchedulingWrapper) Obj() *resourcev1alpha1.PodScheduling {
-	return &wrapper.PodScheduling
+func (wrapper *PodSchedulingWrapper) Obj() *resourcev1alpha2.PodSchedulingContext {
+	return &wrapper.PodSchedulingContext
 }
 
 // Name sets `s` as the name of the inner object.
@@ -965,11 +1082,12 @@ func (wrapper *PodSchedulingWrapper) Namespace(s string) *PodSchedulingWrapper {
 func (wrapper *PodSchedulingWrapper) OwnerReference(name, uid string, gvk schema.GroupVersionKind) *PodSchedulingWrapper {
 	wrapper.OwnerReferences = []metav1.OwnerReference{
 		{
-			APIVersion: gvk.GroupVersion().String(),
-			Kind:       gvk.Kind,
-			Name:       name,
-			UID:        types.UID(uid),
-			Controller: pointer.Bool(true),
+			APIVersion:         gvk.GroupVersion().String(),
+			Kind:               gvk.Kind,
+			Name:               name,
+			UID:                types.UID(uid),
+			Controller:         ptr.To(true),
+			BlockOwnerDeletion: ptr.To(true),
 		},
 	}
 	return wrapper
@@ -997,7 +1115,135 @@ func (wrapper *PodSchedulingWrapper) PotentialNodes(nodes ...string) *PodSchedul
 }
 
 // ResourceClaims sets that field of the inner object.
-func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourcev1alpha1.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
+func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourcev1alpha2.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
 	wrapper.Status.ResourceClaims = statuses
+	return wrapper
+}
+
+type ResourceSliceWrapper struct {
+	resourcev1alpha2.ResourceSlice
+}
+
+func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = nodeName + "-" + driverName
+	wrapper.NodeName = nodeName
+	wrapper.DriverName = driverName
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) Obj() *resourcev1alpha2.ResourceSlice {
+	return &wrapper.ResourceSlice
+}
+
+func (wrapper *ResourceSliceWrapper) NamedResourcesInstances(names ...string) *ResourceSliceWrapper {
+	wrapper.ResourceModel = resourcev1alpha2.ResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{}}
+	for _, name := range names {
+		wrapper.ResourceModel.NamedResources.Instances = append(wrapper.ResourceModel.NamedResources.Instances,
+			resourcev1alpha2.NamedResourcesInstance{Name: name},
+		)
+	}
+	return wrapper
+}
+
+type ClaimParametersWrapper struct {
+	resourcev1alpha2.ResourceClaimParameters
+}
+
+func MakeClaimParameters() *ClaimParametersWrapper {
+	return &ClaimParametersWrapper{}
+}
+
+func (wrapper *ClaimParametersWrapper) Obj() *resourcev1alpha2.ResourceClaimParameters {
+	return &wrapper.ResourceClaimParameters
+}
+
+func (wrapper *ClaimParametersWrapper) Name(s string) *ClaimParametersWrapper {
+	wrapper.SetName(s)
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) UID(s string) *ClaimParametersWrapper {
+	wrapper.SetUID(types.UID(s))
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) Namespace(s string) *ClaimParametersWrapper {
+	wrapper.SetNamespace(s)
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) Shareable(value bool) *ClaimParametersWrapper {
+	wrapper.ResourceClaimParameters.Shareable = value
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) GeneratedFrom(value *resourcev1alpha2.ResourceClaimParametersReference) *ClaimParametersWrapper {
+	wrapper.ResourceClaimParameters.GeneratedFrom = value
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) NamedResourcesRequests(driverName string, selectors ...string) *ClaimParametersWrapper {
+	requests := resourcev1alpha2.DriverRequests{
+		DriverName: driverName,
+	}
+	for _, selector := range selectors {
+		request := resourcev1alpha2.ResourceRequest{
+			ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
+				NamedResources: &resourcev1alpha2.NamedResourcesRequest{
+					Selector: selector,
+				},
+			},
+		}
+		requests.Requests = append(requests.Requests, request)
+	}
+	wrapper.DriverRequests = append(wrapper.DriverRequests, requests)
+	return wrapper
+}
+
+type ClassParametersWrapper struct {
+	resourcev1alpha2.ResourceClassParameters
+}
+
+func MakeClassParameters() *ClassParametersWrapper {
+	return &ClassParametersWrapper{}
+}
+
+func (wrapper *ClassParametersWrapper) Obj() *resourcev1alpha2.ResourceClassParameters {
+	return &wrapper.ResourceClassParameters
+}
+
+func (wrapper *ClassParametersWrapper) Name(s string) *ClassParametersWrapper {
+	wrapper.SetName(s)
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) UID(s string) *ClassParametersWrapper {
+	wrapper.SetUID(types.UID(s))
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) Namespace(s string) *ClassParametersWrapper {
+	wrapper.SetNamespace(s)
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) GeneratedFrom(value *resourcev1alpha2.ResourceClassParametersReference) *ClassParametersWrapper {
+	wrapper.ResourceClassParameters.GeneratedFrom = value
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) NamedResourcesFilters(driverName string, selectors ...string) *ClassParametersWrapper {
+	for _, selector := range selectors {
+		filter := resourcev1alpha2.ResourceFilter{
+			DriverName: driverName,
+			ResourceFilterModel: resourcev1alpha2.ResourceFilterModel{
+				NamedResources: &resourcev1alpha2.NamedResourcesFilter{
+					Selector: selector,
+				},
+			},
+		}
+		wrapper.Filters = append(wrapper.Filters, filter)
+	}
 	return wrapper
 }

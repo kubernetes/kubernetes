@@ -1,3 +1,25 @@
+- testname: Priority and Fairness FlowSchema API
+  codename: '[sig-api-machinery] API priority and fairness should support FlowSchema
+    API operations [Conformance]'
+  description: ' The flowcontrol.apiserver.k8s.io API group MUST exist in the /apis
+    discovery document. The flowcontrol.apiserver.k8s.io/v1 API group/version MUST
+    exist in the /apis/flowcontrol.apiserver.k8s.io discovery document. The flowschemas
+    and flowschemas/status resources MUST exist in the /apis/flowcontrol.apiserver.k8s.io/v1
+    discovery document. The flowschema resource must support create, get, list, watch,
+    update, patch, delete, and deletecollection.'
+  release: v1.29
+  file: test/e2e/apimachinery/flowcontrol.go
+- testname: Priority and Fairness PriorityLevelConfiguration API
+  codename: '[sig-api-machinery] API priority and fairness should support PriorityLevelConfiguration
+    API operations [Conformance]'
+  description: ' The flowcontrol.apiserver.k8s.io API group MUST exist in the /apis
+    discovery document. The flowcontrol.apiserver.k8s.io/v1 API group/version MUST
+    exist in the /apis/flowcontrol.apiserver.k8s.io discovery document. The prioritylevelconfiguration
+    and prioritylevelconfiguration/status resources MUST exist in the /apis/flowcontrol.apiserver.k8s.io/v1
+    discovery document. The prioritylevelconfiguration resource must support create,
+    get, list, watch, update, patch, delete, and deletecollection.'
+  release: v1.29
+  file: test/e2e/apimachinery/flowcontrol.go
 - testname: Admission webhook, list mutating webhooks
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing
     mutating webhooks should work [Conformance]'
@@ -37,6 +59,28 @@
     MUST NOT deny the create. Patch the webhook to apply to the create operation again
     and attempt to create an object; the webhook MUST deny the create.
   release: v1.16
+  file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, create and update mutating webhook configuration
+    with matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    be able to create and update mutating webhook configurations with match conditions
+    [Conformance]'
+  description: Register a mutating webhook configuration. Verify that the match conditions
+    field are properly stored in the api-server.  Update the mutating webhook configuration
+    and retrieve it; the retrieved object must contain the newly update matchConditions
+    fields.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
+- testname: Validating Admission webhook, create and update validating webhook configuration
+    with matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    be able to create and update validating webhook configurations with match conditions
+    [Conformance]'
+  description: Register a validating webhook configuration. Verify that the match
+    conditions field are properly stored in the api-server.  Update the validating
+    webhook configuration and retrieve it; the retrieved object must contain the newly
+    update matchConditions fields.
+  release: v1.28
   file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, deny attach
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
@@ -128,6 +172,16 @@
     present.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, mutating webhook excluding object with specific
+    name
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    mutate everything except ''skip-me'' configmaps [Conformance]'
+  description: Create a mutating webhook configuration with matchConditions field
+    that will reject all resources except ones with a specific name 'skip-me'. Create
+    a configMap with the name 'skip-me' and verify that it's mutated. Create a configMap
+    with a different name than 'skip-me' and verify that it's mustated.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, mutation with defaulting
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     mutate pod and apply defaults after mutation [Conformance]'
@@ -145,6 +199,24 @@
     MUST be allowed and the webhook configuration object MUST NOT be mutated the webhooks.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Mutating Admission webhook, reject mutating webhook configurations with
+    invalid matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    reject mutating webhook configurations with invalid match conditions [Conformance]'
+  description: Creates a mutating webhook configuration with an invalid CEL expression
+    in it's matchConditions field. The api-server server should reject the create
+    request with a "compilation failed" error message.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
+- testname: Validing Admission webhook, reject validating webhook configurations with
+    invalid matchConditions
+  codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
+    reject validating webhook configurations with invalid match conditions [Conformance]'
+  description: Creates a validating webhook configuration with an invalid CEL expression
+    in it's matchConditions field. The api-server server should reject the create
+    request with a "compilation failed" error message.
+  release: v1.28
+  file: test/e2e/apimachinery/webhook.go
 - testname: Admission webhook, fail closed
   codename: '[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should
     unconditionally reject operations on fail closed webhook [Conformance]'
@@ -153,6 +225,35 @@
     all MUST be denied.
   release: v1.16
   file: test/e2e/apimachinery/webhook.go
+- testname: Aggregated Discovery Interface
+  codename: '[sig-api-machinery] AggregatedDiscovery should support aggregated discovery
+    interface [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery client interface.
+    Built-in resources MUST all be present.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Interface CRDs
+  codename: '[sig-api-machinery] AggregatedDiscovery should support aggregated discovery
+    interface for CRDs [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery client interface.
+    Add a CRD to the apiserver. The CRD resource MUST be present in the discovery
+    document.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Endpoint Accept Headers
+  codename: '[sig-api-machinery] AggregatedDiscovery should support raw aggregated
+    discovery endpoint Accept headers [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery endpoint Accept
+    headers. Built-in resources MUST all be present.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
+- testname: Aggregated Discovery Endpoint Accept Headers CRDs
+  codename: '[sig-api-machinery] AggregatedDiscovery should support raw aggregated
+    discovery request for CRDs [Conformance]'
+  description: An apiserver MUST support the Aggregated Discovery endpoint Accept
+    headers. Add a CRD to the apiserver. The CRD MUST appear in the discovery document.
+  release: v1.30
+  file: test/e2e/apimachinery/aggregated_discovery.go
 - testname: aggregator-supports-the-sample-apiserver
   codename: '[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample
     API Server using the current Aggregator [Conformance]'
@@ -186,7 +287,7 @@
 - testname: Custom Resource Definition, create
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     Simple CustomResourceDefinition creating/deleting custom resource definition objects
-    works  [Conformance]'
+    works [Conformance]'
   description: Create a API extension client and define a random custom resource definition.
     Create the custom resource definition and then delete it. The creation and deletion
     MUST be successful.
@@ -195,7 +296,7 @@
 - testname: Custom Resource Definition, status sub-resource
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
     Simple CustomResourceDefinition getting/updating/patching custom resource definition
-    status sub-resource works  [Conformance]'
+    status sub-resource works [Conformance]'
   description: Create a custom resource definition. Attempt to read, update and patch
     its status sub-resource; all mutating sub-resource operations MUST be visible
     to subsequent reads.
@@ -203,7 +304,8 @@
   file: test/e2e/apimachinery/custom_resource_definition.go
 - testname: Custom Resource Definition, list
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
-    Simple CustomResourceDefinition listing custom resource definition objects works  [Conformance]'
+    Simple CustomResourceDefinition listing custom resource definition objects works
+    [Conformance]'
   description: Create a API extension client, define 10 labeled custom resource definitions
     and list them using a label selector; the list result MUST contain only the labeled
     custom resource definitions. Delete the labeled custom resource definitions via
@@ -213,7 +315,7 @@
   file: test/e2e/apimachinery/custom_resource_definition.go
 - testname: Custom Resource Definition, defaulting
   codename: '[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin]
-    custom resource defaulting for requests and from storage works  [Conformance]'
+    custom resource defaulting for requests and from storage works [Conformance]'
   description: Create a custom resource definition without default. Create CR. Add
     default and read CR until the default is applied. Create another CR. Remove default,
     add default for another field and read CR until new field is defaulted, but old
@@ -312,6 +414,14 @@
     definitions MUST be published for custom resource definitions.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
+- testname: Discovery, confirm the groupVerion and a resourcefrom each apiGroup
+  codename: '[sig-api-machinery] Discovery should locate the groupVersion and a resource
+    within each APIGroup [Conformance]'
+  description: A resourceList MUST be found for each apiGroup that is retrieved. For
+    each apiGroup the groupVersion MUST equal the groupVersion as reported by the
+    schema. From each resourceList a valid resource MUST be found.
+  release: v1.28
+  file: test/e2e/apimachinery/discovery.go
 - testname: Discovery, confirm the PreferredVersion for each api group
   codename: '[sig-api-machinery] Discovery should validate PreferredVersion for each
     APIGroup [Conformance]'
@@ -487,8 +597,7 @@
     be found. Patching the hard status values MUST succeed. The reported hard status
     values MUST equal the new spec hard values. Getting the /status MUST succeed and
     the reported hard status values MUST equal the spec hard values. Repatching the
-    hard status values MUST succeed. The spec spec MUST NOT be changed when patching
-    /status.
+    hard status values MUST succeed. The spec MUST NOT be changed when patching /status.
   release: v1.26
   file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, update and delete
@@ -630,6 +739,38 @@
     of 'Terminating' scoped ResourceQuota.
   release: v1.16
   file: test/e2e/apimachinery/resource_quota.go
+- testname: API Chunking, server should return chunks of results for list calls
+  codename: '[sig-api-machinery] Servers with support for API chunking should return
+    chunks of results for list calls [Conformance]'
+  description: Create a large number of PodTemplates. Attempt to retrieve the first
+    chunk with limit set; the server MUST return the chunk of the size not exceeding
+    the limit with RemainingItems set in the response. Attempt to retrieve the remaining
+    items by providing the received continuation token and limit; the server MUST
+    return the remaining items in chunks of the size not exceeding the limit, with
+    appropriately set RemainingItems field in the response and with the ResourceVersion
+    returned in the first response. Attempt to list all objects at once without setting
+    the limit; the server MUST return all items in a single response.
+  release: v1.29
+  file: test/e2e/apimachinery/chunking.go
+- testname: API Chunking, server should support continue listing from the last key
+    even if the original version has been compacted away
+  codename: '[sig-api-machinery] Servers with support for API chunking should support
+    continue listing from the last key if the original version has been compacted
+    away, though the list is inconsistent [Slow] [Conformance]'
+  description: Create a large number of PodTemplates. Attempt to retrieve the first
+    chunk with limit set; the server MUST return the chunk of the size not exceeding
+    the limit with RemainingItems set in the response. Attempt to retrieve the second
+    page until the continuation token expires; the server MUST return a continuation
+    token for inconsistent list continuation. Attempt to retrieve the second page
+    with the received inconsistent list continuation token; the server MUST return
+    the number of items not exceeding the limit, a new continuation token and appropriately
+    set RemainingItems field in the response. Attempt to retrieve the remaining pages
+    by passing the received continuation token; the server MUST return the remaining
+    items in chunks of the size not exceeding the limit, with appropriately set RemainingItems
+    field in the response and with the ResourceVersion returned as part of the inconsistent
+    list.
+  release: v1.29
+  file: test/e2e/apimachinery/chunking.go
 - testname: API metadata HTTP return
   codename: '[sig-api-machinery] Servers with support for Table transformation should
     return a 406 for a backend which does not implement metadata [Conformance]'
@@ -637,6 +778,41 @@
     code of 406.
   release: v1.16
   file: test/e2e/apimachinery/table_conversion.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should allow expressions to refer variables. [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should allow expressions to refer variables.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingAdmissionPolicy API
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should support ValidatingAdmissionPolicy API operations [Conformance]'
+  description: ' The admissionregistration.k8s.io API group MUST exist in the /apis
+    discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
+    exist in the /apis/admissionregistration.k8s.io discovery document. The validatingadmisionpolicy
+    and validatingadmissionpolicy/status resources MUST exist in the /apis/admissionregistration.k8s.io/v1
+    discovery document. The validatingadmisionpolicy resource must support create,
+    get, list, watch, update, patch, delete, and deletecollection.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingadmissionPolicyBinding API
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should support ValidatingAdmissionPolicyBinding API operations [Conformance]'
+  description: ' The admissionregistration.k8s.io API group MUST exist in the /apis
+    discovery document. The admissionregistration.k8s.io/v1 API group/version MUST
+    exist in the /apis/admissionregistration.k8s.io discovery document. The ValidatingadmissionPolicyBinding
+    resources MUST exist in the /apis/admissionregistration.k8s.io/v1 discovery document.
+    The ValidatingadmissionPolicyBinding resource must support create, get, list,
+    watch, update, patch, delete, and deletecollection.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
+- testname: ValidatingAdmissionPolicy
+  codename: '[sig-api-machinery] ValidatingAdmissionPolicy [Privileged:ClusterAdmin]
+    should validate against a Deployment [Conformance]'
+  description: ' The ValidatingAdmissionPolicy should validate a deployment as the
+    expression defined inside the policy.'
+  release: v1.30
+  file: test/e2e/apimachinery/validatingadmissionpolicy.go
 - testname: watch-configmaps-closed-and-restarted
   codename: '[sig-api-machinery] Watchers should be able to restart watching from
     the last resource version observed by the previous watch [Conformance]'
@@ -882,10 +1058,9 @@
 - testname: Jobs, apply changes to status
   codename: '[sig-apps] Job should apply changes to a job status [Conformance]'
   description: Attempt to create a running Job which MUST succeed. Attempt to patch
-    the Job status to include a new start time which MUST succeed. An annotation for
-    the job that was patched MUST be found. Attempt to replace the job status with
-    a new start time which MUST succeed. Attempt to read its status sub-resource which
-    MUST succeed
+    the Job status which MUST succeed. An annotation for the job that was patched
+    MUST be found. Attempt to replace the job status with update which MUST succeed.
+    Attempt to read its status sub-resource which MUST succeed
   release: v1.24
   file: test/e2e/apps/job.go
 - testname: Ensure Pods of an Indexed Job get a unique index.
@@ -954,7 +1129,7 @@
   file: test/e2e/apps/replica_set.go
 - testname: Replica Set, run basic image
   codename: '[sig-apps] ReplicaSet should serve a basic image on each replica with
-    a public image  [Conformance]'
+    a public image [Conformance]'
   description: Create a ReplicaSet with a Pod and a single Container. Make sure that
     the Pod is running. Pod SHOULD send a valid response when queried.
   release: v1.9
@@ -992,7 +1167,7 @@
   file: test/e2e/apps/rc.go
 - testname: Replication Controller, run basic image
   codename: '[sig-apps] ReplicationController should serve a basic image on each replica
-    with a public image  [Conformance]'
+    with a public image [Conformance]'
   description: Replication Controller MUST create a Pod with Basic Image and MUST
     run the service with the provided image. Image MUST be tested by dialing into
     the service listening through TCP, UDP and HTTP.
@@ -1111,7 +1286,8 @@
   release: v1.21
   file: test/e2e/auth/service_accounts.go
 - testname: Service account tokens auto mount optionally
-  codename: '[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance]'
+  codename: '[sig-auth] ServiceAccounts should allow opting out of API token automount
+    [Conformance]'
   description: Ensure that Service Account keys are mounted into the Pod only when
     AutoMountServiceToken is not set to false. We test the following scenarios here.
     1. Create Pod, Pod Spec has AutomountServiceAccountToken set to nil a) Service
@@ -1138,7 +1314,7 @@
   release: v1.21
   file: test/e2e/auth/service_accounts.go
 - testname: Service Account Tokens Must AutoMount
-  codename: '[sig-auth] ServiceAccounts should mount an API token into pods  [Conformance]'
+  codename: '[sig-auth] ServiceAccounts should mount an API token into pods [Conformance]'
   description: Ensure that Service Account keys are mounted into the Container. Pod
     contains three containers each will read Service Account token, root CA and default
     namespace respectively from the default API Token Mount path. All these three
@@ -1182,7 +1358,7 @@
   file: test/e2e/auth/subjectreviews.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
-    a working application  [Conformance]'
+    a working application [Conformance]'
   description: Create Guestbook application that contains an agnhost primary server,
     2 agnhost replicas, frontend application, frontend service and agnhost primary
     service and agnhost replica service. Using frontend service, the test will write
@@ -1193,21 +1369,21 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, check version v1
   codename: '[sig-cli] Kubectl client Kubectl api-versions should check if v1 is in
-    available api versions  [Conformance]'
+    available api versions [Conformance]'
   description: Run kubectl to get api versions, output MUST contain returned versions
     with 'v1' listed.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, cluster info
   codename: '[sig-cli] Kubectl client Kubectl cluster-info should check if Kubernetes
-    control plane services is included in cluster-info  [Conformance]'
+    control plane services is included in cluster-info [Conformance]'
   description: Call kubectl to get cluster-info, output MUST contain cluster-info
     returned and Kubernetes control plane SHOULD be running.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, describe pod or rc
   codename: '[sig-cli] Kubectl client Kubectl describe should check if kubectl describe
-    prints relevant information for rc and pods  [Conformance]'
+    prints relevant information for rc and pods [Conformance]'
   description: Deploy an agnhost controller and an agnhost service. Kubectl describe
     pods SHOULD return the name, namespace, labels, state and other information as
     expected. Kubectl describe on rc, service, node and namespace SHOULD also return
@@ -1223,7 +1399,8 @@
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, create service, replication controller
-  codename: '[sig-cli] Kubectl client Kubectl expose should create services for rc  [Conformance]'
+  codename: '[sig-cli] Kubectl client Kubectl expose should create services for rc
+    [Conformance]'
   description: Create a Pod running agnhost listening to port 6379. Using kubectl
     expose the agnhost primary replication controllers at port 1234. Validate that
     the replication controller is listening on port 1234 and the target port is set
@@ -1233,7 +1410,8 @@
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, label update
-  codename: '[sig-cli] Kubectl client Kubectl label should update the label on a resource  [Conformance]'
+  codename: '[sig-cli] Kubectl client Kubectl label should update the label on a resource
+    [Conformance]'
   description: When a Pod is running, update a Label using 'kubectl label' command.
     The label MUST be created in the Pod. A 'kubectl get pod' with -l option on the
     container MUST verify that the label can be read back. Use 'kubectl label label-'
@@ -1243,7 +1421,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, patch to annotate
   codename: '[sig-cli] Kubectl client Kubectl patch should add annotations for pods
-    in rc  [Conformance]'
+    in rc [Conformance]'
   description: Start running agnhost and a replication controller. When the pod is
     running, using 'kubectl patch' command add annotations. The annotation MUST be
     added to running pods and SHOULD be able to read added annotations from each of
@@ -1252,7 +1430,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, replace
   codename: '[sig-cli] Kubectl client Kubectl replace should update a single-container
-    pod''s image  [Conformance]'
+    pod''s image [Conformance]'
   description: Command 'kubectl replace' on a existing Pod with a new spec MUST update
     the image of the container running in the Pod. A -f option to 'kubectl replace'
     SHOULD force to re-create the resource. The new Pod SHOULD have the container
@@ -1261,7 +1439,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, run pod
   codename: '[sig-cli] Kubectl client Kubectl run pod should create a pod from an
-    image when restart is Never  [Conformance]'
+    image when restart is Never [Conformance]'
   description: Command 'kubectl run' MUST create a pod, when a image name is specified
     in the run command. After the run command there SHOULD be a pod that should exist
     with one container running the specified image.
@@ -1278,13 +1456,14 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, version
   codename: '[sig-cli] Kubectl client Kubectl version should check is all data is
-    printed  [Conformance]'
+    printed [Conformance]'
   description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit,
     etc of the Client and the Server that the kubectl is configured to connect to.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, proxy socket
-  codename: '[sig-cli] Kubectl client Proxy server should support --unix-socket=/path  [Conformance]'
+  codename: '[sig-cli] Kubectl client Proxy server should support --unix-socket=/path
+    [Conformance]'
   description: Start a proxy server on by running 'kubectl proxy' with --unix-socket=<some
     path>. Call the proxy server by requesting api versions from  http://locahost:0/api.
     The proxy server MUST provide at least one version string
@@ -1292,7 +1471,7 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, proxy port zero
   codename: '[sig-cli] Kubectl client Proxy server should support proxy with --port
-    0  [Conformance]'
+    0 [Conformance]'
   description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0.
     Call the proxy server by requesting api versions from unix socket. The proxy server
     MUST provide at least one version string.
@@ -1300,14 +1479,15 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, replication controller
   codename: '[sig-cli] Kubectl client Update Demo should create and stop a replication
-    controller  [Conformance]'
+    controller [Conformance]'
   description: Create a Pod and a container with a given image. Configure replication
     controller to run 2 replicas. The number of running instances of the Pod MUST
     equal the number of replicas set on the replication controller which is 2.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, scale replication controller
-  codename: '[sig-cli] Kubectl client Update Demo should scale a replication controller  [Conformance]'
+  codename: '[sig-cli] Kubectl client Update Demo should scale a replication controller
+    [Conformance]'
   description: Create a Pod and a container with a given image. Configure replication
     controller to run 2 replicas. The number of running instances of the Pod MUST
     equal the number of replicas set on the replication controller which is 2. Update
@@ -1316,7 +1496,8 @@
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, logs
-  codename: '[sig-cli] Kubectl logs logs should be able to retrieve and filter logs  [Conformance]'
+  codename: '[sig-cli] Kubectl logs logs should be able to retrieve and filter logs
+    [Conformance]'
   description: When a Pod is running then it MUST generate logs. Starting a Pod should
     have a expected log line. Also log command options MUST work as expected and described
     below. 'kubectl logs -tail=1' should generate a output of one line, the last line
@@ -1390,7 +1571,7 @@
   release: v1.15
   file: test/e2e/network/dns.go
 - testname: DNS, services
-  codename: '[sig-network] DNS should provide DNS for services  [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for services [Conformance]'
   description: When a headless service is created, the service MUST be able to resolve
     all the required service endpoints. When the service is created, any pod in the
     same namespace must be able to resolve the service by all of the expected DNS
@@ -1398,7 +1579,7 @@
   release: v1.9
   file: test/e2e/network/dns.go
 - testname: DNS, cluster
-  codename: '[sig-network] DNS should provide DNS for the cluster  [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
     entries such as kubernetes.default via DNS.
   release: v1.9
@@ -1490,8 +1671,8 @@
   release: v1.19
   file: test/e2e/network/ingress.go
 - testname: IngressClass API
-  codename: '[sig-network] IngressClass API  should support creating IngressClass
-    API operations [Conformance]'
+  codename: '[sig-network] IngressClass API should support creating IngressClass API
+    operations [Conformance]'
   description: ' - The networking.k8s.io API group MUST exist in the /apis discovery
     document. - The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
     discovery document. - The ingressclasses resource MUST exist in the /apis/networking.k8s.io/v1
@@ -1568,13 +1749,14 @@
   release: v1.21
   file: test/e2e/network/proxy.go
 - testname: Proxy, logs service endpoint
-  codename: '[sig-network] Proxy version v1 should proxy through a service and a pod  [Conformance]'
+  codename: '[sig-network] Proxy version v1 should proxy through a service and a pod
+    [Conformance]'
   description: Select any node in the cluster to invoke  /logs endpoint  using the
     /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
   release: v1.9
   file: test/e2e/network/proxy.go
 - testname: Service endpoint latency, thresholds
-  codename: '[sig-network] Service endpoints latency should not be very high  [Conformance]'
+  codename: '[sig-network] Service endpoints latency should not be very high [Conformance]'
   description: Run 100 iterations of create service with the Pod running the pause
     image, measure the time it takes for creating the service and the endpoint with
     the service name is available. These durations are captured for 100 iterations,
@@ -1722,13 +1904,13 @@
   release: v1.19
   file: test/e2e/network/service.go
 - testname: Kubernetes Service
-  codename: '[sig-network] Services should provide secure master service  [Conformance]'
+  codename: '[sig-network] Services should provide secure master service [Conformance]'
   description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
     service running in the cluster.
   release: v1.9
   file: test/e2e/network/service.go
 - testname: Service, endpoints
-  codename: '[sig-network] Services should serve a basic endpoint from pods  [Conformance]'
+  codename: '[sig-network] Services should serve a basic endpoint from pods [Conformance]'
   description: Create a service with a endpoint without any Pods, the service MUST
     run and show empty endpoints. Add a pod to the service and the service MUST validate
     to show all the endpoints for the ports exposed by the Pod. Add another Pod then
@@ -1738,8 +1920,18 @@
     pods are deleted the endpoints from the service MUST be empty.
   release: v1.9
   file: test/e2e/network/service.go
+- testname: Service, should serve endpoints on same port and different protocols.
+  codename: '[sig-network] Services should serve endpoints on same port and different
+    protocols [Conformance]'
+  description: Create one service with two ports, same port number and different protocol
+    TCP and UDP. It MUST be able to forward traffic to both ports. Update the Service
+    to expose only the TCP port, it MUST succeed to connect to the TCP port and fail
+    to connect to the UDP port. Update the Service to expose only the UDP port, it
+    MUST succeed to connect to the UDP port and fail to connect to the TCP port.
+  release: v1.29
+  file: test/e2e/network/service.go
 - testname: Service, endpoints with multiple ports
-  codename: '[sig-network] Services should serve multiport endpoints from pods  [Conformance]'
+  codename: '[sig-network] Services should serve multiport endpoints from pods [Conformance]'
   description: Create a service with two ports but no Pods are added to the service
     yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first
     port, service MUST list one endpoint for the Pod on that port. Add another Pod
@@ -1942,6 +2134,15 @@
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
+- testname: Ephemeral Container, update ephemeral containers
+  codename: '[sig-node] Ephemeral Containers [NodeConformance] should update the ephemeral
+    containers in an existing pod [Conformance]'
+  description: Adding an ephemeral container to pod.spec MUST result in the container
+    running. There MUST now be only one ephermal container found. Updating the pod
+    with another ephemeral container MUST succeed. There MUST now be two ephermal
+    containers found.
+  release: v1.28
+  file: test/e2e/common/node/ephemeral_containers.go
 - testname: Ephemeral Container Creation
   codename: '[sig-node] Ephemeral Containers [NodeConformance] will start an ephemeral
     container in an existing pod [Conformance]'
@@ -2168,7 +2369,7 @@
   release: v1.13
   file: test/e2e/common/node/pods.go
 - testname: Pods, prestop hook
-  codename: '[sig-node] PreStop should call prestop when killing a pod  [Conformance]'
+  codename: '[sig-node] PreStop should call prestop when killing a pod [Conformance]'
   description: Create a server pod with a rest endpoint '/write' that changes state.Received
     field. Create a Pod with a pre-stop handle that posts to the /write endpoint on
     the server Pod. Verify that the Pod with pre-stop hook is running. Delete the
@@ -2264,16 +2465,6 @@
     count MUST be zero.
   release: v1.9
   file: test/e2e/common/node/container_probe.go
-- testname: RuntimeClass API
-  codename: '[sig-node] RuntimeClass  should support RuntimeClasses API operations
-    [Conformance]'
-  description: ' The node.k8s.io API group MUST exist in the /apis discovery document.
-    The node.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
-    document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
-    document. The runtimeclasses resource must support create, get, list, watch, update,
-    patch, delete, and deletecollection.'
-  release: v1.20
-  file: test/e2e/common/node/runtimeclass.go
 - testname: Pod with the deleted RuntimeClass is rejected.
   codename: '[sig-node] RuntimeClass should reject a Pod requesting a deleted RuntimeClass
     [NodeConformance] [Conformance]'
@@ -2302,6 +2493,16 @@
     test doesn't validate that the Pod will actually start because this functionality
     depends on container runtime and preconfigured handler. Runtime-specific functionality
     is not being tested here.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: RuntimeClass API
+  codename: '[sig-node] RuntimeClass should support RuntimeClasses API operations
+    [Conformance]'
+  description: ' The node.k8s.io API group MUST exist in the /apis discovery document.
+    The node.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
+    document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
+    document. The runtimeclasses resource must support create, get, list, watch, update,
+    patch, delete, and deletecollection.'
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
 - testname: Secrets, pod environment field
@@ -2400,10 +2601,11 @@
   file: test/e2e/common/node/sysctl.go
 - testname: Sysctl, test sysctls
   codename: '[sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls
-    [MinimumKubeletVersion:1.21] [Conformance]'
+    [MinimumKubeletVersion:1.21] [Environment:NotInUserNS] [Conformance]'
   description: 'Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced
     must be set to 1 [LinuxOnly]: This test is marked as LinuxOnly since Windows does
-    not support sysctls'
+    not support sysctls [Environment:NotInUserNS]: The test fails in UserNS (as expected):
+    `open /proc/sys/kernel/shm_rmid_forced: permission denied`'
   release: v1.21
   file: test/e2e/common/node/sysctl.go
 - testname: Environment variables, expansion
@@ -2485,13 +2687,13 @@
   file: test/e2e/scheduling/limit_range.go
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
-    of pods that are allowed to run  [Conformance]'
+    of pods that are allowed to run [Conformance]'
   description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
   release: v1.9
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduler, node selector matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
-    is respected if matching  [Conformance]'
+    is respected if matching [Conformance]'
   description: 'Create a label on the node {k: v}. Then create a Pod with a NodeSelector
     set to {k: v}. Check to see if the Pod is scheduled. When the NodeSelector matches
     then Pod MUST be scheduled on that node.'
@@ -2499,7 +2701,7 @@
   file: test/e2e/scheduling/predicates.go
 - testname: Scheduler, node selector not matching
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector
-    is respected if not matching  [Conformance]'
+    is respected if not matching [Conformance]'
   description: Create a Pod with a NodeSelector set to a value that does not match
     a node in the cluster. Since there are no nodes matching the criteria the Pod
     MUST not be scheduled.
@@ -2548,6 +2750,15 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIDriver, lifecycle
+  codename: '[sig-storage] CSIInlineVolumes should run through the lifecycle of a
+    CSIDriver [Conformance]'
+  description: Creating two CSIDrivers MUST succeed. Patching a CSIDriver MUST succeed
+    with its new label found. Updating a CSIDriver MUST succeed with its new label
+    found. Two CSIDrivers MUST be found when listed. Deleting the first CSIDriver
+    MUST succeed. Deleting the second CSIDriver via deleteCollection MUST succeed.
+  release: v1.28
+  file: test/e2e/storage/csi_inline.go
 - testname: CSIInlineVolumes should support Pods with inline volumes
   codename: '[sig-storage] CSIInlineVolumes should support CSIVolumeSource in Pod
     API [Conformance]'
@@ -2555,15 +2766,8 @@
     patch, and delete operations.
   release: v1.26
   file: test/e2e/storage/csi_inline.go
-- testname: CSIInlineVolumes should support ephemeral CSIDrivers
-  codename: '[sig-storage] CSIInlineVolumes should support ephemeral VolumeLifecycleMode
-    in CSIDriver API [Conformance]'
-  description: CSIDriver resources with ephemeral VolumeLifecycleMode should support
-    create, get, list, and delete operations.
-  release: v1.26
-  file: test/e2e/storage/csi_inline.go
 - testname: CSIStorageCapacity API
-  codename: '[sig-storage] CSIStorageCapacity  should support CSIStorageCapacities
+  codename: '[sig-storage] CSIStorageCapacity should support CSIStorageCapacities
     API operations [Conformance]'
   description: ' The storage.k8s.io API group MUST exist in the /apis discovery document.
     The storage.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
@@ -2939,9 +3143,34 @@
     able to start with Secret and ConfigMap volumes mounted into the container.
   release: v1.13
   file: test/e2e/storage/empty_dir_wrapper.go
+- testname: PersistentVolumes(Claims), apply changes to a pv/pvc status
+  codename: '[sig-storage] PersistentVolumes CSI Conformance should apply changes
+    to a pv/pvc status [Conformance]'
+  description: Creating PV and PVC MUST succeed. Listing PVs with a labelSelector
+    MUST succeed. Listing PVCs in a namespace MUST succeed. Reading PVC status MUST
+    succeed with a valid phase found. Reading PV status MUST succeed with a valid
+    phase found. Patching the PVC status MUST succeed with its new condition found.
+    Patching the PV status MUST succeed with the new reason/message found. Updating
+    the PVC status MUST succeed with its new condition found. Updating the PV status
+    MUST succeed with the new reason/message found.
+  release: v1.29
+  file: test/e2e/storage/persistent_volumes.go
+- testname: PersistentVolumes(Claims), lifecycle
+  codename: '[sig-storage] PersistentVolumes CSI Conformance should run through the
+    lifecycle of a PV and a PVC [Conformance]'
+  description: Creating PV and PVC MUST succeed. Listing PVs with a labelSelector
+    MUST succeed. Listing PVCs in a namespace MUST succeed. Patching a PV MUST succeed
+    with its new label found. Patching a PVC MUST succeed with its new label found.
+    Reading a PV and PVC MUST succeed with required UID retrieved. Deleting a PVC
+    and PV MUST succeed and it MUST be confirmed. Replacement PV and PVC MUST be created.
+    Updating a PV MUST succeed with its new label found. Updating a PVC MUST succeed
+    with its new label found. Deleting the PVC and PV via deleteCollection MUST succeed
+    and it MUST be confirmed.
+  release: v1.29
+  file: test/e2e/storage/persistent_volumes.go
 - testname: Projected Volume, multiple projections
   codename: '[sig-storage] Projected combined should project all components that make
-    up the projection API [Projection][NodeConformance] [Conformance]'
+    up the projection API [Projection] [NodeConformance] [Conformance]'
   description: A Pod is created with a projected volume source for secrets, configMap
     and downwardAPI with pod name, cpu and memory limits and cpu and memory requests.
     Pod MUST be able to read the secrets, configMap values and the cpu and memory
@@ -3292,6 +3521,16 @@
     to delete the secret, the deletion must succeed.
   release: v1.21
   file: test/e2e/common/storage/secrets_volume.go
+- testname: StorageClass, lifecycle
+  codename: '[sig-storage] StorageClasses CSI Conformance should run through the lifecycle
+    of a StorageClass [Conformance]'
+  description: Creating a StorageClass MUST succeed. Reading the StorageClass MUST
+    succeed. Patching the StorageClass MUST succeed with its new label found. Deleting
+    the StorageClass MUST succeed and it MUST be confirmed. Replacement StorageClass
+    MUST be created. Updating the StorageClass MUST succeed with its new label found.
+    Deleting the StorageClass via deleteCollection MUST succeed and it MUST be confirmed.
+  release: v1.29
+  file: test/e2e/storage/storageclass.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
     configmap pod [Conformance]'
@@ -3328,4 +3567,18 @@
     was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
+- testname: VolumeAttachment, lifecycle
+  codename: '[sig-storage] VolumeAttachment Conformance should run through the lifecycle
+    of a VolumeAttachment [Conformance]'
+  description: Creating an initial VolumeAttachment MUST succeed. Reading the VolumeAttachment
+    MUST succeed with with required name retrieved. Patching a VolumeAttachment MUST
+    succeed with its new label found. Listing VolumeAttachment with a labelSelector
+    MUST succeed with a single item retrieved. Deleting a VolumeAttachment MUST succeed
+    and it MUST be confirmed. Creating a second VolumeAttachment MUST succeed. Updating
+    the second VolumentAttachment with a new label MUST succeed with its new label
+    found. Creating a third VolumeAttachment MUST succeed. Updating the third VolumentAttachment
+    with a new label MUST succeed with its new label found. Deleting both VolumeAttachments
+    via deleteCollection MUST succeed and it MUST be confirmed.
+  release: v1.30
+  file: test/e2e/storage/volume_attachment.go
 

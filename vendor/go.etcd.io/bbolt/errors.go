@@ -16,6 +16,9 @@ var (
 	// This typically occurs when a file is not a bolt database.
 	ErrInvalid = errors.New("invalid database")
 
+	// ErrInvalidMapping is returned when the database file fails to get mapped.
+	ErrInvalidMapping = errors.New("database isn't correctly mapped")
+
 	// ErrVersionMismatch is returned when the data file was created with a
 	// different version of Bolt.
 	ErrVersionMismatch = errors.New("version mismatch")
@@ -41,6 +44,10 @@ var (
 	// ErrDatabaseReadOnly is returned when a mutating transaction is started on a
 	// read-only database.
 	ErrDatabaseReadOnly = errors.New("database is in read-only mode")
+
+	// ErrFreePagesNotLoaded is returned when a readonly transaction without
+	// preloading the free pages is trying to access the free pages.
+	ErrFreePagesNotLoaded = errors.New("free pages are not pre-loaded")
 )
 
 // These errors can occur when putting or deleting a value or a bucket.

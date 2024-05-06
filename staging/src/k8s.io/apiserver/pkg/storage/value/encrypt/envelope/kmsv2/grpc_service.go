@@ -29,7 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/klog/v2"
-	kmsapi "k8s.io/kms/apis/v2alpha1"
+	kmsapi "k8s.io/kms/apis/v2"
 	kmsservice "k8s.io/kms/pkg/service"
 	"k8s.io/kms/pkg/util"
 )
@@ -144,9 +144,9 @@ func (g *gRPCService) Status(ctx context.Context) (*kmsservice.StatusResponse, e
 
 func recordMetricsInterceptor(providerName string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		start := time.Now()
+		start := NowFunc()
 		respErr := invoker(ctx, method, req, reply, cc, opts...)
-		elapsed := time.Since(start)
+		elapsed := NowFunc().Sub(start)
 		metrics.RecordKMSOperationLatency(providerName, method, elapsed, respErr)
 		return respErr
 	}

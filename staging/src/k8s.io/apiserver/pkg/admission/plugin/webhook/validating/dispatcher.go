@@ -18,6 +18,7 @@ package validating
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -62,30 +63,51 @@ func newValidatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) gene
 	}
 }
 
+var _ generic.VersionedAttributeAccessor = &versionedAttributeAccessor{}
+
+type versionedAttributeAccessor struct {
+	versionedAttrs   map[schema.GroupVersionKind]*admission.VersionedAttributes
+	attr             admission.Attributes
+	objectInterfaces admission.ObjectInterfaces
+}
+
+func (v *versionedAttributeAccessor) VersionedAttribute(gvk schema.GroupVersionKind) (*admission.VersionedAttributes, error) {
+	if val, ok := v.versionedAttrs[gvk]; ok {
+		return val, nil
+	}
+	versionedAttr, err := admission.NewVersionedAttributes(v.attr, gvk, v.objectInterfaces)
+	if err != nil {
+		return nil, err
+	}
+	v.versionedAttrs[gvk] = versionedAttr
+	return versionedAttr, nil
+}
+
 var _ generic.Dispatcher = &validatingDispatcher{}
 
 func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
 	var relevantHooks []*generic.WebhookInvocation
 	// Construct all the versions we need to call our webhooks
-	versionedAttrs := map[schema.GroupVersionKind]*admission.VersionedAttributes{}
+	versionedAttrAccessor := &versionedAttributeAccessor{
+		versionedAttrs:   map[schema.GroupVersionKind]*admission.VersionedAttributes{},
+		attr:             attr,
+		objectInterfaces: o,
+	}
 	for _, hook := range hooks {
-		invocation, statusError := d.plugin.ShouldCallHook(hook, attr, o)
+		invocation, statusError := d.plugin.ShouldCallHook(ctx, hook, attr, o, versionedAttrAccessor)
 		if statusError != nil {
 			return statusError
 		}
 		if invocation == nil {
 			continue
 		}
+
 		relevantHooks = append(relevantHooks, invocation)
-		// If we already have this version, continue
-		if _, ok := versionedAttrs[invocation.Kind]; ok {
-			continue
-		}
-		versionedAttr, err := admission.NewVersionedAttributes(attr, invocation.Kind, o)
+		// VersionedAttr result will be cached and reused later during parallel webhook calls
+		_, err := versionedAttrAccessor.VersionedAttribute(invocation.Kind)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
-		versionedAttrs[invocation.Kind] = versionedAttr
 	}
 
 	if len(relevantHooks) == 0 {
@@ -108,7 +130,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 		go func(invocation *generic.WebhookInvocation, idx int) {
 			ignoreClientCallFailures := false
 			hookName := "unknown"
-			versionedAttr := versionedAttrs[invocation.Kind]
+			versionedAttr := versionedAttrAccessor.versionedAttrs[invocation.Kind]
 			// The ordering of these two defers is critical. The wg.Done will release the parent go func to close the errCh
 			// that is used by the second defer to report errors. The recovery and error reporting must be done first.
 			defer wg.Done()
@@ -154,7 +176,10 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 				case *webhookutil.ErrCallingWebhook:
 					if !ignoreClientCallFailures {
 						rejected = true
-						admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, int(err.Status.ErrStatus.Code))
+						// Ignore context cancelled from webhook metrics
+						if !errors.Is(err.Reason, context.Canceled) {
+							admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, int(err.Status.ErrStatus.Code))
+						}
 					}
 					admissionmetrics.Metrics.ObserveWebhook(ctx, hook.Name, time.Since(t), rejected, versionedAttr.Attributes, "validating", int(err.Status.ErrStatus.Code))
 				case *webhookutil.ErrWebhookRejection:
@@ -173,12 +198,17 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 
 			if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
-					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-					admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "validating")
-					key := fmt.Sprintf("%sround_0_index_%d", ValidatingAuditAnnotationFailedOpenKeyPrefix, idx)
-					value := hook.Name
-					if err := versionedAttr.Attributes.AddAnnotation(key, value); err != nil {
-						klog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, value, hook.Name, err)
+					// Ignore context cancelled from webhook metrics
+					if errors.Is(callErr.Reason, context.Canceled) {
+						klog.Warningf("Context canceled when calling webhook %v", hook.Name)
+					} else {
+						klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
+						admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "validating")
+						key := fmt.Sprintf("%sround_0_index_%d", ValidatingAuditAnnotationFailedOpenKeyPrefix, idx)
+						value := hook.Name
+						if err := versionedAttr.Attributes.AddAnnotation(key, value); err != nil {
+							klog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, value, hook.Name, err)
+						}
 					}
 					utilruntime.HandleError(callErr)
 					return

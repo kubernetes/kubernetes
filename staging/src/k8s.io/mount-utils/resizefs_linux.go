@@ -45,7 +45,6 @@ func NewResizeFs(exec utilexec.Interface) *ResizeFs {
 // Resize perform resize of file system
 func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (bool, error) {
 	format, err := getDiskFormat(resizefs.exec, devicePath)
-
 	if err != nil {
 		formatErr := fmt.Errorf("ResizeFS.Resize - error checking format for device %s: %v", devicePath, err)
 		return false, formatErr
@@ -78,7 +77,6 @@ func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {
 
 	resizeError := fmt.Errorf("resize of device %s failed: %v. resize2fs output: %s", devicePath, err, string(output))
 	return false, resizeError
-
 }
 
 func (resizefs *ResizeFs) xfsResize(deviceMountPath string) (bool, error) {
@@ -161,6 +159,7 @@ func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) 
 	}
 	return true, nil
 }
+
 func (resizefs *ResizeFs) getDeviceSize(devicePath string) (uint64, error) {
 	output, err := resizefs.exec.Command(blockDev, "--getsize64", devicePath).CombinedOutput()
 	outStr := strings.TrimSpace(string(output))

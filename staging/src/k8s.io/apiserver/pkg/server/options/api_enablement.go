@@ -42,6 +42,9 @@ func NewAPIEnablementOptions() *APIEnablementOptions {
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *APIEnablementOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
 		"A set of key=value pairs that enable or disable built-in APIs. Supported options are:\n"+
 		"v1=true|false for the core API group\n"+
@@ -87,7 +90,6 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegistry) []error {
 
 // ApplyTo override MergedResourceConfig with defaults and registry
 func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *serverstore.ResourceConfig, registry resourceconfig.GroupVersionRegistry) error {
-
 	if s == nil {
 		return nil
 	}

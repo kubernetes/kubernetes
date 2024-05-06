@@ -36,6 +36,9 @@ type Example struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode RequestBody as JSON
 func (e *Example) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(e)
+	}
 	b1, err := json.Marshal(e.Refable)
 	if err != nil {
 		return nil, err
@@ -49,6 +52,17 @@ func (e *Example) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
+}
+func (e *Example) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref          string `json:"$ref,omitempty"`
+		ExampleProps `json:",inline"`
+		spec.Extensions
+	}
+	x.Ref = e.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(e.Extensions)
+	x.ExampleProps = e.ExampleProps
+	return opts.MarshalNext(enc, x)
 }
 
 func (e *Example) UnmarshalJSON(data []byte) error {

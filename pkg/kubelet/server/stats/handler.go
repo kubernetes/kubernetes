@@ -51,8 +51,13 @@ type Provider interface {
 	// for more details.
 	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	// ImageFsStats returns the stats of the image filesystem.
-	ImageFsStats(ctx context.Context) (*statsapi.FsStats, error)
-
+	// Kubelet allows three options for container filesystems
+	// Everything is on node fs (so no image filesystem)
+	// Container storage is on a dedicated disk (imageFs is separate from root)
+	// Container Filesystem is on root and Images are stored on ImageFs
+	// First return parameter is the image filesystem and
+	// second parameter is the container filesystem
+	ImageFsStats(ctx context.Context) (imageFs *statsapi.FsStats, containerFs *statsapi.FsStats, callErr error)
 	// The following stats are provided by cAdvisor.
 	//
 	// GetCgroupStats returns the stats and the networking usage of the cgroup
@@ -64,15 +69,6 @@ type Provider interface {
 	// RootFsStats returns the stats of the node root filesystem.
 	RootFsStats() (*statsapi.FsStats, error)
 
-	// The following stats are provided by cAdvisor for legacy usage.
-	//
-	// GetContainerInfo returns the information of the container with the
-	// containerName managed by the pod with the uid.
-	GetContainerInfo(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	// GetRawContainerInfo returns the information of the container with the
-	// containerName. If subcontainers is true, this function will return the
-	// information of all the sub-containers as well.
-	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
 	// GetRequestedContainersInfo returns the information of the container with
 	// the containerName, and with the specified cAdvisor options.
 	GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)

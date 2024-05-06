@@ -112,6 +112,7 @@ type Server struct {
 
 func (s *Server) Start(ctx context.Context) error {
 	s.informerFactory.Start(ctx.Done())
+	logger := klog.FromContext(ctx)
 
 	mux := http.NewServeMux()
 	healthz.InstallHandler(mux, healthz.PingHealthz)
@@ -141,11 +142,11 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	<-listenerStoppedCh
-	klog.V(1).InfoS("[graceful-termination] HTTP Server has stopped listening")
+	logger.V(1).Info("[graceful-termination] HTTP Server has stopped listening")
 
 	// Wait for graceful shutdown.
 	<-shutdownCh
-	klog.V(1).Info("[graceful-termination] HTTP Server is exiting")
+	logger.V(1).Info("[graceful-termination] HTTP Server is exiting")
 
 	return nil
 }
@@ -157,14 +158,15 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	})
 
 	var (
-		body []byte
-		err  error
-		ctx  = r.Context()
+		body   []byte
+		err    error
+		ctx    = r.Context()
+		logger = klog.FromContext(ctx)
 	)
 
 	if timeout, ok, err := parseTimeout(r); err != nil {
 		// Ignore an invalid timeout.
-		klog.V(2).InfoS("Invalid timeout", "error", err)
+		logger.V(2).Info("Invalid timeout", "error", err)
 	} else if ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -173,7 +175,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 
 	if r.Body == nil || r.Body == http.NoBody {
 		err = errors.New("request body is empty")
-		klog.ErrorS(err, "bad request")
+		logger.Error(err, "bad request")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -181,12 +183,12 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	limitedReader := &io.LimitedReader{R: r.Body, N: maxRequestSize}
 	if body, err = ioutil.ReadAll(limitedReader); err != nil {
-		klog.ErrorS(err, "unable to read the body from the incoming request")
+		logger.Error(err, "unable to read the body from the incoming request")
 		http.Error(w, "unable to read the body from the incoming request", http.StatusBadRequest)
 		return
 	}
 	if limitedReader.N <= 0 {
-		klog.ErrorS(err, "unable to read the body from the incoming request; limit reached")
+		logger.Error(err, "unable to read the body from the incoming request; limit reached")
 		http.Error(w, fmt.Sprintf("request entity is too large; limit is %d bytes", maxRequestSize), http.StatusRequestEntityTooLarge)
 		return
 	}
@@ -194,7 +196,7 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	// verify the content type is accurate
 	if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
 		err = fmt.Errorf("contentType=%s, expected application/json", contentType)
-		klog.ErrorS(err, "unable to process a request with an unknown content type", "contentType", contentType)
+		logger.Error(err, "unable to process a request with an unknown content type", "type", contentType)
 		http.Error(w, "unable to process a request with a non-json content type", http.StatusBadRequest)
 		return
 	}
@@ -202,21 +204,21 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	v1AdmissionReviewKind := admissionv1.SchemeGroupVersion.WithKind("AdmissionReview")
 	reviewObject, gvk, err := codecs.UniversalDeserializer().Decode(body, &v1AdmissionReviewKind, nil)
 	if err != nil {
-		klog.ErrorS(err, "unable to decode the request")
+		logger.Error(err, "unable to decode the request")
 		http.Error(w, "unable to decode the request", http.StatusBadRequest)
 		return
 	}
 	if *gvk != v1AdmissionReviewKind {
-		klog.InfoS("Unexpected AdmissionReview kind", "kind", gvk.String())
+		logger.Info("Unexpected AdmissionReview kind", "kind", gvk.String())
 		http.Error(w, fmt.Sprintf("unexpected AdmissionReview kind: %s", gvk.String()), http.StatusBadRequest)
 		return
 	}
 	review, ok := reviewObject.(*admissionv1.AdmissionReview)
 	if !ok {
-		klog.InfoS("Failed admissionv1.AdmissionReview type assertion")
+		logger.Info("Failed admissionv1.AdmissionReview type assertion")
 		http.Error(w, "unexpected AdmissionReview type", http.StatusBadRequest)
 	}
-	klog.V(1).InfoS("received request", "UID", review.Request.UID, "kind", review.Request.Kind, "resource", review.Request.Resource)
+	logger.V(1).Info("received request", "UID", review.Request.UID, "kind", review.Request.Kind, "resource", review.Request.Resource)
 
 	attributes := api.RequestAttributes(review.Request, codecs.UniversalDeserializer())
 	response := s.delegate.Validate(ctx, attributes)
@@ -241,7 +243,6 @@ func LoadConfig(opts *options.Options) (*Config, error) {
 
 	var c Config
 	opts.SecureServing.ApplyTo(&c.SecureServing)
-	opts.InsecureServing.ApplyTo(&c.InsecureServing)
 
 	// Load Kube Client
 	kubeConfig, err := clientcmd.BuildConfigFromFlags("", opts.Kubeconfig)

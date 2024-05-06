@@ -40,7 +40,8 @@ message ConversionRequest {
   optional string desiredAPIVersion = 2;
 
   // objects is the list of custom resource objects to be converted.
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
+  // +listType=atomic
+  repeated .k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
 }
 
 // ConversionResponse describes a conversion response.
@@ -53,14 +54,15 @@ message ConversionResponse {
   // The webhook is expected to set `apiVersion` of these objects to the `request.desiredAPIVersion`. The list
   // must also have the same size as the input list with the same objects in the same order (equal kind, metadata.uid, metadata.name and metadata.namespace).
   // The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension convertedObjects = 2;
+  // +listType=atomic
+  repeated .k8s.io.apimachinery.pkg.runtime.RawExtension convertedObjects = 2;
 
   // result contains the result of conversion with extra details if the conversion failed. `result.status` determines if
   // the conversion failed or succeeded. The `result.status` field is required and represents the success or failure of the
   // conversion. A successful conversion must set `result.status` to `Success`. A failed conversion must set
   // `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message`
   // will be used to construct an error message for the end user.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Status result = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Status result = 3;
 }
 
 // ConversionReview describes a conversion request/response.
@@ -125,6 +127,7 @@ message CustomResourceConversion {
   // include any versions known to the API Server, calls to the webhook will fail.
   // Defaults to `["v1beta1"]`.
   // +optional
+  // +listType=atomic
   repeated string conversionReviewVersions = 3;
 }
 
@@ -135,7 +138,7 @@ message CustomResourceDefinition {
   // Standard object's metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec describes how the user wants the resources to appear
   optional CustomResourceDefinitionSpec spec = 2;
@@ -156,7 +159,7 @@ message CustomResourceDefinitionCondition {
 
   // lastTransitionTime last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // reason is a unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
@@ -172,7 +175,7 @@ message CustomResourceDefinitionList {
   // Standard object's metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items list individual CustomResourceDefinition objects
   repeated CustomResourceDefinition items = 2;
@@ -194,6 +197,7 @@ message CustomResourceDefinitionNames {
   // and used by clients to support invocations like `kubectl get <shortname>`.
   // It must be all lowercase.
   // +optional
+  // +listType=atomic
   repeated string shortNames = 3;
 
   // kind is the serialized kind of the resource. It is normally CamelCase and singular.
@@ -208,6 +212,7 @@ message CustomResourceDefinitionNames {
   // This is published in API discovery documents, and used by clients to support invocations like
   // `kubectl get all`.
   // +optional
+  // +listType=atomic
   repeated string categories = 6;
 }
 
@@ -256,6 +261,7 @@ message CustomResourceDefinitionSpec {
   // major version, then minor version. An example sorted list of versions:
   // v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
   // +optional
+  // +listType=atomic
   repeated CustomResourceDefinitionVersion versions = 7;
 
   // additionalPrinterColumns specifies additional columns returned in Table output.
@@ -264,7 +270,16 @@ message CustomResourceDefinitionSpec {
   // Top-level and per-version columns are mutually exclusive.
   // If no top-level or per-version columns are specified, a single column displaying the age of the custom resource is used.
   // +optional
+  // +listType=atomic
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
+
+  // selectableFields specifies paths to fields that may be used as field selectors.
+  // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+  //
+  // +featureGate=CustomResourceFieldSelectors
+  // +optional
+  // +listType=atomic
+  repeated SelectableField selectableFields = 11;
 
   // conversion defines conversion settings for the CRD.
   // +optional
@@ -302,6 +317,7 @@ message CustomResourceDefinitionStatus {
   // versions from this list.
   // Versions may not be removed from `spec.versions` while they exist in this list.
   // +optional
+  // +listType=atomic
   repeated string storedVersions = 3;
 }
 
@@ -349,7 +365,16 @@ message CustomResourceDefinitionVersion {
   // Per-version columns must not all be set to identical values (top-level columns should be used instead).
   // If no top-level or per-version columns are specified, a single column displaying the age of the custom resource is used.
   // +optional
+  // +listType=atomic
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
+
+  // selectableFields specifies paths to fields that may be used as field selectors.
+  // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+  //
+  // +featureGate=CustomResourceFieldSelectors
+  // +optional
+  // +listType=atomic
+  repeated SelectableField selectableFields = 9;
 }
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
@@ -491,20 +516,25 @@ message JSONSchemaProps {
 
   optional double multipleOf = 19;
 
+  // +listType=atomic
   repeated JSON enum = 20;
 
   optional int64 maxProperties = 21;
 
   optional int64 minProperties = 22;
 
+  // +listType=atomic
   repeated string required = 23;
 
   optional JSONSchemaPropsOrArray items = 24;
 
+  // +listType=atomic
   repeated JSONSchemaProps allOf = 25;
 
+  // +listType=atomic
   repeated JSONSchemaProps oneOf = 26;
 
+  // +listType=atomic
   repeated JSONSchemaProps anyOf = 27;
 
   optional JSONSchemaProps not = 28;
@@ -570,6 +600,7 @@ message JSONSchemaProps {
   // to ensure those properties are present for all list items.
   //
   // +optional
+  // +listType=atomic
   repeated string xKubernetesListMapKeys = 41;
 
   // x-kubernetes-list-type annotates an array to further describe its topology.
@@ -616,6 +647,7 @@ message JSONSchemaProps {
 message JSONSchemaPropsOrArray {
   optional JSONSchemaProps schema = 1;
 
+  // +listType=atomic
   repeated JSONSchemaProps jSONSchemas = 2;
 }
 
@@ -631,7 +663,21 @@ message JSONSchemaPropsOrBool {
 message JSONSchemaPropsOrStringArray {
   optional JSONSchemaProps schema = 1;
 
+  // +listType=atomic
   repeated string property = 2;
+}
+
+// SelectableField specifies the JSON path of a field that may be used with field selectors.
+message SelectableField {
+  // jsonPath is a simple JSON path which is evaluated against each custom resource to produce a
+  // field selector value.
+  // Only JSON paths without the array notation are allowed.
+  // Must point to a field of type string, boolean or integer. Types with enum values
+  // and strings with formats are allowed.
+  // If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string.
+  // Must not point to metdata fields.
+  // Required.
+  optional string jsonPath = 1;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
@@ -710,6 +756,18 @@ message ValidationRule {
   //   - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values
   //     are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with
   //     non-intersecting keys are appended, retaining their partial order.
+  //
+  // If `rule` makes use of the `oldSelf` variable it is implicitly a
+  // `transition rule`.
+  //
+  // By default, the `oldSelf` variable is the same type as `self`.
+  // When `optionalOldSelf` is true, the `oldSelf` variable is a CEL optional
+  //  variable whose value() is the same type as `self`.
+  // See the documentation for the `optionalOldSelf` field for details.
+  //
+  // Transition rules by default are applied only on UPDATE requests and are
+  // skipped if an old value could not be found. You can opt a transition
+  // rule into unconditional evaluation by setting `optionalOldSelf` to true.
   optional string rule = 1;
 
   // Message represents the message displayed when validation fails. The message is required if the Rule contains
@@ -730,6 +788,44 @@ message ValidationRule {
   // "x must be less than max ("+string(self.max)+")"
   // +optional
   optional string messageExpression = 3;
+
+  // reason provides a machine-readable validation failure reason that is returned to the caller when a request fails this validation rule.
+  // The HTTP status code returned to the caller will match the reason of the reason of the first failed validation rule.
+  // The currently supported reasons are: "FieldValueInvalid", "FieldValueForbidden", "FieldValueRequired", "FieldValueDuplicate".
+  // If not set, default to use "FieldValueInvalid".
+  // All future added reasons must be accepted by clients when reading this value and unknown reasons should be treated as FieldValueInvalid.
+  // +optional
+  optional string reason = 4;
+
+  // fieldPath represents the field path returned when the validation fails.
+  // It must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.
+  // e.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`
+  // If the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`
+  // It does not support list numeric index.
+  // It supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.
+  // Numeric index of array is not supported.
+  // For field name which contains special characters, use `['specialName']` to refer the field name.
+  // e.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`
+  // +optional
+  optional string fieldPath = 5;
+
+  // optionalOldSelf is used to opt a transition rule into evaluation
+  // even when the object is first created, or if the old object is
+  // missing the value.
+  //
+  // When enabled `oldSelf` will be a CEL optional whose value will be
+  // `None` if there is no old value, or when the object is initially created.
+  //
+  // You may check for presence of oldSelf using `oldSelf.hasValue()` and
+  // unwrap it after checking using `oldSelf.value()`. Check the CEL
+  // documentation for Optional types for more information:
+  // https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
+  //
+  // May not be set unless `oldSelf` is used in `rule`.
+  //
+  // +featureGate=CRDValidationRatcheting
+  // +optional
+  optional bool optionalOldSelf = 6;
 }
 
 // WebhookClientConfig contains the information to make a TLS connection with the webhook.

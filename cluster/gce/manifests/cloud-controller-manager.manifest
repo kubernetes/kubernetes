@@ -23,16 +23,17 @@
 "containers":[
     {
     "name": "cloud-controller-manager",
-    "image": "gcr.io/k8s-staging-cloud-provider-gcp/cloud-controller-manager:v1.25.2-alpha_ae91c1fc0c443c464a4c878ffa2a4544483c6d1f",
+    "image": "gcr.io/k8s-staging-cloud-provider-gcp/cloud-controller-manager:v30.0.0",
     "resources": {
       "requests": {
         "cpu": "{{cpurequest}}"
       }
     },
-    "command": ["/cloud-controller-manager"],
     "args": [
       "--log-file=/var/log/cloud-controller-manager.log",
-      "--logtostderr=false",
+      "--also-stdout=false",
+      "--redirect-stderr=true",
+      "/cloud-controller-manager",
       {{params}}
     ],
     {{container_env}}
@@ -56,6 +57,50 @@
         {{flexvolume_hostpath_mount}}
         { "name": "logfile",
         "mountPath": "/var/log/cloud-controller-manager.log",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharecacerts",
+        "mountPath": "/usr/share/ca-certificates",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpki",
+        "mountPath": "/etc/pki",
+        "readOnly": true}
+      ]
+    },
+    {
+    "name": "cloud-pvl-admission",
+    "image": "gcr.io/k8s-staging-cloud-pv-labeler/cloud-pv-admission-labeler:v0.3.0",
+    "resources": {
+      "requests": {
+        "cpu": "10m"
+      }
+    },
+    "command": [
+      "/cloud-pv-admission-labeler",
+      "--addr=localhost:9001",
+      "--tls-cert-path=/etc/srv/kubernetes/pki/cloud-pvl-admission/server.crt",
+      "--tls-key-path=/etc/srv/kubernetes/pki/cloud-pvl-admission/server.key",
+      "--cloud-provider=gce",
+      "--cloud-config=/etc/gce.conf"
+    ],
+    "volumeMounts": [
+        {{cloud_config_mount}}
+        {{additional_cloud_config_mount}}
+        {{pv_recycler_mount}}
+        { "name": "srvkube",
+        "mountPath": "/etc/srv/kubernetes",
+        "readOnly": true},
+        {{flexvolume_hostpath_mount}}
+        { "name": "logfile",
+        "mountPath": "/var/log/cloud-pvl-admission.log",
         "readOnly": false},
         { "name": "etcssl",
         "mountPath": "/etc/ssl",

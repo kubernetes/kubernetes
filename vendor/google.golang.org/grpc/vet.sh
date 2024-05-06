@@ -41,16 +41,8 @@ if [[ "$1" = "-install" ]]; then
     github.com/client9/misspell/cmd/misspell
   popd
   if [[ -z "${VET_SKIP_PROTO}" ]]; then
-    if [[ "${TRAVIS}" = "true" ]]; then
-      PROTOBUF_VERSION=3.14.0
-      PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-      pushd /home/travis
-      wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
-      unzip ${PROTOC_FILENAME}
-      bin/protoc --version
-      popd
-    elif [[ "${GITHUB_ACTIONS}" = "true" ]]; then
-      PROTOBUF_VERSION=3.14.0
+    if [[ "${GITHUB_ACTIONS}" = "true" ]]; then
+      PROTOBUF_VERSION=22.0 # a.k.a v4.22.0 in pb.go files.
       PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
       pushd /home/runner/go
       wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
@@ -64,6 +56,16 @@ if [[ "$1" = "-install" ]]; then
   exit 0
 elif [[ "$#" -ne 0 ]]; then
   die "Unknown argument(s): $*"
+fi
+
+# - Check that generated proto files are up to date.
+if [[ -z "${VET_SKIP_PROTO}" ]]; then
+  make proto && git status --porcelain 2>&1 | fail_on_output || \
+    (git status; git --no-pager diff; exit 1)
+fi
+
+if [[ -n "${VET_ONLY_PROTO}" ]]; then
+  exit 0
 fi
 
 # - Ensure all source files contain a copyright message.
@@ -82,23 +84,22 @@ not git grep -l 'x/net/context' -- "*.go"
 #   thread safety.
 git grep -l '"math/rand"' -- "*.go" 2>&1 | not grep -v '^examples\|^stress\|grpcrand\|^benchmark\|wrr_test'
 
+# - Do not use "interface{}"; use "any" instead.
+git grep -l 'interface{}' -- "*.go" 2>&1 | not grep -v '\.pb\.go\|protoc-gen-go-grpc'
+
 # - Do not call grpclog directly. Use grpclog.Component instead.
 git grep -l -e 'grpclog.I' --or -e 'grpclog.W' --or -e 'grpclog.E' --or -e 'grpclog.F' --or -e 'grpclog.V' -- "*.go" | not grep -v '^grpclog/component.go\|^internal/grpctest/tlogger_test.go'
 
 # - Ensure all ptypes proto packages are renamed when importing.
 not git grep "\(import \|^\s*\)\"github.com/golang/protobuf/ptypes/" -- "*.go"
 
+# - Ensure all usages of grpc_testing package are renamed when importing.
+not git grep "\(import \|^\s*\)\"google.golang.org/grpc/interop/grpc_testing" -- "*.go" 
+
 # - Ensure all xds proto imports are renamed to *pb or *grpc.
 git grep '"github.com/envoyproxy/go-control-plane/envoy' -- '*.go' ':(exclude)*.pb.go' | not grep -v 'pb "\|grpc "'
 
 misspell -error .
-
-# - Check that generated proto files are up to date.
-if [[ -z "${VET_SKIP_PROTO}" ]]; then
-  PATH="/home/travis/bin:${PATH}" make proto && \
-    git status --porcelain 2>&1 | fail_on_output || \
-    (git status; git --no-pager diff; exit 1)
-fi
 
 # - gofmt, goimports, golint (with exceptions for generated code), go vet,
 # go mod tidy.
@@ -111,7 +112,7 @@ for MOD_FILE in $(find . -name 'go.mod'); do
   goimports -l . 2>&1 | not grep -vE "\.pb\.go"
   golint ./... 2>&1 | not grep -vE "/grpc_testing_not_regenerate/.*\.pb\.go:"
 
-  go mod tidy
+  go mod tidy -compat=1.19
   git status --porcelain 2>&1 | fail_on_output || \
     (git status; git --no-pager diff; exit 1)
   popd
@@ -121,8 +122,9 @@ done
 #
 # TODO(dfawley): don't use deprecated functions in examples or first-party
 # plugins.
+# TODO(dfawley): enable ST1019 (duplicate imports) but allow for protobufs.
 SC_OUT="$(mktemp)"
-staticcheck -go 1.9 -checks 'inherit,-ST1015' ./... > "${SC_OUT}" || true
+staticcheck -go 1.19 -checks 'inherit,-ST1015,-ST1019,-SA1019' ./... > "${SC_OUT}" || true
 # Error if anything other than deprecation warnings are printed.
 not grep -v "is deprecated:.*SA1019" "${SC_OUT}"
 # Only ignore the following deprecated types/fields/functions.
@@ -172,8 +174,6 @@ proto.RegisteredExtension is deprecated
 proto.RegisteredExtensions is deprecated
 proto.RegisterMapType is deprecated
 proto.Unmarshaler is deprecated
-resolver.Backend
-resolver.GRPCLB
 Target is deprecated: Use the Target field in the BuildOptions instead.
 xxx_messageInfo_
 ' "${SC_OUT}"

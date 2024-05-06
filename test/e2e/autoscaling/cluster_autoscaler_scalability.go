@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -40,6 +41,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -60,9 +62,9 @@ type scaleUpTestConfig struct {
 	expectedResult *clusterPredicates
 }
 
-var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
+var _ = SIGDescribe("Cluster size autoscaler scalability", framework.WithSlow(), func() {
 	f := framework.NewDefaultFramework("autoscaling")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var nodeCount int
 	var coresPerNode int
@@ -102,7 +104,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		coresPerNode = int((&cpu).MilliValue() / 1000)
 		memCapacityMb = int((&mem).Value() / 1024 / 1024)
 
-		framework.ExpectEqual(nodeCount, sum)
+		gomega.Expect(nodeCount).To(gomega.Equal(sum))
 
 		if framework.ProviderIs("gke") {
 			val, err := isAutoscalerEnabled(3)
@@ -137,7 +139,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		klog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
 	})
 
-	ginkgo.It("should scale up at all [Feature:ClusterAutoscalerScalability1]", func(ctx context.Context) {
+	f.It("should scale up at all", feature.ClusterAutoscalerScalability1, func(ctx context.Context) {
 		perNodeReservation := int(float64(memCapacityMb) * 0.95)
 		replicasPerNode := 10
 
@@ -160,7 +162,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		defer testCleanup()
 	})
 
-	ginkgo.It("should scale up twice [Feature:ClusterAutoscalerScalability2]", func(ctx context.Context) {
+	f.It("should scale up twice", feature.ClusterAutoscalerScalability2, func(ctx context.Context) {
 		perNodeReservation := int(float64(memCapacityMb) * 0.95)
 		replicasPerNode := 10
 		additionalNodes1 := int(math.Ceil(0.7 * maxNodes))
@@ -209,7 +211,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		klog.Infof("Scaled up twice")
 	})
 
-	ginkgo.It("should scale down empty nodes [Feature:ClusterAutoscalerScalability3]", func(ctx context.Context) {
+	f.It("should scale down empty nodes", feature.ClusterAutoscalerScalability3, func(ctx context.Context) {
 		perNodeReservation := int(float64(memCapacityMb) * 0.7)
 		replicas := int(math.Ceil(maxNodes * 0.7))
 		totalNodes := maxNodes
@@ -237,7 +239,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 			}, scaleDownTimeout))
 	})
 
-	ginkgo.It("should scale down underutilized nodes [Feature:ClusterAutoscalerScalability4]", func(ctx context.Context) {
+	f.It("should scale down underutilized nodes", feature.ClusterAutoscalerScalability4, func(ctx context.Context) {
 		perPodReservation := int(float64(memCapacityMb) * 0.01)
 		// underutilizedNodes are 10% full
 		underutilizedPerNodeReplicas := 10
@@ -295,7 +297,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		}, timeout))
 	})
 
-	ginkgo.It("shouldn't scale down with underutilized nodes due to host port conflicts [Feature:ClusterAutoscalerScalability5]", func(ctx context.Context) {
+	f.It("shouldn't scale down with underutilized nodes due to host port conflicts", feature.ClusterAutoscalerScalability5, func(ctx context.Context) {
 		fullReservation := int(float64(memCapacityMb) * 0.9)
 		hostPortPodReservation := int(float64(memCapacityMb) * 0.3)
 		totalNodes := maxNodes
@@ -329,10 +331,10 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
-		framework.ExpectEqual(len(nodes.Items), totalNodes)
+		gomega.Expect(nodes.Items).To(gomega.HaveLen(totalNodes))
 	})
 
-	ginkgo.It("CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6]", func(ctx context.Context) {
+	f.It("CA ignores unschedulable pods while scheduling schedulable pods", feature.ClusterAutoscalerScalability6, func(ctx context.Context) {
 		// Start a number of pods saturating existing nodes.
 		perNodeReservation := int(float64(memCapacityMb) * 0.80)
 		replicasPerNode := 10
@@ -353,7 +355,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 
 		// Ensure that no new nodes have been added so far.
 		readyNodeCount, _ := e2enode.TotalReady(ctx, f.ClientSet)
-		framework.ExpectEqual(readyNodeCount, nodeCount)
+		gomega.Expect(readyNodeCount).To(gomega.Equal(nodeCount))
 
 		// Start a number of schedulable pods to ensure CA reacts.
 		additionalNodes := maxNodes - nodeCount

@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 /*
 Copyright 2021 The Kubernetes Authors.
 
@@ -24,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // Mutate modifies absolute path fields in the KubeletConfiguration to be Windows compatible absolute paths.
@@ -32,7 +35,7 @@ func (kc *kubeletConfig) Mutate() error {
 	// When "kubeadm join" downloads the KubeletConfiguration from the cluster on Windows
 	// nodes, it would contain absolute paths that may lack drive letters, since the config
 	// could have been generated on a Linux control-plane node. On Windows the
-	// Golang path.IsAbs() function returns false unless the path contains a drive letter.
+	// Golang filepath.IsAbs() function returns false unless the path contains a drive letter.
 	// This trips client-go and the kubelet, creating problems on Windows nodes.
 	// Fixing it in client-go or the kubelet is a breaking change to existing Windows
 	// users that rely on relative paths:
@@ -57,7 +60,7 @@ func (kc *kubeletConfig) Mutate() error {
 
 func mutatePaths(cfg *kubeletconfig.KubeletConfiguration, drive string) {
 	mutateStringField := func(name string, field *string) {
-		// path.IsAbs() is not reliable here in the Windows runtime, so check if the
+		// filepath.IsAbs() is not reliable here in the Windows runtime, so check if the
 		// path starts with "/" instead. This means the path originated from a Unix node and
 		// is an absolute path.
 		if !strings.HasPrefix(*field, "/") {
@@ -70,7 +73,7 @@ func mutatePaths(cfg *kubeletconfig.KubeletConfiguration, drive string) {
 
 	// Mutate the fields we care about.
 	klog.V(2).Infof("[componentconfig] kubelet/Windows: changing field \"resolverConfig\" to empty")
-	cfg.ResolverConfig = utilpointer.String("")
+	cfg.ResolverConfig = ptr.To("")
 	mutateStringField("staticPodPath", &cfg.StaticPodPath)
 	mutateStringField("authentication.x509.clientCAFile", &cfg.Authentication.X509.ClientCAFile)
 }

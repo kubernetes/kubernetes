@@ -42,10 +42,6 @@ func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 	SetDefaults_InitConfiguration(in)
-	for i := range in.BootstrapTokens {
-		a := &in.BootstrapTokens[i]
-		SetDefaults_BootstrapToken(a)
-	}
 	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
 }
 

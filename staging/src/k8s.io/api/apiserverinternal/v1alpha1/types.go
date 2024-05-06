@@ -77,6 +77,11 @@ type ServerStorageVersion struct {
 	// The encodingVersion must be included in the decodableVersions.
 	// +listType=set
 	DecodableVersions []string `json:"decodableVersions,omitempty" protobuf:"bytes,3,opt,name=decodableVersions"`
+
+	// The API server can serve these versions.
+	// DecodableVersions must include all ServedVersions.
+	// +listType=set
+	ServedVersions []string `json:"servedVersions,omitempty" protobuf:"bytes,4,opt,name=servedVersions"`
 }
 
 type StorageVersionConditionType string
@@ -106,7 +111,6 @@ type StorageVersionCondition struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,3,opt,name=observedGeneration"`
 	// Last time the condition transitioned from one status to another.
-	// +required
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// The reason for the condition's last transition.
 	// +required

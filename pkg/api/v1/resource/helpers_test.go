@@ -576,6 +576,7 @@ func getPod(cname string, resources podResources) *v1.Pod {
 }
 
 func TestPodResourceRequests(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
 		description      string
 		options          PodResourcesOptions
@@ -737,7 +738,7 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					ResourcesAllocated: v1.ResourceList{
+					AllocatedResources: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("2"),
 					},
 				},
@@ -762,7 +763,7 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					ResourcesAllocated: v1.ResourceList{
+					AllocatedResources: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("2"),
 					},
 				},
@@ -788,29 +789,212 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
-					ResourcesAllocated: v1.ResourceList{
+					AllocatedResources: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+			},
+		},
+		{
+			description: "restartable init container",
+			expectedRequests: v1.ResourceList{
+				// restartable init + regular container
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "multiple restartable init containers",
+			expectedRequests: v1.ResourceList{
+				// max(5, restartable init containers(3+2+1) + regular(1)) = 7
+				v1.ResourceCPU: resource.MustParse("7"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name: "init-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("5"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-2",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-3",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "multiple restartable and regular init containers",
+			expectedRequests: v1.ResourceList{
+				// init-2 requires 5 + the previously running restartable init
+				// containers(1+2) = 8, the restartable init container that starts
+				// after it doesn't count
+				v1.ResourceCPU: resource.MustParse("8"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name: "init-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("5"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-2",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Name: "init-2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("5"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-3",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "restartable-init, init and regular",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("210"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("10"),
+						},
+					},
+				},
+				{
+					Name: "init-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("200"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100"),
+						},
 					},
 				},
 			},
 		},
 	}
 	for _, tc := range testCases {
-		p := &v1.Pod{
-			Spec: v1.PodSpec{
-				Containers:     tc.containers,
-				InitContainers: tc.initContainers,
-				Overhead:       tc.overhead,
-			},
-			Status: v1.PodStatus{
-				ContainerStatuses: tc.containerStatus,
-				Resize:            tc.podResizeStatus,
-			},
-		}
-		request := PodRequests(p, tc.options)
-		if !resourcesEqual(tc.expectedRequests, request) {
-			t.Errorf("[%s] expected requests = %v, got %v", tc.description, tc.expectedRequests, request)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			p := &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers:     tc.containers,
+					InitContainers: tc.initContainers,
+					Overhead:       tc.overhead,
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: tc.containerStatus,
+					Resize:            tc.podResizeStatus,
+				},
+			}
+			request := PodRequests(p, tc.options)
+			if !resourcesEqual(tc.expectedRequests, request) {
+				t.Errorf("[%s] expected requests = %v, got %v", tc.description, tc.expectedRequests, request)
+			}
+		})
 	}
 }
 
@@ -848,6 +1032,7 @@ func TestPodResourceRequestsReuse(t *testing.T) {
 }
 
 func TestPodResourceLimits(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
 		description    string
 		options        PodResourcesOptions
@@ -984,19 +1169,263 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description:    "no limited containers should result in no limits for the pod",
+			expectedLimits: v1.ResourceList{},
+			initContainers: []v1.Container{},
+			containers: []v1.Container{
+				{
+					// Unlimited container
+				},
+			},
+		},
+		{
+			description: "one limited and one unlimited container should result in the limited container's limits for the pod",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			initContainers: []v1.Container{},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+				{
+					// Unlimited container
+				},
+			},
+		},
+		{
+			description: "one limited and one unlimited init container should result in the limited init container's limits for the pod",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("2"),
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			initContainers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+				},
+				{
+					// Unlimited init container
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "restartable init container",
+			expectedLimits: v1.ResourceList{
+				// restartable init + regular container
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "multiple restartable init containers",
+			expectedLimits: v1.ResourceList{
+				// max(5, restartable init containers(3+2+1) + regular(1)) = 7
+				v1.ResourceCPU: resource.MustParse("7"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name: "init-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("5"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-2",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-3",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "multiple restartable and regular init containers",
+			expectedLimits: v1.ResourceList{
+				// init-2 requires 5 + the previously running restartable init
+				// containers(1+2) = 8, the restartable init container that starts
+				// after it doesn't count
+				v1.ResourceCPU: resource.MustParse("8"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name: "init-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("5"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-2",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+				{
+					Name: "init-2",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("5"),
+						},
+					},
+				},
+				{
+					Name:          "restartable-init-3",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("3"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "restartable-init, init and regular",
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("210"),
+			},
+			initContainers: []v1.Container{
+				{
+					Name:          "restartable-init-1",
+					RestartPolicy: &restartAlways,
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("10"),
+						},
+					},
+				},
+				{
+					Name: "init-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("200"),
+						},
+					},
+				},
+			},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("100"),
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
-		p := &v1.Pod{
-			Spec: v1.PodSpec{
-				Containers:     tc.containers,
-				InitContainers: tc.initContainers,
-				Overhead:       tc.overhead,
-			},
-		}
-		limits := PodLimits(p, tc.options)
-		if !resourcesEqual(tc.expectedLimits, limits) {
-			t.Errorf("[%s] expected limits = %v, got %v", tc.description, tc.expectedLimits, limits)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			p := &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers:     tc.containers,
+					InitContainers: tc.initContainers,
+					Overhead:       tc.overhead,
+				},
+			}
+			limits := PodLimits(p, tc.options)
+			if !resourcesEqual(tc.expectedLimits, limits) {
+				t.Errorf("[%s] expected limits = %v, got %v", tc.description, tc.expectedLimits, limits)
+			}
+		})
 	}
 }
 

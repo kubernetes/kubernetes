@@ -28,6 +28,10 @@ var (
 	BigZiByte = (&big.Int{}).Mul(BigEiByte, bigIECExp)
 	// BigYiByte is 1,024 z bytes in bit.Ints
 	BigYiByte = (&big.Int{}).Mul(BigZiByte, bigIECExp)
+	// BigRiByte is 1,024 y bytes in bit.Ints
+	BigRiByte = (&big.Int{}).Mul(BigYiByte, bigIECExp)
+	// BigQiByte is 1,024 r bytes in bit.Ints
+	BigQiByte = (&big.Int{}).Mul(BigRiByte, bigIECExp)
 )
 
 var (
@@ -51,6 +55,10 @@ var (
 	BigZByte = (&big.Int{}).Mul(BigEByte, bigSIExp)
 	// BigYByte is 1,000 SI z bytes in big.Ints
 	BigYByte = (&big.Int{}).Mul(BigZByte, bigSIExp)
+	// BigRByte is 1,000 SI y bytes in big.Ints
+	BigRByte = (&big.Int{}).Mul(BigYByte, bigSIExp)
+	// BigQByte is 1,000 SI r bytes in big.Ints
+	BigQByte = (&big.Int{}).Mul(BigRByte, bigSIExp)
 )
 
 var bigBytesSizeTable = map[string]*big.Int{
@@ -71,6 +79,10 @@ var bigBytesSizeTable = map[string]*big.Int{
 	"zb":  BigZByte,
 	"yib": BigYiByte,
 	"yb":  BigYByte,
+	"rib": BigRiByte,
+	"rb":  BigRByte,
+	"qib": BigQiByte,
+	"qb":  BigQByte,
 	// Without suffix
 	"":   BigByte,
 	"ki": BigKiByte,
@@ -89,6 +101,10 @@ var bigBytesSizeTable = map[string]*big.Int{
 	"zi": BigZiByte,
 	"y":  BigYByte,
 	"yi": BigYiByte,
+	"r":  BigRByte,
+	"ri": BigRiByte,
+	"q":  BigQByte,
+	"qi": BigQiByte,
 }
 
 var ten = big.NewInt(10)
@@ -115,7 +131,7 @@ func humanateBigBytes(s, base *big.Int, sizes []string) string {
 //
 // BigBytes(82854982) -> 83 MB
 func BigBytes(s *big.Int) string {
-	sizes := []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}
+	sizes := []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB", "RB", "QB"}
 	return humanateBigBytes(s, bigSIExp, sizes)
 }
 
@@ -125,7 +141,7 @@ func BigBytes(s *big.Int) string {
 //
 // BigIBytes(82854982) -> 79 MiB
 func BigIBytes(s *big.Int) string {
-	sizes := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"}
+	sizes := []string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB", "RiB", "QiB"}
 	return humanateBigBytes(s, bigIECExp, sizes)
 }
 

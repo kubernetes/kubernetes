@@ -14,39 +14,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import boilerplate
-import unittest
-from io import StringIO
 import os
 import sys
+import unittest
+
+from io import StringIO
+
+import boilerplate
 
 class TestBoilerplate(unittest.TestCase):
-  """
-  Note: run this test from the hack/boilerplate directory.
+    """
+    Note: run this test from the hack/boilerplate directory.
 
-  $ python -m unittest boilerplate_test
-  """
+    $ python -m unittest boilerplate_test
+    """
 
-  def test_boilerplate(self):
-    os.chdir("test/")
+    def test_boilerplate(self):
+        os.chdir("test/")
 
-    class Args(object):
-      def __init__(self):
-        self.filenames = []
-        self.rootdir = "."
-        self.boilerplate_dir = "../"
-        self.verbose = True
+        class Args:
+            filenames = []
+            rootdir = "."
+            boilerplate_dir = "../"
+            verbose = True
 
-    # capture stdout
-    old_stdout = sys.stdout
-    sys.stdout = StringIO.StringIO()
+        # capture stdout
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
 
-    boilerplate.args = Args()
-    ret = boilerplate.main()
+        boilerplate.args = Args
+        ret = boilerplate.main()
+        self.assertEqual(ret, 0)
 
-    output = sorted(sys.stdout.getvalue().split())
+        output = sorted(sys.stdout.getvalue().split())
 
-    sys.stdout = old_stdout
+        sys.stdout = old_stdout
 
-    self.assertEqual(
-        output, ['././fail.go', '././fail.py'])
+        self.assertEqual(output, ["././fail.go", "././fail.py"])

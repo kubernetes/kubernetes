@@ -22,8 +22,8 @@ import (
 	"os"
 	"strings"
 
-	openapiv2 "github.com/google/gnostic/openapiv2"
-	"k8s.io/gengo/types"
+	openapiv2 "github.com/google/gnostic-models/openapiv2"
+	"k8s.io/gengo/v2/types"
 	utilproto "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )

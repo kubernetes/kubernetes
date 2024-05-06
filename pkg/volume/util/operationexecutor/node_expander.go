@@ -37,7 +37,7 @@ type NodeExpander struct {
 	// computed via precheck
 	pvcStatusCap resource.Quantity
 	pvCap        resource.Quantity
-	resizeStatus *v1.PersistentVolumeClaimResizeStatus
+	resizeStatus v1.ClaimResourceStatus
 
 	// pvcAlreadyUpdated if true indicates that although we are calling NodeExpandVolume on the kubelet
 	// PVC has already been updated - possibly because expansion already succeeded on different node.
@@ -68,29 +68,37 @@ type testResponseData struct {
 }
 
 // runPreCheck performs some sanity checks before expansion can be performed on the PVC.
+// This function returns true only if node expansion is allowed to proceed otherwise
+// it returns false.
 func (ne *NodeExpander) runPreCheck() bool {
 	ne.pvcStatusCap = ne.pvc.Status.Capacity[v1.ResourceStorage]
 	ne.pvCap = ne.pv.Spec.Capacity[v1.ResourceStorage]
 
-	ne.resizeStatus = ne.pvc.Status.ResizeStatus
+	allocatedResourceStatus := ne.pvc.Status.AllocatedResourceStatuses
+	if currentStatus, ok := allocatedResourceStatus[v1.ResourceStorage]; ok {
+		ne.resizeStatus = currentStatus
+	}
 
 	// PVC is already expanded but we are still trying to expand the volume because
 	// last recorded size in ASOW is older. This can happen for RWX volume types.
-	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 && (ne.resizeStatus == nil || *ne.resizeStatus == v1.PersistentVolumeClaimNoExpansionInProgress) {
+	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 && ne.resizeStatus == "" {
 		ne.pvcAlreadyUpdated = true
-	}
-
-	// if resizestatus is nil or NodeExpansionInProgress or NodeExpansionPending then we
-	// should allow volume expansion on the node to proceed. We are making an exception for
-	// resizeStatus being nil because it will support use cases where
-	// resizeStatus may not be set (old control-plane expansion controller etc).
-	if ne.resizeStatus == nil ||
-		ne.pvcAlreadyUpdated ||
-		*ne.resizeStatus == v1.PersistentVolumeClaimNodeExpansionPending ||
-		*ne.resizeStatus == v1.PersistentVolumeClaimNodeExpansionInProgress {
 		return true
 	}
 
+	// recovery features will only work for newer version of resize controller
+	if ne.resizeStatus == "" {
+		return false
+	}
+
+	resizeStatusVal := ne.resizeStatus
+
+	// if resizestatus is nil or NodeExpansionInProgress or NodeExpansionPending then we
+	// should allow volume expansion on the node to proceed.
+	if resizeStatusVal == v1.PersistentVolumeClaimNodeResizePending ||
+		resizeStatusVal == v1.PersistentVolumeClaimNodeResizeInProgress {
+		return true
+	}
 	return false
 }
 

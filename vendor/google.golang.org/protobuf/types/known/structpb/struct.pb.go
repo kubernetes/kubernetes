@@ -44,8 +44,7 @@
 // "google.golang.org/protobuf/encoding/protojson" package
 // ensures that they will be serialized as their JSON equivalent.
 //
-//
-// Conversion to and from a Go interface
+// # Conversion to and from a Go interface
 //
 // The standard Go "encoding/json" package has functionality to serialize
 // arbitrary types to a large degree. The Value.AsInterface, Struct.AsMap, and
@@ -58,8 +57,7 @@
 // forms back as Value, Struct, and ListValue messages, use the NewStruct,
 // NewList, and NewValue constructor functions.
 //
-//
-// Example usage
+// # Example usage
 //
 // Consider the following example JSON object:
 //
@@ -118,7 +116,6 @@
 //		... // handle error
 //	}
 //	... // make use of m as a *structpb.Value
-//
 package structpb
 
 import (
@@ -135,7 +132,7 @@ import (
 // `NullValue` is a singleton enumeration to represent the null value for the
 // `Value` type union.
 //
-//  The JSON representation for `NullValue` is JSON `null`.
+// The JSON representation for `NullValue` is JSON `null`.
 type NullValue int32
 
 const (
@@ -218,8 +215,9 @@ func NewStruct(v map[string]interface{}) (*Struct, error) {
 // AsMap converts x to a general-purpose Go map.
 // The map values are converted by calling Value.AsInterface.
 func (x *Struct) AsMap() map[string]interface{} {
-	vs := make(map[string]interface{})
-	for k, v := range x.GetFields() {
+	f := x.GetFields()
+	vs := make(map[string]interface{}, len(f))
+	for k, v := range f {
 		vs[k] = v.AsInterface()
 	}
 	return vs
@@ -274,8 +272,8 @@ func (x *Struct) GetFields() map[string]*Value {
 
 // `Value` represents a dynamically typed value which can be either
 // null, a number, a string, a boolean, a recursive struct value, or a
-// list of values. A producer of value is expected to set one of that
-// variants, absence of any variant indicates an error.
+// list of values. A producer of value is expected to set one of these
+// variants. Absence of any variant indicates an error.
 //
 // The JSON representation for `Value` is JSON value.
 type Value struct {
@@ -286,6 +284,7 @@ type Value struct {
 	// The kind of value.
 	//
 	// Types that are assignable to Kind:
+	//
 	//	*Value_NullValue
 	//	*Value_NumberValue
 	//	*Value_StringValue
@@ -596,8 +595,9 @@ func NewList(v []interface{}) (*ListValue, error) {
 // AsSlice converts x to a general-purpose Go slice.
 // The slice elements are converted by calling Value.AsInterface.
 func (x *ListValue) AsSlice() []interface{} {
-	vs := make([]interface{}, len(x.GetValues()))
-	for i, v := range x.GetValues() {
+	vals := x.GetValues()
+	vs := make([]interface{}, len(vals))
+	for i, v := range vals {
 		vs[i] = v.AsInterface()
 	}
 	return vs

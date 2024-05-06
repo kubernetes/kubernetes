@@ -51,6 +51,10 @@ type DeltaFIFOOptions struct {
 	// When true, `Replaced` events will be sent for items passed to a Replace() call.
 	// When false, `Sync` events will be sent instead.
 	EmitDeltaTypeReplaced bool
+
+	// If set, will be called for objects before enqueueing them. Please
+	// see the comment on TransformFunc for details.
+	Transformer TransformFunc
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -129,7 +133,28 @@ type DeltaFIFO struct {
 	// emitDeltaTypeReplaced is whether to emit the Replaced or Sync
 	// DeltaType when Replace() is called (to preserve backwards compat).
 	emitDeltaTypeReplaced bool
+
+	// Called with every object if non-nil.
+	transformer TransformFunc
 }
+
+// TransformFunc allows for transforming an object before it will be processed.
+//
+// The most common usage pattern is to clean-up some parts of the object to
+// reduce component memory usage if a given component doesn't care about them.
+//
+// New in v1.27: TransformFunc sees the object before any other actor, and it
+// is now safe to mutate the object in place instead of making a copy.
+//
+// It's recommended for the TransformFunc to be idempotent.
+// It MUST be idempotent if objects already present in the cache are passed to
+// the Replace() to avoid re-mutating them. Default informers do not pass
+// existing objects to Replace though.
+//
+// Note that TransformFunc is called while inserting objects into the
+// notification queue and is therefore extremely performance sensitive; please
+// do not do anything that will take a long time.
+type TransformFunc func(interface{}) (interface{}, error)
 
 // DeltaType is the type of a change (addition, deletion, etc)
 type DeltaType string
@@ -227,6 +252,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 		knownObjects: opts.KnownObjects,
 
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
+		transformer:           opts.Transformer,
 	}
 	f.cond.L = &f.lock
 	return f
@@ -411,10 +437,41 @@ func isDeletionDup(a, b *Delta) *Delta {
 // queueActionLocked appends to the delta list for the object.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
+	return f.queueActionInternalLocked(actionType, actionType, obj)
+}
+
+// queueActionInternalLocked appends to the delta list for the object.
+// The actionType is emitted and must honor emitDeltaTypeReplaced.
+// The internalActionType is only used within this function and must
+// ignore emitDeltaTypeReplaced.
+// Caller must lock first.
+func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType DeltaType, obj interface{}) error {
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
+
+	// Every object comes through this code path once, so this is a good
+	// place to call the transform func.
+	//
+	// If obj is a DeletedFinalStateUnknown tombstone or the action is a Sync,
+	// then the object have already gone through the transformer.
+	//
+	// If the objects already present in the cache are passed to Replace(),
+	// the transformer must be idempotent to avoid re-mutating them,
+	// or coordinate with all readers from the cache to avoid data races.
+	// Default informers do not pass existing objects to Replace.
+	if f.transformer != nil {
+		_, isTombstone := obj.(DeletedFinalStateUnknown)
+		if !isTombstone && internalActionType != Sync {
+			var err error
+			obj, err = f.transformer(obj)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	oldDeltas := f.items[id]
 	newDeltas := append(oldDeltas, Delta{actionType, obj})
 	newDeltas = dedupDeltas(newDeltas)
@@ -594,7 +651,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 			return KeyError{item, err}
 		}
 		keys.Insert(key)
-		if err := f.queueActionLocked(action, item); err != nil {
+		if err := f.queueActionInternalLocked(action, Replaced, item); err != nil {
 			return fmt.Errorf("couldn't enqueue object: %v", err)
 		}
 	}

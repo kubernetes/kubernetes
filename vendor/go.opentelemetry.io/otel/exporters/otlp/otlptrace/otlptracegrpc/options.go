@@ -22,8 +22,8 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/internal/retry"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/otlpconfig"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/otlpconfig"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/retry"
 )
 
 // Option applies an option to the gRPC driver.
@@ -93,13 +93,7 @@ func compressorToCompression(compressor string) otlpconfig.Compression {
 }
 
 // WithCompressor sets the compressor for the gRPC client to use when sending
-// requests. It is the responsibility of the caller to ensure that the
-// compressor set has been registered with google.golang.org/grpc/encoding.
-// This can be done by encoding.RegisterCompressor. Some compressors
-// auto-register on import, such as gzip, which can be registered by calling
-// `import _ "google.golang.org/grpc/encoding/gzip"`.
-//
-// This option has no effect if WithGRPCConn is used.
+// requests. Supported compressor values: "gzip".
 func WithCompressor(compressor string) Option {
 	return wrappedOption{otlpconfig.WithCompression(compressorToCompression(compressor))}
 }

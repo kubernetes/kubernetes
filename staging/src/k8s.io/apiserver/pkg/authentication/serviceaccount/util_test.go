@@ -17,11 +17,69 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
+
+func TestUserInfo(t *testing.T) {
+	tests := map[string]struct {
+		info             ServiceAccountInfo
+		expectedUserInfo *user.DefaultInfo
+	}{
+		"extracts pod name/uid": {
+			info: ServiceAccountInfo{Name: "name", Namespace: "ns", PodName: "test", PodUID: "uid"},
+			expectedUserInfo: &user.DefaultInfo{
+				Name:   "system:serviceaccount:ns:name",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:ns"},
+				Extra: map[string][]string{
+					"authentication.kubernetes.io/pod-name": {"test"},
+					"authentication.kubernetes.io/pod-uid":  {"uid"},
+				},
+			},
+		},
+		"extracts node name/uid": {
+			info: ServiceAccountInfo{Name: "name", Namespace: "ns", NodeName: "test", NodeUID: "uid"},
+			expectedUserInfo: &user.DefaultInfo{
+				Name:   "system:serviceaccount:ns:name",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:ns"},
+				Extra: map[string][]string{
+					"authentication.kubernetes.io/node-name": {"test"},
+					"authentication.kubernetes.io/node-uid":  {"uid"},
+				},
+			},
+		},
+		"extracts node name only": {
+			info: ServiceAccountInfo{Name: "name", Namespace: "ns", NodeName: "test"},
+			expectedUserInfo: &user.DefaultInfo{
+				Name:   "system:serviceaccount:ns:name",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:ns"},
+				Extra: map[string][]string{
+					"authentication.kubernetes.io/node-name": {"test"},
+				},
+			},
+		},
+		"does not extract node UID if name is not set": {
+			info: ServiceAccountInfo{Name: "name", Namespace: "ns", NodeUID: "test"},
+			expectedUserInfo: &user.DefaultInfo{
+				Name:   "system:serviceaccount:ns:name",
+				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:ns"},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			userInfo := test.info.UserInfo()
+			if !reflect.DeepEqual(userInfo, test.expectedUserInfo) {
+				t.Errorf("expected %#v but got %#v", test.expectedUserInfo, userInfo)
+			}
+		})
+	}
+}
 
 func TestMakeUsername(t *testing.T) {
 

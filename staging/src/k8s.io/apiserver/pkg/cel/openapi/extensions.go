@@ -18,6 +18,7 @@ package openapi
 
 import (
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -47,6 +48,11 @@ func getXListType(schema *spec.Schema) string {
 	return s
 }
 
+func getXMapType(schema *spec.Schema) string {
+	s, _ := schema.Extensions.GetString(extMapType)
+	return s
+}
+
 func getXListMapKeys(schema *spec.Schema) []string {
 	mapKeys, ok := schema.Extensions.GetStringSlice(extListMapKeys)
 	if !ok {
@@ -55,8 +61,47 @@ func getXListMapKeys(schema *spec.Schema) []string {
 	return mapKeys
 }
 
+type ValidationRule struct {
+	RuleField              string `json:"rule"`
+	MessageField           string `json:"message"`
+	MessageExpressionField string `json:"messageExpression"`
+	PathField              string `json:"fieldPath"`
+}
+
+func (v ValidationRule) Rule() string {
+	return v.RuleField
+}
+
+func (v ValidationRule) Message() string {
+	return v.MessageField
+}
+
+func (v ValidationRule) FieldPath() string {
+	return v.PathField
+}
+
+func (v ValidationRule) MessageExpression() string {
+	return v.MessageExpressionField
+}
+
+// TODO: simplify
+func getXValidations(schema *spec.Schema) []common.ValidationRule {
+	var rules []ValidationRule
+	err := schema.Extensions.GetObject(extValidations, &rules)
+	if err != nil {
+		return nil
+	}
+	results := make([]common.ValidationRule, len(rules))
+	for i, rule := range rules {
+		results[i] = rule
+	}
+	return results
+}
+
 const extIntOrString = "x-kubernetes-int-or-string"
 const extEmbeddedResource = "x-kubernetes-embedded-resource"
 const extPreserveUnknownFields = "x-kubernetes-preserve-unknown-fields"
 const extListType = "x-kubernetes-list-type"
+const extMapType = "x-kubernetes-map-type"
 const extListMapKeys = "x-kubernetes-list-map-keys"
+const extValidations = "x-kubernetes-validations"

@@ -17,9 +17,11 @@ limitations under the License.
 package v1
 
 import (
-	"time"
+	"encoding/json"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Supported output formats.
@@ -39,10 +41,11 @@ type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
 	Format string `json:"format,omitempty"`
-	// Maximum number of nanoseconds (i.e. 1s = 1000000000) between log
-	// flushes. Ignored if the selected logging backend writes log
-	// messages without buffering.
-	FlushFrequency time.Duration `json:"flushFrequency"`
+	// Maximum time between log flushes.
+	// If a string, parsed as a duration (i.e. "1s")
+	// If an int, the maximum number of nanoseconds (i.e. 1s = 1000000000).
+	// Ignored if the selected logging backend writes log messages without buffering.
+	FlushFrequency TimeOrMetaDuration `json:"flushFrequency"`
 	// Verbosity is the threshold that determines which log messages are
 	// logged. Default is zero which logs only the most important
 	// messages. Higher values enable additional messages. Error messages
@@ -58,15 +61,59 @@ type LoggingConfiguration struct {
 	Options FormatOptions `json:"options,omitempty"`
 }
 
+// TimeOrMetaDuration is present only for backwards compatibility for the
+// flushFrequency field, and new fields should use metav1.Duration.
+type TimeOrMetaDuration struct {
+	// Duration holds the duration
+	Duration metav1.Duration
+	// SerializeAsString controls whether the value is serialized as a string or an integer
+	SerializeAsString bool `json:"-"`
+}
+
+func (t TimeOrMetaDuration) MarshalJSON() ([]byte, error) {
+	if t.SerializeAsString {
+		return t.Duration.MarshalJSON()
+	} else {
+		// Marshal as integer for backwards compatibility
+		return json.Marshal(t.Duration.Duration)
+	}
+}
+
+func (t *TimeOrMetaDuration) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '"' {
+		// string values unmarshal as metav1.Duration
+		t.SerializeAsString = true
+		return json.Unmarshal(b, &t.Duration)
+	}
+	t.SerializeAsString = false
+	if err := json.Unmarshal(b, &t.Duration.Duration); err != nil {
+		return fmt.Errorf("invalid duration %q: %w", string(b), err)
+	}
+	return nil
+}
+
 // FormatOptions contains options for the different logging formats.
 type FormatOptions struct {
+	// [Alpha] Text contains options for logging format "text".
+	// Only available when the LoggingAlphaOptions feature gate is enabled.
+	Text TextOptions `json:"text,omitempty"`
 	// [Alpha] JSON contains options for logging format "json".
 	// Only available when the LoggingAlphaOptions feature gate is enabled.
 	JSON JSONOptions `json:"json,omitempty"`
 }
 
+// TextOptions contains options for logging format "text".
+type TextOptions struct {
+	OutputRoutingOptions `json:",inline"`
+}
+
 // JSONOptions contains options for logging format "json".
 type JSONOptions struct {
+	OutputRoutingOptions `json:",inline"`
+}
+
+// OutputRoutingOptions contains options that are supported by both "text" and "json".
+type OutputRoutingOptions struct {
 	// [Alpha] SplitStream redirects error messages to stderr while
 	// info messages go to stdout, with buffering. The default is to write
 	// both to stdout, without buffering. Only available when

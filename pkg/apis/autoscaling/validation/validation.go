@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -316,11 +317,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 		expectedField = "external"
 	case autoscaling.ContainerResourceMetricSourceType:
 		if spec.ContainerResource == nil {
-			if utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) {
-				allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source"))
-			} else {
-				allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source (only allowed when HPAContainerMetrics feature is enabled)"))
-			}
+			allErrs = append(allErrs, field.Required(fldPath.Child("containerResource"), "must populate information for the given metric source"))
 		}
 		expectedField = "containerResource"
 	default:
@@ -387,7 +384,7 @@ func validateContainerResourceSource(src *autoscaling.ContainerResourceMetricSou
 	if len(src.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a resource name"))
 	} else {
-		allErrs = append(allErrs, corevalidation.ValidateContainerResourceName(string(src.Name), fldPath.Child("name"))...)
+		allErrs = append(allErrs, corevalidation.ValidateContainerResourceName(src.Name, fldPath.Child("name"))...)
 	}
 
 	if len(src.Container) == 0 {

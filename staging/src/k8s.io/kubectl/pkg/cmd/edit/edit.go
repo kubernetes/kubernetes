@@ -19,7 +19,8 @@ package edit
 import (
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -34,6 +35,10 @@ var (
 		The edit command allows you to directly edit any API resource you can retrieve via the
 		command-line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
 		environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
+		When attempting to open the editor, it will first attempt to use the shell
+		that has been defined in the 'SHELL' environment variable. If this is not defined,
+		the default shell will be used, which is '/bin/bash' for Linux or 'cmd' for Windows.
+
 		You can edit multiple objects, although changes are applied one at a time. The command
 		accepts file names as well as command-line arguments, although the files you point to must
 		be previously saved versions of resources.
@@ -65,12 +70,12 @@ var (
 		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation
 		kubectl edit deployment/mydeployment -o yaml --save-config
 
-		# Edit the deployment/mydeployment's status subresource
+		# Edit the 'status' subresource for the 'mydeployment' deployment
 		kubectl edit deployment mydeployment --subresource='status'`))
 )
 
 // NewCmdEdit creates the `edit` command
-func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdEdit(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.NormalEditMode, ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "edit (RESOURCE/NAME | -f FILENAME)",

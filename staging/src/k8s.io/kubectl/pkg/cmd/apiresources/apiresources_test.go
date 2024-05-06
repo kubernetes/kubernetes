@@ -22,17 +22,17 @@ import (
 	"github.com/spf13/cobra"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 func TestAPIResourcesComplete(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
-	cmd := NewCmdAPIResources(tf, genericclioptions.NewTestIOStreamsDiscard())
+	cmd := NewCmdAPIResources(tf, genericiooptions.NewTestIOStreamsDiscard())
 	parentCmd := &cobra.Command{Use: "kubectl"}
 	parentCmd.AddCommand(cmd)
-	o := NewAPIResourceOptions(genericclioptions.NewTestIOStreamsDiscard())
+	o := NewAPIResourceOptions(genericiooptions.NewTestIOStreamsDiscard())
 
 	err := o.Complete(tf, cmd, []string{})
 	if err != nil {
@@ -79,7 +79,7 @@ func TestAPIResourcesValidate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
-			o := NewAPIResourceOptions(genericclioptions.NewTestIOStreamsDiscard())
+			o := NewAPIResourceOptions(genericiooptions.NewTestIOStreamsDiscard())
 			tc.optionSetupFn(o)
 			err := o.Validate()
 			if tc.expectedError == "" {
@@ -305,7 +305,7 @@ bazzes   b            somegroup/v1   true         Baz
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
 			dc.Invalidations = 0
-			ioStreams, _, out, errOut := genericclioptions.NewTestIOStreams()
+			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdAPIResources(tf, ioStreams)
 			tc.commandSetupFn(cmd)
 			cmd.Run(cmd, []string{})

@@ -43,6 +43,7 @@ type ServiceAccountTokenGetter interface {
 	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
 	GetPod(namespace, name string) (*v1.Pod, error)
 	GetSecret(namespace, name string) (*v1.Secret, error)
+	GetNode(name string) (*v1.Node, error)
 }
 
 type TokenGenerator interface {
@@ -290,6 +291,11 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 		return nil, false, utilerrors.NewAggregate(errlist)
 	}
 
+	// sanity check issuer since we parsed it out before signature validation
+	if !j.issuers[public.Issuer] {
+		return nil, false, fmt.Errorf("token issuer %q is invalid", public.Issuer)
+	}
+
 	tokenAudiences := authenticator.Audiences(public.Audience)
 	if len(tokenAudiences) == 0 {
 		// only apiserver audiences are allowed for legacy tokens
@@ -329,6 +335,9 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 // Note: go-jose currently does not allow access to unverified JWS payloads.
 // See https://github.com/square/go-jose/issues/169
 func (j *jwtTokenAuthenticator) hasCorrectIssuer(tokenData string) bool {
+	if strings.HasPrefix(strings.TrimSpace(tokenData), "{") {
+		return false
+	}
 	parts := strings.Split(tokenData, ".")
 	if len(parts) != 3 {
 		return false

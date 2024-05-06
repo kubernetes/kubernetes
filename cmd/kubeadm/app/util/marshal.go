@@ -54,23 +54,11 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 	return runtime.Encode(encoder, obj)
 }
 
-// UnmarshalFromYaml unmarshals yaml into an object.
-func UnmarshalFromYaml(buffer []byte, gv schema.GroupVersion) (runtime.Object, error) {
-	return UnmarshalFromYamlForCodecs(buffer, gv, clientsetscheme.Codecs)
-}
-
-// UnmarshalFromYamlForCodecs unmarshals yaml into an object using the specified codec
-// TODO: Is specifying the gv really needed here?
-// TODO: Can we support json out of the box easily here?
-func UnmarshalFromYamlForCodecs(buffer []byte, gv schema.GroupVersion, codecs serializer.CodecFactory) (runtime.Object, error) {
-	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return nil, errors.Errorf("unsupported media type %q", mediaType)
-	}
-
-	decoder := codecs.DecoderToVersion(info.Serializer, gv)
-	obj, err := runtime.Decode(decoder, buffer)
+// UniversalUnmarshal unmarshals YAML or JSON into a runtime.Object using the universal deserializer.
+func UniversalUnmarshal(buffer []byte) (runtime.Object, error) {
+	codecs := clientsetscheme.Codecs
+	decoder := codecs.UniversalDeserializer()
+	obj, _, err := decoder.Decode(buffer, nil, nil)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to decode %s into runtime.Object", buffer)
 	}
@@ -157,4 +145,14 @@ func GroupVersionKindsHasInitConfiguration(gvks ...schema.GroupVersionKind) bool
 // GroupVersionKindsHasJoinConfiguration returns whether the following gvk slice contains a JoinConfiguration object
 func GroupVersionKindsHasJoinConfiguration(gvks ...schema.GroupVersionKind) bool {
 	return GroupVersionKindsHasKind(gvks, constants.JoinConfigurationKind)
+}
+
+// GroupVersionKindsHasResetConfiguration returns whether the following gvk slice contains a ResetConfiguration object
+func GroupVersionKindsHasResetConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.ResetConfigurationKind)
+}
+
+// GroupVersionKindsHasUpgradeConfiguration returns whether the following gvk slice contains a UpgradeConfiguration object
+func GroupVersionKindsHasUpgradeConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.UpgradeConfigurationKind)
 }

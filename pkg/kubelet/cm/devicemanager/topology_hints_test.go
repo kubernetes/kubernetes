@@ -61,8 +61,8 @@ func TestGetTopologyHints(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:       NewResourceDeviceInstances(),
-			healthyDevices:   make(map[string]sets.String),
-			allocatedDevices: make(map[string]sets.String),
+			healthyDevices:   make(map[string]sets.Set[string]),
+			allocatedDevices: make(map[string]sets.Set[string]),
 			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
 			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod} },
@@ -71,7 +71,7 @@ func TestGetTopologyHints(t *testing.T) {
 
 		for r := range tc.devices {
 			m.allDevices[r] = make(DeviceInstances)
-			m.healthyDevices[r] = sets.NewString()
+			m.healthyDevices[r] = sets.New[string]()
 
 			for _, d := range tc.devices[r] {
 				m.allDevices[r][d.ID] = d
@@ -84,7 +84,7 @@ func TestGetTopologyHints(t *testing.T) {
 				for r, devices := range tc.allocatedDevices[p][c] {
 					m.podDevices.insert(p, c, r, constructDevices(devices), nil)
 
-					m.allocatedDevices[r] = sets.NewString()
+					m.allocatedDevices[r] = sets.New[string]()
 					for _, d := range devices {
 						m.allocatedDevices[r].Insert(d)
 					}
@@ -414,8 +414,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:            NewResourceDeviceInstances(),
-			healthyDevices:        make(map[string]sets.String),
-			allocatedDevices:      make(map[string]sets.String),
+			healthyDevices:        make(map[string]sets.Set[string]),
+			allocatedDevices:      make(map[string]sets.Set[string]),
 			endpoints:             make(map[string]endpointInfo),
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
@@ -424,7 +424,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 		}
 
 		m.allDevices[tc.resource] = make(DeviceInstances)
-		m.healthyDevices[tc.resource] = sets.NewString()
+		m.healthyDevices[tc.resource] = sets.New[string]()
 		m.endpoints[tc.resource] = endpointInfo{}
 
 		for _, d := range tc.devices {
@@ -441,7 +441,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			}
 		}
 
-		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.NewString())
+		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string]())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
@@ -603,8 +603,8 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:            NewResourceDeviceInstances(),
-			healthyDevices:        make(map[string]sets.String),
-			allocatedDevices:      make(map[string]sets.String),
+			healthyDevices:        make(map[string]sets.Set[string]),
+			allocatedDevices:      make(map[string]sets.Set[string]),
 			endpoints:             make(map[string]endpointInfo),
 			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
@@ -613,13 +613,13 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 		}
 
 		m.allDevices[tc.resource] = make(DeviceInstances)
-		m.healthyDevices[tc.resource] = sets.NewString()
+		m.healthyDevices[tc.resource] = sets.New[string]()
 		for _, d := range tc.allDevices {
 			m.allDevices[tc.resource][d.ID] = d
 			m.healthyDevices[tc.resource].Insert(d.ID)
 		}
 
-		m.allocatedDevices[tc.resource] = sets.NewString()
+		m.allocatedDevices[tc.resource] = sets.New[string]()
 		for _, d := range tc.allocatedDevices {
 			m.allocatedDevices[tc.resource].Insert(d)
 		}
@@ -639,17 +639,17 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
 		}
 
-		_, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.NewString(tc.reusableDevices...))
+		_, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string](tc.reusableDevices...))
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
 
-		if !sets.NewString(actualAvailable...).Equal(sets.NewString(tc.expectedAvailable...)) {
+		if !sets.New[string](actualAvailable...).Equal(sets.New[string](tc.expectedAvailable...)) {
 			t.Errorf("%v. expected available: %v but got: %v", tc.description, tc.expectedAvailable, actualAvailable)
 		}
 
-		if !sets.NewString(actualAvailable...).Equal(sets.NewString(tc.expectedAvailable...)) {
+		if !sets.New[string](actualAvailable...).Equal(sets.New[string](tc.expectedAvailable...)) {
 			t.Errorf("%v. expected mustInclude: %v but got: %v", tc.description, tc.expectedMustInclude, actualMustInclude)
 		}
 
@@ -903,11 +903,11 @@ func TestGetPodDeviceRequest(t *testing.T) {
 
 	for _, tc := range tcases {
 		m := ManagerImpl{
-			healthyDevices: make(map[string]sets.String),
+			healthyDevices: make(map[string]sets.Set[string]),
 		}
 
 		for _, res := range tc.registeredDevices {
-			m.healthyDevices[res] = sets.NewString()
+			m.healthyDevices[res] = sets.New[string]()
 		}
 
 		accumulatedResourceRequests := m.getPodDeviceRequest(tc.pod)
@@ -925,8 +925,8 @@ func TestGetPodTopologyHints(t *testing.T) {
 	for _, tc := range tcases {
 		m := ManagerImpl{
 			allDevices:       NewResourceDeviceInstances(),
-			healthyDevices:   make(map[string]sets.String),
-			allocatedDevices: make(map[string]sets.String),
+			healthyDevices:   make(map[string]sets.Set[string]),
+			allocatedDevices: make(map[string]sets.Set[string]),
 			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
 			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod, {ObjectMeta: metav1.ObjectMeta{UID: "fakeOtherPod"}}} },
@@ -935,7 +935,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 
 		for r := range tc.devices {
 			m.allDevices[r] = make(DeviceInstances)
-			m.healthyDevices[r] = sets.NewString()
+			m.healthyDevices[r] = sets.New[string]()
 
 			for _, d := range tc.devices[r] {
 				//add `pluginapi.Device` with Topology
@@ -949,7 +949,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 				for r, devices := range tc.allocatedDevices[p][c] {
 					m.podDevices.insert(p, c, r, constructDevices(devices), nil)
 
-					m.allocatedDevices[r] = sets.NewString()
+					m.allocatedDevices[r] = sets.New[string]()
 					for _, d := range devices {
 						m.allocatedDevices[r].Insert(d)
 					}

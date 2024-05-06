@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -36,9 +37,9 @@ var upgradeTests = []upgrades.Test{
 	&apps.CassandraUpgradeTest{},
 }
 
-var _ = SIGDescribe("stateful Upgrade [Feature:StatefulUpgrade]", func() {
+var _ = SIGDescribe("stateful Upgrade", feature.StatefulUpgrade, func() {
 	f := framework.NewDefaultFramework("stateful-upgrade")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("stateful upgrade", func() {

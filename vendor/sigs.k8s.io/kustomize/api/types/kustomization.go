@@ -7,16 +7,21 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
+	"sigs.k8s.io/kustomize/kyaml/errors"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 	"sigs.k8s.io/yaml"
 )
 
 const (
-	KustomizationVersion  = "kustomize.config.k8s.io/v1beta1"
-	KustomizationKind     = "Kustomization"
-	ComponentVersion      = "kustomize.config.k8s.io/v1alpha1"
-	ComponentKind         = "Component"
-	MetadataNamespacePath = "metadata/namespace"
+	KustomizationVersion        = "kustomize.config.k8s.io/v1beta1"
+	KustomizationKind           = "Kustomization"
+	ComponentVersion            = "kustomize.config.k8s.io/v1alpha1"
+	ComponentKind               = "Component"
+	MetadataNamespacePath       = "metadata/namespace"
+	MetadataNamespaceApiVersion = "v1"
+	MetadataNamePath            = "metadata/name"
 
 	OriginAnnotations      = "originAnnotations"
 	TransformerAnnotations = "transformerAnnotations"
@@ -59,12 +64,14 @@ type Kustomization struct {
 	// CommonAnnotations to add to all objects.
 	CommonAnnotations map[string]string `json:"commonAnnotations,omitempty" yaml:"commonAnnotations,omitempty"`
 
+	// Deprecated: Use the Patches field instead, which provides a superset of the functionality of PatchesStrategicMerge.
 	// PatchesStrategicMerge specifies the relative path to a file
 	// containing a strategic merge patch.  Format documented at
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md
 	// URLs and globs are not supported.
 	PatchesStrategicMerge []PatchStrategicMerge `json:"patchesStrategicMerge,omitempty" yaml:"patchesStrategicMerge,omitempty"`
 
+	// Deprecated: Use the Patches field instead, which provides a superset of the functionality of JSONPatches.
 	// JSONPatches is a list of JSONPatch for applying JSON patch.
 	// Format documented at https://tools.ietf.org/html/rfc6902
 	// and http://jsonpatch.com
@@ -80,6 +87,9 @@ type Kustomization struct {
 	// patch, but this operator is simpler to specify.
 	Images []Image `json:"images,omitempty" yaml:"images,omitempty"`
 
+	// Deprecated: Use the Images field instead.
+	ImageTags []Image `json:"imageTags,omitempty" yaml:"imageTags,omitempty"`
+
 	// Replacements is a list of replacements, which will copy nodes from a
 	// specified source to N specified targets.
 	Replacements []ReplacementField `json:"replacements,omitempty" yaml:"replacements,omitempty"`
@@ -88,6 +98,7 @@ type Kustomization struct {
 	// specification. This can also be done with a patch.
 	Replicas []Replica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
+	// Deprecated: Vars will be removed in future release. Migrate to Replacements instead.
 	// Vars allow things modified by kustomize to be injected into a
 	// kubernetes object specification. A var is a name (e.g. FOO) associated
 	// with a field in a specific resource instance.  The field must
@@ -96,6 +107,9 @@ type Kustomization struct {
 	// spec will be replaced at kustomize build time, after the final
 	// value of the specified field has been determined.
 	Vars []Var `json:"vars,omitempty" yaml:"vars,omitempty"`
+
+	// SortOptions change the order that kustomize outputs resources.
+	SortOptions *SortOptions `json:"sortOptions,omitempty" yaml:"sortOptions,omitempty"`
 
 	//
 	// Operands - what kustomize operates on.
@@ -116,9 +130,7 @@ type Kustomization struct {
 	// CRDs themselves are not modified.
 	Crds []string `json:"crds,omitempty" yaml:"crds,omitempty"`
 
-	// Deprecated.
-	// Anything that would have been specified here should
-	// be specified in the Resources field instead.
+	// Deprecated: Anything that would have been specified here should be specified in the Resources field instead.
 	Bases []string `json:"bases,omitempty" yaml:"bases,omitempty"`
 
 	//
@@ -164,19 +176,46 @@ type Kustomization struct {
 	// Validators is a list of files containing validators
 	Validators []string `json:"validators,omitempty" yaml:"validators,omitempty"`
 
-	// Inventory appends an object that contains the record
-	// of all other objects, which can be used in apply, prune and delete
-	Inventory *Inventory `json:"inventory,omitempty" yaml:"inventory,omitempty"`
-
 	// BuildMetadata is a list of strings used to toggle different build options
 	BuildMetadata []string `json:"buildMetadata,omitempty" yaml:"buildMetadata,omitempty"`
 }
 
-// FixKustomizationPostUnmarshalling fixes things
+const (
+	deprecatedWarningToRunEditFix              = "Run 'kustomize edit fix' to update your Kustomization automatically."
+	deprecatedWarningToRunEditFixExperimential = "[EXPERIMENTAL] Run 'kustomize edit fix' to update your Kustomization automatically."
+	deprecatedBaseWarningMessage               = "# Warning: 'bases' is deprecated. Please use 'resources' instead." + " " + deprecatedWarningToRunEditFix
+	deprecatedImageTagsWarningMessage          = "# Warning: 'imageTags' is deprecated. Please use 'images' instead." + " " + deprecatedWarningToRunEditFix
+	deprecatedPatchesJson6902Message           = "# Warning: 'patchesJson6902' is deprecated. Please use 'patches' instead." + " " + deprecatedWarningToRunEditFix
+	deprecatedPatchesStrategicMergeMessage     = "# Warning: 'patchesStrategicMerge' is deprecated. Please use 'patches' instead." + " " + deprecatedWarningToRunEditFix
+	deprecatedVarsMessage                      = "# Warning: 'vars' is deprecated. Please use 'replacements' instead." + " " + deprecatedWarningToRunEditFixExperimential
+)
+
+// CheckDeprecatedFields check deprecated field is used or not.
+func (k *Kustomization) CheckDeprecatedFields() *[]string {
+	var warningMessages []string
+	if k.Bases != nil {
+		warningMessages = append(warningMessages, deprecatedBaseWarningMessage)
+	}
+	if k.ImageTags != nil {
+		warningMessages = append(warningMessages, deprecatedImageTagsWarningMessage)
+	}
+	if k.PatchesJson6902 != nil {
+		warningMessages = append(warningMessages, deprecatedPatchesJson6902Message)
+	}
+	if k.PatchesStrategicMerge != nil {
+		warningMessages = append(warningMessages, deprecatedPatchesStrategicMergeMessage)
+	}
+	if k.Vars != nil {
+		warningMessages = append(warningMessages, deprecatedVarsMessage)
+	}
+	return &warningMessages
+}
+
+// FixKustomization fixes things
 // like empty fields that should not be empty, or
 // moving content of deprecated fields to newer
 // fields.
-func (k *Kustomization) FixKustomizationPostUnmarshalling() {
+func (k *Kustomization) FixKustomization() {
 	if k.Kind == "" {
 		k.Kind = KustomizationKind
 	}
@@ -187,8 +226,15 @@ func (k *Kustomization) FixKustomizationPostUnmarshalling() {
 			k.APIVersion = KustomizationVersion
 		}
 	}
+
+	// 'bases' field was deprecated in favor of the 'resources' field.
 	k.Resources = append(k.Resources, k.Bases...)
 	k.Bases = nil
+
+	// 'imageTags' field was deprecated in favor of the 'images' field.
+	k.Images = append(k.Images, k.ImageTags...)
+	k.ImageTags = nil
+
 	for i, g := range k.ConfigMapGenerator {
 		if g.EnvSource != "" {
 			k.ConfigMapGenerator[i].EnvSources =
@@ -217,10 +263,24 @@ func (k *Kustomization) FixKustomizationPostUnmarshalling() {
 // FixKustomizationPreMarshalling fixes things
 // that should occur after the kustomization file
 // has been processed.
-func (k *Kustomization) FixKustomizationPreMarshalling() error {
+func (k *Kustomization) FixKustomizationPreMarshalling(fSys filesys.FileSystem) error {
 	// PatchesJson6902 should be under the Patches field.
 	k.Patches = append(k.Patches, k.PatchesJson6902...)
 	k.PatchesJson6902 = nil
+
+	if k.PatchesStrategicMerge != nil {
+		for _, patchStrategicMerge := range k.PatchesStrategicMerge {
+			// check this patch is file path select.
+			if _, err := fSys.ReadFile(string(patchStrategicMerge)); err == nil {
+				// path patch
+				k.Patches = append(k.Patches, Patch{Path: string(patchStrategicMerge)})
+			} else {
+				// inline string patch
+				k.Patches = append(k.Patches, Patch{Patch: string(patchStrategicMerge)})
+			}
+		}
+		k.PatchesStrategicMerge = nil
+	}
 
 	// this fix is not in FixKustomizationPostUnmarshalling because
 	// it will break some commands like `create` and `add`. those
@@ -236,6 +296,20 @@ func (k *Kustomization) FixKustomizationPreMarshalling() error {
 		}
 		k.Labels = append(k.Labels, *cl)
 		k.CommonLabels = nil
+	}
+
+	return nil
+}
+
+func (k *Kustomization) CheckEmpty() error {
+	// generate empty Kustomization
+	emptyKustomization := &Kustomization{}
+
+	// k.TypeMeta is metadata. It Isn't related to whether empty or not.
+	emptyKustomization.TypeMeta = k.TypeMeta
+
+	if reflect.DeepEqual(k, emptyKustomization) {
+		return fmt.Errorf("kustomization.yaml is empty")
 	}
 
 	return nil
@@ -258,16 +332,19 @@ func (k *Kustomization) EnforceFields() []string {
 
 // Unmarshal replace k with the content in YAML input y
 func (k *Kustomization) Unmarshal(y []byte) error {
+	// TODO: switch to strict decoding to catch duplicate keys.
+	// We can't do so until there is a yaml decoder that supports anchors AND case-insensitive keys.
+	// See https://github.com/kubernetes-sigs/kustomize/issues/5061
 	j, err := yaml.YAMLToJSON(y)
 	if err != nil {
-		return err
+		return errors.WrapPrefixf(err, "invalid Kustomization")
 	}
 	dec := json.NewDecoder(bytes.NewReader(j))
 	dec.DisallowUnknownFields()
 	var nk Kustomization
 	err = dec.Decode(&nk)
 	if err != nil {
-		return err
+		return errors.WrapPrefixf(err, "invalid Kustomization")
 	}
 	*k = nk
 	return nil

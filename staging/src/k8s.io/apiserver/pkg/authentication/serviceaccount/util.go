@@ -36,12 +36,27 @@ const (
 	ServiceAccountUsernameSeparator = ":"
 	ServiceAccountGroupPrefix       = "system:serviceaccounts:"
 	AllServiceAccountsGroup         = "system:serviceaccounts"
+	// CredentialIDKey is the key used in a user's "extra" to specify the unique
+	// identifier for this identity document).
+	CredentialIDKey = "authentication.kubernetes.io/credential-id"
+	// IssuedCredentialIDAuditAnnotationKey is the annotation key used in the audit event that is persisted to the
+	// '/token' endpoint for service accounts.
+	// This annotation indicates the generated credential identifier for the service account token being issued.
+	// This is useful when tracing back the origin of tokens that have gone on to make request that have persisted
+	// their credential-identifier into the audit log via the user's extra info stored on subsequent audit events.
+	IssuedCredentialIDAuditAnnotationKey = "authentication.kubernetes.io/issued-credential-id"
 	// PodNameKey is the key used in a user's "extra" to specify the pod name of
 	// the authenticating request.
 	PodNameKey = "authentication.kubernetes.io/pod-name"
 	// PodUIDKey is the key used in a user's "extra" to specify the pod UID of
 	// the authenticating request.
 	PodUIDKey = "authentication.kubernetes.io/pod-uid"
+	// NodeNameKey is the key used in a user's "extra" to specify the node name of
+	// the authenticating request.
+	NodeNameKey = "authentication.kubernetes.io/node-name"
+	// NodeUIDKey is the key used in a user's "extra" to specify the node UID of
+	// the authenticating request.
+	NodeUIDKey = "authentication.kubernetes.io/node-uid"
 )
 
 // MakeUsername generates a username from the given namespace and ServiceAccount name.
@@ -119,6 +134,8 @@ func UserInfo(namespace, name, uid string) user.Info {
 type ServiceAccountInfo struct {
 	Name, Namespace, UID string
 	PodName, PodUID      string
+	CredentialID         string
+	NodeName, NodeUID    string
 }
 
 func (sa *ServiceAccountInfo) UserInfo() user.Info {
@@ -127,13 +144,41 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 		UID:    sa.UID,
 		Groups: MakeGroupNames(sa.Namespace),
 	}
+
 	if sa.PodName != "" && sa.PodUID != "" {
-		info.Extra = map[string][]string{
-			PodNameKey: {sa.PodName},
-			PodUIDKey:  {sa.PodUID},
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[PodNameKey] = []string{sa.PodName}
+		info.Extra[PodUIDKey] = []string{sa.PodUID}
+	}
+	if sa.CredentialID != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[CredentialIDKey] = []string{sa.CredentialID}
+	}
+	if sa.NodeName != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[NodeNameKey] = []string{sa.NodeName}
+		// node UID is optional and will only be set if the node name is set
+		if sa.NodeUID != "" {
+			info.Extra[NodeUIDKey] = []string{sa.NodeUID}
 		}
 	}
+
 	return info
+}
+
+// CredentialIDForJTI converts a given JTI string into a credential identifier for use in a
+// users 'extra' info.
+func CredentialIDForJTI(jti string) string {
+	if len(jti) == 0 {
+		return ""
+	}
+	return "JTI=" + jti
 }
 
 // IsServiceAccountToken returns true if the secret is a valid api token for the service account

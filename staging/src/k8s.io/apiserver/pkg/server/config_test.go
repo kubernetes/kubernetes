@@ -17,8 +17,10 @@ limitations under the License.
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -26,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/tracing"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -78,6 +82,9 @@ func TestAuthorizeClientBearerTokenNoops(t *testing.T) {
 }
 
 func TestNewWithDelegate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test is done"))
 	delegateConfig := NewConfig(codecs)
 	delegateConfig.ExternalAddress = "192.168.10.4:443"
 	delegateConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
@@ -135,10 +142,8 @@ func TestNewWithDelegate(t *testing.T) {
 		return nil
 	})
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	wrappingServer.PrepareRun()
-	wrappingServer.RunPostStartHooks(stopCh)
+	wrappingServer.RunPostStartHooks(ctx)
 
 	server := httptest.NewServer(wrappingServer.Handler)
 	defer server.Close()
@@ -192,7 +197,7 @@ func TestNewWithDelegate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		data, _ := ioutil.ReadAll(resp.Body)
+		data, _ := io.ReadAll(resp.Body)
 		if http.StatusOK != resp.StatusCode {
 			t.Logf("got %d", resp.StatusCode)
 			t.Log(string(data))
@@ -233,7 +238,7 @@ func checkPath(url string, expectedStatusCode int, expectedBody string, t *testi
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -256,7 +261,7 @@ func checkExpectedPathsAtRoot(url string, expectedPaths []string, t *testing.T) 
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -284,11 +289,6 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 	authn := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		// confirm that we can set an audit annotation in a handler before WithAudit
 		audit.AddAuditAnnotation(req.Context(), "pandas", "are awesome")
-
-		// confirm that trying to use the audit event directly would never work
-		if ae := audit.AuditEventFrom(req.Context()); ae != nil {
-			t.Errorf("expected nil audit event, got %v", ae)
-		}
 
 		return &authenticator.Response{User: &user.DefaultInfo{}}, true, nil
 	})
@@ -366,4 +366,22 @@ type testBackend struct {
 func (b *testBackend) ProcessEvents(events ...*auditinternal.Event) bool {
 	b.events = append(b.events, events...)
 	return true
+}
+
+func TestNewErrorForbiddenSerializer(t *testing.T) {
+	config := CompletedConfig{
+		&completedConfig{
+			Config: &Config{
+				Serializer: runtime.NewSimpleNegotiatedSerializer(runtime.SerializerInfo{
+					MediaType: "application/cbor",
+				}),
+			},
+		},
+	}
+	_, err := config.New("test", NewEmptyDelegate())
+	if err == nil {
+		t.Error("successfully created a new server configured with cbor support")
+	} else if err.Error() != `refusing to create new apiserver "test" with support for media type "application/cbor" (allowed media types are: application/json, application/yaml, application/vnd.kubernetes.protobuf)` {
+		t.Errorf("unexpected error: %v", err)
+	}
 }

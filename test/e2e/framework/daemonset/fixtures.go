@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -97,7 +97,7 @@ func SchedulableNodes(ctx context.Context, c clientset.Interface, ds *appsv1.Dae
 func CheckDaemonPodOnNodes(f *framework.Framework, ds *appsv1.DaemonSet, nodeNames []string) func(ctx context.Context) (bool, error) {
 	return func(ctx context.Context) (bool, error) {
 		return checkDaemonPodStateOnNodes(ctx, f.ClientSet, ds, f.Namespace.Name, nodeNames, func(pod *v1.Pod) bool {
-			return podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now())
+			return podutils.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now())
 		})
 	}
 }

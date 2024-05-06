@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -84,6 +83,7 @@ func markVolumeAttached(t *testing.T, client clientset.Interface, watch *watch.R
 	for i := 0; i < 100; i++ {
 		attach, err = client.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 		if err != nil {
+			attach = nil
 			if apierrors.IsNotFound(err) {
 				<-ticker.C
 				continue
@@ -1110,6 +1110,7 @@ func TestAttacherMountDevice(t *testing.T) {
 		exitError                      error
 		spec                           *volume.Spec
 		watchTimeout                   time.Duration
+		skipClientSetup                bool
 	}{
 		{
 			testName:         "normal PV",
@@ -1250,6 +1251,20 @@ func TestAttacherMountDevice(t *testing.T) {
 			createAttachment:               true,
 			spec:                           volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
+		{
+			testName:                "driver not specified",
+			volName:                 "test-vol1",
+			devicePath:              "path1",
+			deviceMountPath:         "path2",
+			fsGroup:                 &testFSGroup,
+			stageUnstageSet:         true,
+			createAttachment:        true,
+			populateDeviceMountPath: false,
+			spec:                    volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, "not-found", "test-vol1"), false),
+			exitError:               transientError,
+			shouldFail:              true,
+			skipClientSetup:         true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1278,7 +1293,9 @@ func TestAttacherMountDevice(t *testing.T) {
 				t.Fatalf("failed to create new attacher: %v", err0)
 			}
 			csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, tc.watchTimeout)
-			csiAttacher.csiClient = setupClientWithVolumeMountGroup(t, tc.stageUnstageSet, tc.driverSupportsVolumeMountGroup)
+			if !tc.skipClientSetup {
+				csiAttacher.csiClient = setupClientWithVolumeMountGroup(t, tc.stageUnstageSet, tc.driverSupportsVolumeMountGroup)
+			}
 
 			if tc.deviceMountPath != "" {
 				tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
@@ -1343,14 +1360,13 @@ func TestAttacherMountDevice(t *testing.T) {
 						t.Errorf("failed to modify permissions after test: %v", err)
 					}
 				}
+				if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+					t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(tc.exitError), reflect.TypeOf(err), err)
+				}
 				return
 			}
 			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
-			}
-
-			if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
-				t.Fatalf("expected exitError: %v got: %v", tc.exitError, err)
 			}
 
 			// Verify call goes through all the way
@@ -1570,6 +1586,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 }
 
 func TestAttacherUnmountDevice(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
 	testCases := []struct {
 		testName        string
 		volID           string
@@ -1579,6 +1596,8 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		stageUnstageSet bool
 		shouldFail      bool
 		watchTimeout    time.Duration
+		exitError       error
+		unsetClient     bool
 	}{
 		// PV agnostic path positive test cases
 		{
@@ -1596,12 +1615,11 @@ func TestAttacherUnmountDevice(t *testing.T) {
 		},
 		// PV agnostic path negative test cases
 		{
-			testName:        "fail: missing json, fail to retrieve driver and volumeID from globalpath",
-			volID:           "project/zone/test-vol1",
+			testName:        "success: json file doesn't exist, unmount device is skipped",
 			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
 			jsonFile:        "",
 			stageUnstageSet: true,
-			shouldFail:      true,
+			createPV:        true,
 		},
 		{
 			testName:        "fail: invalid json, fail to retrieve driver and volumeID from globalpath",
@@ -1611,44 +1629,16 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			stageUnstageSet: true,
 			shouldFail:      true,
 		},
-		// Old style PV based path positive test cases
+		// Ensure that a transient error is returned if the client is not established
 		{
-			testName:        "success: json file doesn't exist, old style pv based global path -> use PV",
+			testName:        "fail with transient error, json file exists but client not found",
 			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
-			stageUnstageSet: true,
-			createPV:        true,
-		},
-		{
-			testName:        "success: invalid json file, old style pv based global path -> use PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        `{"driverName"}}`,
-			stageUnstageSet: true,
-			createPV:        true,
-		},
-		{
-			testName:        "stage_unstage not set, PV based path, unmount device is skipped",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        `{"driverName":"test-driver","volumeHandle":"test-vol1"}`,
-			stageUnstageSet: false,
-		},
-		// Old style PV based path negative test cases
-		{
-			testName:        "fail: json file doesn't exist, old style pv based device path, missing PV",
-			volID:           "project/zone/test-vol1",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
+			deviceMountPath: "plugins/csi/" + generateSha("project/zone/test-vol1") + "/globalmount",
+			jsonFile:        `{"driverName": "unknown-driver", "volumeHandle":"project/zone/test-vol1"}`,
 			stageUnstageSet: true,
 			shouldFail:      true,
-		},
-		{
-			testName:        "fail: no json, no PV.volID, old style pv based global path",
-			volID:           "",
-			deviceMountPath: "plugins/csi/pv/test-pv-name/globalmount",
-			jsonFile:        "",
-			shouldFail:      true,
+			exitError:       transientError,
+			unsetClient:     true,
 		},
 	}
 
@@ -1684,7 +1674,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			// Make JSON for this object
 			if tc.jsonFile != "" {
 				dataPath := filepath.Join(dir, volDataFileName)
-				if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
+				if err := os.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
 					t.Fatalf("error creating %s: %s", dataPath, err)
 				}
 			}
@@ -1697,6 +1687,11 @@ func TestAttacherUnmountDevice(t *testing.T) {
 					t.Fatalf("Failed to create PV: %v", err)
 				}
 			}
+			// Clear out the client if specified
+			// The lookup to generate a new client will fail
+			if tc.unsetClient {
+				csiAttacher.csiClient = nil
+			}
 
 			// Run
 			err := csiAttacher.UnmountDevice(tc.deviceMountPath)
@@ -1704,6 +1699,9 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			if err != nil {
 				if !tc.shouldFail {
 					t.Errorf("test should not fail, but error occurred: %v", err)
+				}
+				if tc.exitError != nil && reflect.TypeOf(tc.exitError) != reflect.TypeOf(err) {
+					t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(tc.exitError), reflect.TypeOf(err), err)
 				}
 				return
 			}
@@ -1713,7 +1711,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 
 			// Verify call goes through all the way
 			expectedSet := 0
-			if !tc.stageUnstageSet {
+			if !tc.stageUnstageSet || tc.volID == "" {
 				expectedSet = 1
 			}
 			staged := cdc.nodeClient.GetNodeStagedVolumes()
@@ -1722,7 +1720,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 			}
 
 			_, ok := staged[tc.volID]
-			if ok && tc.stageUnstageSet {
+			if ok && tc.stageUnstageSet && tc.volID != "" {
 				t.Errorf("found unexpected staged volume: %s", tc.volID)
 			} else if !ok && !tc.stageUnstageSet {
 				t.Errorf("could not find expected staged volume: %s", tc.volID)

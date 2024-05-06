@@ -20,8 +20,9 @@ import (
 	"errors"
 	"fmt"
 
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	yaml "gopkg.in/yaml.v2"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -146,6 +147,11 @@ func hasGVKExtension(extensions []*openapi_v2.NamedAny, gvk schema.GroupVersionK
 // specific group-version-kind supports the specific query parameter for
 // the PATCH end-point.
 func supportsQueryParam(doc *openapi_v2.Document, gvk schema.GroupVersionKind, queryParam VerifiableQueryParam) (bool, error) {
+	globalParams := map[string]*openapi_v2.NamedParameter{}
+	for _, p := range doc.GetParameters().GetAdditionalProperties() {
+		globalParams["#/parameters/"+p.GetName()] = p
+	}
+
 	for _, path := range doc.GetPaths().GetPath() {
 		// Is this describing the gvk we're looking for?
 		if !hasGVKExtension(path.GetValue().GetPatch().GetVendorExtension(), gvk) {
@@ -154,6 +160,13 @@ func supportsQueryParam(doc *openapi_v2.Document, gvk schema.GroupVersionKind, q
 		for _, param := range path.GetValue().GetPatch().GetParameters() {
 			if param.GetParameter().GetNonBodyParameter().GetQueryParameterSubSchema().GetName() == string(queryParam) {
 				return true, nil
+			}
+
+			// lookup global parameters
+			if ref := param.GetJsonReference().GetXRef(); ref != "" {
+				if globalParam, ok := globalParams[ref]; ok && globalParam != nil && globalParam.GetValue().GetNonBodyParameter().GetQueryParameterSubSchema().GetName() == string(queryParam) {
+					return true, nil
+				}
 			}
 		}
 		return false, nil

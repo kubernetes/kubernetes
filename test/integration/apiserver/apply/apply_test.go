@@ -17,16 +17,19 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -247,6 +250,55 @@ func getRV(obj runtime.Object) (string, error) {
 		return "", err
 	}
 	return acc.GetResourceVersion(), nil
+}
+
+func TestNoopChangeCreationTime(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ssBytes := []byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "myconfig",
+			"creationTimestamp": null,
+			"resourceVersion": null
+		},
+		"data": {
+			"key": "value"
+		}
+	}`)
+
+	obj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("configmaps").
+		Name("myconfig").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	require.NoError(t, err)
+	// Sleep for one second to make sure that the times of each update operation is different.
+	time.Sleep(1200 * time.Millisecond)
+
+	newObj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("configmaps").
+		Name("myconfig").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	require.NoError(t, err)
+	require.Equal(t, obj, newObj)
 }
 
 // TestNoSemanticUpdateAppleSameResourceVersion makes sure that APPLY requests which makes no semantic changes
@@ -3618,5 +3670,774 @@ func TestApplyFormerlyAtomicFields(t *testing.T) {
 
 	if !reflect.DeepEqual(expectedManagedFields, managedFields) {
 		t.Fatalf("unexpected managed fields: %v", cmp.Diff(expectedManagedFields, managedFields))
+	}
+}
+
+func TestDuplicatesInAssociativeLists(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ds := []byte(`{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "example-daemonset",
+    "labels": {
+      "app": "example"
+    }
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "app": "example"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "example"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "nginx",
+            "image": "nginx",
+            "ports": [
+              {
+                "name": "port0",
+                "containerPort": 1
+              },
+              {
+              	"name": "port1",
+                "containerPort": 80
+              },
+              {
+              	"name": "port2",
+                "containerPort": 80
+              }
+            ],
+            "env": [
+              {
+                "name": "ENV0",
+                "value": "/env0value"
+              },
+              {
+                "name": "PATH",
+                "value": "/bin"
+              },
+              {
+                "name": "PATH",
+                "value": "$PATH:/usr/bin"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}`)
+	// Create the object
+	obj, err := client.AppsV1().RESTClient().
+		Post().
+		Namespace("default").
+		Param("fieldManager", "create").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create the object: %v", err)
+	}
+	daemon := obj.(*appsv1.DaemonSet)
+	if want, got := 3, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 3, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+
+	expectManagedFields(t, daemon.ManagedFields, `
+[
+	{
+		"manager": "create",
+		"operation": "Update",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:annotations": {
+					".": {},
+					"f:deprecated.daemonset.template.generation": {}
+				},
+				"f:labels": {
+					".": {},
+					"f:app": {}
+				}
+			},
+			"f:spec": {
+			"f:revisionHistoryLimit": {},
+			"f:selector": {},
+			"f:template": {
+				"f:metadata": {
+					"f:labels": {
+						".": {},
+						"f:app": {}
+					}
+				},
+				"f:spec": {
+					"f:containers": {
+						"k:{\"name\":\"nginx\"}": {
+						".": {},
+						"f:env": {
+							".": {},
+							"k:{\"name\":\"ENV0\"}": {
+								".": {},
+								"f:name": {},
+								"f:value": {}
+							},
+							"k:{\"name\":\"PATH\"}": {}
+						},
+						"f:image": {},
+						"f:imagePullPolicy": {},
+						"f:name": {},
+						"f:ports": {
+							".": {},
+							"k:{\"containerPort\":1,\"protocol\":\"TCP\"}": {
+								".": {},
+								"f:containerPort": {},
+								"f:name": {},
+								"f:protocol": {}
+							},
+							"k:{\"containerPort\":80,\"protocol\":\"TCP\"}": {}
+						},
+						"f:resources": {},
+						"f:terminationMessagePath": {},
+						"f:terminationMessagePolicy": {}
+						}
+					},
+					"f:dnsPolicy": {},
+					"f:restartPolicy": {},
+					"f:schedulerName": {},
+					"f:securityContext": {},
+					"f:terminationGracePeriodSeconds": {}
+					}
+				},
+				"f:updateStrategy": {
+					"f:rollingUpdate": {
+					".": {},
+					"f:maxSurge": {},
+					"f:maxUnavailable": {}
+					},
+					"f:type": {}
+				}
+			}
+		}
+	}
+]`)
+
+	// Apply unrelated fields, fieldmanager should be strictly additive.
+	ds = []byte(`
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example-daemonset
+  labels:
+    app: example
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - name: port3
+              containerPort: 443
+          env:
+            - name: HOME
+              value: "/usr/home"
+`)
+	obj, err = client.AppsV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Namespace("default").
+		Name("example-daemonset").
+		Param("fieldManager", "apply").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to aply the first object: %v", err)
+	}
+	daemon = obj.(*appsv1.DaemonSet)
+	if want, got := 4, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 4, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+
+	expectManagedFields(t, daemon.ManagedFields, `
+[
+	{
+		"manager": "apply",
+		"operation": "Apply",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:labels": {
+					"f:app": {}
+				}
+			},
+			"f:spec": {
+				"f:selector": {},
+				"f:template": {
+					"f:spec": {
+						"f:containers": {
+							"k:{\"name\":\"nginx\"}": {
+								".": {},
+								"f:env": {
+									"k:{\"name\":\"HOME\"}": {
+										".": {},
+										"f:name": {},
+										"f:value": {}
+									}
+								},
+								"f:image": {},
+								"f:name": {},
+								"f:ports": {
+									"k:{\"containerPort\":443,\"protocol\":\"TCP\"}": {
+										".": {},
+										"f:containerPort": {},
+										"f:name": {}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"manager": "create",
+		"operation": "Update",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:annotations": {
+					".": {},
+					"f:deprecated.daemonset.template.generation": {}
+				},
+				"f:labels": {
+					".": {},
+					"f:app": {}
+				}
+			},
+			"f:spec": {
+				"f:revisionHistoryLimit": {},
+				"f:selector": {},
+				"f:template": {
+					"f:metadata": {
+						"f:labels": {
+							".": {},
+							"f:app": {}
+						}
+					},
+					"f:spec": {
+						"f:containers": {
+							"k:{\"name\":\"nginx\"}": {
+								".": {},
+								"f:env": {
+									".": {},
+									"k:{\"name\":\"ENV0\"}": {
+										".": {},
+										"f:name": {},
+										"f:value": {}
+									},
+									"k:{\"name\":\"PATH\"}": {}
+								},
+								"f:image": {},
+								"f:imagePullPolicy": {},
+								"f:name": {},
+								"f:ports": {
+									".": {},
+									"k:{\"containerPort\":1,\"protocol\":\"TCP\"}": {
+										".": {},
+										"f:containerPort": {},
+										"f:name": {},
+										"f:protocol": {}
+									},
+									"k:{\"containerPort\":80,\"protocol\":\"TCP\"}": {}
+								},
+								"f:resources": {},
+								"f:terminationMessagePath": {},
+								"f:terminationMessagePolicy": {}
+							}
+						},
+						"f:dnsPolicy": {},
+						"f:restartPolicy": {},
+						"f:schedulerName": {},
+						"f:securityContext": {},
+						"f:terminationGracePeriodSeconds": {}
+					}
+				},
+				"f:updateStrategy": {
+					"f:rollingUpdate": {
+						".": {},
+						"f:maxSurge": {},
+						"f:maxUnavailable": {}
+					},
+					"f:type": {}
+				}
+			}
+		}
+	}
+]
+`)
+
+	// Change name of some ports.
+	ds = []byte(`{
+  "apiVersion": "apps/v1",
+  "kind": "DaemonSet",
+  "metadata": {
+    "name": "example-daemonset",
+    "labels": {
+      "app": "example"
+    }
+  },
+  "spec": {
+    "selector": {
+      "matchLabels": {
+        "app": "example"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "example"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "nginx",
+            "image": "nginx",
+            "ports": [
+              {
+                "name": "port0",
+                "containerPort": 1
+              },
+              {
+              	"name": "port3",
+                "containerPort": 443
+              },
+              {
+              	"name": "port4",
+                "containerPort": 80
+              },
+              {
+              	"name": "port5",
+                "containerPort": 80
+              }
+            ],
+            "env": [
+              {
+                "name": "ENV0",
+                "value": "/env0value"
+              },
+              {
+                "name": "PATH",
+                "value": "/bin"
+              },
+              {
+                "name": "PATH",
+                "value": "$PATH:/usr/bin:/usr/local/bin"
+              },
+              {
+                "name": "HOME",
+                "value": "/usr/home"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}`)
+	obj, err = client.AppsV1().RESTClient().
+		Put().
+		Namespace("default").
+		Name("example-daemonset").
+		Param("fieldManager", "update").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to update the object: %v", err)
+	}
+	daemon = obj.(*appsv1.DaemonSet)
+	if want, got := 4, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 4, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+
+	expectManagedFields(t, daemon.ManagedFields, `
+[
+	{
+		"manager": "apply",
+		"operation": "Apply",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:labels": {
+					"f:app": {}
+				}
+			},
+			"f:spec": {
+				"f:selector": {},
+				"f:template": {
+					"f:spec": {
+						"f:containers": {
+							"k:{\"name\":\"nginx\"}": {
+								".": {},
+								"f:env": {
+									"k:{\"name\":\"HOME\"}": {
+										".": {},
+										"f:name": {},
+										"f:value": {}
+									}
+								},
+								"f:image": {},
+								"f:name": {},
+								"f:ports": {
+									"k:{\"containerPort\":443,\"protocol\":\"TCP\"}": {
+										".": {},
+										"f:containerPort": {},
+										"f:name": {}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"manager": "create",
+		"operation": "Update",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:annotations": {},
+				"f:labels": {
+					".": {},
+					"f:app": {}
+				}
+			},
+			"f:spec": {
+				"f:revisionHistoryLimit": {},
+				"f:selector": {},
+				"f:template": {
+					"f:metadata": {
+						"f:labels": {
+							".": {},
+							"f:app": {}
+						}
+					},
+					"f:spec": {
+						"f:containers": {
+							"k:{\"name\":\"nginx\"}": {
+								".": {},
+								"f:env": {
+									".": {},
+									"k:{\"name\":\"ENV0\"}": {
+										".": {},
+										"f:name": {},
+										"f:value": {}
+									}
+								},
+								"f:image": {},
+								"f:imagePullPolicy": {},
+								"f:name": {},
+								"f:ports": {
+									".": {},
+									"k:{\"containerPort\":1,\"protocol\":\"TCP\"}": {
+										".": {},
+										"f:containerPort": {},
+										"f:name": {},
+										"f:protocol": {}
+									}
+								},
+								"f:resources": {},
+								"f:terminationMessagePath": {},
+								"f:terminationMessagePolicy": {}
+							}
+						},
+						"f:dnsPolicy": {},
+						"f:restartPolicy": {},
+						"f:schedulerName": {},
+						"f:securityContext": {},
+						"f:terminationGracePeriodSeconds": {}
+					}
+				},
+				"f:updateStrategy": {
+					"f:rollingUpdate": {
+						".": {},
+						"f:maxSurge": {},
+						"f:maxUnavailable": {}
+					},
+					"f:type": {}
+				}
+			}
+		}
+	},
+	{
+		"manager": "update",
+		"operation": "Update",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:annotations": {
+				"f:deprecated.daemonset.template.generation": {}
+				}
+			},
+			"f:spec": {
+				"f:template": {
+					"f:spec": {
+						"f:containers": {
+							"k:{\"name\":\"nginx\"}": {
+								"f:env": {
+									"k:{\"name\":\"PATH\"}": {}
+								},
+								"f:ports": {
+									"k:{\"containerPort\":80,\"protocol\":\"TCP\"}": {}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+]
+`)
+
+	// Replaces envvars and paths.
+	ds = []byte(`
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example-daemonset
+  labels:
+    app: example
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - name: port80
+              containerPort: 80
+          env:
+            - name: PATH
+              value: "/bin:/usr/bin:/usr/local/bin"
+`)
+	obj, err = client.AppsV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Namespace("default").
+		Name("example-daemonset").
+		Param("fieldManager", "apply").
+		Param("force", "true").
+		Resource("daemonsets").
+		Body(ds).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply the second object: %v", err)
+	}
+
+	daemon = obj.(*appsv1.DaemonSet)
+	// HOME is removed, PATH is replaced with 1.
+	if want, got := 2, len(daemon.Spec.Template.Spec.Containers[0].Env); want != got {
+		t.Fatalf("Expected %v EnvVars, got %v", want, got)
+	}
+	if want, got := 2, len(daemon.Spec.Template.Spec.Containers[0].Ports); want != got {
+		t.Fatalf("Expected %v Ports, got %v", want, got)
+	}
+
+	expectManagedFields(t, daemon.ManagedFields, `
+[
+	{
+		"manager": "apply",
+		"operation": "Apply",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:labels": {
+					"f:app": {}
+				}
+			},
+			"f:spec": {
+				"f:selector": {},
+				"f:template": {
+					"f:spec": {
+						"f:containers": {
+							"k:{\"name\":\"nginx\"}": {
+								".": {},
+								"f:env": {
+									"k:{\"name\":\"PATH\"}": {
+										".": {},
+										"f:name": {},
+										"f:value": {}
+									}
+								},
+								"f:image": {},
+								"f:name": {},
+								"f:ports": {
+									"k:{\"containerPort\":80,\"protocol\":\"TCP\"}": {
+										".": {},
+										"f:containerPort": {},
+										"f:name": {}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	{
+		"manager": "create",
+		"operation": "Update",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:annotations": {},
+				"f:labels": {
+					".": {},
+					"f:app": {}
+				}
+			},
+			"f:spec": {
+				"f:revisionHistoryLimit": {},
+				"f:selector": {},
+				"f:template": {
+					"f:metadata": {
+						"f:labels": {
+							".": {},
+							"f:app": {}
+						}
+					},
+					"f:spec": {
+						"f:containers": {
+							"k:{\"name\":\"nginx\"}": {
+								".": {},
+								"f:env": {
+									".": {},
+									"k:{\"name\":\"ENV0\"}": {
+										".": {},
+										"f:name": {},
+										"f:value": {}
+									}
+								},
+								"f:image": {},
+								"f:imagePullPolicy": {},
+								"f:name": {},
+								"f:ports": {
+									".": {},
+									"k:{\"containerPort\":1,\"protocol\":\"TCP\"}": {
+										".": {},
+										"f:containerPort": {},
+										"f:name": {},
+										"f:protocol": {}
+									}
+								},
+								"f:resources": {},
+								"f:terminationMessagePath": {},
+								"f:terminationMessagePolicy": {}
+							}
+						},
+						"f:dnsPolicy": {},
+						"f:restartPolicy": {},
+						"f:schedulerName": {},
+						"f:securityContext": {},
+						"f:terminationGracePeriodSeconds": {}
+					}
+				},
+				"f:updateStrategy": {
+					"f:rollingUpdate": {
+						".": {},
+						"f:maxSurge": {},
+						"f:maxUnavailable": {}
+					},
+					"f:type": {}
+				}
+			}
+		}
+	},
+	{
+		"manager": "update",
+		"operation": "Update",
+		"apiVersion": "apps/v1",
+		"time": null,
+		"fieldsType": "FieldsV1",
+		"fieldsV1": {
+			"f:metadata": {
+				"f:annotations": {
+					"f:deprecated.daemonset.template.generation": {}
+				}
+			}
+		}
+	}
+]
+`)
+}
+
+func expectManagedFields(t *testing.T, managedFields []metav1.ManagedFieldsEntry, expect string) {
+	t.Helper()
+	for i := range managedFields {
+		managedFields[i].Time = &metav1.Time{}
+	}
+	got, err := json.MarshalIndent(managedFields, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal managed fields: %v", err)
+	}
+	b := &bytes.Buffer{}
+	err = json.Indent(b, []byte(expect), "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to indent json: %v", err)
+	}
+	want := b.String()
+	diff := cmp.Diff(strings.Split(strings.TrimSpace(string(got)), "\n"), strings.Split(strings.TrimSpace(want), "\n"))
+	if len(diff) > 0 {
+		t.Fatalf("Want:\n%s\nGot:\n%s\nDiff:\n%s", string(want), string(got), diff)
 	}
 }

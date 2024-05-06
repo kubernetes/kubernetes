@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,7 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/utils/exec"
 )
 
@@ -64,14 +63,11 @@ func (f *FakeObject) Live() runtime.Object {
 func TestDiffProgram(t *testing.T) {
 	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
 
-	if oriLang := os.Getenv("LANG"); oriLang != "C" {
-		os.Setenv("LANG", "C")
-		defer os.Setenv("LANG", oriLang)
-	}
+	t.Setenv("LANG", "C")
 
 	for i, c := range externalDiffCommands {
-		os.Setenv("KUBECTL_EXTERNAL_DIFF", c)
-		streams, _, stdout, _ := genericclioptions.NewTestIOStreams()
+		t.Setenv("KUBECTL_EXTERNAL_DIFF", c)
+		streams, _, stdout, _ := genericiooptions.NewTestIOStreams()
 		diff := DiffProgram{
 			IOStreams: streams,
 			Exec:      exec.New(),
@@ -133,7 +129,7 @@ func TestDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := os.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(filepath.Join(diff.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +200,7 @@ func TestDiffer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(filepath.Join(diff.From.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +209,7 @@ func TestDiffer(t *testing.T) {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}
 
-	fcontent, err = os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
+	fcontent, err = os.ReadFile(filepath.Join(diff.To.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,12 +285,12 @@ metadata:
 				t.Fatal(err)
 			}
 
-			actualFromContent, _ := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
+			actualFromContent, _ := os.ReadFile(filepath.Join(diff.From.Dir.Name, obj.Name()))
 			if string(actualFromContent) != tc.expectedFromContent {
 				t.Fatalf("File has %q, expected %q", string(actualFromContent), tc.expectedFromContent)
 			}
 
-			actualToContent, _ := os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
+			actualToContent, _ := os.ReadFile(filepath.Join(diff.To.Dir.Name, obj.Name()))
 			if string(actualToContent) != tc.expectedToContent {
 				t.Fatalf("File has %q, expected %q", string(actualToContent), tc.expectedToContent)
 			}

@@ -149,3 +149,50 @@ func TestCalculateCPUMaximum(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateWindowsResources(t *testing.T) {
+	// TODO: remove skip once the failing test has been fixed.
+	t.Skip("Skip failing test on Windows.")
+
+	_, _, fakeRuntimeSvc, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		cpuLim   resource.Quantity
+		memLim   resource.Quantity
+		expected *runtimeapi.WindowsContainerResources
+	}{
+		{
+			name:   "Request128MBLimit256MB",
+			cpuLim: resource.MustParse("2"),
+			memLim: resource.MustParse("128Mi"),
+			expected: &runtimeapi.WindowsContainerResources{
+				CpuMaximum:         2500,
+				MemoryLimitInBytes: 134217728,
+			},
+		},
+		{
+			name:   "RequestNoMemory",
+			cpuLim: resource.MustParse("8"),
+			memLim: resource.MustParse("0"),
+			expected: &runtimeapi.WindowsContainerResources{
+				CpuMaximum:         10000,
+				MemoryLimitInBytes: 0,
+			},
+		},
+		{
+			name:   "RequestZeroCPU",
+			cpuLim: resource.MustParse("0"),
+			memLim: resource.MustParse("128Mi"),
+			expected: &runtimeapi.WindowsContainerResources{
+				CpuMaximum:         1,
+				MemoryLimitInBytes: 134217728,
+			},
+		},
+	}
+	for _, test := range tests {
+		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(&test.cpuLim, &test.memLim)
+		assert.Equal(t, test.expected, windowsContainerResources)
+	}
+}

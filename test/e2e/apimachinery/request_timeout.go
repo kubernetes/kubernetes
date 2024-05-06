@@ -34,7 +34,7 @@ const (
 
 var _ = SIGDescribe("Server request timeout", func() {
 	f := framework.NewDefaultFramework("request-timeout")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should return HTTP status code 400 if the user specifies an invalid timeout in the request URL", func(ctx context.Context) {
 		rt := getRoundTripper(f)

@@ -28,6 +28,40 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/flowcontrol/v1beta3";
 
+// ExemptPriorityLevelConfiguration describes the configurable aspects
+// of the handling of exempt requests.
+// In the mandatory exempt configuration object the values in the fields
+// here can be modified by authorized users, unlike the rest of the `spec`.
+message ExemptPriorityLevelConfiguration {
+  // `nominalConcurrencyShares` (NCS) contributes to the computation of the
+  // NominalConcurrencyLimit (NominalCL) of this level.
+  // This is the number of execution seats nominally reserved for this priority level.
+  // This DOES NOT limit the dispatching from this priority level
+  // but affects the other priority levels through the borrowing mechanism.
+  // The server's concurrency limit (ServerCL) is divided among all the
+  // priority levels in proportion to their NCS values:
+  //
+  // NominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs )
+  // sum_ncs = sum[priority level k] NCS(k)
+  //
+  // Bigger numbers mean a larger nominal concurrency limit,
+  // at the expense of every other priority level.
+  // This field has a default value of zero.
+  // +optional
+  optional int32 nominalConcurrencyShares = 1;
+
+  // `lendablePercent` prescribes the fraction of the level's NominalCL that
+  // can be borrowed by other priority levels.  This value of this
+  // field must be between 0 and 100, inclusive, and it defaults to 0.
+  // The number of seats that other levels can borrow from this level, known
+  // as this level's LendableConcurrencyLimit (LendableCL), is defined as follows.
+  //
+  // LendableCL(i) = round( NominalCL(i) * lendablePercent(i)/100.0 )
+  //
+  // +optional
+  optional int32 lendablePercent = 2;
+}
+
 // FlowDistinguisherMethod specifies the method of a flow distinguisher.
 message FlowDistinguisherMethod {
   // `type` is the type of flow distinguisher method
@@ -42,7 +76,7 @@ message FlowSchema {
   // `metadata` is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // `spec` is the specification of the desired behavior of a FlowSchema.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -67,7 +101,7 @@ message FlowSchemaCondition {
   optional string status = 2;
 
   // `lastTransitionTime` is the last time the condition transitioned from one status to another.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
   optional string reason = 4;
@@ -81,7 +115,7 @@ message FlowSchemaList {
   // `metadata` is the standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of FlowSchemas.
   repeated FlowSchema items = 2;
@@ -168,10 +202,10 @@ message LimitedPriorityLevelConfiguration {
   // Limited priority levels in proportion to their NCS values:
   //
   // NominalCL(i)  = ceil( ServerCL * NCS(i) / sum_ncs )
-  // sum_ncs = sum[limited priority level k] NCS(k)
+  // sum_ncs = sum[priority level k] NCS(k)
   //
   // Bigger numbers mean a larger nominal concurrency limit,
-  // at the expense of every other Limited priority level.
+  // at the expense of every other priority level.
   // This field has a default value of 30.
   // +optional
   optional int32 nominalConcurrencyShares = 1;
@@ -263,7 +297,7 @@ message PriorityLevelConfiguration {
   // `metadata` is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // `spec` is the specification of the desired behavior of a "request-priority".
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -288,7 +322,7 @@ message PriorityLevelConfigurationCondition {
   optional string status = 2;
 
   // `lastTransitionTime` is the last time the condition transitioned from one status to another.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // `reason` is a unique, one-word, CamelCase reason for the condition's last transition.
   optional string reason = 4;
@@ -302,7 +336,7 @@ message PriorityLevelConfigurationList {
   // `metadata` is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of request-priorities.
   repeated PriorityLevelConfiguration items = 2;
@@ -334,6 +368,14 @@ message PriorityLevelConfigurationSpec {
   // This field must be non-empty if and only if `type` is `"Limited"`.
   // +optional
   optional LimitedPriorityLevelConfiguration limited = 2;
+
+  // `exempt` specifies how requests are handled for an exempt priority level.
+  // This field MUST be empty if `type` is `"Limited"`.
+  // This field MAY be non-empty if `type` is `"Exempt"`.
+  // If empty and `type` is `"Exempt"` then the default values
+  // for `ExemptPriorityLevelConfiguration` apply.
+  // +optional
+  optional ExemptPriorityLevelConfiguration exempt = 3;
 }
 
 // PriorityLevelConfigurationStatus represents the current state of a "request-priority".

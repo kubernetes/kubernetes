@@ -15,6 +15,7 @@ package procfs
 
 import (
 	"bytes"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -22,7 +23,7 @@ import (
 )
 
 // ProcStatus provides status information about the process,
-// read from /proc/[pid]/stat.
+// read from /proc/[pid]/status.
 type ProcStatus struct {
 	// The process ID.
 	PID int
@@ -31,6 +32,8 @@ type ProcStatus struct {
 
 	// Thread group ID.
 	TGID int
+	// List of Pid namespace.
+	NSpids []uint64
 
 	// Peak virtual memory size.
 	VmPeak uint64 // nolint:revive
@@ -76,6 +79,9 @@ type ProcStatus struct {
 	UIDs [4]string
 	// GIDs of the process (Real, effective, saved set, and filesystem GIDs)
 	GIDs [4]string
+
+	// CpusAllowedList: List of cpu cores processes are allowed to run on.
+	CpusAllowedList []uint64
 }
 
 // NewStatus returns the current status information of the process.
@@ -96,10 +102,10 @@ func (p Proc) NewStatus() (ProcStatus, error) {
 		kv := strings.SplitN(line, ":", 2)
 
 		// removes spaces
-		k := string(strings.TrimSpace(kv[0]))
-		v := string(strings.TrimSpace(kv[1]))
+		k := strings.TrimSpace(kv[0])
+		v := strings.TrimSpace(kv[1])
 		// removes "kB"
-		v = string(bytes.Trim([]byte(v), " kB"))
+		v = strings.TrimSuffix(v, " kB")
 
 		// value to int when possible
 		// we can skip error check here, 'cause vKBytes is not used when value is a string
@@ -123,6 +129,8 @@ func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintByt
 		copy(s.UIDs[:], strings.Split(vString, "\t"))
 	case "Gid":
 		copy(s.GIDs[:], strings.Split(vString, "\t"))
+	case "NSpid":
+		s.NSpids = calcNSPidsList(vString)
 	case "VmPeak":
 		s.VmPeak = vUintBytes
 	case "VmSize":
@@ -161,10 +169,53 @@ func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintByt
 		s.VoluntaryCtxtSwitches = vUint
 	case "nonvoluntary_ctxt_switches":
 		s.NonVoluntaryCtxtSwitches = vUint
+	case "Cpus_allowed_list":
+		s.CpusAllowedList = calcCpusAllowedList(vString)
 	}
+
 }
 
 // TotalCtxtSwitches returns the total context switch.
 func (s ProcStatus) TotalCtxtSwitches() uint64 {
 	return s.VoluntaryCtxtSwitches + s.NonVoluntaryCtxtSwitches
+}
+
+func calcCpusAllowedList(cpuString string) []uint64 {
+	s := strings.Split(cpuString, ",")
+
+	var g []uint64
+
+	for _, cpu := range s {
+		// parse cpu ranges, example: 1-3=[1,2,3]
+		if l := strings.Split(strings.TrimSpace(cpu), "-"); len(l) > 1 {
+			startCPU, _ := strconv.ParseUint(l[0], 10, 64)
+			endCPU, _ := strconv.ParseUint(l[1], 10, 64)
+
+			for i := startCPU; i <= endCPU; i++ {
+				g = append(g, i)
+			}
+		} else if len(l) == 1 {
+			cpu, _ := strconv.ParseUint(l[0], 10, 64)
+			g = append(g, cpu)
+		}
+
+	}
+
+	sort.Slice(g, func(i, j int) bool { return g[i] < g[j] })
+	return g
+}
+
+func calcNSPidsList(nspidsString string) []uint64 {
+	s := strings.Split(nspidsString, " ")
+	var nspids []uint64
+
+	for _, nspid := range s {
+		nspid, _ := strconv.ParseUint(nspid, 10, 64)
+		if nspid == 0 {
+			continue
+		}
+		nspids = append(nspids, nspid)
+	}
+
+	return nspids
 }

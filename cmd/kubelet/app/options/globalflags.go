@@ -29,7 +29,6 @@ import (
 	"k8s.io/component-base/version/verflag"
 
 	// ensure libs have a chance to globally register their flags
-	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
 	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
 )
 
@@ -60,16 +59,6 @@ func register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
 	}
 }
 
-// pflagRegister adds a flag to local that targets the Value associated with the Flag named globalName in global
-func pflagRegister(global, local *pflag.FlagSet, globalName string) {
-	if f := global.Lookup(globalName); f != nil {
-		f.Name = normalize(f.Name)
-		local.AddFlag(f)
-	} else {
-		panic(fmt.Sprintf("failed to find flag in global flagset (pflag): %s", globalName))
-	}
-}
-
 // registerDeprecated registers the flag with register, and then marks it deprecated
 func registerDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, deprecated string) {
 	register(global, local, globalName)
@@ -79,10 +68,7 @@ func registerDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, 
 // addCredentialProviderFlags adds flags from k8s.io/kubernetes/pkg/credentialprovider
 func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	// lookup flags in global flag set and re-register the values with our flagset
-	global := pflag.CommandLine
 	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
-
-	addLegacyCloudProviderCredentialProviderFlags(global, local)
 
 	fs.AddFlagSet(local)
 }

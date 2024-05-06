@@ -34,8 +34,9 @@ type ContainerStatusApplyConfiguration struct {
 	ImageID              *string                                 `json:"imageID,omitempty"`
 	ContainerID          *string                                 `json:"containerID,omitempty"`
 	Started              *bool                                   `json:"started,omitempty"`
-	ResourcesAllocated   *corev1.ResourceList                    `json:"resourcesAllocated,omitempty"`
+	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
 	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	VolumeMounts         []VolumeMountStatusApplyConfiguration   `json:"volumeMounts,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with
@@ -116,11 +117,11 @@ func (b *ContainerStatusApplyConfiguration) WithStarted(value bool) *ContainerSt
 	return b
 }
 
-// WithResourcesAllocated sets the ResourcesAllocated field in the declarative configuration to the given value
+// WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ResourcesAllocated field is set to the value of the last call.
-func (b *ContainerStatusApplyConfiguration) WithResourcesAllocated(value corev1.ResourceList) *ContainerStatusApplyConfiguration {
-	b.ResourcesAllocated = &value
+// If called multiple times, the AllocatedResources field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *ContainerStatusApplyConfiguration {
+	b.AllocatedResources = &value
 	return b
 }
 
@@ -129,5 +130,18 @@ func (b *ContainerStatusApplyConfiguration) WithResourcesAllocated(value corev1.
 // If called multiple times, the Resources field is set to the value of the last call.
 func (b *ContainerStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *ContainerStatusApplyConfiguration {
 	b.Resources = value
+	return b
+}
+
+// WithVolumeMounts adds the given value to the VolumeMounts field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the VolumeMounts field.
+func (b *ContainerStatusApplyConfiguration) WithVolumeMounts(values ...*VolumeMountStatusApplyConfiguration) *ContainerStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVolumeMounts")
+		}
+		b.VolumeMounts = append(b.VolumeMounts, *values[i])
+	}
 	return b
 }

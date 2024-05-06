@@ -412,12 +412,13 @@ func (d *Decoder) parseFieldName() (tok Token, err error) {
 	// Field number. Identify if input is a valid number that is not negative
 	// and is decimal integer within 32-bit range.
 	if num := parseNumber(d.in); num.size > 0 {
+		str := num.string(d.in)
 		if !num.neg && num.kind == numDec {
-			if _, err := strconv.ParseInt(string(d.in[:num.size]), 10, 32); err == nil {
+			if _, err := strconv.ParseInt(str, 10, 32); err == nil {
 				return d.consumeToken(Name, num.size, uint8(FieldNumber)), nil
 			}
 		}
-		return Token{}, d.newSyntaxError("invalid field number: %s", d.in[:num.size])
+		return Token{}, d.newSyntaxError("invalid field number: %s", str)
 	}
 
 	return Token{}, d.newSyntaxError("invalid field name: %s", errId(d.in))

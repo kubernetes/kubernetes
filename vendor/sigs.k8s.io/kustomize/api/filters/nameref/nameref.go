@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filters/fieldspec"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -64,7 +64,7 @@ func (f Filter) run(node *yaml.RNode) (*yaml.RNode, error) {
 		FieldSpec: f.NameFieldToUpdate,
 		SetValue:  f.set,
 	}); err != nil {
-		return nil, errors.Wrapf(
+		return nil, errors.WrapPrefixf(
 			err, "updating name reference in '%s' field of '%s'",
 			f.NameFieldToUpdate.Path, f.Referrer.CurId().String())
 	}
@@ -104,7 +104,7 @@ func (f Filter) setMapping(node *yaml.RNode) error {
 	}
 	nameNode, err := node.Pipe(yaml.FieldMatcher{Name: "name"})
 	if err != nil {
-		return errors.Wrap(err, "trying to match 'name' field")
+		return errors.WrapPrefixf(err, "trying to match 'name' field")
 	}
 	if nameNode == nil {
 		// This is a _configuration_ error; the field path
@@ -153,7 +153,7 @@ func (f Filter) filterMapCandidatesByNamespace(
 	node *yaml.RNode) ([]*resource.Resource, error) {
 	namespaceNode, err := node.Pipe(yaml.FieldMatcher{Name: "namespace"})
 	if err != nil {
-		return nil, errors.Wrap(err, "trying to match 'namespace' field")
+		return nil, errors.WrapPrefixf(err, "trying to match 'namespace' field")
 	}
 	if namespaceNode == nil {
 		return f.ReferralCandidates.Resources(), nil

@@ -37,12 +37,14 @@ var (
 		"[+]ping ok",
 		"[+]log ok",
 		"[+]etcd ok",
-		"[+]poststarthook/start-kube-apiserver-admission-initializer ok",
+		"[+]poststarthook/start-apiserver-admission-initializer ok",
 		"[+]poststarthook/generic-apiserver-start-informers ok",
 		"[+]poststarthook/start-apiextensions-informers ok",
 		"[+]poststarthook/start-apiextensions-controllers ok",
 		"[+]poststarthook/crd-informer-synced ok",
 		"[+]poststarthook/bootstrap-controller ok",
+		"[+]poststarthook/start-system-namespaces-controller ok",
+		"[+]poststarthook/start-service-ip-repair-controllers ok",
 		"[+]poststarthook/scheduling/bootstrap-system-priority-classes ok",
 		"[+]poststarthook/start-cluster-authentication-info-controller ok",
 		"[+]poststarthook/start-kube-aggregator-informers ok",
@@ -56,12 +58,14 @@ var (
 		"[+]ping ok",
 		"[+]log ok",
 		"[+]etcd ok",
-		"[+]poststarthook/start-kube-apiserver-admission-initializer ok",
+		"[+]poststarthook/start-apiserver-admission-initializer ok",
 		"[+]poststarthook/generic-apiserver-start-informers ok",
 		"[+]poststarthook/start-apiextensions-informers ok",
 		"[+]poststarthook/start-apiextensions-controllers ok",
 		"[+]poststarthook/crd-informer-synced ok",
 		"[+]poststarthook/bootstrap-controller ok",
+		"[+]poststarthook/start-system-namespaces-controller ok",
+		"[+]poststarthook/start-service-ip-repair-controllers ok",
 		"[+]poststarthook/scheduling/bootstrap-system-priority-classes ok",
 		"[+]poststarthook/start-cluster-authentication-info-controller ok",
 		"[+]poststarthook/start-kube-aggregator-informers ok",
@@ -76,12 +80,14 @@ var (
 		"[+]log ok",
 		"[+]etcd ok",
 		"[+]informer-sync ok",
-		"[+]poststarthook/start-kube-apiserver-admission-initializer ok",
+		"[+]poststarthook/start-apiserver-admission-initializer ok",
 		"[+]poststarthook/generic-apiserver-start-informers ok",
 		"[+]poststarthook/start-apiextensions-informers ok",
 		"[+]poststarthook/start-apiextensions-controllers ok",
 		"[+]poststarthook/crd-informer-synced ok",
 		"[+]poststarthook/bootstrap-controller ok",
+		"[+]poststarthook/start-system-namespaces-controller ok",
+		"[+]poststarthook/start-service-ip-repair-controllers ok",
 		"[+]poststarthook/scheduling/bootstrap-system-priority-classes ok",
 		"[+]poststarthook/start-cluster-authentication-info-controller ok",
 		"[+]poststarthook/start-kube-aggregator-informers ok",
@@ -117,7 +123,7 @@ func testPath(ctx context.Context, client clientset.Interface, path string, requ
 
 var _ = SIGDescribe("health handlers", func() {
 	f := framework.NewDefaultFramework("health")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should contain necessary checks", func(ctx context.Context) {
 		ginkgo.By("/health")

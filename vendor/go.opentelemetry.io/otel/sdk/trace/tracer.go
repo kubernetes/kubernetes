@@ -20,9 +20,12 @@ import (
 
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/embedded"
 )
 
 type tracer struct {
+	embedded.Tracer
+
 	provider             *TracerProvider
 	instrumentationScope instrumentation.Scope
 }
@@ -51,7 +54,7 @@ func (tr *tracer) Start(ctx context.Context, name string, options ...trace.SpanS
 
 	s := tr.newSpan(ctx, name, &config)
 	if rw, ok := s.(ReadWriteSpan); ok && s.IsRecording() {
-		sps, _ := tr.provider.spanProcessors.Load().(spanProcessorStates)
+		sps := tr.provider.getSpanProcessors()
 		for _, sp := range sps {
 			sp.sp.OnStart(ctx, rw)
 		}

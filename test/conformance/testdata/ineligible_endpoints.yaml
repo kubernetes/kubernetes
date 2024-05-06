@@ -40,189 +40,12 @@
 - endpoint: connectCoreV1PutNodeProxyWithPath
   reason: Unable to be tested, and likely soon deprecated
   link: https://github.com/kubernetes/kubernetes/issues/95930
-- endpoint: createCoreV1NamespacedPersistentVolumeClaim
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: createCoreV1NamespacedServiceAccountToken
-  reason: optional feature
-  link: https://github.com/kubernetes/kubernetes/issues/80770
-- endpoint: createCoreV1Node
-  reason: uses kubelet api
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L36
-- endpoint: createCoreV1PersistentVolume
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: createStorageV1CSINode
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: createStorageV1StorageClass
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: createStorageV1VolumeAttachment
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteCoreV1CollectionNamespacedPersistentVolumeClaim
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteCoreV1CollectionPersistentVolume
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteCoreV1NamespacedPersistentVolumeClaim
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteCoreV1Node
-  reason: uses kubelet api
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L36
-- endpoint: deleteCoreV1PersistentVolume
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1CollectionCSIDriver
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1CollectionCSINode
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1CollectionStorageClass
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1CollectionVolumeAttachment
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1CSINode
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1StorageClass
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: deleteStorageV1VolumeAttachment
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: getFlowcontrolApiserverAPIGroup
-  reason: depends on alpha feature
-  link: https://github.com/kubernetes/enhancements/blob/f16c4c7f1c9e28a3cc4bb4d0e6503efea2ae7987/keps/sig-api-machinery/20190228-priority-and-fairness.md
-- endpoint: getInternalApiserverAPIGroup
-  reason: Not eligible for conformance yet
-  link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190802-dynamic-coordinated-storage-version.md
-- endpoint: getResourceAPIGroup
-  reason: still an alpha feature plan for GA 1.31
-  link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/3063-dynamic-resource-allocation/kep.yaml#L29-L33
-- endpoint: getStorageAPIGroup
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: getStorageV1APIResources
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: listCoreV1ComponentStatus
   reason: pending deprecation
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L69
-- endpoint: listCoreV1NamespacedPersistentVolumeClaim
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: listCoreV1PersistentVolume
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: listCoreV1PersistentVolumeClaimForAllNamespaces
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: listStorageV1CSINode
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: listStorageV1StorageClass
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: listStorageV1VolumeAttachment
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchCoreV1NamespacedPersistentVolumeClaim
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchCoreV1NamespacedPersistentVolumeClaimStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchCoreV1NamespacedPodEphemeralcontainers
-  reason: Not eligible for conformance yet
-  link: https://github.com/kubernetes/kubernetes/pull/97276
-- endpoint: patchCoreV1PersistentVolume
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchCoreV1PersistentVolumeStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchStorageV1CSIDriver
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchStorageV1CSINode
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchStorageV1StorageClass
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchStorageV1VolumeAttachment
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: patchStorageV1VolumeAttachmentStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: readCoreV1ComponentStatus
   reason: pending deprecation
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L69
-- endpoint: readCoreV1NamespacedPersistentVolumeClaim
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readCoreV1NamespacedPersistentVolumeClaimStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readCoreV1NamespacedPodEphemeralcontainers
-  reason: Not eligible for conformance yet
-  link: https://github.com/kubernetes/kubernetes/pull/97276
-- endpoint: readCoreV1PersistentVolume
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readCoreV1PersistentVolumeStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readStorageV1CSINode
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readStorageV1StorageClass
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readStorageV1VolumeAttachment
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readStorageV1VolumeAttachmentStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceCoreV1NamespacedPersistentVolumeClaim
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceCoreV1NamespacedPersistentVolumeClaimStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceCoreV1NamespacedPodEphemeralcontainers
-  reason: Not eligible for conformance yet
-  link: https://github.com/kubernetes/kubernetes/pull/97276
-- endpoint: replaceCoreV1PersistentVolume
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceCoreV1PersistentVolumeStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceStorageV1CSIDriver
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceStorageV1CSINode
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceStorageV1StorageClass
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceStorageV1VolumeAttachment
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: replaceStorageV1VolumeAttachmentStatus
-  reason: vendor specific feature
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
 - endpoint: createNetworkingV1NamespacedNetworkPolicy
   reason: optional feature
   link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
@@ -415,15 +238,6 @@
 - endpoint: logFileListHandler
   reason: optional feature
   link: https://github.com/kubernetes/kubernetes/issues/108675
-- endpoint: readNetworkingV1NamespacedNetworkPolicyStatus
-  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
-  link: https://github.com/kubernetes/kubernetes/pull/107963
-- endpoint: patchNetworkingV1NamespacedNetworkPolicyStatus
-  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
-  link: https://github.com/kubernetes/kubernetes/pull/107963
-- endpoint: replaceNetworkingV1NamespacedNetworkPolicyStatus
-  reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
-  link: https://github.com/kubernetes/kubernetes/pull/107963
 - endpoint: readCoreV1NodeStatus
   reason: Kubernetes distribution would reasonably not allow this action via the API
   link: https://github.com/kubernetes/kubernetes/issues/109379
@@ -432,20 +246,31 @@
   link: https://github.com/kubernetes/kubernetes/issues/109379
 - endpoint: deleteCoreV1CollectionNode
   reason: Kubernetes distribution would reasonably not allow this action via the API
-  link: https://github.com/kubernetes/kubernetes/issues/109379 
+  link: https://github.com/kubernetes/kubernetes/issues/109379
 - endpoint: createCoreV1NamespacedBinding
   reason: Endpoint was deprecated in 1.7
-  link: https://github.com/kubernetes/kubernetes/pull/47041  
+  link: https://github.com/kubernetes/kubernetes/pull/47041
 - endpoint: createAuthorizationV1SelfSubjectRulesReview
   reason: Endpoint likely to be deprecated
-  link: https://github.com/kubernetes/kubernetes/issues/112657#issuecomment-1265441626  
+  link: https://github.com/kubernetes/kubernetes/issues/112657#issuecomment-1265441626
 - endpoint: connectCoreV1GetNamespacedPodPortforward
   reason: Explicitly designed to be a debug feature
   link: https://github.com/kubernetes/kubernetes/issues/112778#issuecomment-1427995711
 - endpoint: connectCoreV1GetNamespacedPodAttach
   reason: Explicitly designed to be a debug feature
-  reason: Endpoint likely to be deprecated
   link: https://github.com/kubernetes/kubernetes/issues/112778#issuecomment-1427995711
 - endpoint: connectCoreV1PostNamespacedPodAttach
   reason: Explicitly designed to be a debug feature
   link: https://github.com/kubernetes/kubernetes/issues/112778#issuecomment-1427995711
+- endpoint: createAuthenticationV1SelfSubjectReview
+  reason: Cluster providers are allowed to choose to not serve this API, and the whoami command handles unavailability gracefully.
+  link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/3325-self-subject-attributes-review-api/README.md#ga
+- endpoint: getInternalApiserverAPIGroup
+  reason: The endpoint is part of a group that has no stable endpoints yet, reporting as a stable endpoint in apisnoop.
+  link: https://github.com/kubernetes/issues/124248
+- endpoint: getResourceAPIGroup
+  reason: The endpoint is part of a group that has no stable endpoints yet, reporting as a stable endpoint in apisnoop.
+  link: https://github.com/kubernetes/issues/124248
+- endpoint: getStoragemigrationAPIGroup
+  reason: The endpoint is part of a group that has no stable endpoints yet, reporting as a stable endpoint in apisnoop.
+  link: https://github.com/kubernetes/issues/124248

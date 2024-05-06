@@ -16,13 +16,14 @@ package cel
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/checker/decls"
+	chkdecls "github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common"
+	celast "github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/containers"
+	"github.com/google/cel-go/common/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
@@ -37,80 +38,114 @@ type Source = common.Source
 // Ast representing the checked or unchecked expression, its source, and related metadata such as
 // source position information.
 type Ast struct {
-	expr    *exprpb.Expr
-	info    *exprpb.SourceInfo
-	source  Source
-	refMap  map[int64]*exprpb.Reference
-	typeMap map[int64]*exprpb.Type
+	source Source
+	impl   *celast.AST
+}
+
+// NativeRep converts the AST to a Go-native representation.
+func (ast *Ast) NativeRep() *celast.AST {
+	return ast.impl
 }
 
 // Expr returns the proto serializable instance of the parsed/checked expression.
+//
+// Deprecated: prefer cel.AstToCheckedExpr() or cel.AstToParsedExpr() and call GetExpr()
+// the result instead.
 func (ast *Ast) Expr() *exprpb.Expr {
-	return ast.expr
+	if ast == nil {
+		return nil
+	}
+	pbExpr, _ := celast.ExprToProto(ast.impl.Expr())
+	return pbExpr
 }
 
 // IsChecked returns whether the Ast value has been successfully type-checked.
 func (ast *Ast) IsChecked() bool {
-	return ast.typeMap != nil && len(ast.typeMap) > 0
+	if ast == nil {
+		return false
+	}
+	return ast.impl.IsChecked()
 }
 
 // SourceInfo returns character offset and newline position information about expression elements.
 func (ast *Ast) SourceInfo() *exprpb.SourceInfo {
-	return ast.info
+	if ast == nil {
+		return nil
+	}
+	pbInfo, _ := celast.SourceInfoToProto(ast.impl.SourceInfo())
+	return pbInfo
 }
 
 // ResultType returns the output type of the expression if the Ast has been type-checked, else
-// returns decls.Dyn as the parse step cannot infer the type.
+// returns chkdecls.Dyn as the parse step cannot infer the type.
 //
 // Deprecated: use OutputType
 func (ast *Ast) ResultType() *exprpb.Type {
-	if !ast.IsChecked() {
-		return decls.Dyn
+	out := ast.OutputType()
+	t, err := TypeToExprType(out)
+	if err != nil {
+		return chkdecls.Dyn
 	}
-	return ast.typeMap[ast.expr.GetId()]
+	return t
 }
 
 // OutputType returns the output type of the expression if the Ast has been type-checked, else
 // returns cel.DynType as the parse step cannot infer types.
 func (ast *Ast) OutputType() *Type {
-	t, err := ExprTypeToType(ast.ResultType())
-	if err != nil {
-		return DynType
+	if ast == nil {
+		return types.ErrorType
 	}
-	return t
+	return ast.impl.GetType(ast.impl.Expr().ID())
 }
 
 // Source returns a view of the input used to create the Ast. This source may be complete or
 // constructed from the SourceInfo.
 func (ast *Ast) Source() Source {
+	if ast == nil {
+		return nil
+	}
 	return ast.source
 }
 
 // FormatType converts a type message into a string representation.
+//
+// Deprecated: prefer FormatCELType
 func FormatType(t *exprpb.Type) string {
 	return checker.FormatCheckedType(t)
+}
+
+// FormatCELType formats a cel.Type value to a string representation.
+//
+// The type formatting is identical to FormatType.
+func FormatCELType(t *Type) string {
+	return checker.FormatCELType(t)
 }
 
 // Env encapsulates the context necessary to perform parsing, type checking, or generation of
 // evaluable programs for different expressions.
 type Env struct {
 	Container       *containers.Container
-	functions       map[string]*functionDecl
-	declarations    []*exprpb.Decl
+	variables       []*decls.VariableDecl
+	functions       map[string]*decls.FunctionDecl
 	macros          []parser.Macro
-	adapter         ref.TypeAdapter
-	provider        ref.TypeProvider
+	adapter         types.Adapter
+	provider        types.Provider
 	features        map[int]bool
 	appliedFeatures map[int]bool
+	libraries       map[string]bool
+	validators      []ASTValidator
+	costOptions     []checker.CostOption
 
 	// Internal parser representation
-	prsr *parser.Parser
+	prsr     *parser.Parser
+	prsrOpts []parser.Option
 
 	// Internal checker representation
-	chk     *checker.Env
-	chkErr  error
-	chkOnce sync.Once
-	chkOpts []checker.Option
+	chkMutex sync.Mutex
+	chk      *checker.Env
+	chkErr   error
+	chkOnce  sync.Once
+	chkOpts  []checker.Option
 
 	// Program options tied to the environment
 	progOpts []ProgramOption
@@ -151,49 +186,72 @@ func NewCustomEnv(opts ...EnvOption) (*Env, error) {
 		return nil, err
 	}
 	return (&Env{
-		declarations:    []*exprpb.Decl{},
-		functions:       map[string]*functionDecl{},
+		variables:       []*decls.VariableDecl{},
+		functions:       map[string]*decls.FunctionDecl{},
 		macros:          []parser.Macro{},
 		Container:       containers.DefaultContainer,
 		adapter:         registry,
 		provider:        registry,
 		features:        map[int]bool{},
 		appliedFeatures: map[int]bool{},
+		libraries:       map[string]bool{},
+		validators:      []ASTValidator{},
 		progOpts:        []ProgramOption{},
+		costOptions:     []checker.CostOption{},
 	}).configure(opts)
 }
 
 // Check performs type-checking on the input Ast and yields a checked Ast and/or set of Issues.
+// If any `ASTValidators` are configured on the environment, they will be applied after a valid
+// type-check result. If any issues are detected, the validators will provide them on the
+// output Issues object.
 //
-// Checking has failed if the returned Issues value and its Issues.Err() value are non-nil.
-// Issues should be inspected if they are non-nil, but may not represent a fatal error.
+// Either checking or validation has failed if the returned Issues value and its Issues.Err()
+// value are non-nil. Issues should be inspected if they are non-nil, but may not represent a
+// fatal error.
 //
 // It is possible to have both non-nil Ast and Issues values returned from this call: however,
 // the mere presence of an Ast does not imply that it is valid for use.
 func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
-	// Note, errors aren't currently possible on the Ast to ParsedExpr conversion.
-	pe, _ := AstToParsedExpr(ast)
-
 	// Construct the internal checker env, erroring if there is an issue adding the declarations.
-	err := e.initChecker()
+	chk, err := e.initChecker()
 	if err != nil {
 		errs := common.NewErrors(ast.Source())
-		errs.ReportError(common.NoLocation, e.chkErr.Error())
-		return nil, NewIssues(errs)
+		errs.ReportError(common.NoLocation, err.Error())
+		return nil, NewIssuesWithSourceInfo(errs, ast.impl.SourceInfo())
 	}
 
-	res, errs := checker.Check(pe, ast.Source(), e.chk)
+	checked, errs := checker.Check(ast.impl, ast.Source(), chk)
 	if len(errs.GetErrors()) > 0 {
-		return nil, NewIssues(errs)
+		return nil, NewIssuesWithSourceInfo(errs, ast.impl.SourceInfo())
 	}
 	// Manually create the Ast to ensure that the Ast source information (which may be more
 	// detailed than the information provided by Check), is returned to the caller.
-	return &Ast{
-		source:  ast.Source(),
-		expr:    res.GetExpr(),
-		info:    res.GetSourceInfo(),
-		refMap:  res.GetReferenceMap(),
-		typeMap: res.GetTypeMap()}, nil
+	ast = &Ast{
+		source: ast.Source(),
+		impl:   checked}
+
+	// Avoid creating a validator config if it's not needed.
+	if len(e.validators) == 0 {
+		return ast, nil
+	}
+
+	// Generate a validator configuration from the set of configured validators.
+	vConfig := newValidatorConfig()
+	for _, v := range e.validators {
+		if cv, ok := v.(ASTValidatorConfigurer); ok {
+			cv.Configure(vConfig)
+		}
+	}
+	// Apply additional validators on the type-checked result.
+	iss := NewIssuesWithSourceInfo(errs, ast.impl.SourceInfo())
+	for _, v := range e.validators {
+		v.Validate(e, vConfig, checked, iss)
+	}
+	if iss.Err() != nil {
+		return nil, iss
+	}
+	return ast, nil
 }
 
 // Compile combines the Parse and Check phases CEL program compilation to produce an Ast and
@@ -236,9 +294,13 @@ func (e *Env) CompileSource(src Source) (*Ast, *Issues) {
 // TypeProvider are immutable, or that their underlying implementations are based on the
 // ref.TypeRegistry which provides a Copy method which will be invoked by this method.
 func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
-	if e.chkErr != nil {
-		return nil, e.chkErr
+	chk, chkErr := e.getCheckerOrError()
+	if chkErr != nil {
+		return nil, chkErr
 	}
+
+	prsrOptsCopy := make([]parser.Option, len(e.prsrOpts))
+	copy(prsrOptsCopy, e.prsrOpts)
 
 	// The type-checker is configured with Declarations. The declarations may either be provided
 	// as options which have not yet been validated, or may come from a previous checker instance
@@ -247,16 +309,16 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	copy(chkOptsCopy, e.chkOpts)
 
 	// Copy the declarations if needed.
-	decsCopy := []*exprpb.Decl{}
-	if e.chk != nil {
+	varsCopy := []*decls.VariableDecl{}
+	if chk != nil {
 		// If the type-checker has already been instantiated, then the e.declarations have been
-		// valdiated within the chk instance.
-		chkOptsCopy = append(chkOptsCopy, checker.ValidatedDeclarations(e.chk))
+		// validated within the chk instance.
+		chkOptsCopy = append(chkOptsCopy, checker.ValidatedDeclarations(chk))
 	} else {
 		// If the type-checker has not been instantiated, ensure the unvalidated declarations are
 		// provided to the extended Env instance.
-		decsCopy = make([]*exprpb.Decl, len(e.declarations))
-		copy(decsCopy, e.declarations)
+		varsCopy = make([]*decls.VariableDecl, len(e.variables))
+		copy(varsCopy, e.variables)
 	}
 
 	// Copy macros and program options
@@ -268,8 +330,8 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	// Copy the adapter / provider if they appear to be mutable.
 	adapter := e.adapter
 	provider := e.provider
-	adapterReg, isAdapterReg := e.adapter.(ref.TypeRegistry)
-	providerReg, isProviderReg := e.provider.(ref.TypeRegistry)
+	adapterReg, isAdapterReg := e.adapter.(*types.Registry)
+	providerReg, isProviderReg := e.provider.(*types.Registry)
 	// In most cases the provider and adapter will be a ref.TypeRegistry;
 	// however, in the rare cases where they are not, they are assumed to
 	// be immutable. Since it is possible to set the TypeProvider separately
@@ -300,23 +362,34 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	for k, v := range e.appliedFeatures {
 		appliedFeaturesCopy[k] = v
 	}
-	funcsCopy := make(map[string]*functionDecl, len(e.functions))
+	funcsCopy := make(map[string]*decls.FunctionDecl, len(e.functions))
 	for k, v := range e.functions {
 		funcsCopy[k] = v
 	}
+	libsCopy := make(map[string]bool, len(e.libraries))
+	for k, v := range e.libraries {
+		libsCopy[k] = v
+	}
+	validatorsCopy := make([]ASTValidator, len(e.validators))
+	copy(validatorsCopy, e.validators)
+	costOptsCopy := make([]checker.CostOption, len(e.costOptions))
+	copy(costOptsCopy, e.costOptions)
 
-	// TODO: functions copy needs to happen here.
 	ext := &Env{
 		Container:       e.Container,
-		declarations:    decsCopy,
+		variables:       varsCopy,
 		functions:       funcsCopy,
 		macros:          macsCopy,
 		progOpts:        progOptsCopy,
 		adapter:         adapter,
 		features:        featuresCopy,
 		appliedFeatures: appliedFeaturesCopy,
+		libraries:       libsCopy,
+		validators:      validatorsCopy,
 		provider:        provider,
 		chkOpts:         chkOptsCopy,
+		prsrOpts:        prsrOptsCopy,
+		costOptions:     costOptsCopy,
 	}
 	return ext.configure(opts)
 }
@@ -326,6 +399,31 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 func (e *Env) HasFeature(flag int) bool {
 	enabled, has := e.features[flag]
 	return has && enabled
+}
+
+// HasLibrary returns whether a specific SingletonLibrary has been configured in the environment.
+func (e *Env) HasLibrary(libName string) bool {
+	configured, exists := e.libraries[libName]
+	return exists && configured
+}
+
+// Libraries returns a list of SingletonLibrary that have been configured in the environment.
+func (e *Env) Libraries() []string {
+	libraries := make([]string, 0, len(e.libraries))
+	for libName := range e.libraries {
+		libraries = append(libraries, libName)
+	}
+	return libraries
+}
+
+// HasValidator returns whether a specific ASTValidator has been configured in the environment.
+func (e *Env) HasValidator(name string) bool {
+	for _, v := range e.validators {
+		if v.Name() == name {
+			return true
+		}
+	}
+	return false
 }
 
 // Parse parses the input expression value `txt` to a Ast and/or a set of Issues.
@@ -345,16 +443,11 @@ func (e *Env) Parse(txt string) (*Ast, *Issues) {
 // It is possible to have both non-nil Ast and Issues values returned from this call; however,
 // the mere presence of an Ast does not imply that it is valid for use.
 func (e *Env) ParseSource(src Source) (*Ast, *Issues) {
-	res, errs := e.prsr.Parse(src)
+	parsed, errs := e.prsr.Parse(src)
 	if len(errs.GetErrors()) > 0 {
 		return nil, &Issues{errs: errs}
 	}
-	// Manually create the Ast to ensure that the text source information is propagated on
-	// subsequent calls to Check.
-	return &Ast{
-		source: src,
-		expr:   res.GetExpr(),
-		info:   res.GetSourceInfo()}, nil
+	return &Ast{source: src, impl: parsed}, nil
 }
 
 // Program generates an evaluable instance of the Ast within the environment (Env).
@@ -369,34 +462,62 @@ func (e *Env) Program(ast *Ast, opts ...ProgramOption) (Program, error) {
 	return newProgram(e, ast, optSet)
 }
 
+// CELTypeAdapter returns the `types.Adapter` configured for the environment.
+func (e *Env) CELTypeAdapter() types.Adapter {
+	return e.adapter
+}
+
+// CELTypeProvider returns the `types.Provider` configured for the environment.
+func (e *Env) CELTypeProvider() types.Provider {
+	return e.provider
+}
+
 // TypeAdapter returns the `ref.TypeAdapter` configured for the environment.
+//
+// Deprecated: use CELTypeAdapter()
 func (e *Env) TypeAdapter() ref.TypeAdapter {
 	return e.adapter
 }
 
 // TypeProvider returns the `ref.TypeProvider` configured for the environment.
+//
+// Deprecated: use CELTypeProvider()
 func (e *Env) TypeProvider() ref.TypeProvider {
-	return e.provider
+	if legacyProvider, ok := e.provider.(ref.TypeProvider); ok {
+		return legacyProvider
+	}
+	return &interopLegacyTypeProvider{Provider: e.provider}
 }
 
-// UnknownVars returns an interpreter.PartialActivation which marks all variables
-// declared in the Env as unknown AttributePattern values.
+// UnknownVars returns an interpreter.PartialActivation which marks all variables declared in the
+// Env as unknown AttributePattern values.
 //
-// Note, the UnknownVars will behave the same as an interpreter.EmptyActivation
-// unless the PartialAttributes option is provided as a ProgramOption.
+// Note, the UnknownVars will behave the same as an interpreter.EmptyActivation unless the
+// PartialAttributes option is provided as a ProgramOption.
 func (e *Env) UnknownVars() interpreter.PartialActivation {
-	var unknownPatterns []*interpreter.AttributePattern
-	for _, d := range e.declarations {
-		switch d.GetDeclKind().(type) {
-		case *exprpb.Decl_Ident:
-			unknownPatterns = append(unknownPatterns,
-				interpreter.NewAttributePattern(d.GetName()))
-		}
-	}
-	part, _ := PartialVars(
-		interpreter.EmptyActivation(),
-		unknownPatterns...)
+	act := interpreter.EmptyActivation()
+	part, _ := PartialVars(act, e.computeUnknownVars(act)...)
 	return part
+}
+
+// PartialVars returns an interpreter.PartialActivation where all variables not in the input variable
+// set, but which have been configured in the environment, are marked as unknown.
+//
+// The `vars` value may either be an interpreter.Activation or any valid input to the
+// interpreter.NewActivation call.
+//
+// Note, this is equivalent to calling cel.PartialVars and manually configuring the set of unknown
+// variables. For more advanced use cases of partial state where portions of an object graph, rather
+// than top-level variables, are missing the PartialVars() method may be a more suitable choice.
+//
+// Note, the PartialVars will behave the same as an interpreter.EmptyActivation unless the
+// PartialAttributes option is provided as a ProgramOption.
+func (e *Env) PartialVars(vars any) (interpreter.PartialActivation, error) {
+	act, err := interpreter.NewActivation(vars)
+	if err != nil {
+		return nil, err
+	}
+	return PartialVars(act, e.computeUnknownVars(act)...)
 }
 
 // ResidualAst takes an Ast and its EvalDetails to produce a new Ast which only contains the
@@ -422,8 +543,9 @@ func (e *Env) UnknownVars() interpreter.PartialActivation {
 // TODO: Consider adding an option to generate a Program.Residual to avoid round-tripping to an
 // Ast format and then Program again.
 func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
-	pruned := interpreter.PruneAst(a.Expr(), details.State())
-	expr, err := AstToString(ParsedExprToAst(&exprpb.ParsedExpr{Expr: pruned}))
+	pruned := interpreter.PruneAst(a.impl.Expr(), a.impl.SourceInfo().MacroCalls(), details.State())
+	newAST := &Ast{source: a.Source(), impl: pruned}
+	expr, err := AstToString(newAST)
 	if err != nil {
 		return nil, err
 	}
@@ -443,12 +565,11 @@ func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
 
 // EstimateCost estimates the cost of a type checked CEL expression using the length estimates of input data and
 // extension functions provided by estimator.
-func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator) (checker.CostEstimate, error) {
-	checked, err := AstToCheckedExpr(ast)
-	if err != nil {
-		return checker.CostEstimate{}, fmt.Errorf("EsimateCost could not inspect Ast: %v", err)
-	}
-	return checker.Cost(checked, estimator), nil
+func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator, opts ...checker.CostOption) (checker.CostEstimate, error) {
+	extendedOpts := make([]checker.CostOption, 0, len(e.costOptions))
+	extendedOpts = append(extendedOpts, opts...)
+	extendedOpts = append(extendedOpts, e.costOptions...)
+	return checker.Cost(ast.impl, estimator, extendedOpts...)
 }
 
 // configure applies a series of EnvOptions to the current environment.
@@ -464,31 +585,21 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	}
 
 	// If the default UTC timezone fix has been enabled, make sure the library is configured
-	if e.HasFeature(featureDefaultUTCTimeZone) {
-		if _, found := e.appliedFeatures[featureDefaultUTCTimeZone]; !found {
-			e, err = Lib(timeUTCLibrary{})(e)
-			if err != nil {
-				return nil, err
-			}
-			// record that the feature has been applied since it will generate declarations
-			// and functions which will be propagated on Extend() calls and which should only
-			// be registered once.
-			e.appliedFeatures[featureDefaultUTCTimeZone] = true
-		}
-	}
-
-	// Initialize all of the functions configured within the environment.
-	for _, fn := range e.functions {
-		err = fn.init()
-		if err != nil {
-			return nil, err
-		}
+	e, err = e.maybeApplyFeature(featureDefaultUTCTimeZone, Lib(timeUTCLibrary{}))
+	if err != nil {
+		return nil, err
 	}
 
 	// Configure the parser.
-	prsrOpts := []parser.Option{parser.Macros(e.macros...)}
+	prsrOpts := []parser.Option{}
+	prsrOpts = append(prsrOpts, e.prsrOpts...)
+	prsrOpts = append(prsrOpts, parser.Macros(e.macros...))
+
 	if e.HasFeature(featureEnableMacroCallTracking) {
 		prsrOpts = append(prsrOpts, parser.PopulateMacroCalls(true))
+	}
+	if e.HasFeature(featureVariadicLogicalASTs) {
+		prsrOpts = append(prsrOpts, parser.EnableVariadicOperatorASTs(true))
 	}
 	e.prsr, err = parser.NewParser(prsrOpts...)
 	if err != nil {
@@ -497,7 +608,7 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 
 	// Ensure that the checker init happens eagerly rather than lazily.
 	if e.HasFeature(featureEagerlyValidateDeclarations) {
-		err := e.initChecker()
+		_, err := e.initChecker()
 		if err != nil {
 			return nil, err
 		}
@@ -506,57 +617,115 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	return e, nil
 }
 
-func (e *Env) initChecker() error {
+func (e *Env) initChecker() (*checker.Env, error) {
 	e.chkOnce.Do(func() {
 		chkOpts := []checker.Option{}
 		chkOpts = append(chkOpts, e.chkOpts...)
 		chkOpts = append(chkOpts,
-			checker.HomogeneousAggregateLiterals(
-				e.HasFeature(featureDisableDynamicAggregateLiterals)),
 			checker.CrossTypeNumericComparisons(
 				e.HasFeature(featureCrossTypeNumericComparisons)))
 
 		ce, err := checker.NewEnv(e.Container, e.provider, chkOpts...)
 		if err != nil {
-			e.chkErr = err
+			e.setCheckerOrError(nil, err)
 			return
 		}
 		// Add the statically configured declarations.
-		err = ce.Add(e.declarations...)
+		err = ce.AddIdents(e.variables...)
 		if err != nil {
-			e.chkErr = err
+			e.setCheckerOrError(nil, err)
 			return
 		}
 		// Add the function declarations which are derived from the FunctionDecl instances.
 		for _, fn := range e.functions {
-			fnDecl, err := functionDeclToExprDecl(fn)
-			if err != nil {
-				e.chkErr = err
-				return
+			if fn.IsDeclarationDisabled() {
+				continue
 			}
-			err = ce.Add(fnDecl)
+			err = ce.AddFunctions(fn)
 			if err != nil {
-				e.chkErr = err
+				e.setCheckerOrError(nil, err)
 				return
 			}
 		}
 		// Add function declarations here separately.
-		e.chk = ce
+		e.setCheckerOrError(ce, nil)
 	})
-	return e.chkErr
+	return e.getCheckerOrError()
 }
+
+// setCheckerOrError sets the checker.Env or error state in a concurrency-safe manner
+func (e *Env) setCheckerOrError(chk *checker.Env, chkErr error) {
+	e.chkMutex.Lock()
+	e.chk = chk
+	e.chkErr = chkErr
+	e.chkMutex.Unlock()
+}
+
+// getCheckerOrError gets the checker.Env or error state in a concurrency-safe manner
+func (e *Env) getCheckerOrError() (*checker.Env, error) {
+	e.chkMutex.Lock()
+	defer e.chkMutex.Unlock()
+	return e.chk, e.chkErr
+}
+
+// maybeApplyFeature determines whether the feature-guarded option is enabled, and if so applies
+// the feature if it has not already been enabled.
+func (e *Env) maybeApplyFeature(feature int, option EnvOption) (*Env, error) {
+	if !e.HasFeature(feature) {
+		return e, nil
+	}
+	_, applied := e.appliedFeatures[feature]
+	if applied {
+		return e, nil
+	}
+	e, err := option(e)
+	if err != nil {
+		return nil, err
+	}
+	// record that the feature has been applied since it will generate declarations
+	// and functions which will be propagated on Extend() calls and which should only
+	// be registered once.
+	e.appliedFeatures[feature] = true
+	return e, nil
+}
+
+// computeUnknownVars determines a set of missing variables based on the input activation and the
+// environment's configured declaration set.
+func (e *Env) computeUnknownVars(vars interpreter.Activation) []*interpreter.AttributePattern {
+	var unknownPatterns []*interpreter.AttributePattern
+	for _, v := range e.variables {
+		varName := v.Name()
+		if _, found := vars.ResolveName(varName); found {
+			continue
+		}
+		unknownPatterns = append(unknownPatterns, interpreter.NewAttributePattern(varName))
+	}
+	return unknownPatterns
+}
+
+// Error type which references an expression id, a location within source, and a message.
+type Error = common.Error
 
 // Issues defines methods for inspecting the error details of parse and check calls.
 //
 // Note: in the future, non-fatal warnings and notices may be inspectable via the Issues struct.
 type Issues struct {
 	errs *common.Errors
+	info *celast.SourceInfo
 }
 
 // NewIssues returns an Issues struct from a common.Errors object.
 func NewIssues(errs *common.Errors) *Issues {
+	return NewIssuesWithSourceInfo(errs, nil)
+}
+
+// NewIssuesWithSourceInfo returns an Issues struct from a common.Errors object with SourceInfo metatata
+// which can be used with the `ReportErrorAtID` method for additional error reports within the context
+// information that's inferred from an expression id.
+func NewIssuesWithSourceInfo(errs *common.Errors, info *celast.SourceInfo) *Issues {
 	return &Issues{
 		errs: errs,
+		info: info,
 	}
 }
 
@@ -572,9 +741,9 @@ func (i *Issues) Err() error {
 }
 
 // Errors returns the collection of errors encountered in more granular detail.
-func (i *Issues) Errors() []common.Error {
+func (i *Issues) Errors() []*Error {
 	if i == nil {
-		return []common.Error{}
+		return []*Error{}
 	}
 	return i.errs.GetErrors()
 }
@@ -598,12 +767,111 @@ func (i *Issues) String() string {
 	return i.errs.ToDisplayString()
 }
 
+// ReportErrorAtID reports an error message with an optional set of formatting arguments.
+//
+// The source metadata for the expression at `id`, if present, is attached to the error report.
+// To ensure that source metadata is attached to error reports, use NewIssuesWithSourceInfo.
+func (i *Issues) ReportErrorAtID(id int64, message string, args ...any) {
+	i.errs.ReportErrorAtID(id, i.info.GetStartLocation(id), message, args...)
+}
+
 // getStdEnv lazy initializes the CEL standard environment.
 func getStdEnv() (*Env, error) {
 	stdEnvInit.Do(func() {
 		stdEnv, stdEnvErr = NewCustomEnv(StdLib(), EagerlyValidateDeclarations(true))
 	})
 	return stdEnv, stdEnvErr
+}
+
+// interopCELTypeProvider layers support for the types.Provider interface on top of a ref.TypeProvider.
+type interopCELTypeProvider struct {
+	ref.TypeProvider
+}
+
+// FindStructType returns a types.Type instance for the given fully-qualified typeName if one exists.
+//
+// This method proxies to the underyling ref.TypeProvider's FindType method and converts protobuf type
+// into a native type representation. If the conversion fails, the type is listed as not found.
+func (p *interopCELTypeProvider) FindStructType(typeName string) (*types.Type, bool) {
+	if et, found := p.FindType(typeName); found {
+		t, err := types.ExprTypeToType(et)
+		if err != nil {
+			return nil, false
+		}
+		return t, true
+	}
+	return nil, false
+}
+
+// FindStructFieldNames returns an empty set of field for the interop provider.
+//
+// To inspect the field names, migrate to a `types.Provider` implementation.
+func (p *interopCELTypeProvider) FindStructFieldNames(typeName string) ([]string, bool) {
+	return []string{}, false
+}
+
+// FindStructFieldType returns a types.FieldType instance for the given fully-qualified typeName and field
+// name, if one exists.
+//
+// This method proxies to the underyling ref.TypeProvider's FindFieldType method and converts protobuf type
+// into a native type representation. If the conversion fails, the type is listed as not found.
+func (p *interopCELTypeProvider) FindStructFieldType(structType, fieldName string) (*types.FieldType, bool) {
+	if ft, found := p.FindFieldType(structType, fieldName); found {
+		t, err := types.ExprTypeToType(ft.Type)
+		if err != nil {
+			return nil, false
+		}
+		return &types.FieldType{
+			Type:    t,
+			IsSet:   ft.IsSet,
+			GetFrom: ft.GetFrom,
+		}, true
+	}
+	return nil, false
+}
+
+// interopLegacyTypeProvider layers support for the ref.TypeProvider interface on top of a types.Provider.
+type interopLegacyTypeProvider struct {
+	types.Provider
+}
+
+// FindType retruns the protobuf Type representation for the input type name if one exists.
+//
+// This method proxies to the underlying types.Provider FindStructType method and converts the types.Type
+// value to a protobuf Type representation.
+//
+// Failure to convert the type will result in the type not being found.
+func (p *interopLegacyTypeProvider) FindType(typeName string) (*exprpb.Type, bool) {
+	if t, found := p.FindStructType(typeName); found {
+		et, err := types.TypeToExprType(t)
+		if err != nil {
+			return nil, false
+		}
+		return et, true
+	}
+	return nil, false
+}
+
+// FindFieldType returns the protobuf-based FieldType representation for the input type name and field,
+// if one exists.
+//
+// This call proxies to the types.Provider FindStructFieldType method and converts the types.FIeldType
+// value to a protobuf-based ref.FieldType representation if found.
+//
+// Failure to convert the FieldType will result in the field not being found.
+func (p *interopLegacyTypeProvider) FindFieldType(structType, fieldName string) (*ref.FieldType, bool) {
+	if cft, found := p.FindStructFieldType(structType, fieldName); found {
+		et, err := types.TypeToExprType(cft.Type)
+		if err != nil {
+			return nil, false
+		}
+		return &ref.FieldType{
+			Type:    et,
+			IsSet:   cft.IsSet,
+			GetFrom: cft.GetFrom,
+		}, true
+	}
+	return nil, false
 }
 
 var (

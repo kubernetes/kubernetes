@@ -144,7 +144,7 @@
               ],
               "parameters": {
                 "filter": {
-                  "description": "A filter to narrow down results to a preferred subset. The filtering language accepts strings like \"displayName=tokyo\", and is documented in more detail in [AIP-160](https://google.aip.dev/160).",
+                  "description": "A filter to narrow down results to a preferred subset. The filtering language accepts strings like `\"displayName=tokyo\"`, and is documented in more detail in [AIP-160](https://google.aip.dev/160).",
                   "location": "query",
                   "type": "string"
                 },
@@ -537,7 +537,7 @@
                   ]
                 },
                 "list": {
-                  "description": "Lists operations that match the specified filter in the request. If the server doesn't support this method, it returns `UNIMPLEMENTED`. NOTE: the `name` binding allows API services to override the binding to use different resource name schemes, such as `users/*/operations`. To override the binding, API services can add a binding such as `\"/v1/{name=users/*}/operations\"` to their service configuration. For backwards compatibility, the default name includes the operations collection id, however overriding users must ensure the name binding is the parent resource, without the operations collection id.",
+                  "description": "Lists operations that match the specified filter in the request. If the server doesn't support this method, it returns `UNIMPLEMENTED`.",
                   "flatPath": "v1/projects/{projectsId}/locations/{locationsId}/operations",
                   "httpMethod": "GET",
                   "id": "tpu.projects.locations.operations.list",
@@ -659,7 +659,7 @@
       }
     }
   },
-  "revision": "20210824",
+  "revision": "20230420",
   "rootUrl": "https://tpu.googleapis.com/",
   "schemas": {
     "AcceleratorType": {
@@ -678,7 +678,7 @@
       "type": "object"
     },
     "Empty": {
-      "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance: service Foo { rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty); } The JSON representation for `Empty` is empty JSON object `{}`.",
+      "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance: service Foo { rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty); }",
       "id": "Empty",
       "properties": {},
       "type": "object"
@@ -795,7 +795,7 @@
       "type": "object"
     },
     "Location": {
-      "description": "A resource that represents Google Cloud Platform location.",
+      "description": "A resource that represents a Google Cloud location.",
       "id": "Location",
       "properties": {
         "displayName": {
@@ -1043,44 +1043,37 @@
       "type": "object"
     },
     "OperationMetadata": {
-      "description": "Represents the metadata of the long-running operation.",
+      "description": "Metadata describing an Operation",
       "id": "OperationMetadata",
       "properties": {
         "apiVersion": {
-          "description": "Output only. API version used to start the operation.",
-          "readOnly": true,
+          "description": "API version.",
           "type": "string"
         },
         "cancelRequested": {
-          "description": "Output only. Identifies whether the user has requested cancellation of the operation. Operations that have been cancelled successfully have Operation.error value with a google.rpc.Status.code of 1, corresponding to `Code.CANCELLED`.",
-          "readOnly": true,
+          "description": "Specifies if cancellation was requested for the operation.",
           "type": "boolean"
         },
         "createTime": {
-          "description": "Output only. The time the operation was created.",
+          "description": "The time the operation was created.",
           "format": "google-datetime",
-          "readOnly": true,
           "type": "string"
         },
         "endTime": {
-          "description": "Output only. The time the operation finished running.",
+          "description": "The time the operation finished running.",
           "format": "google-datetime",
-          "readOnly": true,
           "type": "string"
         },
         "statusDetail": {
-          "description": "Output only. Human-readable status of the operation, if any.",
-          "readOnly": true,
+          "description": "Human-readable status of the operation, if any.",
           "type": "string"
         },
         "target": {
-          "description": "Output only. Server-defined resource path for the target of the operation.",
-          "readOnly": true,
+          "description": "Target of the operation - for example projects/project-1/connectivityTests/test-1",
           "type": "string"
         },
         "verb": {
-          "description": "Output only. Name of the verb executed by the operation.",
-          "readOnly": true,
+          "description": "Name of the verb executed by the operation.",
           "type": "string"
         }
       },

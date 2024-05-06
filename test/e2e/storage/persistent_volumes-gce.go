@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -20,12 +23,14 @@ import (
 	"context"
 
 	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
@@ -58,7 +63,7 @@ func initializeGCETestSpec(ctx context.Context, c clientset.Interface, t *framew
 }
 
 // Testing configurations of single a PV/PVC pair attached to a GCE PD
-var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", func() {
+var _ = utils.SIGDescribe("PersistentVolumes GCEPD", feature.StorageProvider, func() {
 	var (
 		c         clientset.Interface
 		diskName  string
@@ -75,7 +80,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 	)
 
 	f := framework.NewDefaultFramework("pv")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -130,7 +135,9 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 
 		ginkgo.By("Deleting the Claim")
 		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(ctx, c, pvc.Name, ns), "Unable to delete PVC ", pvc.Name)
-		framework.ExpectEqual(verifyGCEDiskAttached(diskName, node), true)
+		if !verifyGCEDiskAttached(diskName, node) {
+			framework.Failf("Disk %s is not attached to node %s", diskName, node)
+		}
 
 		ginkgo.By("Deleting the Pod")
 		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, clientPod), "Failed to delete pod ", clientPod.Name)
@@ -145,7 +152,9 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", f
 
 		ginkgo.By("Deleting the Persistent Volume")
 		framework.ExpectNoError(e2epv.DeletePersistentVolume(ctx, c, pv.Name), "Failed to delete PV ", pv.Name)
-		framework.ExpectEqual(verifyGCEDiskAttached(diskName, node), true)
+		if !verifyGCEDiskAttached(diskName, node) {
+			framework.Failf("Disk %s is not attached to node %s", diskName, node)
+		}
 
 		ginkgo.By("Deleting the client pod")
 		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, clientPod), "Failed to delete pod ", clientPod.Name)

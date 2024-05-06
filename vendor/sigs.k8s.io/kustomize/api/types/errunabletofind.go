@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 )
 
 type errUnableToFind struct {
@@ -31,10 +31,6 @@ func NewErrUnableToFind(w string, a []Pair) *errUnableToFind {
 }
 
 func IsErrUnableToFind(err error) bool {
-	_, ok := err.(*errUnableToFind)
-	if ok {
-		return true
-	}
-	_, ok = errors.Cause(err).(*errUnableToFind)
-	return ok
+	e := &errUnableToFind{}
+	return errors.As(err, &e)
 }

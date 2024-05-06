@@ -31,24 +31,24 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
 type fakeRemoteAttach struct {
-	method string
-	url    *url.URL
-	err    error
+	url *url.URL
+	err error
 }
 
-func (f *fakeRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
-	f.method = method
+func (f *fakeRemoteAttach) Attach(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	f.url = url
 	return f.err
 }
@@ -308,7 +308,7 @@ func TestAttach(t *testing.T) {
 			options := &AttachOptions{
 				StreamOptions: exec.StreamOptions{
 					ContainerName: test.container,
-					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
+					IOStreams:     genericiooptions.NewTestIOStreamsDiscard(),
 				},
 				Attach:        remoteAttach,
 				GetPodTimeout: 1000,
@@ -326,7 +326,7 @@ func TestAttach(t *testing.T) {
 						return err
 					}
 
-					return options.Attach.Attach("POST", u, nil, nil, nil, nil, raw, sizeQueue)
+					return options.Attach.Attach(u, nil, nil, nil, nil, raw, sizeQueue)
 				}
 			}
 
@@ -345,9 +345,6 @@ func TestAttach(t *testing.T) {
 			if remoteAttach.url.Path != test.attachPath {
 				t.Errorf("%s: Did not get expected path for exec request: %q %q", test.name, test.attachPath, remoteAttach.url.Path)
 				return
-			}
-			if remoteAttach.method != "POST" {
-				t.Errorf("%s: Did not get method for attach request: %s", test.name, remoteAttach.method)
 			}
 			if remoteAttach.url.Query().Get("container") != "bar" {
 				t.Errorf("%s: Did not have query parameters: %s", test.name, remoteAttach.url.Query())
@@ -379,7 +376,7 @@ func TestAttachWarnings(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			streams, _, _, bufErr := genericiooptions.NewTestIOStreams()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := scheme.Codecs.WithoutConversion()
@@ -427,7 +424,7 @@ func TestAttachWarnings(t *testing.T) {
 						return err
 					}
 
-					return options.Attach.Attach("POST", u, nil, nil, nil, nil, raw, sizeQueue)
+					return options.Attach.Attach(u, nil, nil, nil, nil, raw, sizeQueue)
 				}
 			}
 
@@ -555,5 +552,39 @@ func TestReattachMessage(t *testing.T) {
 				t.Errorf("reattachMessage(%v, %v) = %q, want string containing %q", test.container, test.rawTTY, msg, test.expected)
 			}
 		})
+	}
+}
+
+func TestCreateExecutor(t *testing.T) {
+	url, err := url.Parse("http://localhost:8080/index.html")
+	if err != nil {
+		t.Fatalf("unable to parse test url: %v", err)
+	}
+	config := cmdtesting.DefaultClientConfig()
+	// First, ensure that no environment variable creates the fallback executor.
+	executor, err := createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Next, check turning on feature flag explicitly also creates fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "true")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Finally, check explicit disabling does NOT create the fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
 	}
 }

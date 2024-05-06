@@ -41,8 +41,10 @@ type Encoder struct {
 //
 // If indent is a non-empty string, it causes every entry for an Array or Object
 // to be preceded by the indent and trailed by a newline.
-func NewEncoder(indent string) (*Encoder, error) {
-	e := &Encoder{}
+func NewEncoder(buf []byte, indent string) (*Encoder, error) {
+	e := &Encoder{
+		out: buf,
+	}
 	if len(indent) > 0 {
 		if strings.Trim(indent, " \t") != "" {
 			return nil, errors.New("indent may only be composed of space or tab characters")
@@ -176,13 +178,13 @@ func appendFloat(out []byte, n float64, bitSize int) []byte {
 // WriteInt writes out the given signed integer in JSON number value.
 func (e *Encoder) WriteInt(n int64) {
 	e.prepareNext(scalar)
-	e.out = append(e.out, strconv.FormatInt(n, 10)...)
+	e.out = strconv.AppendInt(e.out, n, 10)
 }
 
 // WriteUint writes out the given unsigned integer in JSON number value.
 func (e *Encoder) WriteUint(n uint64) {
 	e.prepareNext(scalar)
-	e.out = append(e.out, strconv.FormatUint(n, 10)...)
+	e.out = strconv.AppendUint(e.out, n, 10)
 }
 
 // StartObject writes out the '{' symbol.

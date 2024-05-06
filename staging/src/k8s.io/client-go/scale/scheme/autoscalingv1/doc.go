@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/vendor/k8s.io/client-go/scale/scheme
+// +k8s:conversion-gen=k8s.io/client-go/scale/scheme
 // +k8s:conversion-gen-external-types=k8s.io/api/autoscaling/v1
 
 package autoscalingv1 // import "k8s.io/client-go/scale/scheme/autoscalingv1"

@@ -40,22 +40,24 @@ var podmetricsesKind = v1alpha1.SchemeGroupVersion.WithKind("PodMetrics")
 
 // Get takes name of the podMetrics, and returns the corresponding podMetrics object, and an error if there is any.
 func (c *FakePodMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodMetrics, err error) {
+	emptyResult := &v1alpha1.PodMetrics{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podmetricsesResource, c.ns, name), &v1alpha1.PodMetrics{})
+		Invokes(testing.NewGetAction(podmetricsesResource, c.ns, name), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.PodMetrics), err
 }
 
 // List takes label and field selectors, and returns the list of PodMetricses that match those selectors.
 func (c *FakePodMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PodMetricsList, err error) {
+	emptyResult := &v1alpha1.PodMetricsList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podmetricsesResource, podmetricsesKind, c.ns, opts), &v1alpha1.PodMetricsList{})
+		Invokes(testing.NewListAction(podmetricsesResource, podmetricsesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)

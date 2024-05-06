@@ -20,9 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
@@ -33,10 +31,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 )
-
-func init() {
-	spew.Config.DisableMethods = true
-}
 
 const testTokenID = "abc123"
 

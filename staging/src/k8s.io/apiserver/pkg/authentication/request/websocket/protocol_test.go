@@ -46,6 +46,25 @@ func TestAuthenticateRequest(t *testing.T) {
 	}
 }
 
+func TestAuthenticateRequestMultipleConnectionHeaders(t *testing.T) {
+	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+		if token != "token" {
+			t.Errorf("unexpected token: %s", token)
+		}
+		return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+	}))
+	resp, ok, err := auth.AuthenticateRequest(&http.Request{
+		Header: http.Header{
+			"Connection":             []string{"not", "upgrade"},
+			"Upgrade":                []string{"websocket"},
+			"Sec-Websocket-Protocol": []string{"base64url.bearer.authorization.k8s.io.dG9rZW4,dummy"},
+		},
+	})
+	if !ok || resp == nil || err != nil {
+		t.Errorf("expected valid user")
+	}
+}
+
 func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 	auth := NewProtocolAuthenticator(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, nil

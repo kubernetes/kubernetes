@@ -79,9 +79,7 @@ func SetSpecIngressRules(rules ...networkingv1.NetworkPolicyIngressRule) SetFunc
 			policy.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{}
 			policy.Spec.PolicyTypes = append(policy.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
 		}
-		for _, rule := range rules {
-			policy.Spec.Ingress = append(policy.Spec.Ingress, rule)
-		}
+		policy.Spec.Ingress = append(policy.Spec.Ingress, rules...)
 	}
 }
 
@@ -91,8 +89,6 @@ func SetSpecEgressRules(rules ...networkingv1.NetworkPolicyEgressRule) SetFunc {
 			policy.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{}
 			policy.Spec.PolicyTypes = append(policy.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 		}
-		for _, rule := range rules {
-			policy.Spec.Egress = append(policy.Spec.Egress, rule)
-		}
+		policy.Spec.Egress = append(policy.Spec.Egress, rules...)
 	}
 }

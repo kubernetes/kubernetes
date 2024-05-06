@@ -111,6 +111,6 @@ func WalkN(root string, walkFn fs.WalkDirFunc, num int) error {
 // walkArgs holds the arguments that were passed to the Walk or WalkN
 // functions.
 type walkArgs struct {
-	path  string
 	entry fs.DirEntry
+	path  string
 }

@@ -15,7 +15,7 @@
 package cloudinfo
 
 import (
-	"io/ioutil"
+	"os"
 	"strings"
 
 	info "github.com/google/cadvisor/info/v1"
@@ -37,7 +37,7 @@ type provider struct{}
 var _ cloudinfo.CloudProvider = provider{}
 
 func (provider) IsActiveProvider() bool {
-	data, err := ioutil.ReadFile(sysVendorFileName)
+	data, err := os.ReadFile(sysVendorFileName)
 	if err != nil {
 		return false
 	}
@@ -50,7 +50,7 @@ func (provider) GetInstanceType() info.InstanceType {
 }
 
 func (provider) GetInstanceID() info.InstanceID {
-	data, err := ioutil.ReadFile(biosUUIDFileName)
+	data, err := os.ReadFile(biosUUIDFileName)
 	if err != nil {
 		return info.UnNamedInstance
 	}

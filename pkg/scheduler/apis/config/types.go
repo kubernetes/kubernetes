@@ -26,10 +26,6 @@ import (
 )
 
 const (
-	// SchedulerPolicyConfigMapKey defines the key of the element in the
-	// scheduler's policy ConfigMap that contains scheduler's policy config.
-	SchedulerPolicyConfigMapKey = "policy.cfg"
-
 	// DefaultKubeSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
 	DefaultKubeSchedulerPort = 10259
@@ -58,10 +54,6 @@ type KubeSchedulerConfiguration struct {
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
 	ClientConnection componentbaseconfig.ClientConnectionConfiguration
-	// HealthzBindAddress is the IP address and port for the health check server to serve on.
-	HealthzBindAddress string
-	// MetricsBindAddress is the IP address and port for the metrics server to serve on.
-	MetricsBindAddress string
 
 	// DebuggingConfiguration holds configuration for Debugging related features
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfig.DebuggingConfiguration
@@ -96,6 +88,12 @@ type KubeSchedulerConfiguration struct {
 	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
 	// with the extender. These extenders are shared by all scheduler profiles.
 	Extenders []Extender
+
+	// DelayCacheUntilActive specifies when to start caching. If this is true and leader election is enabled,
+	// the scheduler will wait to fill informer caches until it is the leader. Doing so will have slower
+	// failover with the benefit of lower memory overhead while waiting to become leader.
+	// Defaults to false.
+	DelayCacheUntilActive bool
 }
 
 // KubeSchedulerProfile is a scheduling profile.
@@ -247,13 +245,13 @@ func (p *Plugins) Names() []string {
 		p.Permit,
 		p.QueueSort,
 	}
-	n := sets.NewString()
+	n := sets.New[string]()
 	for _, e := range extensions {
 		for _, pg := range e.Enabled {
 			n.Insert(pg.Name)
 		}
 	}
-	return n.List()
+	return sets.List(n)
 }
 
 // Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,

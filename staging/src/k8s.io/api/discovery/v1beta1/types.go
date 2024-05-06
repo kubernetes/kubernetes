@@ -172,7 +172,7 @@ type ForZone struct {
 // EndpointPort represents a Port used by an EndpointSlice
 type EndpointPort struct {
 	// name represents the name of this port. All ports in an EndpointSlice must have a unique name.
-	// If the EndpointSlice is dervied from a Kubernetes service, this corresponds to the Service.ports[].name.
+	// If the EndpointSlice is derived from a Kubernetes service, this corresponds to the Service.ports[].name.
 	// Name must either be an empty string or pass DNS_LABEL validation:
 	// * must be no more than 63 characters long.
 	// * must consist of lower case alphanumeric characters or '-'.

@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 )
 
 // Scheme is the runtime.Scheme to which all kubeadm api types are registered.
@@ -42,5 +43,8 @@ func init() {
 func AddToScheme(scheme *runtime.Scheme) {
 	utilruntime.Must(kubeadm.AddToScheme(scheme))
 	utilruntime.Must(v1beta3.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1beta3.SchemeGroupVersion))
+	utilruntime.Must(v1beta4.AddToScheme(scheme))
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2890
+	// make v1beta4 highest priority
+	utilruntime.Must(scheme.SetVersionPriority(v1beta3.SchemeGroupVersion, v1beta4.SchemeGroupVersion))
 }

@@ -148,7 +148,15 @@ func newCrioContainerHandler(
 		Namespace: CrioNamespace,
 	}
 
-	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootFs, cInfo.Pid, includedMetrics)
+	// Find out if we need network metrics reported for this container.
+	// Containers that don't have their own network -- this includes
+	// containers running in Kubernetes pods that use the network of the
+	// infrastructure container -- does not need their stats to be
+	// reported. This stops metrics being reported multiple times for each
+	// container in a pod.
+	metrics := common.RemoveNetMetrics(includedMetrics, cInfo.Labels["io.kubernetes.container.name"] != "POD")
+
+	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootFs, cInfo.Pid, metrics)
 
 	// TODO: extract object mother method
 	handler := &crioContainerHandler{
@@ -161,7 +169,7 @@ func newCrioContainerHandler(
 		rootfsStorageDir:    rootfsStorageDir,
 		envs:                make(map[string]string),
 		labels:              cInfo.Labels,
-		includedMetrics:     includedMetrics,
+		includedMetrics:     metrics,
 		reference:           containerReference,
 		libcontainerHandler: libcontainerHandler,
 		cgroupManager:       cgroupManager,
@@ -210,16 +218,10 @@ func (h *crioContainerHandler) ContainerReference() (info.ContainerReference, er
 	return h.reference, nil
 }
 
-func (h *crioContainerHandler) needNet() bool {
-	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
-		return h.labels["io.kubernetes.container.name"] == "POD"
-	}
-	return false
-}
-
 func (h *crioContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	hasFilesystem := h.includedMetrics.Has(container.DiskUsageMetrics)
-	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, h.needNet(), hasFilesystem)
+	hasNet := h.includedMetrics.Has(container.NetworkUsageMetrics)
+	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, hasNet, hasFilesystem)
 
 	spec.Labels = h.labels
 	spec.Envs = h.envs
@@ -305,14 +307,14 @@ func (h *crioContainerHandler) GetStats() (*info.ContainerStats, error) {
 	if err != nil {
 		return stats, err
 	}
-	// Clean up stats for containers that don't have their own network - this
-	// includes containers running in Kubernetes pods that use the network of the
-	// infrastructure container. This stops metrics being reported multiple times
-	// for each container in a pod.
-	if !h.needNet() {
-		stats.Network = info.NetworkStats{}
-	}
 
+	if h.includedMetrics.Has(container.NetworkUsageMetrics) && len(stats.Network.Interfaces) == 0 {
+		// No network related information indicates that the pid of the
+		// container is not longer valid and we need to ask crio to
+		// provide the pid of another container from that pod
+		h.pidKnown = false
+		return stats, nil
+	}
 	// Get filesystem stats.
 	err = h.getFsStats(stats)
 	if err != nil {

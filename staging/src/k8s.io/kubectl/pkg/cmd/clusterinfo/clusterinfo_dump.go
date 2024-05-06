@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -59,10 +61,10 @@ type ClusterInfoDumpOptions struct {
 	RESTClientGetter genericclioptions.RESTClientGetter
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewCmdClusterInfoDump(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdClusterInfoDump(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json"),
 
@@ -117,8 +119,8 @@ func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fil
 	if len(dir) == 0 || dir == "-" {
 		return defaultWriter
 	}
-	fullFile := path.Join(dir, filename) + fileExtension
-	parent := path.Dir(fullFile)
+	fullFile := filepath.Join(dir, filename) + fileExtension
+	parent := filepath.Dir(fullFile)
 	cmdutil.CheckErr(os.MkdirAll(parent, 0755))
 
 	file, err := os.Create(fullFile)

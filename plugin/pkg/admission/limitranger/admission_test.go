@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
@@ -63,6 +64,13 @@ func getStorageResourceList(storage string) api.ResourceList {
 
 func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
 	res := api.ResourceRequirements{}
+	res.Requests = requests
+	res.Limits = limits
+	return res
+}
+
+func getVolumeResourceRequirements(requests, limits api.ResourceList) api.VolumeResourceRequirements {
+	res := api.VolumeResourceRequirements{}
 	res.Requests = requests
 	res.Limits = limits
 	return res
@@ -626,6 +634,11 @@ func TestPodLimitFunc(t *testing.T) {
 			pod:        validPod("pod-max-local-ephemeral-storage-ratio", 3, getResourceRequirements(getLocalStorageResourceList("250Mi"), getLocalStorageResourceList("500Mi"))),
 			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("2Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
 		},
+		{
+			pod: withRestartableInitContainer(getComputeResourceList("1500m", ""), api.ResourceList{},
+				validPod("ctr-max-cpu-limit-restartable-init-container", 1, getResourceRequirements(getComputeResourceList("1000m", ""), getComputeResourceList("1500m", "")))),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
 	}
 	for i := range errorCases {
 		test := errorCases[i]
@@ -638,6 +651,18 @@ func TestPodLimitFunc(t *testing.T) {
 			t.Errorf("Expected error for pod: %s", test.pod.Name)
 		}
 	}
+}
+
+func withRestartableInitContainer(requests, limits api.ResourceList, pod api.Pod) api.Pod {
+	policyAlways := api.ContainerRestartPolicyAlways
+	pod.Spec.InitContainers = append(pod.Spec.InitContainers,
+		api.Container{
+			RestartPolicy: &policyAlways,
+			Image:         "foo:V" + strconv.Itoa(len(pod.Spec.InitContainers)),
+			Resources:     getResourceRequirements(requests, limits),
+			Name:          "foo-" + strconv.Itoa(len(pod.Spec.InitContainers)),
+		})
+	return pod
 }
 
 func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {
@@ -792,13 +817,13 @@ func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInf
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := genericadmissioninitializer.New(c, nil, f, nil, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, nil, f, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }
 
-func validPersistentVolumeClaim(name string, resources api.ResourceRequirements) api.PersistentVolumeClaim {
+func validPersistentVolumeClaim(name string, resources api.VolumeResourceRequirements) api.PersistentVolumeClaim {
 	pvc := api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec: api.PersistentVolumeClaimSpec{
@@ -816,19 +841,19 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 
 	successCases := []testCase{
 		{
-			pvc:        validPersistentVolumeClaim("pvc-is-min-storage-request", getResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-is-min-storage-request", getVolumeResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-is-max-storage-request", getResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-is-max-storage-request", getVolumeResourceRequirements(getStorageResourceList("1Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, api.ResourceList{}, getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-no-minmax-storage-request", getResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-no-minmax-storage-request", getVolumeResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList(""), getStorageResourceList(""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-within-minmax-storage-request", getResourceRequirements(getStorageResourceList("5Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-within-minmax-storage-request", getVolumeResourceRequirements(getStorageResourceList("5Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), getStorageResourceList("10Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 	}
@@ -842,11 +867,11 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 
 	errorCases := []testCase{
 		{
-			pvc:        validPersistentVolumeClaim("pvc-below-min-storage-request", getResourceRequirements(getStorageResourceList("500Mi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-below-min-storage-request", getVolumeResourceRequirements(getStorageResourceList("500Mi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 		{
-			pvc:        validPersistentVolumeClaim("pvc-exceeds-max-storage-request", getResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
+			pvc:        validPersistentVolumeClaim("pvc-exceeds-max-storage-request", getVolumeResourceRequirements(getStorageResourceList("100Gi"), getStorageResourceList(""))),
 			limitRange: createLimitRange(api.LimitTypePersistentVolumeClaim, getStorageResourceList("1Gi"), getStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 		},
 	}

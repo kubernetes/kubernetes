@@ -38,7 +38,7 @@ type Snapshot struct {
 	havePodsWithRequiredAntiAffinityNodeInfoList []*framework.NodeInfo
 	// usedPVCSet contains a set of PVC names that have one or more scheduled pods using them,
 	// keyed in the format "namespace/name".
-	usedPVCSet sets.String
+	usedPVCSet sets.Set[string]
 	generation int64
 }
 
@@ -48,7 +48,7 @@ var _ framework.SharedLister = &Snapshot{}
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		nodeInfoMap: make(map[string]*framework.NodeInfo),
-		usedPVCSet:  sets.NewString(),
+		usedPVCSet:  sets.New[string](),
 	}
 }
 
@@ -103,8 +103,8 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.N
 	return nodeNameToInfo
 }
 
-func createUsedPVCSet(pods []*v1.Pod) sets.String {
-	usedPVCSet := sets.NewString()
+func createUsedPVCSet(pods []*v1.Pod) sets.Set[string] {
+	usedPVCSet := sets.New[string]()
 	for _, pod := range pods {
 		if pod.Spec.NodeName == "" {
 			continue
@@ -123,14 +123,14 @@ func createUsedPVCSet(pods []*v1.Pod) sets.String {
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
-func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String) map[string]*framework.ImageStateSummary {
+func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.Set[string]) map[string]*framework.ImageStateSummary {
 	imageStates := make(map[string]*framework.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
 			imageStates[name] = &framework.ImageStateSummary{
 				Size:     image.SizeBytes,
-				NumNodes: len(imageExistenceMap[name]),
+				NumNodes: imageExistenceMap[name].Len(),
 			}
 		}
 	}
@@ -138,13 +138,13 @@ func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.String)
 }
 
 // createImageExistenceMap returns a map recording on which nodes the images exist, keyed by the images' names.
-func createImageExistenceMap(nodes []*v1.Node) map[string]sets.String {
-	imageExistenceMap := make(map[string]sets.String)
+func createImageExistenceMap(nodes []*v1.Node) map[string]sets.Set[string] {
+	imageExistenceMap := make(map[string]sets.Set[string])
 	for _, node := range nodes {
 		for _, image := range node.Status.Images {
 			for _, name := range image.Names {
 				if _, ok := imageExistenceMap[name]; !ok {
-					imageExistenceMap[name] = sets.NewString(node.Name)
+					imageExistenceMap[name] = sets.New(node.Name)
 				} else {
 					imageExistenceMap[name].Insert(node.Name)
 				}

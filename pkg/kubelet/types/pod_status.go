@@ -37,8 +37,8 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodHasNetworkCondition) {
-		if conditionType == PodHasNetwork {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
+		if conditionType == v1.PodReadyToStartContainers {
 			return true
 		}
 	}

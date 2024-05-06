@@ -23,9 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -46,7 +44,9 @@ func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, er
 
 	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver))
 	if err != nil {
-		return false, err
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return false, volumetypes.NewTransientOperationFailure(err.Error())
 	}
 	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
 	if err != nil {
@@ -72,7 +72,7 @@ func (c *csiPlugin) nodeExpandWithClient(
 	}
 
 	if !nodeExpandSet {
-		return false, fmt.Errorf("Expander.NodeExpand found CSI plugin %s/%s to not support node expansion", c.GetPluginName(), driverName)
+		return false, volumetypes.NewOperationNotSupportedError(fmt.Sprintf("NodeExpand is not supported by the CSI driver %s", driverName))
 	}
 
 	pv := resizeOptions.VolumeSpec.PersistentVolume
@@ -81,13 +81,12 @@ func (c *csiPlugin) nodeExpandWithClient(
 	}
 	nodeExpandSecrets := map[string]string{}
 	expandClient := c.host.GetKubeClient()
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeExpandSecret) {
-		if csiSource.NodeExpandSecretRef != nil {
-			nodeExpandSecrets, err = getCredentialsFromSecret(expandClient, csiSource.NodeExpandSecretRef)
-			if err != nil {
-				return false, fmt.Errorf("expander.NodeExpand failed to get NodeExpandSecretRef %s/%s: %v",
-					csiSource.NodeExpandSecretRef.Namespace, csiSource.NodeExpandSecretRef.Name, err)
-			}
+
+	if csiSource.NodeExpandSecretRef != nil {
+		nodeExpandSecrets, err = getCredentialsFromSecret(expandClient, csiSource.NodeExpandSecretRef)
+		if err != nil {
+			return false, fmt.Errorf("expander.NodeExpand failed to get NodeExpandSecretRef %s/%s: %v",
+				csiSource.NodeExpandSecretRef.Namespace, csiSource.NodeExpandSecretRef.Name, err)
 		}
 	}
 

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -44,7 +45,7 @@ type isImmutableFunc func(runtime.Object) bool
 
 // objectCacheItem is a single item stored in objectCache.
 type objectCacheItem struct {
-	refCount  int
+	refMap    map[types.UID]int
 	store     *cacheStore
 	reflector *cache.Reflector
 
@@ -223,15 +224,19 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		return c.watchObject(namespace, options)
 	}
 	store := c.newStore()
-	reflector := cache.NewNamedReflector(
-		fmt.Sprintf("object-%q/%q", namespace, name),
+	reflector := cache.NewReflectorWithOptions(
 		&cache.ListWatch{ListFunc: listFunc, WatchFunc: watchFunc},
 		c.newObject(),
 		store,
-		0,
+		cache.ReflectorOptions{
+			Name: fmt.Sprintf("object-%q/%q", namespace, name),
+			// Bump default 5m MinWatchTimeout to avoid recreating
+			// watches too often.
+			MinWatchTimeout: 30 * time.Minute,
+		},
 	)
 	item := &objectCacheItem{
-		refCount:  0,
+		refMap:    make(map[types.UID]int),
 		store:     store,
 		reflector: reflector,
 		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
@@ -245,7 +250,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 	return item
 }
 
-func (c *objectCache) AddReference(namespace, name string) {
+func (c *objectCache) AddReference(namespace, name string, referencedFrom types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod thus it needs to be efficient.
@@ -260,17 +265,20 @@ func (c *objectCache) AddReference(namespace, name string) {
 		item = c.newReflectorLocked(namespace, name)
 		c.items[key] = item
 	}
-	item.refCount++
+	item.refMap[referencedFrom]++
 }
 
-func (c *objectCache) DeleteReference(namespace, name string) {
+func (c *objectCache) DeleteReference(namespace, name string, referencedFrom types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if item, ok := c.items[key]; ok {
-		item.refCount--
-		if item.refCount == 0 {
+		item.refMap[referencedFrom]--
+		if item.refMap[referencedFrom] == 0 {
+			delete(item.refMap, referencedFrom)
+		}
+		if len(item.refMap) == 0 {
 			// Stop the underlying reflector.
 			item.stop()
 			delete(c.items, key)

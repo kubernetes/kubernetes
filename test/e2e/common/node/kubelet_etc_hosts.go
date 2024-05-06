@@ -47,7 +47,7 @@ type KubeletManagedHostConfig struct {
 
 var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
 	f := framework.NewDefaultFramework("e2e-kubelet-etc-hosts")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	config := &KubeletManagedHostConfig{
 		f: f,
 	}
@@ -61,7 +61,7 @@ var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
 			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
 		This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 	*/
-	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly]", f.WithNodeConformance(), func(ctx context.Context) {
 		ginkgo.By("Setting up the test")
 		config.setup(ctx)
 

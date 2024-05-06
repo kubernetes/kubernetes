@@ -28,7 +28,7 @@ func InterpretListError(err error, qualifiedResource schema.GroupResource) error
 	switch {
 	case storage.IsNotFound(err):
 		return errors.NewNotFound(qualifiedResource, "")
-	case storage.IsUnreachable(err):
+	case storage.IsUnreachable(err), storage.IsRequestTimeout(err):
 		return errors.NewServerTimeout(qualifiedResource, "list", 2) // TODO: make configurable or handled at a higher level
 	case storage.IsInternalError(err):
 		return errors.NewInternalError(err)

@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
@@ -113,10 +114,12 @@ type vertexType byte
 
 const (
 	configMapVertexType vertexType = iota
+	sliceVertexType
 	nodeVertexType
 	podVertexType
 	pvcVertexType
 	pvVertexType
+	resourceClaimVertexType
 	secretVertexType
 	vaVertexType
 	serviceAccountVertexType
@@ -124,10 +127,12 @@ const (
 
 var vertexTypes = map[vertexType]string{
 	configMapVertexType:      "configmap",
+	sliceVertexType:          "resourceslice",
 	nodeVertexType:           "node",
 	podVertexType:            "pod",
 	pvcVertexType:            "pvc",
 	pvVertexType:             "pv",
+	resourceClaimVertexType:  "resourceclaim",
 	secretVertexType:         "secret",
 	vaVertexType:             "volumeattachment",
 	serviceAccountVertexType: "serviceAccount",
@@ -393,6 +398,20 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 			g.addEdgeToDestinationIndex_locked(e)
 		}
 	}
+
+	for _, podResourceClaim := range pod.Spec.ResourceClaims {
+		claimName, _, err := resourceclaim.Name(pod, &podResourceClaim)
+		// Do we have a valid claim name? If yes, add an edge that grants
+		// kubelet access to that claim. An error indicates that a claim
+		// still needs to be created, nil that intentionally no claim
+		// was created and never will be because it isn't needed.
+		if err == nil && claimName != nil {
+			claimVertex := g.getOrCreateVertex_locked(resourceClaimVertexType, pod.Namespace, *claimName)
+			e := newDestinationEdge(claimVertex, podVertex, nodeVertex)
+			g.graph.SetEdge(e)
+			g.addEdgeToDestinationIndex_locked(e)
+		}
+	}
 }
 func (g *Graph) DeletePod(name, namespace string) {
 	start := time.Now()
@@ -474,4 +493,35 @@ func (g *Graph) DeleteVolumeAttachment(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(vaVertexType, "", name)
+}
+
+// AddResourceSlice sets up edges for the following relationships:
+//
+//	node resource slice -> node
+func (g *Graph) AddResourceSlice(sliceName, nodeName string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddResourceSlice").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	// clear existing edges
+	g.deleteVertex_locked(sliceVertexType, "", sliceName)
+
+	// if we have a node, establish new edges
+	if len(nodeName) > 0 {
+		sliceVertex := g.getOrCreateVertex_locked(sliceVertexType, "", sliceName)
+		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+		g.graph.SetEdge(newDestinationEdge(sliceVertex, nodeVertex, nodeVertex))
+	}
+}
+func (g *Graph) DeleteResourceSlice(sliceName string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeleteResourceSlice").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertex_locked(sliceVertexType, "", sliceName)
 }

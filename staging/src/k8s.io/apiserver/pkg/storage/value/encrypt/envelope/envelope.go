@@ -53,7 +53,7 @@ type envelopeTransformer struct {
 	transformers *lru.Cache
 
 	// baseTransformerFunc creates a new transformer for encrypting the data with the DEK.
-	baseTransformerFunc func(cipher.Block) value.Transformer
+	baseTransformerFunc func(cipher.Block) (value.Transformer, error)
 
 	cacheSize    int
 	cacheEnabled bool
@@ -63,7 +63,7 @@ type envelopeTransformer struct {
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
 // used decrypted DEKs in memory.
-func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
+func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) (value.Transformer, error)) value.Transformer {
 	var (
 		cache *lru.Cache
 	)
@@ -161,7 +161,11 @@ func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.T
 	if err != nil {
 		return nil, err
 	}
-	transformer := t.baseTransformerFunc(block)
+	transformer, err := t.baseTransformerFunc(block)
+	if err != nil {
+		return nil, err
+	}
+
 	// Use base64 of encKey as the key into the cache because hashicorp/golang-lru
 	// cannot hash []uint8.
 	if t.cacheEnabled {

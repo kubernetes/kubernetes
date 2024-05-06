@@ -29,7 +29,7 @@ import (
 	"regexp"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
@@ -143,11 +143,11 @@ func TestDialURL(t *testing.T) {
 			u, _ := url.Parse(ts.URL)
 			_, p, _ := net.SplitHostPort(u.Host)
 			u.Host = net.JoinHostPort("127.0.0.1", p)
-			conn, err := dialURL(context.Background(), u, transport)
+			conn, err := DialURL(context.Background(), u, transport)
 
 			// Make sure dialing doesn't mutate the transport's TLSConfig
 			if !reflect.DeepEqual(tc.TLSConfig, tlsConfigCopy) {
-				t.Errorf("%s: transport's copy of TLSConfig was mutated\n%s", k, diff.ObjectReflectDiff(tc.TLSConfig, tlsConfigCopy))
+				t.Errorf("%s: transport's copy of TLSConfig was mutated\n%s", k, cmp.Diff(tc.TLSConfig, tlsConfigCopy))
 			}
 
 			if err != nil {

@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -31,6 +32,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
@@ -544,6 +547,115 @@ func (s *singleBenchmark) bench(b *testing.B) {
 func withAudit(ctx context.Context) context.Context {
 	ctx = audit.WithAuditContext(ctx)
 	ac := audit.AuditContextFrom(ctx)
-	ac.Event = &auditinternal.Event{Level: auditinternal.LevelMetadata}
+	ac.Event.Level = auditinternal.LevelMetadata
 	return ctx
+}
+
+func TestUnsafeConversions(t *testing.T) {
+	t.Parallel()
+
+	// needs to be large to force allocations so we pick a random value between [1024, 2048]
+	size := utilrand.IntnRange(1024, 2048+1)
+
+	t.Run("toBytes semantics", func(t *testing.T) {
+		t.Parallel()
+
+		s := utilrand.String(size)
+		b := toBytes(s)
+		if len(b) != size {
+			t.Errorf("unexpected length: %d", len(b))
+		}
+		if cap(b) != size {
+			t.Errorf("unexpected capacity: %d", cap(b))
+		}
+		if !bytes.Equal(b, []byte(s)) {
+			t.Errorf("unexpected equality failure: %#v", b)
+		}
+	})
+
+	t.Run("toBytes allocations", func(t *testing.T) {
+		t.Parallel()
+
+		s := utilrand.String(size)
+		f := func() {
+			b := toBytes(s)
+			if len(b) != size {
+				t.Errorf("invalid length: %d", len(b))
+			}
+		}
+		allocs := testing.AllocsPerRun(100, f)
+		if allocs > 0 {
+			t.Errorf("expected zero allocations, got %v", allocs)
+		}
+	})
+
+	t.Run("toString semantics", func(t *testing.T) {
+		t.Parallel()
+
+		b := make([]byte, size)
+		if _, err := rand.Read(b); err != nil {
+			t.Fatal(err)
+		}
+		s := toString(b)
+		if len(s) != size {
+			t.Errorf("unexpected length: %d", len(s))
+		}
+		if s != string(b) {
+			t.Errorf("unexpected equality failure: %#v", s)
+		}
+	})
+
+	t.Run("toString allocations", func(t *testing.T) {
+		t.Parallel()
+
+		b := make([]byte, size)
+		if _, err := rand.Read(b); err != nil {
+			t.Fatal(err)
+		}
+		f := func() {
+			s := toString(b)
+			if len(s) != size {
+				t.Errorf("invalid length: %d", len(s))
+			}
+		}
+		allocs := testing.AllocsPerRun(100, f)
+		if allocs > 0 {
+			t.Errorf("expected zero allocations, got %v", allocs)
+		}
+	})
+}
+
+func TestKeyFunc(t *testing.T) {
+	t.Parallel()
+
+	hashPool := &sync.Pool{
+		New: func() interface{} {
+			return hmac.New(sha256.New, []byte("098c9e46-b7f4-4358-bb3c-35cb7495b836")) // deterministic HMAC for testing
+		},
+	}
+
+	// use realistic audiences
+	auds := []string{"7daf30b7-a85c-429b-8b21-e666aecbb235", "c22aa267-bdde-4acb-8505-998be7818400", "44f9b4f3-7125-4333-b04c-1446a16c6113"}
+
+	keyWithAuds := "\"\xf7\xac\xcd\x12\xf5\x83l\xa9;@\n\xa13a;\nd\x1f\xdelL\xd1\xe1!\x8a\xdahٛ\xbb\xf0"
+
+	keyWithoutAuds := "\x054a \xa5\x8e\xea\xb2?\x8c\x88\xb9,e\n5\xe7ȵ>\xfdK\x0e\x93+\x02˿&\xf98\x1e"
+
+	t.Run("has audiences", func(t *testing.T) {
+		t.Parallel()
+
+		key := keyFunc(hashPool, auds, jwtToken)
+		if key != keyWithAuds {
+			t.Errorf("unexpected equality failure: %#v", key)
+		}
+	})
+
+	t.Run("nil audiences", func(t *testing.T) {
+		t.Parallel()
+
+		key := keyFunc(hashPool, nil, jwtToken)
+		if key != keyWithoutAuds {
+			t.Errorf("unexpected equality failure: %#v", key)
+		}
+	})
 }

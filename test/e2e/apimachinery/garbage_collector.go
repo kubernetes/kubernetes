@@ -38,15 +38,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
+	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	"github.com/onsi/gomega"
 )
 
 // estimateMaximumPods estimates how many pods the cluster can handle
@@ -98,7 +100,9 @@ func getOrphanOptions() metav1.DeleteOptions {
 var (
 	zero       = int64(0)
 	lablecount = int64(0)
+)
 
+const (
 	// The GC controller periodically rediscovers available APIs and syncs running informers for those resources.
 	// If previously available APIs are removed during that resync process, the sync process can fail and need to be retried.
 	//
@@ -108,6 +112,12 @@ var (
 	// This timeout covers two resync/retry periods, and should be added to wait timeouts to account for delays
 	// to the GC controller caused by API changes in other tests.
 	gcInformerResyncRetryTimeout = time.Minute
+
+	// Many operations in these tests are per-replica and may require 100 mutating requests. The
+	// default client QPS of a controller is 5. If the qps is saturated, it will take 20s complete
+	// 100 requests. The e2e tests are running in parallel, so a controller might be stuck
+	// processing other tests.
+	replicaSyncTimeout = 2 * time.Minute
 )
 
 func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
@@ -302,7 +312,7 @@ func getUniqLabel(labelkey, labelvalue string) map[string]string {
 
 var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -380,19 +390,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create pods
-		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
-			rc, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %w", err)
-			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
+		waitForReplicas(ctx, rc, rcClient)
 
-		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
-		}
 		ginkgo.By("delete the rc")
 		deleteOptions := getOrphanOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
@@ -449,18 +448,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create some pods
-		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
-			rc, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %w", err)
-			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
-		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
-		}
+		waitForReplicas(ctx, rc, rcClient)
+
 		ginkgo.By("delete the rc")
 		deleteOptions := metav1.DeleteOptions{
 			Preconditions: metav1.NewUIDPreconditions(string(rc.UID)),
@@ -502,7 +491,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		// wait for deployment to create some rs
 		ginkgo.By("Wait for the Deployment to create new ReplicaSet")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			rsList, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %w", err)
@@ -521,7 +510,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for all rs to be garbage collected")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, true, func(ctx context.Context) (bool, error) {
 			objects := map[string]int{"Deployments": 0, "ReplicaSets": 0, "Pods": 0}
 			return verifyRemainingObjects(ctx, f, objects)
 		})
@@ -562,7 +551,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		// wait for deployment to create some rs
 		ginkgo.By("Wait for the Deployment to create new ReplicaSet")
 		var replicaset appsv1.ReplicaSet
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			rsList, err := rsClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list rs: %w", err)
@@ -579,7 +568,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 
 		desiredGeneration := replicaset.Generation
-		if err := wait.PollImmediateWithContext(ctx, 100*time.Millisecond, 60*time.Second, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 			newRS, err := clientSet.AppsV1().ReplicaSets(replicaset.Namespace).Get(ctx, replicaset.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -596,7 +585,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("failed to delete the deployment: %v", err)
 		}
 		ginkgo.By("wait for deployment deletion to see if the garbage collector mistakenly deletes the rs")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute+gcInformerResyncRetryTimeout, true, func(ctx context.Context) (bool, error) {
 			dList, err := deployClient.List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list deployments: %w", err)
@@ -660,18 +649,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc to create pods
-		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
-			rc, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %w", err)
-			}
-			if rc.Status.Replicas == *rc.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
-		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
-		}
+		waitForReplicas(ctx, rc, rcClient)
+
 		ginkgo.By("delete the rc")
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(rc.UID))
@@ -755,18 +734,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
 		// wait for rc1 to be stable
-		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
-			rc1, err := rcClient.Get(ctx, rc1.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, fmt.Errorf("failed to get rc: %w", err)
-			}
-			if rc1.Status.Replicas == *rc1.Spec.Replicas {
-				return true, nil
-			}
-			return false, nil
-		}); err != nil {
-			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
-		}
+		waitForReplicas(ctx, rc1, rcClient)
+
 		ginkgo.By(fmt.Sprintf("set half of pods created by rc %s to have rc %s as owner as well", rc1Name, rc2Name))
 		pods, err := podClient.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list pods in namespace: %s", f.Namespace.Name)
@@ -926,7 +895,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		gomega.Expect(definition.Spec.Versions).To(gomega.HaveLen(1), "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
@@ -1005,7 +974,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		// Wait for the canary foreground finalization to complete, which means GC is aware of our new custom resource type
 		var lastCanary *unstructured.Unstructured
-		if err := wait.PollImmediateWithContext(ctx, 5*time.Second, 3*time.Minute, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			lastCanary, err = resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		}); err != nil {
@@ -1061,7 +1030,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		gomega.Expect(definition.Spec.Versions).To(gomega.HaveLen(1), "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
@@ -1132,14 +1101,11 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("timeout in waiting for the owner to be deleted: %v", err)
 		}
 
-		// Wait 30s and ensure the dependent is not deleted.
-		ginkgo.By("wait for 30 seconds to see if the garbage collector mistakenly deletes the dependent crd")
-		if err := wait.PollWithContext(ctx, 5*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
-			_, err := resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
-			return false, err
-		}); err != nil && err != wait.ErrWaitTimeout {
-			framework.Failf("failed to ensure the dependent is not deleted: %v", err)
-		}
+		timeout := 30*time.Second + gcInformerResyncRetryTimeout
+		ginkgo.By(fmt.Sprintf("wait for %s to see if the garbage collector mistakenly deletes the dependent crd\n", timeout))
+		gomega.Consistently(ctx, framework.HandleRetry(func(ctx context.Context) (*unstructured.Unstructured, error) {
+			return resourceClient.Get(ctx, dependentName, metav1.GetOptions{})
+		})).WithTimeout(timeout).WithPolling(5 * time.Second).ShouldNot(gomega.BeNil())
 	})
 
 	ginkgo.It("should delete jobs and pods created by cronjob", func(ctx context.Context) {
@@ -1150,7 +1116,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		framework.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		ginkgo.By("Wait for the CronJob to create new Job")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 2*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
 			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list jobs: %w", err)
@@ -1166,7 +1132,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			framework.Failf("Failed to delete the CronJob: %v", err)
 		}
 		ginkgo.By("Verify if cronjob does not leave jobs nor pods behind")
-		err = wait.PollImmediateWithContext(ctx, 500*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 			objects := map[string]int{"CronJobs": 0, "Jobs": 0, "Pods": 0}
 			return verifyRemainingObjects(ctx, f, objects)
 		})
@@ -1177,3 +1143,28 @@ var _ = SIGDescribe("Garbage collector", func() {
 		gatherMetrics(ctx, f)
 	})
 })
+
+// TODO(106575): Migrate away from generic polling function.
+func waitForReplicas(ctx context.Context, rc *v1.ReplicationController, rcClient clientv1.ReplicationControllerInterface) {
+	var (
+		lastObservedRC *v1.ReplicationController
+		err            error
+	)
+	if err := wait.PollWithContext(ctx, framework.Poll, replicaSyncTimeout, func(ctx context.Context) (bool, error) {
+		lastObservedRC, err = rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if lastObservedRC.Status.Replicas == *rc.Spec.Replicas {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		if lastObservedRC == nil {
+			framework.Failf("Failed to get ReplicationController %q: %v", rc.Name, err)
+		} else {
+			framework.Failf("failed to wait for the rc.Status.Replicas (%d) to reach rc.Spec.Replicas (%d): %v",
+				lastObservedRC.Status.Replicas, *lastObservedRC.Spec.Replicas, err)
+		}
+	}
+}

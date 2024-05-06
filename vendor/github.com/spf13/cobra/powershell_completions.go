@@ -1,4 +1,4 @@
-// Copyright 2013-2022 The Cobra Authors
+// Copyright 2013-2023 The Cobra Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -77,6 +77,7 @@ filter __%[1]s_escapeStringWithSpecialChars {
     $ShellCompDirectiveNoFileComp=%[6]d
     $ShellCompDirectiveFilterFileExt=%[7]d
     $ShellCompDirectiveFilterDirs=%[8]d
+    $ShellCompDirectiveKeepOrder=%[9]d
 
     # Prepare the command to request completions for the program.
     # Split the command at the first space to separate the program and arguments.
@@ -106,13 +107,22 @@ filter __%[1]s_escapeStringWithSpecialChars {
         # If the last parameter is complete (there is a space following it)
         # We add an extra empty parameter so we can indicate this to the go method.
         __%[1]s_debug "Adding extra empty parameter"
-`+"        # We need to use `\"`\" to pass an empty argument a \"\" or '' does not work!!!"+`
-`+"        $RequestComp=\"$RequestComp\" + ' `\"`\"'"+`
+        # PowerShell 7.2+ changed the way how the arguments are passed to executables,
+        # so for pre-7.2 or when Legacy argument passing is enabled we need to use
+`+"        # `\"`\" to pass an empty argument, a \"\" or '' does not work!!!"+`
+        if ($PSVersionTable.PsVersion -lt [version]'7.2.0' -or
+            ($PSVersionTable.PsVersion -lt [version]'7.3.0' -and -not [ExperimentalFeature]::IsEnabled("PSNativeCommandArgumentPassing")) -or
+            (($PSVersionTable.PsVersion -ge [version]'7.3.0' -or [ExperimentalFeature]::IsEnabled("PSNativeCommandArgumentPassing")) -and
+              $PSNativeCommandArgumentPassing -eq 'Legacy')) {
+`+"             $RequestComp=\"$RequestComp\" + ' `\"`\"'"+`
+        } else {
+             $RequestComp="$RequestComp" + ' ""'
+        }
     }
 
     __%[1]s_debug "Calling $RequestComp"
     # First disable ActiveHelp which is not supported for Powershell
-    $env:%[9]s=0
+    $env:%[10]s=0
 
     #call the command store the output in $out and redirect stderr and stdout to null
     # $Out is an array contains each line per element
@@ -137,7 +147,7 @@ filter __%[1]s_escapeStringWithSpecialChars {
     }
 
     $Longest = 0
-    $Values = $Out | ForEach-Object {
+    [Array]$Values = $Out | ForEach-Object {
         #Split the output in name and description
 `+"        $Name, $Description = $_.Split(\"`t\",2)"+`
         __%[1]s_debug "Name: $Name Description: $Description"
@@ -180,6 +190,11 @@ filter __%[1]s_escapeStringWithSpecialChars {
             __%[1]s_debug "Join the equal sign flag back to the completion value"
             $_.Name = $Flag + "=" + $_.Name
         }
+    }
+
+    # we sort the values in ascending order by name if keep order isn't passed
+    if (($Directive -band $ShellCompDirectiveKeepOrder) -eq 0 ) {
+        $Values = $Values | Sort-Object -Property Name
     }
 
     if (($Directive -band $ShellCompDirectiveNoFileComp) -ne 0 ) {
@@ -267,7 +282,7 @@ filter __%[1]s_escapeStringWithSpecialChars {
 Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock $__%[2]sCompleterBlock
 `, name, nameForVar, compCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, activeHelpEnvVar(name)))
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, ShellCompDirectiveKeepOrder, activeHelpEnvVar(name)))
 }
 
 func (c *Command) genPowerShellCompletion(w io.Writer, includeDesc bool) error {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -47,8 +48,8 @@ func LoadAppArmorProfiles(ctx context.Context, nsName string, clientset clientse
 // CreateAppArmorTestPod creates a pod that tests apparmor profile enforcement. The pod exits with
 // an error code if the profile is incorrectly enforced. If runOnce is true the pod will exit after
 // a single test, otherwise it will repeat the test every 1 second until failure.
-func CreateAppArmorTestPod(ctx context.Context, nsName string, clientset clientset.Interface, podClient *e2epod.PodClient, unconfined bool, runOnce bool) *v1.Pod {
-	profile := "localhost/" + appArmorProfilePrefix + nsName
+func AppArmorTestPod(nsName string, unconfined bool, runOnce bool) *v1.Pod {
+	localhostProfile := appArmorProfilePrefix + nsName
 	testCmd := fmt.Sprintf(`
 if touch %[1]s; then
   echo "FAILURE: write to %[1]s should be denied"
@@ -63,7 +64,6 @@ elif [[ $(< /proc/self/attr/current) != "%[3]s" ]]; then
 fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+nsName)
 
 	if unconfined {
-		profile = v1.AppArmorBetaProfileNameUnconfined
 		testCmd = `
 if cat /proc/sysrq-trigger 2>&1 | grep 'Permission denied'; then
   echo 'FAILURE: reading /proc/sysrq-trigger should be allowed'
@@ -93,17 +93,25 @@ done`, testCmd)
 		},
 	}
 
+	profile := &v1.AppArmorProfile{}
+	if unconfined {
+		profile.Type = v1.AppArmorProfileTypeUnconfined
+	} else {
+		profile.Type = v1.AppArmorProfileTypeLocalhost
+		profile.LocalhostProfile = &localhostProfile
+	}
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-apparmor-",
-			Annotations: map[string]string{
-				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
-			},
 			Labels: map[string]string{
 				"test": "apparmor",
 			},
 		},
 		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{
+				AppArmorProfile: profile,
+			},
 			Affinity: loaderAffinity,
 			Containers: []v1.Container{{
 				Name:    "test",
@@ -114,21 +122,25 @@ done`, testCmd)
 		},
 	}
 
+	return pod
+}
+
+func RunAppArmorTestPod(ctx context.Context, pod *v1.Pod, clientset clientset.Interface, podClient *e2epod.PodClient, runOnce bool) *v1.Pod {
 	if runOnce {
 		pod = podClient.Create(ctx, pod)
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(ctx,
-			clientset, pod.Name, nsName))
+			clientset, pod.Name, pod.Namespace))
 		var err error
 		pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 	} else {
 		pod = podClient.CreateSync(ctx, pod)
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, clientset, pod.Name, nsName, framework.PodStartTimeout))
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, clientset, pod.Name, pod.Namespace, framework.PodStartTimeout))
 	}
 
 	// Verify Pod affinity colocated the Pods.
-	loader := getRunningLoaderPod(ctx, nsName, clientset)
-	framework.ExpectEqual(pod.Spec.NodeName, loader.Spec.NodeName)
+	loader := getRunningLoaderPod(ctx, pod.Namespace, clientset)
+	gomega.Expect(pod.Spec.NodeName).To(gomega.Equal(loader.Spec.NodeName))
 
 	return pod
 }

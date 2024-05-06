@@ -14,18 +14,17 @@
 package prometheus
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 	"unicode/utf8"
 
-	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/golang/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/prometheus/client_golang/prometheus/internal"
 
 	dto "github.com/prometheus/client_model/go"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ValueType is an enumeration of metric types that represent a simple value.
@@ -93,7 +92,7 @@ func (v *valueFunc) Desc() *Desc {
 }
 
 func (v *valueFunc) Write(out *dto.Metric) error {
-	return populateMetric(v.valType, v.function(), v.labelPairs, nil, out)
+	return populateMetric(v.valType, v.function(), v.labelPairs, nil, out, nil)
 }
 
 // NewConstMetric returns a metric with one fixed value that cannot be
@@ -107,12 +106,12 @@ func NewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues 
 	if desc.err != nil {
 		return nil, desc.err
 	}
-	if err := validateLabelValues(labelValues, len(desc.variableLabels)); err != nil {
+	if err := validateLabelValues(labelValues, len(desc.variableLabels.names)); err != nil {
 		return nil, err
 	}
 
 	metric := &dto.Metric{}
-	if err := populateMetric(valueType, value, MakeLabelPairs(desc, labelValues), nil, metric); err != nil {
+	if err := populateMetric(valueType, value, MakeLabelPairs(desc, labelValues), nil, metric, nil); err != nil {
 		return nil, err
 	}
 
@@ -126,6 +125,43 @@ func NewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues 
 // NewConstMetric would have returned an error.
 func MustNewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues ...string) Metric {
 	m, err := NewConstMetric(desc, valueType, value, labelValues...)
+	if err != nil {
+		panic(err)
+	}
+	return m
+}
+
+// NewConstMetricWithCreatedTimestamp does the same thing as NewConstMetric, but generates Counters
+// with created timestamp set and returns an error for other metric types.
+func NewConstMetricWithCreatedTimestamp(desc *Desc, valueType ValueType, value float64, ct time.Time, labelValues ...string) (Metric, error) {
+	if desc.err != nil {
+		return nil, desc.err
+	}
+	if err := validateLabelValues(labelValues, len(desc.variableLabels.names)); err != nil {
+		return nil, err
+	}
+	switch valueType {
+	case CounterValue:
+		break
+	default:
+		return nil, errors.New("created timestamps are only supported for counters")
+	}
+
+	metric := &dto.Metric{}
+	if err := populateMetric(valueType, value, MakeLabelPairs(desc, labelValues), nil, metric, timestamppb.New(ct)); err != nil {
+		return nil, err
+	}
+
+	return &constMetric{
+		desc:   desc,
+		metric: metric,
+	}, nil
+}
+
+// MustNewConstMetricWithCreatedTimestamp is a version of NewConstMetricWithCreatedTimestamp that panics where
+// NewConstMetricWithCreatedTimestamp would have returned an error.
+func MustNewConstMetricWithCreatedTimestamp(desc *Desc, valueType ValueType, value float64, ct time.Time, labelValues ...string) Metric {
+	m, err := NewConstMetricWithCreatedTimestamp(desc, valueType, value, ct, labelValues...)
 	if err != nil {
 		panic(err)
 	}
@@ -155,11 +191,12 @@ func populateMetric(
 	labelPairs []*dto.LabelPair,
 	e *dto.Exemplar,
 	m *dto.Metric,
+	ct *timestamppb.Timestamp,
 ) error {
 	m.Label = labelPairs
 	switch t {
 	case CounterValue:
-		m.Counter = &dto.Counter{Value: proto.Float64(v), Exemplar: e}
+		m.Counter = &dto.Counter{Value: proto.Float64(v), Exemplar: e, CreatedTimestamp: ct}
 	case GaugeValue:
 		m.Gauge = &dto.Gauge{Value: proto.Float64(v)}
 	case UntypedValue:
@@ -178,19 +215,19 @@ func populateMetric(
 // This function is only needed for custom Metric implementations. See MetricVec
 // example.
 func MakeLabelPairs(desc *Desc, labelValues []string) []*dto.LabelPair {
-	totalLen := len(desc.variableLabels) + len(desc.constLabelPairs)
+	totalLen := len(desc.variableLabels.names) + len(desc.constLabelPairs)
 	if totalLen == 0 {
 		// Super fast path.
 		return nil
 	}
-	if len(desc.variableLabels) == 0 {
+	if len(desc.variableLabels.names) == 0 {
 		// Moderately fast path.
 		return desc.constLabelPairs
 	}
 	labelPairs := make([]*dto.LabelPair, 0, totalLen)
-	for i, n := range desc.variableLabels {
+	for i, l := range desc.variableLabels.names {
 		labelPairs = append(labelPairs, &dto.LabelPair{
-			Name:  proto.String(n),
+			Name:  proto.String(l),
 			Value: proto.String(labelValues[i]),
 		})
 	}

@@ -425,13 +425,40 @@ spec:
 	}
 }`
 
+	crdApplyFinalizerBody = `
+{
+	"apiVersion": "%s",
+	"kind": "%s",
+	"metadata": {
+		"name": "%s",
+		"finalizers": %s
+	},
+	"spec": {
+		"knownField1": "val1",
+		"ports": [{
+			"name": "portName",
+			"containerPort": 8080,
+			"protocol": "TCP",
+			"hostPort": 8082
+		}],
+		"embeddedObj": {
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "my-cm",
+				"namespace": "my-ns"
+			}
+		}
+	}
+}`
+
 	patchYAMLBody = `
 apiVersion: %s
 kind: %s
 metadata:
   name: %s
   finalizers:
-  - test-finalizer
+  - test/finalizer
 spec:
   cronSpec: "* * * * */5"
   ports:
@@ -569,6 +596,9 @@ func TestFieldValidation(t *testing.T) {
 	t.Run("PatchCRDSchemaless", func(t *testing.T) { testFieldValidationPatchCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
 	t.Run("ApplyCreateCRDSchemaless", func(t *testing.T) { testFieldValidationApplyCreateCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
 	t.Run("ApplyUpdateCRDSchemaless", func(t *testing.T) { testFieldValidationApplyUpdateCRDSchemaless(t, rest, schemalessGVK, schemalessGVR) })
+	t.Run("testFinalizerValidationApplyCreateCRD", func(t *testing.T) {
+		testFinalizerValidationApplyCreateAndUpdateCRD(t, rest, schemalessGVK, schemalessGVR)
+	})
 }
 
 // testFieldValidationPost tests POST requests containing unknown fields with
@@ -2135,7 +2165,7 @@ kind: %s
 metadata:
   name: %s
   finalizers:
-  - test-finalizer
+  - test/finalizer
 spec:
   cronSpec: "* * * * */5"
   ports:
@@ -2882,6 +2912,111 @@ func testFieldValidationApplyUpdateCRDSchemaless(t *testing.T, rest rest.Interfa
 					t.Fatalf("expected warning: %s, got warning: %s", strictWarn, result.Warnings()[i].Text)
 				}
 
+			}
+		})
+	}
+}
+
+func testFinalizerValidationApplyCreateAndUpdateCRD(t *testing.T, rest rest.Interface, gvk schema.GroupVersionKind, gvr schema.GroupVersionResource) {
+	var testcases = []struct {
+		name                 string
+		finalizer            []string
+		updatedFinalizer     []string
+		opts                 metav1.PatchOptions
+		expectUpdateWarnings []string
+		expectCreateWarnings []string
+	}{
+		{
+			name:      "create-crd-with-invalid-finalizer",
+			finalizer: []string{"invalid-finalizer"},
+			expectCreateWarnings: []string{
+				`metadata.finalizers: "invalid-finalizer": prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers`,
+			},
+		},
+		{
+			name:      "create-crd-with-valid-finalizer",
+			finalizer: []string{"kubernetes.io/valid-finalizer"},
+		},
+		{
+			name:             "update-crd-with-invalid-finalizer",
+			finalizer:        []string{"invalid-finalizer"},
+			updatedFinalizer: []string{"another-invalid-finalizer"},
+			expectCreateWarnings: []string{
+				`metadata.finalizers: "invalid-finalizer": prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers`,
+			},
+			expectUpdateWarnings: []string{
+				`metadata.finalizers: "another-invalid-finalizer": prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers`,
+			},
+		},
+		{
+			name:             "update-crd-with-valid-finalizer",
+			finalizer:        []string{"kubernetes.io/valid-finalizer"},
+			updatedFinalizer: []string{"kubernetes.io/another-valid-finalizer"},
+		},
+		{
+			name:             "update-crd-with-valid-finalizer-leaving-an-existing-invalid-finalizer",
+			finalizer:        []string{"invalid-finalizer"},
+			updatedFinalizer: []string{"kubernetes.io/another-valid-finalizer"},
+			expectCreateWarnings: []string{
+				`metadata.finalizers: "invalid-finalizer": prefer a domain-qualified finalizer name to avoid accidental conflicts with other finalizer writers`,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			kind := gvk.Kind
+			apiVersion := gvk.Group + "/" + gvk.Version
+
+			// create the CR as specified by the test case
+			name := fmt.Sprintf("apply-create-crd-%s", tc.name)
+			finalizerVal, _ := json.Marshal(tc.finalizer)
+			applyCreateBody := []byte(fmt.Sprintf(crdApplyFinalizerBody, apiVersion, kind, name, finalizerVal))
+
+			req := rest.Patch(types.ApplyPatchType).
+				AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+				Name(name).
+				Param("fieldManager", "apply_test").
+				VersionedParams(&tc.opts, metav1.ParameterCodec)
+			result := req.Body(applyCreateBody).Do(context.TODO())
+			if result.Error() != nil {
+				t.Fatalf("unexpected error: %v", result.Error())
+			}
+
+			if len(result.Warnings()) != len(tc.expectCreateWarnings) {
+				for _, r := range result.Warnings() {
+					t.Logf("received warning: %v", r)
+				}
+				t.Fatalf("unexpected number of warnings, expected: %d, got: %d", len(tc.expectCreateWarnings), len(result.Warnings()))
+			}
+			for i, expectedWarning := range tc.expectCreateWarnings {
+				if expectedWarning != result.Warnings()[i].Text {
+					t.Fatalf("expected warning: %s, got warning: %s", expectedWarning, result.Warnings()[i].Text)
+				}
+			}
+
+			if len(tc.updatedFinalizer) != 0 {
+				finalizerVal, _ := json.Marshal(tc.updatedFinalizer)
+				applyUpdateBody := []byte(fmt.Sprintf(crdApplyFinalizerBody, apiVersion, kind, name, finalizerVal))
+				updateReq := rest.Patch(types.ApplyPatchType).
+					AbsPath("/apis", gvr.Group, gvr.Version, gvr.Resource).
+					Name(name).
+					Param("fieldManager", "apply_test").
+					VersionedParams(&tc.opts, metav1.ParameterCodec)
+				result = updateReq.Body(applyUpdateBody).Do(context.TODO())
+
+				if result.Error() != nil {
+					t.Fatalf("unexpected error: %v", result.Error())
+				}
+
+				if len(result.Warnings()) != len(tc.expectUpdateWarnings) {
+					t.Fatalf("unexpected number of warnings, expected: %d, got: %d", len(tc.expectUpdateWarnings), len(result.Warnings()))
+				}
+				for i, expectedWarning := range tc.expectUpdateWarnings {
+					if expectedWarning != result.Warnings()[i].Text {
+						t.Fatalf("expected warning: %s, got warning: %s", expectedWarning, result.Warnings()[i].Text)
+					}
+				}
 			}
 		})
 	}
@@ -3687,7 +3822,7 @@ kind: %s
 metadata:
   name: %s
   finalizers:
-  - test-finalizer
+  - test/finalizer
 spec:
   cronSpec: "* * * * */5"
   ports:

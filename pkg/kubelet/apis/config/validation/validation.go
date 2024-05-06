@@ -19,6 +19,7 @@ package validation
 import (
 	"fmt"
 	"time"
+	"unicode"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -30,9 +31,10 @@ import (
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/utils/cpuset"
 )
 
 var (
@@ -82,6 +84,15 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	}
 	if kc.ImageGCLowThresholdPercent >= kc.ImageGCHighThresholdPercent {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageGCLowThresholdPercent (--image-gc-low-threshold) %v must be less than imageGCHighThresholdPercent (--image-gc-high-threshold) %v", kc.ImageGCLowThresholdPercent, kc.ImageGCHighThresholdPercent))
+	}
+	if kc.ImageMaximumGCAge.Duration != 0 && !localFeatureGate.Enabled(features.ImageMaximumGCAge) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge"))
+	}
+	if kc.ImageMaximumGCAge.Duration < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMaximumGCAge %v must not be negative", kc.ImageMaximumGCAge.Duration))
+	}
+	if kc.ImageMaximumGCAge.Duration > 0 && kc.ImageMaximumGCAge.Duration <= kc.ImageMinimumGCAge.Duration {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageMaximumGCAge %v must be greater than imageMinimumGCAge %v", kc.ImageMaximumGCAge.Duration, kc.ImageMinimumGCAge.Duration))
 	}
 	if utilvalidation.IsInRange(int(kc.IPTablesDropBit), 0, 31) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: iptablesDropBit (--iptables-drop-bit) %v must be between 0 and 31, inclusive", kc.IPTablesDropBit))
@@ -184,10 +195,10 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if localFeatureGate.Enabled(features.NodeSwap) {
 		switch kc.MemorySwap.SwapBehavior {
 		case "":
+		case kubetypes.NoSwap:
 		case kubetypes.LimitedSwap:
-		case kubetypes.UnlimitedSwap:
 		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q, or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.UnlimitedSwap))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
 		}
 	}
 	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
@@ -260,6 +271,42 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 
 	if kc.ContainerRuntimeEndpoint == "" {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: the containerRuntimeEndpoint was not specified or empty"))
+	}
+
+	if kc.EnableSystemLogQuery && !localFeatureGate.Enabled(features.NodeLogQuery) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLogQuery feature gate is required for enableSystemLogHandler"))
+	}
+	if kc.EnableSystemLogQuery && !kc.EnableSystemLogHandler {
+		allErrors = append(allErrors,
+			fmt.Errorf("invalid configuration: enableSystemLogHandler is required for enableSystemLogQuery"))
+	}
+
+	if kc.ContainerLogMaxWorkers < 1 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMaxWorkers must be greater than or equal to 1"))
+	}
+
+	if kc.ContainerLogMonitorInterval.Duration.Seconds() < 3 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s"))
+	}
+
+	if kc.PodLogsDir == "" {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podLogsDir was not specified"))
+	}
+
+	if !utilfs.IsAbs(kc.PodLogsDir) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be absolute path", kc.PodLogsDir))
+	}
+
+	if !utilfs.IsPathClean(kc.PodLogsDir) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be normalized", kc.PodLogsDir))
+	}
+
+	// Since pod logs path is used in metrics, make sure it contains only ASCII characters.
+	for _, c := range kc.PodLogsDir {
+		if c > unicode.MaxASCII {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q mut contains ASCII characters only", kc.PodLogsDir))
+			break
+		}
 	}
 
 	return utilerrors.NewAggregate(allErrors)

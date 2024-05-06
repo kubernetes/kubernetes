@@ -25,6 +25,7 @@ import (
 const (
 	TypeName   = "name"
 	TypeDocker = "docker"
+	TypePodman = "podman"
 )
 
 type CpuSpec struct {

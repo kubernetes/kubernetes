@@ -46,6 +46,7 @@ func NewKubeletStartPhase() workflow.Phase {
 		Run:     runKubeletStart,
 		InheritFlags: []string{
 			options.CfgPath,
+			options.ImageRepository,
 			options.NodeCRISocket,
 			options.NodeName,
 			options.Patches,

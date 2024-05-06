@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -86,6 +87,16 @@ func detectCoresPerSocket() int {
 	framework.ExpectNoError(err)
 
 	return coreCount
+}
+
+func detectThreadPerCore() int {
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	threadCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return threadCount
 }
 
 func makeContainers(ctnCmd string, ctnAttributes []tmCtnAttribute) (ctns []v1.Container) {
@@ -228,7 +239,7 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 		}
 	}
 	// Dump the config -- debug
-	framework.Logf("New kubelet config is %s", *newCfg)
+	framework.Logf("New kubelet config is %s", newCfg.String())
 
 	return newCfg, newCfg.ReservedSystemCPUs
 }
@@ -944,9 +955,9 @@ func hostPrecheck() (int, int) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Topology Manager [Serial] [NodeFeature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager", framework.WithSerial(), feature.TopologyManager, func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With kubeconfig updated to static CPU Manager policy run the Topology Manager tests", func() {
 		runTopologyManagerTests(f)

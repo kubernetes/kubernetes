@@ -32,6 +32,9 @@ type Encoding struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Encoding as JSON
 func (e *Encoding) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(e)
+	}
 	b1, err := json.Marshal(e.EncodingProps)
 	if err != nil {
 		return nil, err
@@ -41,6 +44,16 @@ func (e *Encoding) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2), nil
+}
+
+func (e *Encoding) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		EncodingProps encodingPropsOmitZero `json:",inline"`
+		spec.Extensions
+	}
+	x.Extensions = internal.SanitizeExtensions(e.Extensions)
+	x.EncodingProps = encodingPropsOmitZero(e.EncodingProps)
+	return opts.MarshalNext(enc, x)
 }
 
 func (e *Encoding) UnmarshalJSON(data []byte) error {
@@ -81,4 +94,12 @@ type EncodingProps struct {
 	Explode bool `json:"explode,omitempty"`
 	// AllowReserved determines whether the parameter value SHOULD allow reserved characters, as defined by RFC3986
 	AllowReserved bool `json:"allowReserved,omitempty"`
+}
+
+type encodingPropsOmitZero struct {
+	ContentType   string             `json:"contentType,omitempty"`
+	Headers       map[string]*Header `json:"headers,omitempty"`
+	Style         string             `json:"style,omitempty"`
+	Explode       bool               `json:"explode,omitzero"`
+	AllowReserved bool               `json:"allowReserved,omitzero"`
 }

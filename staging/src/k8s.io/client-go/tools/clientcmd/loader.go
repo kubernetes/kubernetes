@@ -128,6 +128,28 @@ type ClientConfigLoadingRules struct {
 	// WarnIfAllMissing indicates whether the configuration files pointed by KUBECONFIG environment variable are present or not.
 	// In case of missing files, it warns the user about the missing files.
 	WarnIfAllMissing bool
+
+	// Warner is the warning log callback to use in case of missing files.
+	Warner WarningHandler
+}
+
+// WarningHandler allows to set the logging function to use
+type WarningHandler func(error)
+
+func (handler WarningHandler) Warn(err error) {
+	if handler == nil {
+		klog.V(1).Info(err)
+	} else {
+		handler(err)
+	}
+}
+
+type MissingConfigError struct {
+	Missing []string
+}
+
+func (c MissingConfigError) Error() string {
+	return fmt.Sprintf("Config not found: %s", strings.Join(c.Missing, ", "))
 }
 
 // ClientConfigLoadingRules implements the ClientConfigLoader interface.
@@ -219,7 +241,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	}
 
 	if rules.WarnIfAllMissing && len(missingList) > 0 && len(kubeconfigs) == 0 {
-		klog.Warningf("Config not found: %s", strings.Join(missingList, ", "))
+		rules.Warner.Warn(MissingConfigError{Missing: missingList})
 	}
 
 	// first merge all of our maps

@@ -23,8 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,10 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -399,7 +398,8 @@ func TestPVCProtectionController(t *testing.T) {
 		podInformer := informers.Core().V1().Pods()
 
 		// Create the controller
-		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, client)
+		logger, _ := ktesting.NewTestContext(t)
+		ctrl, err := NewPVCProtectionController(logger, pvcInformer, podInformer, client)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -424,15 +424,15 @@ func TestPVCProtectionController(t *testing.T) {
 
 		// Start the test by simulating an event
 		if test.updatedPVC != nil {
-			ctrl.pvcAddedUpdated(test.updatedPVC)
+			ctrl.pvcAddedUpdated(logger, test.updatedPVC)
 		}
 		switch {
 		case test.deletedPod != nil && test.updatedPod != nil && test.deletedPod.Namespace == test.updatedPod.Namespace && test.deletedPod.Name == test.updatedPod.Name:
-			ctrl.podAddedDeletedUpdated(test.deletedPod, test.updatedPod, false)
+			ctrl.podAddedDeletedUpdated(logger, test.deletedPod, test.updatedPod, false)
 		case test.updatedPod != nil:
-			ctrl.podAddedDeletedUpdated(nil, test.updatedPod, false)
+			ctrl.podAddedDeletedUpdated(logger, nil, test.updatedPod, false)
 		case test.deletedPod != nil:
-			ctrl.podAddedDeletedUpdated(nil, test.deletedPod, true)
+			ctrl.podAddedDeletedUpdated(logger, nil, test.deletedPod, true)
 		}
 
 		// Process the controller queue until we get expected results
@@ -444,7 +444,7 @@ func TestPVCProtectionController(t *testing.T) {
 				break
 			}
 			if ctrl.queue.Len() > 0 {
-				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
+				logger.V(5).Info("Non-empty queue, processing one", "test", test.name, "queueLength", ctrl.queue.Len())
 				ctrl.processNextWorkItem(context.TODO())
 			}
 			if ctrl.queue.Len() > 0 {
@@ -455,7 +455,7 @@ func TestPVCProtectionController(t *testing.T) {
 			if currentActionCount < len(test.expectedActions) {
 				// Do not log every wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
-					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
+					logger.V(5).Info("Waiting for the remaining actions", "test", test.name, "currentActionCount", currentActionCount, "expectedActionCount", len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
 				}
 				// The test expected more to happen, wait for the actions.
@@ -468,13 +468,13 @@ func TestPVCProtectionController(t *testing.T) {
 		actions := client.Actions()
 		for i, action := range actions {
 			if len(test.expectedActions) < i+1 {
-				t.Errorf("Test %q: %d unexpected actions: %+v", test.name, len(actions)-len(test.expectedActions), spew.Sdump(actions[i:]))
+				t.Errorf("Test %q: %d unexpected actions: %+v", test.name, len(actions)-len(test.expectedActions), dump.Pretty(actions[i:]))
 				break
 			}
 
 			expectedAction := test.expectedActions[i]
 			if !reflect.DeepEqual(expectedAction, action) {
-				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, spew.Sdump(expectedAction), spew.Sdump(action))
+				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, dump.Pretty(expectedAction), dump.Pretty(action))
 			}
 		}
 

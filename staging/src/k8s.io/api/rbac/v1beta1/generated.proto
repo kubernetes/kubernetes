@@ -33,7 +33,8 @@ message AggregationRule {
   // ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules.
   // If any of the selectors match, then the ClusterRole's permissions will be added
   // +optional
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector clusterRoleSelectors = 1;
+  // +listType=atomic
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector clusterRoleSelectors = 1;
 }
 
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
@@ -41,10 +42,11 @@ message AggregationRule {
 message ClusterRole {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this ClusterRole
   // +optional
+  // +listType=atomic
   repeated PolicyRule rules = 2;
 
   // AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
@@ -60,10 +62,11 @@ message ClusterRole {
 message ClusterRoleBinding {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
   // +optional
+  // +listType=atomic
   repeated Subject subjects = 2;
 
   // RoleRef can only reference a ClusterRole in the global namespace.
@@ -76,7 +79,7 @@ message ClusterRoleBinding {
 message ClusterRoleBindingList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoleBindings
   repeated ClusterRoleBinding items = 2;
@@ -87,7 +90,7 @@ message ClusterRoleBindingList {
 message ClusterRoleList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoles
   repeated ClusterRole items = 2;
@@ -97,26 +100,31 @@ message ClusterRoleList {
 // about who the rule applies to or which namespace the rule applies to.
 message PolicyRule {
   // Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
+  // +listType=atomic
   repeated string verbs = 1;
 
   // APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
   // the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
   // +optional
+  // +listType=atomic
   repeated string apiGroups = 2;
 
   // Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups.
   // '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.
   // +optional
+  // +listType=atomic
   repeated string resources = 3;
 
   // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
   // +optional
+  // +listType=atomic
   repeated string resourceNames = 4;
 
   // NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
   // Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
   // Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
   // +optional
+  // +listType=atomic
   repeated string nonResourceURLs = 5;
 }
 
@@ -125,10 +133,11 @@ message PolicyRule {
 message Role {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this Role
   // +optional
+  // +listType=atomic
   repeated PolicyRule rules = 2;
 }
 
@@ -139,10 +148,11 @@ message Role {
 message RoleBinding {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
   // +optional
+  // +listType=atomic
   repeated Subject subjects = 2;
 
   // RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
@@ -155,7 +165,7 @@ message RoleBinding {
 message RoleBindingList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of RoleBindings
   repeated RoleBinding items = 2;
@@ -166,7 +176,7 @@ message RoleBindingList {
 message RoleList {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of Roles
   repeated Role items = 2;

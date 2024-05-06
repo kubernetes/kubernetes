@@ -22,16 +22,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/gomega"
-
 	semver "github.com/blang/semver/v4"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -86,13 +86,13 @@ var (
 	User_NTAuthoritySystem       = "NT AUTHORITY\\SYSTEM"
 )
 
-var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
+var _ = sigDescribe(feature.WindowsHostProcessContainers, "[MinimumKubeletVersion:1.22] HostProcess containers", skipUnlessWindows(func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	f := framework.NewDefaultFramework("host-process-test-windows")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a process on the host/node", func(ctx context.Context) {
 
@@ -142,7 +142,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 	})
 
 	ginkgo.It("should support init containers", func(ctx context.Context) {
@@ -202,7 +202,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			}
 			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
 		}
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 	})
 
 	ginkgo.It("container command path validation", func(ctx context.Context) {
@@ -511,7 +511,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 	})
 
 	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func(ctx context.Context) {
@@ -657,7 +657,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		ginkgo.By("Waiting for the pod to start running")
 		timeout := 3 * time.Minute
-		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, timeout)
+		err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, timeout)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting container stats for pod")
 		statsChecked := false
@@ -711,7 +712,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		pc.Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute)
+		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 3*time.Minute)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for 60 seconds")
 		// We wait an additional 60 seconds after the pod is Running because the
@@ -725,15 +727,9 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		framework.Logf("Logs: %s\n", logs)
 
-		framework.ExpectEqual(
-			strings.Contains(logs, "calling /healthz"),
-			true,
-			"app logs should contain 'calling /healthz'")
+		gomega.Expect(logs).Should(gomega.ContainSubstring("calling /healthz"), "app logs should contain 'calling /healthz'")
 
-		framework.ExpectEqual(
-			strings.Contains(logs, "status=failed"),
-			false,
-			"app logs should not contain 'status=failed")
+		gomega.Expect(logs).ShouldNot(gomega.ContainSubstring("status=failed"), "app logs should not contain 'status=failed'")
 	})
 
 	ginkgo.It("should run as localgroup accounts", func(ctx context.Context) {
@@ -793,7 +789,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "error retrieving pod")
-		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 
 		// whoami will output %COMPUTER_NAME%/{randomly generated username} here.
 		// It is sufficient to just check that the logs do not container `nt authority`
@@ -803,15 +799,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, "localgroup-container")
 		framework.ExpectNoError(err, "error retrieving container logs")
 		framework.Logf("Pod logs: %s", logs)
-		framework.ExpectEqual(
-			strings.Contains(
-				strings.ToLower(logs),
-				"nt authority"),
-			false,
-			"Container runs 'whoami' and logs should not contain 'nt authority'")
+		gomega.Expect(strings.ToLower(logs)).ShouldNot(gomega.ContainSubstring("nt authority"), "Container runs 'whoami' and logs should not contain 'nt authority'")
 	})
 
-})
+}))
 
 func makeTestPodWithVolumeMounts(name string) *v1.Pod {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate

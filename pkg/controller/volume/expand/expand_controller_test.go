@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestSyncHandler(t *testing.T) {
@@ -91,11 +92,11 @@ func TestSyncHandler(t *testing.T) {
 	}
 
 	for _, tc := range tests {
+		tCtx := ktesting.Init(t)
 		test := tc
 		fakeKubeClient := controllervolumetesting.CreateTestClient()
 		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 		pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
-		pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 		pvc := test.pvc
 		if tc.pv != nil {
@@ -107,7 +108,7 @@ func TestSyncHandler(t *testing.T) {
 		}
 		allPlugins := []volume.VolumePlugin{}
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
+		expc, err := NewExpandController(tCtx, fakeKubeClient, pvcInformer, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate))
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
@@ -206,7 +207,7 @@ func getFakePersistentVolumeClaim(pvcName, volumeName, statusSize, requestSize s
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: "default", UID: uid},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: map[v1.ResourceName]resource.Quantity{
 					v1.ResourceStorage: resource.MustParse(requestSize),
 				},

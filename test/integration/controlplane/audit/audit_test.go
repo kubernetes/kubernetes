@@ -41,6 +41,7 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
@@ -245,7 +246,7 @@ func runTestWithVersion(t *testing.T, version string) {
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
+	defer utiltesting.CloseAndRemove(t, logFile)
 
 	// start api server
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil,

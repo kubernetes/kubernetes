@@ -28,6 +28,7 @@ var subsystems = []subsystem{
 	&FreezerGroup{},
 	&RdmaGroup{},
 	&NameGroup{GroupName: "name=systemd", Join: true},
+	&NameGroup{GroupName: "misc", Join: true},
 }
 
 var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")

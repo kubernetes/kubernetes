@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -45,9 +46,9 @@ func kubeProxyDaemonSetExtraEnvs(enableKubeProxyDaemonSet bool) []string {
 	return []string{fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet)}
 }
 
-var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]", func() {
+var _ = SIGDescribe("kube-proxy migration", feature.KubeProxyDaemonSetMigration, func() {
 	f := framework.NewDefaultFramework("kube-proxy-ds-migration")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	upgradeTestFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 	downgradeTestsFrameworks := upgrades.CreateUpgradeFrameworks(downgradeTests)
 
@@ -56,7 +57,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 	})
 
 	ginkgo.Describe("Upgrade kube-proxy from static pods to a DaemonSet", func() {
-		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]", func(ctx context.Context) {
+		f.It("should maintain a functioning cluster", feature.KubeProxyDaemonSetUpgrade, func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
@@ -74,7 +75,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 	})
 
 	ginkgo.Describe("Downgrade kube-proxy from a DaemonSet to static pods", func() {
-		ginkgo.It("should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]", func(ctx context.Context) {
+		f.It("should maintain a functioning cluster", feature.KubeProxyDaemonSetDowngrade, func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 

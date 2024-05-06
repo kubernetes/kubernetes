@@ -31,12 +31,14 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/klog/v2"
+	kcmnames "k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	// For existing cloud providers, the option to import legacy providers is still available.
 	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
@@ -48,6 +50,7 @@ func main() {
 	}
 
 	controllerInitializers := app.DefaultInitFuncConstructors
+	controllerAliases := names.CCMControllerAliases()
 	// Here is an example to remove the controller which is not needed.
 	// e.g. remove the cloud-node-lifecycle controller which current cloud provider does not need.
 	//delete(controllerInitializers, "cloud-node-lifecycle")
@@ -59,9 +62,9 @@ func main() {
 	nodeIpamController := nodeIPAMController{}
 	nodeIpamController.nodeIPAMControllerOptions.NodeIPAMControllerConfiguration = &nodeIpamController.nodeIPAMControllerConfiguration
 	fss := cliflag.NamedFlagSets{}
-	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fss.FlagSet("nodeipam controller"))
+	nodeIpamController.nodeIPAMControllerOptions.AddFlags(fss.FlagSet(kcmnames.NodeIpamController))
 
-	controllerInitializers["nodeipam"] = app.ControllerInitFuncConstructor{
+	controllerInitializers[kcmnames.NodeIpamController] = app.ControllerInitFuncConstructor{
 		// "node-controller" is the shared identity of all node controllers, including node, node lifecycle, and node ipam.
 		// See https://github.com/kubernetes/kubernetes/pull/72764#issuecomment-453300990 for more context.
 		InitContext: app.ControllerInitContext{
@@ -69,8 +72,9 @@ func main() {
 		},
 		Constructor: nodeIpamController.StartNodeIpamControllerWrapper,
 	}
+	controllerAliases["nodeipam"] = kcmnames.NodeIpamController
 
-	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
+	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, controllerAliases, fss, wait.NeverStop)
 	code := cli.Run(command)
 	os.Exit(code)
 }

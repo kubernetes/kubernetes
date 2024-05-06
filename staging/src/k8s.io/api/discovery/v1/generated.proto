@@ -54,7 +54,7 @@ message Endpoint {
   // targetRef is a reference to a Kubernetes object that represents this
   // endpoint.
   // +optional
-  optional k8s.io.api.core.v1.ObjectReference targetRef = 4;
+  optional .k8s.io.api.core.v1.ObjectReference targetRef = 4;
 
   // deprecatedTopology contains topology information part of the v1beta1
   // API. This field is deprecated, and will be removed when the v1beta1
@@ -86,7 +86,9 @@ message EndpointConditions {
   // according to whatever system is managing the endpoint. A nil value
   // indicates an unknown state. In most cases consumers should interpret this
   // unknown state as ready. For compatibility reasons, ready should never be
-  // "true" for terminating endpoints.
+  // "true" for terminating endpoints, except when the normal readiness
+  // behavior is being explicitly overridden, for example when the associated
+  // Service has set the publishNotReadyAddresses flag.
   // +optional
   optional bool ready = 1;
 
@@ -116,7 +118,7 @@ message EndpointHints {
 // +structType=atomic
 message EndpointPort {
   // name represents the name of this port. All ports in an EndpointSlice must have a unique name.
-  // If the EndpointSlice is dervied from a Kubernetes service, this corresponds to the Service.ports[].name.
+  // If the EndpointSlice is derived from a Kubernetes service, this corresponds to the Service.ports[].name.
   // Name must either be an empty string or pass DNS_LABEL validation:
   // * must be no more than 63 characters long.
   // * must consist of lower case alphanumeric characters or '-'.
@@ -134,11 +136,20 @@ message EndpointPort {
   // interpreted in the context of the specific consumer.
   optional int32 port = 3;
 
-  // appProtocol represents the application protocol for this port.
+  // The application protocol for this port.
+  // This is used as a hint for implementations to offer richer behavior for protocols that they understand.
   // This field follows standard Kubernetes label syntax.
-  // Un-prefixed names are reserved for IANA standard service names (as per
+  // Valid values are either:
+  //
+  // * Un-prefixed protocol names - reserved for IANA standard service names (as per
   // RFC-6335 and https://www.iana.org/assignments/service-names).
-  // Non-standard protocols should use prefixed names such as
+  //
+  // * Kubernetes-defined prefixed names:
+  //   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+  //   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+  //   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+  //
+  // * Other protocols should use implementation-defined prefixed names such as
   // mycompany.com/my-custom-protocol.
   // +optional
   optional string appProtocol = 4;
@@ -150,7 +161,7 @@ message EndpointPort {
 message EndpointSlice {
   // Standard object's metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // addressType specifies the type of address carried by this EndpointSlice.
   // All addresses in this slice must be the same type. This field is
@@ -180,7 +191,7 @@ message EndpointSlice {
 message EndpointSliceList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of endpoint slices
   repeated EndpointSlice items = 2;

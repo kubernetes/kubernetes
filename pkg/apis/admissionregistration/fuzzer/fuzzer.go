@@ -98,5 +98,14 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.MatchPolicy = &m
 			}
 		},
+		func(obj *admissionregistration.ParamRef, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+
+			// Populate required field
+			if obj.ParameterNotFoundAction == nil {
+				v := admissionregistration.DenyAction
+				obj.ParameterNotFoundAction = &v
+			}
+		},
 	}
 }

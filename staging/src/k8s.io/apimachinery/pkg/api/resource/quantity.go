@@ -592,6 +592,16 @@ func (q *Quantity) Sub(y Quantity) {
 	q.ToDec().d.Dec.Sub(q.d.Dec, y.AsDec())
 }
 
+// Mul multiplies the provided y to the current value.
+// It will return false if the result is inexact. Otherwise, it will return true.
+func (q *Quantity) Mul(y int64) bool {
+	q.s = ""
+	if q.d.Dec == nil && q.i.Mul(y) {
+		return true
+	}
+	return q.ToDec().d.Dec.Mul(q.d.Dec, inf.NewDec(y, inf.Scale(0))).UnscaledBig().IsInt64()
+}
+
 // Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y, or 1 if the
 // quantity is greater than y.
 func (q *Quantity) Cmp(y Quantity) int {

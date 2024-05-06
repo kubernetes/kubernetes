@@ -81,7 +81,9 @@ func NewCommand() *cobra.Command {
 	profilePath := fs.String("pprof-path", "", "The HTTP path where pprof profiling will be available, disabled if empty.")
 
 	fs = sharedFlagSets.FlagSet("CDI")
-	driverName := fs.String("drivername", "test-driver.cdi.k8s.io", "Resource driver name.")
+	driverNameFlagName := "drivername"
+	driverName := fs.String(driverNameFlagName, "test-driver.cdi.k8s.io", "Resource driver name.")
+	driverNameFlag := fs.Lookup(driverNameFlagName)
 
 	fs = sharedFlagSets.FlagSet("other")
 	featureGate := featuregate.NewFeatureGate()
@@ -192,6 +194,7 @@ func NewCommand() *cobra.Command {
 		"Duration, in seconds, that the acting leader will retry refreshing leadership before giving up.")
 	leaderElectionRetryPeriod := fs.Duration("leader-election-retry-period", 5*time.Second,
 		"Duration, in seconds, the LeaderElector clients should wait between tries of actions.")
+	fs = controllerFlagSets.FlagSet("controller")
 	resourceConfig := fs.String("resource-config", "", "A JSON file containing a Resources struct. Defaults are unshared, network-attached resources.")
 	fs = controller.Flags()
 	for _, f := range controllerFlagSets.FlagSets {
@@ -211,9 +214,12 @@ func NewCommand() *cobra.Command {
 				return fmt.Errorf("parse resource config %q: %w", *resourceConfig, err)
 			}
 		}
+		if resources.DriverName == "" || driverNameFlag.Changed {
+			resources.DriverName = *driverName
+		}
 
 		run := func() {
-			controller := NewController(clientset, *driverName, resources)
+			controller := NewController(clientset, resources)
 			controller.Run(ctx, *workers)
 		}
 
@@ -281,7 +287,7 @@ func NewCommand() *cobra.Command {
 			return fmt.Errorf("create socket directory: %w", err)
 		}
 
-		plugin, err := StartPlugin(logger, *cdiDir, *driverName, "", FileOperations{},
+		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, "", FileOperations{},
 			kubeletplugin.PluginSocketPath(*endpoint),
 			kubeletplugin.RegistrarSocketPath(path.Join(*pluginRegistrationPath, *driverName+"-reg.sock")),
 			kubeletplugin.KubeletPluginSocketPath(*draAddress),

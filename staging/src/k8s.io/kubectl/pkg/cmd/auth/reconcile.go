@@ -28,6 +28,7 @@ import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -53,7 +54,7 @@ type ReconcileOptions struct {
 
 	PrintObject printers.ResourcePrinterFunc
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -76,7 +77,7 @@ var (
 )
 
 // NewReconcileOptions returns a new ReconcileOptions instance
-func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOptions {
+func NewReconcileOptions(ioStreams genericiooptions.IOStreams) *ReconcileOptions {
 	return &ReconcileOptions{
 		FilenameOptions: &resource.FilenameOptions{},
 		PrintFlags:      genericclioptions.NewPrintFlags("reconciled").WithTypeSetter(scheme.Scheme),
@@ -85,7 +86,7 @@ func NewReconcileOptions(ioStreams genericclioptions.IOStreams) *ReconcileOption
 }
 
 // NewCmdReconcile holds the options for 'auth reconcile' sub command
-func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdReconcile(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewReconcileOptions(streams)
 
 	cmd := &cobra.Command{

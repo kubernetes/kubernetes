@@ -37,6 +37,7 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -44,7 +45,7 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
-	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
 	s := NewServerRunOptions()
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
@@ -125,203 +126,215 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
-		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-		ServiceClusterIPRanges: (&net.IPNet{IP: netutils.ParseIPSloppy("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
-		MasterCount:            5,
-		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
-		AllowPrivileged:        false,
-		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
-			AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
-			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
-			MaxRequestsInFlight:         400,
-			MaxMutatingRequestsInFlight: 200,
-			RequestTimeout:              time.Duration(2) * time.Minute,
-			MinRequestTimeout:           1800,
-			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
-			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
-		},
-		Admission: &kubeoptions.AdmissionOptions{
-			GenericAdmission: &apiserveroptions.AdmissionOptions{
-				RecommendedPluginOrder: s.Admission.GenericAdmission.RecommendedPluginOrder,
-				DefaultOffPlugins:      s.Admission.GenericAdmission.DefaultOffPlugins,
-				EnablePlugins:          []string{"AlwaysDeny"},
-				ConfigFile:             "/admission-control-config",
-				Plugins:                s.Admission.GenericAdmission.Plugins,
-				Decorators:             s.Admission.GenericAdmission.Decorators,
+		Options: &controlplaneapiserver.Options{
+			GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
+				MaxRequestsInFlight:         400,
+				MaxMutatingRequestsInFlight: 200,
+				RequestTimeout:              time.Duration(2) * time.Minute,
+				MinRequestTimeout:           1800,
+				JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
+				MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
 			},
-		},
-		Etcd: &apiserveroptions.EtcdOptions{
-			StorageConfig: storagebackend.Config{
-				Type: "etcd3",
-				Transport: storagebackend.TransportConfig{
-					ServerList:     nil,
-					KeyFile:        "/var/run/kubernetes/etcd.key",
-					TrustedCAFile:  "/var/run/kubernetes/etcdca.crt",
-					CertFile:       "/var/run/kubernetes/etcdce.crt",
-					TracerProvider: oteltrace.NewNoopTracerProvider(),
-				},
-				Paging:                true,
-				Prefix:                "/registry",
-				CompactionInterval:    storagebackend.DefaultCompactInterval,
-				CountMetricPollPeriod: time.Minute,
-				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
-				HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
-				ReadycheckTimeout:     storagebackend.DefaultReadinessTimeout,
-				LeaseManagerConfig: etcd3.LeaseManagerConfig{
-					ReuseDurationSeconds: 100,
-					MaxObjectCount:       1000,
+			Admission: &kubeoptions.AdmissionOptions{
+				GenericAdmission: &apiserveroptions.AdmissionOptions{
+					RecommendedPluginOrder: s.Options.Admission.GenericAdmission.RecommendedPluginOrder,
+					DefaultOffPlugins:      s.Options.Admission.GenericAdmission.DefaultOffPlugins,
+					EnablePlugins:          []string{"AlwaysDeny"},
+					ConfigFile:             "/admission-control-config",
+					Plugins:                s.Options.Admission.GenericAdmission.Plugins,
+					Decorators:             s.Options.Admission.GenericAdmission.Decorators,
 				},
 			},
-			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
-			DeleteCollectionWorkers: 1,
-			EnableGarbageCollection: true,
-			EnableWatchCache:        true,
-			DefaultWatchCacheSize:   100,
-		},
-		SecureServing: (&apiserveroptions.SecureServingOptions{
-			BindAddress: netutils.ParseIPSloppy("192.168.10.20"),
-			BindPort:    6443,
-			ServerCert: apiserveroptions.GeneratableKeyCert{
-				CertDirectory: "/var/run/kubernetes",
-				PairName:      "apiserver",
-			},
-			HTTP2MaxStreamsPerConnection: 42,
-			Required:                     true,
-		}).WithLoopback(),
-		EventTTL: 1 * time.Hour,
-		KubeletConfig: kubeletclient.KubeletClientConfig{
-			Port:         10250,
-			ReadOnlyPort: 10255,
-			PreferredAddressTypes: []string{
-				string(kapi.NodeHostName),
-				string(kapi.NodeInternalDNS),
-				string(kapi.NodeInternalIP),
-				string(kapi.NodeExternalDNS),
-				string(kapi.NodeExternalIP),
-			},
-			HTTPTimeout: time.Duration(5) * time.Second,
-			TLSClientConfig: kubeletclient.KubeletTLSConfig{
-				CertFile: "/var/run/kubernetes/ceserver.crt",
-				KeyFile:  "/var/run/kubernetes/server.key",
-				CAFile:   "/var/run/kubernetes/caserver.crt",
-			},
-		},
-		Audit: &apiserveroptions.AuditOptions{
-			LogOptions: apiserveroptions.AuditLogOptions{
-				Path:       "/var/log",
-				MaxAge:     11,
-				MaxBackups: 12,
-				MaxSize:    13,
-				Format:     "json",
-				BatchOptions: apiserveroptions.AuditBatchOptions{
-					Mode: "blocking",
-					BatchConfig: auditbuffered.BatchConfig{
-						BufferSize:     46,
-						MaxBatchSize:   47,
-						MaxBatchWait:   48 * time.Second,
-						ThrottleEnable: true,
-						ThrottleQPS:    49.5,
-						ThrottleBurst:  50,
+			Etcd: &apiserveroptions.EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Type: "etcd3",
+					Transport: storagebackend.TransportConfig{
+						ServerList:     nil,
+						KeyFile:        "/var/run/kubernetes/etcd.key",
+						TrustedCAFile:  "/var/run/kubernetes/etcdca.crt",
+						CertFile:       "/var/run/kubernetes/etcdce.crt",
+						TracerProvider: oteltrace.NewNoopTracerProvider(),
+					},
+					Prefix:                "/registry",
+					CompactionInterval:    storagebackend.DefaultCompactInterval,
+					CountMetricPollPeriod: time.Minute,
+					DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
+					HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
+					ReadycheckTimeout:     storagebackend.DefaultReadinessTimeout,
+					LeaseManagerConfig: etcd3.LeaseManagerConfig{
+						ReuseDurationSeconds: 100,
+						MaxObjectCount:       1000,
 					},
 				},
-				TruncateOptions: apiserveroptions.AuditTruncateOptions{
-					Enabled: true,
-					TruncateConfig: audittruncate.Config{
-						MaxBatchSize: 45,
-						MaxEventSize: 44,
-					},
+				DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
+				DeleteCollectionWorkers: 1,
+				EnableGarbageCollection: true,
+				EnableWatchCache:        true,
+				DefaultWatchCacheSize:   100,
+			},
+			SecureServing: (&apiserveroptions.SecureServingOptions{
+				BindAddress: netutils.ParseIPSloppy("192.168.10.20"),
+				BindPort:    6443,
+				ServerCert: apiserveroptions.GeneratableKeyCert{
+					CertDirectory: "/var/run/kubernetes",
+					PairName:      "apiserver",
 				},
-				GroupVersionString: "audit.k8s.io/v1",
-			},
-			WebhookOptions: apiserveroptions.AuditWebhookOptions{
-				ConfigFile: "/webhook-config",
-				BatchOptions: apiserveroptions.AuditBatchOptions{
-					Mode: "blocking",
-					BatchConfig: auditbuffered.BatchConfig{
-						BufferSize:     42,
-						MaxBatchSize:   43,
-						MaxBatchWait:   1 * time.Second,
-						ThrottleEnable: false,
-						ThrottleQPS:    43.5,
-						ThrottleBurst:  44,
-						AsyncDelegate:  true,
+				HTTP2MaxStreamsPerConnection: 42,
+				Required:                     true,
+			}).WithLoopback(),
+			EventTTL: 1 * time.Hour,
+			Audit: &apiserveroptions.AuditOptions{
+				LogOptions: apiserveroptions.AuditLogOptions{
+					Path:       "/var/log",
+					MaxAge:     11,
+					MaxBackups: 12,
+					MaxSize:    13,
+					Format:     "json",
+					BatchOptions: apiserveroptions.AuditBatchOptions{
+						Mode: "blocking",
+						BatchConfig: auditbuffered.BatchConfig{
+							BufferSize:     46,
+							MaxBatchSize:   47,
+							MaxBatchWait:   48 * time.Second,
+							ThrottleEnable: true,
+							ThrottleQPS:    49.5,
+							ThrottleBurst:  50,
+						},
 					},
-				},
-				TruncateOptions: apiserveroptions.AuditTruncateOptions{
-					Enabled: true,
-					TruncateConfig: audittruncate.Config{
-						MaxBatchSize: 43,
-						MaxEventSize: 42,
+					TruncateOptions: apiserveroptions.AuditTruncateOptions{
+						Enabled: true,
+						TruncateConfig: audittruncate.Config{
+							MaxBatchSize: 45,
+							MaxEventSize: 44,
+						},
 					},
+					GroupVersionString: "audit.k8s.io/v1",
 				},
-				InitialBackoff:     2 * time.Second,
-				GroupVersionString: "audit.k8s.io/v1",
+				WebhookOptions: apiserveroptions.AuditWebhookOptions{
+					ConfigFile: "/webhook-config",
+					BatchOptions: apiserveroptions.AuditBatchOptions{
+						Mode: "blocking",
+						BatchConfig: auditbuffered.BatchConfig{
+							BufferSize:     42,
+							MaxBatchSize:   43,
+							MaxBatchWait:   1 * time.Second,
+							ThrottleEnable: false,
+							ThrottleQPS:    43.5,
+							ThrottleBurst:  44,
+							AsyncDelegate:  true,
+						},
+					},
+					TruncateOptions: apiserveroptions.AuditTruncateOptions{
+						Enabled: true,
+						TruncateConfig: audittruncate.Config{
+							MaxBatchSize: 43,
+							MaxEventSize: 42,
+						},
+					},
+					InitialBackoff:     2 * time.Second,
+					GroupVersionString: "audit.k8s.io/v1",
+				},
+				PolicyFile: "/policy",
 			},
-			PolicyFile: "/policy",
+			Features: &apiserveroptions.FeatureOptions{
+				EnableProfiling:           true,
+				EnableContentionProfiling: true,
+			},
+			Authentication: &kubeoptions.BuiltInAuthenticationOptions{
+				Anonymous: &kubeoptions.AnonymousAuthenticationOptions{
+					Allow: false,
+				},
+				ClientCert: &apiserveroptions.ClientCertAuthenticationOptions{
+					ClientCA: "/client-ca",
+				},
+				WebHook: &kubeoptions.WebHookAuthenticationOptions{
+					CacheTTL:     180000000000,
+					ConfigFile:   "/token-webhook-config",
+					Version:      "v1beta1",
+					RetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
+				},
+				BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
+				OIDC:           s.Authentication.OIDC,
+				RequestHeader:  &apiserveroptions.RequestHeaderAuthenticationOptions{},
+				ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
+					Lookup:           true,
+					ExtendExpiration: true,
+				},
+				TokenFile:            &kubeoptions.TokenFileAuthenticationOptions{},
+				TokenSuccessCacheTTL: 10 * time.Second,
+				TokenFailureCacheTTL: 0,
+			},
+			Authorization: &kubeoptions.BuiltInAuthorizationOptions{
+				Modes:                       []string{"AlwaysDeny", "RBAC"},
+				PolicyFile:                  "/policy",
+				WebhookConfigFile:           "/webhook-config",
+				WebhookCacheAuthorizedTTL:   180000000000,
+				WebhookCacheUnauthorizedTTL: 60000000000,
+				WebhookVersion:              "v1beta1",
+				WebhookRetryBackoff:         apiserveroptions.DefaultAuthWebhookRetryBackoff(),
+			},
+			APIEnablement: &apiserveroptions.APIEnablementOptions{
+				RuntimeConfig: cliflag.ConfigurationMap{},
+			},
+			EgressSelector: &apiserveroptions.EgressSelectorOptions{
+				ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",
+			},
+			EnableLogsHandler:       false,
+			EnableAggregatorRouting: true,
+			ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
+			ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
+			Metrics:                 &metrics.Options{},
+			Logs:                    logs.NewOptions(),
+			Traces: &apiserveroptions.TracingOptions{
+				ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
+			},
+			AggregatorRejectForwardingRedirects: true,
+			SystemNamespaces:                    []string{"kube-system", "kube-public", "default", "kube-node-lease"},
 		},
-		Features: &apiserveroptions.FeatureOptions{
-			EnableProfiling:           true,
-			EnableContentionProfiling: true,
-		},
-		Authentication: &kubeoptions.BuiltInAuthenticationOptions{
-			Anonymous: &kubeoptions.AnonymousAuthenticationOptions{
-				Allow: false,
+
+		Extra: Extra{
+			ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
+			ServiceClusterIPRanges: (&net.IPNet{IP: netutils.ParseIPSloppy("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
+			EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
+			AllowPrivileged:        false,
+			KubeletConfig: kubeletclient.KubeletClientConfig{
+				Port:         10250,
+				ReadOnlyPort: 10255,
+				PreferredAddressTypes: []string{
+					string(kapi.NodeHostName),
+					string(kapi.NodeInternalDNS),
+					string(kapi.NodeInternalIP),
+					string(kapi.NodeExternalDNS),
+					string(kapi.NodeExternalIP),
+				},
+				HTTPTimeout: time.Duration(5) * time.Second,
+				TLSClientConfig: kubeletclient.KubeletTLSConfig{
+					CertFile: "/var/run/kubernetes/ceserver.crt",
+					KeyFile:  "/var/run/kubernetes/server.key",
+					CAFile:   "/var/run/kubernetes/caserver.crt",
+				},
 			},
-			ClientCert: &apiserveroptions.ClientCertAuthenticationOptions{
-				ClientCA: "/client-ca",
-			},
-			WebHook: &kubeoptions.WebHookAuthenticationOptions{
-				CacheTTL:     180000000000,
-				ConfigFile:   "/token-webhook-config",
-				Version:      "v1beta1",
-				RetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
-			},
-			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
-			OIDC: &kubeoptions.OIDCAuthenticationOptions{
-				UsernameClaim: "sub",
-				SigningAlgs:   []string{"RS256"},
-			},
-			RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
-			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
-				Lookup:           true,
-				ExtendExpiration: true,
-			},
-			TokenFile:            &kubeoptions.TokenFileAuthenticationOptions{},
-			TokenSuccessCacheTTL: 10 * time.Second,
-			TokenFailureCacheTTL: 0,
-		},
-		Authorization: &kubeoptions.BuiltInAuthorizationOptions{
-			Modes:                       []string{"AlwaysDeny", "RBAC"},
-			PolicyFile:                  "/policy",
-			WebhookConfigFile:           "/webhook-config",
-			WebhookCacheAuthorizedTTL:   180000000000,
-			WebhookCacheUnauthorizedTTL: 60000000000,
-			WebhookVersion:              "v1beta1",
-			WebhookRetryBackoff:         apiserveroptions.DefaultAuthWebhookRetryBackoff(),
+			MasterCount: 5,
 		},
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",
 			CloudProvider:   "azure",
 		},
-		APIEnablement: &apiserveroptions.APIEnablementOptions{
-			RuntimeConfig: cliflag.ConfigurationMap{},
-		},
-		EgressSelector: &apiserveroptions.EgressSelectorOptions{
-			ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",
-		},
-		EnableLogsHandler:       false,
-		EnableAggregatorRouting: true,
-		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
-		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
-		Metrics:                 &metrics.Options{},
-		Logs:                    logs.NewOptions(),
-		Traces: &apiserveroptions.TracingOptions{
-			ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
-		},
-		AggregatorRejectForwardingRedirects: true,
 	}
 
+	expected.Authentication.OIDC.UsernameClaim = "sub"
+	expected.Authentication.OIDC.SigningAlgs = []string{"RS256"}
+
+	if !s.Authorization.AreLegacyFlagsSet() {
+		t.Errorf("expected legacy authorization flags to be set")
+	}
+
+	// setting the method to nil since methods can't be compared with reflect.DeepEqual
+	s.Authorization.AreLegacyFlagsSet = nil
+
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
 	}
 }

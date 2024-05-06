@@ -35,32 +35,87 @@ func TestPolicyBindingStrategy(t *testing.T) {
 		t.Errorf("PolicyBinding should not allow create on update")
 	}
 
-	configuration := validPolicyBinding()
-	strategy.PrepareForCreate(ctx, configuration)
-	errs := strategy.Validate(ctx, configuration)
-	if len(errs) != 0 {
-		t.Errorf("Unexpected error validating %v", errs)
-	}
-	invalidConfiguration := &admissionregistration.ValidatingAdmissionPolicyBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: ""},
-	}
-	strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
-	errs = strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
-	if len(errs) == 0 {
-		t.Errorf("Expected a validation error")
+	for _, configuration := range validPolicyBindings() {
+		strategy.PrepareForCreate(ctx, configuration)
+		errs := strategy.Validate(ctx, configuration)
+		if len(errs) != 0 {
+			t.Errorf("Unexpected error validating %v", errs)
+		}
+		invalidConfiguration := &admissionregistration.ValidatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: ""},
+		}
+		strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
+		errs = strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
+		if len(errs) == 0 {
+			t.Errorf("Expected a validation error")
+		}
 	}
 }
-func validPolicyBinding() *admissionregistration.ValidatingAdmissionPolicyBinding {
-	return &admissionregistration.ValidatingAdmissionPolicyBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
-			PolicyName: "replicalimit-policy.example.com",
-			ParamRef: &admissionregistration.ParamRef{
-				Name: "replica-limit-test.example.com",
+
+func validPolicyBindings() []*admissionregistration.ValidatingAdmissionPolicyBinding {
+	denyAction := admissionregistration.DenyAction
+	return []*admissionregistration.ValidatingAdmissionPolicyBinding{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
 			},
-			ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "replica-limit-test.example.com",
+					ParameterNotFoundAction: &denyAction,
+				},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo-clusterwide",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Name:                    "replica-limit-test.example.com",
+					Namespace:               "default",
+					ParameterNotFoundAction: &denyAction,
+				},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo-selector",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"label": "value",
+						},
+					},
+					ParameterNotFoundAction: &denyAction,
+				},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo-selector-clusterwide",
+			},
+			Spec: admissionregistration.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName: "replicalimit-policy.example.com",
+				ParamRef: &admissionregistration.ParamRef{
+					Namespace: "mynamespace",
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"label": "value",
+						},
+					},
+					ParameterNotFoundAction: &denyAction,
+				},
+				ValidationActions: []admissionregistration.ValidationAction{admissionregistration.Deny},
+			},
 		},
 	}
 }

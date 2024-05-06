@@ -34,7 +34,7 @@ func (matcher *SucceedMatcher) FailureMessage(actual interface{}) (message strin
 	if errors.As(actual.(error), &fgErr) {
 		return fgErr.FormattedGomegaError()
 	}
-	return fmt.Sprintf("Expected success, but got an error:\n%s\n%s", format.Object(actual, 1), format.IndentString(actual.(error).Error(), 1))
+	return fmt.Sprintf("Expected success, but got an error:\n%s", format.Object(actual, 1))
 }
 
 func (matcher *SucceedMatcher) NegatedFailureMessage(actual interface{}) (message string) {

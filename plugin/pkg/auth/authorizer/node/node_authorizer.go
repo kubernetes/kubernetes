@@ -30,6 +30,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -40,7 +41,7 @@ import (
 // NodeAuthorizer authorizes requests from kubelets, with the following logic:
 //  1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
 //  2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
-//  3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
+//  3. If a request is for a secret, configmap, persistent volume, resource claim, or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
 //     node <- configmap
 //     node <- pod
 //     node <- pod <- secret
@@ -48,7 +49,13 @@ import (
 //     node <- pod <- pvc
 //     node <- pod <- pvc <- pv
 //     node <- pod <- pvc <- pv <- secret
-//  4. For other resources, authorize all nodes uniformly using statically defined rules
+//     node <- pod <- ResourceClaim
+//  4. If a request is for a resourceslice, then authorize access if there is an
+//     edge from the existing slice object to the node, which is the case if the
+//     existing object has the node in its NodeName field. For create, the access gets
+//     granted because the noderestriction admission plugin checks that the NodeName
+//     is set to the node.
+//  5. For other resources, authorize all nodes uniformly using statically defined rules
 type NodeAuthorizer struct {
 	graph      *Graph
 	identifier nodeidentifier.NodeIdentifier
@@ -72,14 +79,16 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 }
 
 var (
-	configMapResource = api.Resource("configmaps")
-	secretResource    = api.Resource("secrets")
-	pvcResource       = api.Resource("persistentvolumeclaims")
-	pvResource        = api.Resource("persistentvolumes")
-	vaResource        = storageapi.Resource("volumeattachments")
-	svcAcctResource   = api.Resource("serviceaccounts")
-	leaseResource     = coordapi.Resource("leases")
-	csiNodeResource   = storageapi.Resource("csinodes")
+	configMapResource     = api.Resource("configmaps")
+	secretResource        = api.Resource("secrets")
+	resourceSlice         = resourceapi.Resource("resourceslices")
+	pvcResource           = api.Resource("persistentvolumeclaims")
+	pvResource            = api.Resource("persistentvolumes")
+	resourceClaimResource = resourceapi.Resource("resourceclaims")
+	vaResource            = storageapi.Resource("volumeattachments")
+	svcAcctResource       = api.Resource("serviceaccounts")
+	leaseResource         = coordapi.Resource("leases")
+	csiNodeResource       = storageapi.Resource("csinodes")
 )
 
 func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -117,6 +126,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
+		case resourceClaimResource:
+			return r.authorizeGet(nodeName, resourceClaimVertexType, attrs)
 		case vaResource:
 			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
@@ -125,6 +136,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			return r.authorizeLease(nodeName, attrs)
 		case csiNodeResource:
 			return r.authorizeCSINode(nodeName, attrs)
+		case resourceSlice:
+			return r.authorizeResourceSlice(nodeName, attrs)
 		}
 
 	}
@@ -287,6 +300,39 @@ func (r *NodeAuthorizer) authorizeCSINode(nodeName string, attrs authorizer.Attr
 	}
 
 	return authorizer.DecisionAllow, "", nil
+}
+
+// authorizeResourceSlice authorizes node requests to ResourceSlice resource.k8s.io/resourceslices
+func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	if len(attrs.GetSubresource()) > 0 {
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "cannot authorize ResourceSlice subresources", nil
+	}
+
+	// allowed verbs: get, create, update, patch, delete
+	verb := attrs.GetVerb()
+	switch verb {
+	case "get", "create", "update", "patch", "delete":
+		// Okay, but check individual object permission below.
+	case "watch", "list":
+		// Okay. The kubelet is trusted to use a filter for its own objects.
+		return authorizer.DecisionAllow, "", nil
+	default:
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a ResourceSlice", nil
+	}
+
+	// The request must come from a node with the same name as the ResourceSlice.NodeName field.
+	//
+	// For create, the noderestriction admission plugin is performing this check.
+	// Here we don't have access to the content of the new object.
+	if verb == "create" {
+		return authorizer.DecisionAllow, "", nil
+	}
+
+	// For any other verb, checking the existing object must have established that access
+	// is allowed by recording a graph edge.
+	return r.authorize(nodeName, sliceVertexType, attrs)
 }
 
 // hasPathFrom returns true if there is a directed path from the specified type/namespace/name to the specified Node

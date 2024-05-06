@@ -17,6 +17,9 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -28,6 +31,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicy"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST implements a RESTStorage for validatingAdmissionPolicy against etcd
@@ -35,10 +39,16 @@ type REST struct {
 	*genericregistry.Store
 }
 
+// StatusREST implements a RESTStorage for ValidatingAdmissionPolicyStatus
+type StatusREST struct {
+	// DO NOT embed Store, manually select function to export.
+	store *genericregistry.Store
+}
+
 var groupResource = admissionregistration.Resource("validatingadmissionpolicies")
 
-// NewREST returns a RESTStorage object that will work against validatingAdmissionPolicy.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) (*REST, error) {
+// NewREST returns two RESTStorage objects that will work against validatingAdmissionPolicy and its status.
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) (*REST, *StatusREST, error) {
 	r := &REST{}
 	strategy := validatingadmissionpolicy.NewStrategy(authorizer, resourceResolver)
 	store := &genericregistry.Store{
@@ -50,18 +60,24 @@ func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authori
 		DefaultQualifiedResource:  groupResource,
 		SingularQualifiedResource: admissionregistration.Resource("validatingadmissionpolicy"),
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	r.Store = store
-	return r, nil
+	statusStrategy := validatingadmissionpolicy.NewStatusStrategy(strategy)
+	statusStore := *store
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
+	sr := &StatusREST{store: &statusStore}
+	return r, sr, nil
 }
 
 // Implement CategoriesProvider
@@ -70,4 +86,35 @@ var _ rest.CategoriesProvider = &REST{}
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"api-extensions"}
+}
+
+// New generates a new ValidatingAdmissionPolicy object
+func (r *StatusREST) New() runtime.Object {
+	return &admissionregistration.ValidatingAdmissionPolicy{}
+}
+
+// Destroy disposes the store object. For the StatusREST, this is a no-op.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	return r.store.Get(ctx, name, options)
+}
+
+// GetResetFields returns the fields that got reset by the REST endpoint
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
+// ConvertToTable delegates to the store, implements TableConverter
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+// Update alters the status subset of an object. Delegates to the store
+func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate, options)
 }

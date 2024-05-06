@@ -43,9 +43,9 @@ const (
 	csiResizeWaitPeriod = 5 * time.Minute
 )
 
-var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
+var _ = utils.SIGDescribe("PersistentVolumes-expansion", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-expansion")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("loopback local block volume", func() {
 		var (
 			config *localTestConfig
@@ -127,7 +127,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := testVol.pvc.Status.Conditions
-			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 		})
 
 	})
@@ -139,7 +139,7 @@ func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Qu
 	pvToUpdate := pv.DeepCopy()
 
 	var lastError error
-	waitErr := wait.PollImmediateWithContext(ctx, 5*time.Second, csiResizeWaitPeriod, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
 		pvToUpdate, err = c.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
 		if err != nil {
@@ -154,7 +154,7 @@ func UpdatePVSize(ctx context.Context, pv *v1.PersistentVolume, size resource.Qu
 		}
 		return true, nil
 	})
-	if waitErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(waitErr) {
 		return nil, fmt.Errorf("timed out attempting to update PV size. last update error: %v", lastError)
 	}
 	if waitErr != nil {

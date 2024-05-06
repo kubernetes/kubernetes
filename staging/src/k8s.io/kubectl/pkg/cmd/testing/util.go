@@ -195,3 +195,18 @@ func WithAlphaEnvs(features []cmdutil.FeatureGate, t *testing.T, f func(*testing
 	}
 	f(t)
 }
+
+// WithAlphaEnvs calls func f with the given env-var-based feature gates disabled,
+// and then restores the original values of those variables.
+func WithAlphaEnvsDisabled(features []cmdutil.FeatureGate, t *testing.T, f func(*testing.T)) {
+	for _, feature := range features {
+		key := string(feature)
+		if key != "" {
+			oldValue := os.Getenv(key)
+			err := os.Setenv(key, "false")
+			require.NoError(t, err, "unexpected error setting alpha env")
+			defer os.Setenv(key, oldValue)
+		}
+	}
+	f(t)
+}

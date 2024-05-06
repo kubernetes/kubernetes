@@ -20,13 +20,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 )
@@ -34,8 +35,11 @@ import (
 // workqueueKey is the dummy key used to process change in encryption config file.
 const workqueueKey = "key"
 
-// DynamicKMSEncryptionConfigContent which can dynamically handle changes in encryption config file.
-type DynamicKMSEncryptionConfigContent struct {
+// EncryptionConfigFileChangePollDuration is exposed so that integration tests can crank up the reload speed.
+var EncryptionConfigFileChangePollDuration = time.Minute
+
+// DynamicEncryptionConfigContent which can dynamically handle changes in encryption config file.
+type DynamicEncryptionConfigContent struct {
 	name string
 
 	// filePath is the path of the file to read.
@@ -49,6 +53,17 @@ type DynamicKMSEncryptionConfigContent struct {
 
 	// dynamicTransformers updates the transformers when encryption config file changes.
 	dynamicTransformers *encryptionconfig.DynamicTransformers
+
+	// identity of the api server
+	apiServerID string
+
+	// can be swapped during testing
+	getEncryptionConfigHash func(ctx context.Context, filepath string) (string, error)
+	loadEncryptionConfig    func(ctx context.Context, filepath string, reload bool, apiServerID string) (*encryptionconfig.EncryptionConfiguration, error)
+}
+
+func init() {
+	metrics.RegisterMetrics()
 }
 
 // NewDynamicEncryptionConfiguration returns controller that dynamically reacts to changes in encryption config file.
@@ -56,94 +71,73 @@ func NewDynamicEncryptionConfiguration(
 	name, filePath string,
 	dynamicTransformers *encryptionconfig.DynamicTransformers,
 	configContentHash string,
-) *DynamicKMSEncryptionConfigContent {
-	encryptionConfig := &DynamicKMSEncryptionConfigContent{
+	apiServerID string,
+) *DynamicEncryptionConfigContent {
+	return &DynamicEncryptionConfigContent{
 		name:                           name,
 		filePath:                       filePath,
 		lastLoadedEncryptionConfigHash: configContentHash,
 		dynamicTransformers:            dynamicTransformers,
 		queue:                          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), name),
+		apiServerID:                    apiServerID,
+		getEncryptionConfigHash: func(_ context.Context, filepath string) (string, error) {
+			return encryptionconfig.GetEncryptionConfigHash(filepath)
+		},
+		loadEncryptionConfig: encryptionconfig.LoadEncryptionConfig,
 	}
-	encryptionConfig.queue.Add(workqueueKey) // to avoid missing any file changes that occur in between the initial load and Run
-
-	return encryptionConfig
 }
 
-// Run starts the controller and blocks until stopCh is closed.
-func (d *DynamicKMSEncryptionConfigContent) Run(ctx context.Context) {
+// Run starts the controller and blocks until ctx is canceled.
+func (d *DynamicEncryptionConfigContent) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
-	defer d.queue.ShutDown()
 
 	klog.InfoS("Starting controller", "name", d.name)
 	defer klog.InfoS("Shutting down controller", "name", d.name)
 
-	// start worker for processing content
-	go wait.UntilWithContext(ctx, d.runWorker, time.Second)
+	var wg sync.WaitGroup
 
-	// start the loop that watches the encryption config file until stopCh is closed.
-	go wait.UntilWithContext(ctx, func(ctx context.Context) {
-		if err := d.watchEncryptionConfigFile(ctx); err != nil {
-			// if there is an error while setting up or handling the watches, this will ensure that we will process the config file.
-			defer d.queue.Add(workqueueKey)
-			klog.ErrorS(err, "Failed to watch encryption config file, will retry later")
-		}
-	}, time.Second)
+	wg.Add(1)
+	go func() {
+		defer utilruntime.HandleCrash()
+		defer wg.Done()
+		defer d.queue.ShutDown()
+		<-ctx.Done()
+	}()
 
-	<-ctx.Done()
-}
+	wg.Add(1)
+	go func() {
+		defer utilruntime.HandleCrash()
+		defer wg.Done()
+		d.runWorker(ctx)
+	}()
 
-func (d *DynamicKMSEncryptionConfigContent) watchEncryptionConfigFile(ctx context.Context) error {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return fmt.Errorf("error creating fsnotify watcher: %w", err)
-	}
-	defer watcher.Close()
+	// this function polls changes in the encryption config file by placing a dummy key in the queue.
+	// the 'runWorker' function then picks up this dummy key and processes the changes.
+	// the goroutine terminates when 'ctx' is canceled.
+	_ = wait.PollUntilContextCancel(
+		ctx,
+		EncryptionConfigFileChangePollDuration,
+		true,
+		func(ctx context.Context) (bool, error) {
+			// add dummy item to the queue to trigger file content processing.
+			d.queue.Add(workqueueKey)
 
-	if err = watcher.Add(d.filePath); err != nil {
-		return fmt.Errorf("error adding watch for file %s: %w", d.filePath, err)
-	}
+			// return false to continue polling.
+			return false, nil
+		},
+	)
 
-	for {
-		select {
-		case event := <-watcher.Events:
-			if err := d.handleWatchEvent(event, watcher); err != nil {
-				return err
-			}
-		case err := <-watcher.Errors:
-			return fmt.Errorf("received fsnotify error: %w", err)
-		case <-ctx.Done():
-			return nil
-		}
-	}
-}
-
-func (d *DynamicKMSEncryptionConfigContent) handleWatchEvent(event fsnotify.Event, watcher *fsnotify.Watcher) error {
-	// This should be executed after restarting the watch (if applicable) to ensure no file event will be missing.
-	defer d.queue.Add(workqueueKey)
-
-	// return if file has not been removed or renamed.
-	if event.Op&(fsnotify.Remove|fsnotify.Rename) == 0 {
-		return nil
-	}
-
-	if err := watcher.Remove(d.filePath); err != nil {
-		klog.V(2).InfoS("Failed to remove file watch, it may have been deleted", "file", d.filePath, "err", err)
-	}
-	if err := watcher.Add(d.filePath); err != nil {
-		return fmt.Errorf("error adding watch for file %s: %w", d.filePath, err)
-	}
-
-	return nil
+	wg.Wait()
 }
 
 // runWorker to process file content
-func (d *DynamicKMSEncryptionConfigContent) runWorker(ctx context.Context) {
+func (d *DynamicEncryptionConfigContent) runWorker(ctx context.Context) {
 	for d.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem processes file content when there is a message in the queue.
-func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx context.Context) bool {
+func (d *DynamicEncryptionConfigContent) processNextWorkItem(serverCtx context.Context) bool {
 	// key here is dummy item in the queue to trigger file content processing.
 	key, quit := d.queue.Get()
 	if quit {
@@ -151,6 +145,12 @@ func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx contex
 	}
 	defer d.queue.Done(key)
 
+	d.processWorkItem(serverCtx, key)
+
+	return true
+}
+
+func (d *DynamicEncryptionConfigContent) processWorkItem(serverCtx context.Context, workqueueKey interface{}) {
 	var (
 		updatedEffectiveConfig  bool
 		err                     error
@@ -163,37 +163,40 @@ func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx contex
 	ctx, closeTransformers := context.WithCancel(serverCtx)
 
 	defer func() {
-		// TODO: increment success metric when updatedEffectiveConfig=true
-
 		// TODO can work queue metrics help here?
 
 		if !updatedEffectiveConfig {
 			// avoid leaking if we're not using the newly constructed transformers (due to an error or them not being changed)
 			closeTransformers()
 		}
+
+		if updatedEffectiveConfig && err == nil {
+			metrics.RecordEncryptionConfigAutomaticReloadSuccess(d.apiServerID)
+		}
+
 		if err != nil {
-			// TODO: increment failure metric
+			metrics.RecordEncryptionConfigAutomaticReloadFailure(d.apiServerID)
 			utilruntime.HandleError(fmt.Errorf("error processing encryption config file %s: %v", d.filePath, err))
 			// add dummy item back to the queue to trigger file content processing.
-			d.queue.AddRateLimited(key)
+			d.queue.AddRateLimited(workqueueKey)
 		}
 	}()
 
 	encryptionConfiguration, configChanged, err = d.processEncryptionConfig(ctx)
 	if err != nil {
-		return true
+		return
 	}
 	if !configChanged {
-		return true
+		return
 	}
 
 	if len(encryptionConfiguration.HealthChecks) != 1 {
 		err = fmt.Errorf("unexpected number of healthz checks: %d. Should have only one", len(encryptionConfiguration.HealthChecks))
-		return true
+		return
 	}
 	// get healthz checks for all new KMS plugins.
 	if err = d.validateNewTransformersHealth(ctx, encryptionConfiguration.HealthChecks[0], encryptionConfiguration.KMSCloseGracePeriod); err != nil {
-		return true
+		return
 	}
 
 	// update transformers.
@@ -210,30 +213,44 @@ func (d *DynamicKMSEncryptionConfigContent) processNextWorkItem(serverCtx contex
 	klog.V(2).InfoS("Loaded new kms encryption config content", "name", d.name)
 
 	updatedEffectiveConfig = true
-	return true
 }
 
 // loadEncryptionConfig processes the next set of content from the file.
-func (d *DynamicKMSEncryptionConfigContent) processEncryptionConfig(ctx context.Context) (
-	encryptionConfiguration *encryptionconfig.EncryptionConfiguration,
+func (d *DynamicEncryptionConfigContent) processEncryptionConfig(ctx context.Context) (
+	_ *encryptionconfig.EncryptionConfiguration,
 	configChanged bool,
-	err error,
+	_ error,
 ) {
-	// this code path will only execute if reload=true. So passing true explicitly.
-	encryptionConfiguration, err = encryptionconfig.LoadEncryptionConfig(ctx, d.filePath, true)
+	contentHash, err := d.getEncryptionConfigHash(ctx, d.filePath)
 	if err != nil {
 		return nil, false, err
 	}
 
 	// check if encryptionConfig is different from the current. Do nothing if they are the same.
-	if encryptionConfiguration.EncryptionFileContentHash == d.lastLoadedEncryptionConfigHash {
-		klog.V(4).InfoS("Encryption config has not changed", "name", d.name)
+	if contentHash == d.lastLoadedEncryptionConfigHash {
+		klog.V(4).InfoS("Encryption config has not changed (before load)", "name", d.name)
 		return nil, false, nil
 	}
+
+	// this code path will only execute if reload=true. So passing true explicitly.
+	encryptionConfiguration, err := d.loadEncryptionConfig(ctx, d.filePath, true, d.apiServerID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// check if encryptionConfig is different from the current (again to avoid TOCTOU). Do nothing if they are the same.
+	if encryptionConfiguration.EncryptionFileContentHash == d.lastLoadedEncryptionConfigHash {
+		klog.V(4).InfoS("Encryption config has not changed (after load)", "name", d.name)
+		return nil, false, nil
+	}
+
 	return encryptionConfiguration, true, nil
 }
 
-func (d *DynamicKMSEncryptionConfigContent) validateNewTransformersHealth(
+// minKMSPluginCloseGracePeriod can be lowered in unit tests to make the health check poll faster
+var minKMSPluginCloseGracePeriod = 10 * time.Second
+
+func (d *DynamicEncryptionConfigContent) validateNewTransformersHealth(
 	ctx context.Context,
 	kmsPluginHealthzCheck healthz.HealthChecker,
 	kmsPluginCloseGracePeriod time.Duration,
@@ -241,8 +258,8 @@ func (d *DynamicKMSEncryptionConfigContent) validateNewTransformersHealth(
 	// test if new transformers are healthy
 	var healthCheckError error
 
-	if kmsPluginCloseGracePeriod < 10*time.Second {
-		kmsPluginCloseGracePeriod = 10 * time.Second
+	if kmsPluginCloseGracePeriod < minKMSPluginCloseGracePeriod {
+		kmsPluginCloseGracePeriod = minKMSPluginCloseGracePeriod
 	}
 
 	// really make sure that the immediate check does not hang

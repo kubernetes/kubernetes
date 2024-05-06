@@ -52,6 +52,19 @@ const (
 	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
 
+	// DeprecatedAppArmorAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// Deprecated: use a pod or container security context `appArmorProfile` field instead.
+	DeprecatedAppArmorAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
+
+	// DeprecatedAppArmorAnnotationValueRuntimeDefault is the profile specifying the runtime default.
+	DeprecatedAppArmorAnnotationValueRuntimeDefault = "runtime/default"
+
+	// DeprecatedAppArmorAnnotationValueLocalhostPrefix is the prefix for specifying profiles loaded on the node.
+	DeprecatedAppArmorAnnotationValueLocalhostPrefix = "localhost/"
+
+	// DeprecatedAppArmorAnnotationValueUnconfined is the Unconfined AppArmor profile
+	DeprecatedAppArmorAnnotationValueUnconfined = "unconfined"
+
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
@@ -122,8 +135,24 @@ const (
 	// This annotation is beta-level and is only honored when PodDeletionCost feature is enabled.
 	PodDeletionCost = "controller.kubernetes.io/pod-deletion-cost"
 
-	// AnnotationTopologyAwareHints can be used to enable or disable Topology
-	// Aware Hints for a Service. This may be set to "Auto" or "Disabled". Any
-	// other value is treated as "Disabled".
-	AnnotationTopologyAwareHints = "service.kubernetes.io/topology-aware-hints"
+	// DeprecatedAnnotationTopologyAwareHints can be used to enable or disable
+	// Topology Aware Hints for a Service. This may be set to "Auto" or
+	// "Disabled". Any other value is treated as "Disabled". This annotation has
+	// been deprecated in favor of the `service.kubernetes.io/topology-mode`
+	// annotation which also allows "Auto" and "Disabled", but is not limited to
+	// those (it's open ended to provide room for experimentation while we
+	// pursue configuration for topology via specification). When both
+	// `service.kubernetes.io/topology-aware-hints` and
+	// `service.kubernetes.io/topology-mode` annotations are set, the value of
+	// `service.kubernetes.io/topology-aware-hints` has precedence.
+	DeprecatedAnnotationTopologyAwareHints = "service.kubernetes.io/topology-aware-hints"
+
+	// AnnotationTopologyMode can be used to enable or disable Topology Aware
+	// Routing for a Service. Well known values are "Auto" and "Disabled".
+	// Implementations may choose to develop new topology approaches, exposing
+	// them with domain-prefixed values. For example, "example.com/lowest-rtt"
+	// could be a valid implementation-specific value for this annotation. These
+	// heuristics will often populate topology hints on EndpointSlices, but that
+	// is not a requirement.
+	AnnotationTopologyMode = "service.kubernetes.io/topology-mode"
 )

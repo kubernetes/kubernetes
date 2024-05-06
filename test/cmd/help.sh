@@ -47,6 +47,24 @@ run_kubectl_help_tests() {
   kube::test::if_has_string "$(LANG=zh_CN.UTF-8 kubectl uncordon --help)" "标记节点为可调度。"
   kube::test::if_has_string "$(LANG=zh_TW.UTF-8 kubectl uncordon --help)" "Mark node as schedulable."
 
+  # This part of test is to check those commands that have subcommands output the correct usage prompts.
+  # If a new command with subcommands is added, it is best to be added here.
+  # If some refactoring causes the command to become without subcommands, it needs to be removed here to ensure that the test passes.
+
+  kube::test::if_has_string "$(kubectl --help)" "Use \"kubectl <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl apply --help)" "Use \"kubectl apply <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl auth --help)" "Use \"kubectl auth <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl certificate --help)" "Use \"kubectl certificate <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl cluster-info --help)" "Use \"kubectl cluster-info <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl config --help)" "Use \"kubectl config <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl create --help)" "Use \"kubectl create <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl create secret --help)" "Use \"kubectl create secret <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl create service --help)" "Use \"kubectl create service <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl plugin --help)" "Use \"kubectl plugin <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl rollout --help)" "Use \"kubectl rollout <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl set --help)" "Use \"kubectl set <command> --help\" for more information about a given command."
+  kube::test::if_has_string "$(kubectl top --help)" "Use \"kubectl top <command> --help\" for more information about a given command."
+
   set +o nounset
   set +o errexit
 }

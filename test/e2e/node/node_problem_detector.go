@@ -33,6 +33,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -42,14 +43,14 @@ import (
 
 // This test checks if node-problem-detector (NPD) runs fine without error on
 // the up to 10 nodes in the cluster. NPD's functionality is tested in e2e_node tests.
-var _ = SIGDescribe("NodeProblemDetector", func() {
+var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, func() {
 	const (
 		pollInterval      = 1 * time.Second
 		pollTimeout       = 1 * time.Minute
 		maxNodesToProcess = 10
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
@@ -121,14 +122,14 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 				psCmd := "ps aux | grep [n]ode-problem-detector"
 				result, err = e2essh.SSH(ctx, psCmd, host, framework.TestContext.Provider)
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 				ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 				journalctlCmd := "sudo journalctl -r -u node-problem-detector"
 				result, err = e2essh.SSH(ctx, journalctlCmd, host, framework.TestContext.Provider)
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Code).To(gomega.Equal(0))
 				gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
 
 				// We only will check for the KubeletStart even if parsing of date here succeeded.
@@ -136,7 +137,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 				npdStartTimeCommand := "sudo systemctl show --timestamp=utc node-problem-detector -P ActiveEnterTimestamp"
 				result, err = e2essh.SSH(ctx, npdStartTimeCommand, host, framework.TestContext.Provider)
 				framework.ExpectNoError(err)
-				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Code).To(gomega.Equal(0))
 
 				// The time format matches the systemd format.
 				// 'utc': 'Day YYYY-MM-DD HH:MM:SS UTC (see https://www.freedesktop.org/software/systemd/man/systemd.time.html)
@@ -157,35 +158,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
 			result, err = e2essh.SSH(ctx, injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(result.Code, 0)
-		}
-
-		ginkgo.By("Check node-problem-detector can post conditions and events to API server")
-		for _, node := range nodes {
-			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KernelDeadlock condition on node %q", node.Name))
-			gomega.Eventually(ctx, func() error {
-				return verifyNodeCondition(ctx, f, "KernelDeadlock", v1.ConditionTrue, "DockerHung", node.Name)
-			}, pollTimeout, pollInterval).Should(gomega.Succeed())
-
-			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted DockerHung event on node %q", node.Name))
-			eventListOptions := metav1.ListOptions{FieldSelector: fields.Set{"involvedObject.kind": "Node"}.AsSelector().String()}
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				return verifyEvents(ctx, f, eventListOptions, 1, "DockerHung", node.Name)
-			}, pollTimeout, pollInterval).Should(gomega.Succeed())
-
-			if checkForKubeletStart {
-				// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
-				// Since Kubelet may be restarted for a few times after node is booted. We just check the event
-				// is detected, but do not check how many times Kubelet is started.
-				//
-				// Some test suites run for hours and KubeletStart event will already be cleaned up
-				ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KubeletStart event on node %q", node.Name))
-				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return verifyEventExists(ctx, f, eventListOptions, "KubeletStart", node.Name)
-				}, pollTimeout, pollInterval).Should(gomega.Succeed())
-			} else {
-				ginkgo.By("KubeletStart event will NOT be checked")
-			}
+			gomega.Expect(result.Code).To(gomega.Equal(0))
 		}
 
 		ginkgo.By("Gather node-problem-detector cpu and memory stats")
@@ -236,6 +209,35 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 				workingSetStats[host][0], workingSetStats[host][len(workingSetStats[host])/2], workingSetStats[host][len(workingSetStats[host])-1])
 		}
 		framework.Logf("Node-Problem-Detector CPU and Memory Stats:\n\t%s\n\t%s\n\t%s", cpuStatsMsg, rssStatsMsg, workingSetStatsMsg)
+
+		ginkgo.By("Check node-problem-detector can post conditions and events to API server")
+		for _, node := range nodes {
+			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KernelDeadlock condition on node %q", node.Name))
+			gomega.Eventually(ctx, func() error {
+				return verifyNodeCondition(ctx, f, "KernelDeadlock", v1.ConditionTrue, "DockerHung", node.Name)
+			}, pollTimeout, pollInterval).Should(gomega.Succeed())
+
+			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted DockerHung event on node %q", node.Name))
+			eventListOptions := metav1.ListOptions{FieldSelector: fields.Set{"involvedObject.kind": "Node"}.AsSelector().String()}
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return verifyEvents(ctx, f, eventListOptions, 1, "DockerHung", node.Name)
+			}, pollTimeout, pollInterval).Should(gomega.Succeed())
+
+			if checkForKubeletStart {
+				// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
+				// Since Kubelet may be restarted for a few times after node is booted. We just check the event
+				// is detected, but do not check how many times Kubelet is started.
+				//
+				// Some test suites run for hours and KubeletStart event will already be cleaned up
+				ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KubeletStart event on node %q", node.Name))
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return verifyEventExists(ctx, f, eventListOptions, "KubeletStart", node.Name)
+				}, pollTimeout, pollInterval).Should(gomega.Succeed())
+			} else {
+				ginkgo.By("KubeletStart event will NOT be checked")
+			}
+		}
+
 	})
 })
 
@@ -297,7 +299,7 @@ func getMemoryStat(ctx context.Context, f *framework.Framework, host string) (rs
 
 	result, err := e2essh.SSH(ctx, memCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
 
 	memoryUsage, err := strconv.ParseFloat(lines[0], 64)
@@ -351,7 +353,7 @@ func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage
 
 	result, err := e2essh.SSH(ctx, cpuCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	gomega.Expect(result.Code).To(gomega.Equal(0))
 	lines := strings.Split(result.Stdout, "\n")
 
 	usage, err = strconv.ParseFloat(lines[0], 64)
@@ -367,7 +369,7 @@ func getCPUStat(ctx context.Context, f *framework.Framework, host string) (usage
 func isHostRunningCgroupV2(ctx context.Context, f *framework.Framework, host string) bool {
 	result, err := e2essh.SSH(ctx, "stat -fc %T /sys/fs/cgroup/", host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(result.Code, 0)
+	gomega.Expect(result.Code).To(gomega.Equal(0))
 
 	// 0x63677270 == CGROUP2_SUPER_MAGIC
 	// https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
@@ -380,12 +382,20 @@ func getNpdPodStat(ctx context.Context, f *framework.Framework, nodeName string)
 
 	hasNpdPod := false
 	for _, pod := range summary.Pods {
-		if !strings.HasPrefix(pod.PodRef.Name, "npd") {
+		if !strings.HasPrefix(pod.PodRef.Name, "node-problem-detector") {
 			continue
 		}
-		cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
-		rss = float64(*pod.Memory.RSSBytes) / 1024 / 1024
-		workingSet = float64(*pod.Memory.WorkingSetBytes) / 1024 / 1024
+		if pod.CPU != nil && pod.CPU.UsageNanoCores != nil {
+			cpuUsage = float64(*pod.CPU.UsageNanoCores) * 1e-9
+		}
+		if pod.Memory != nil {
+			if pod.Memory.RSSBytes != nil {
+				rss = float64(*pod.Memory.RSSBytes) / 1024 / 1024
+			}
+			if pod.Memory.WorkingSetBytes != nil {
+				workingSet = float64(*pod.Memory.WorkingSetBytes) / 1024 / 1024
+			}
+		}
 		hasNpdPod = true
 		break
 	}

@@ -99,7 +99,7 @@ spec:
             cpu: {{hollow_proxy_millicpu}}m
             memory: {{hollow_proxy_mem_Ki}}Ki
       - name: hollow-node-problem-detector
-        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.9
+        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.16
         env:
         - name: NODE_NAME
           valueFrom:

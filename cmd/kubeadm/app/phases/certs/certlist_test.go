@@ -21,12 +21,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -188,12 +189,12 @@ func TestCreateCertificateChain(t *testing.T) {
 		t.Fatalf("unexpected error getting tree: %v", err)
 	}
 
-	if certTree.CreateTree(ic); err != nil {
+	if err := certTree.CreateTree(ic); err != nil {
 		t.Fatal(err)
 	}
 
-	caCert, _ := parseCertAndKey(path.Join(dir, "test-ca"), t)
-	daughterCert, _ := parseCertAndKey(path.Join(dir, "test-daughter"), t)
+	caCert, _ := parseCertAndKey(filepath.Join(dir, "test-ca"), t)
+	daughterCert, _ := parseCertAndKey(filepath.Join(dir, "test-daughter"), t)
 
 	pool := x509.NewCertPool()
 	pool.AddCert(caCert)
@@ -221,4 +222,82 @@ func parseCertAndKey(basePath string, t *testing.T) (*x509.Certificate, crypto.P
 	}
 
 	return parsedCert, certPair.PrivateKey
+}
+
+func TestCreateKeyAndCSR(t *testing.T) {
+	dir, err := os.MkdirTemp("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	validKubeadmConfig := &kubeadmapi.InitConfiguration{
+		NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+			Name: "test-node",
+		},
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: dir,
+		},
+	}
+	validKubeadmCert := &KubeadmCert{
+		Name:     "ca",
+		LongName: "self-signed Kubernetes CA to provision identities for other Kubernetes components",
+		BaseName: kubeadmconstants.CACertAndKeyBaseName,
+		config: pkiutil.CertConfig{
+			Config: certutil.Config{
+				CommonName: "kubernetes",
+			},
+		},
+	}
+
+	type args struct {
+		kubeadmConfig *kubeadmapi.InitConfiguration
+		cert          *KubeadmCert
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantErr    bool
+		createfile bool
+	}{
+		{
+			name: "kubeadmConfig is nil",
+			args: args{
+				kubeadmConfig: nil,
+				cert:          validKubeadmCert,
+			},
+			wantErr: true,
+		},
+		{
+			name: "cert is nil",
+			args: args{
+				kubeadmConfig: validKubeadmConfig,
+				cert:          nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "key and CSR do not exist",
+			args: args{
+				kubeadmConfig: validKubeadmConfig,
+				cert:          validKubeadmCert,
+			},
+			wantErr: false,
+		},
+		{
+			name: "key or CSR already exist",
+			args: args{
+				kubeadmConfig: validKubeadmConfig,
+				cert:          validKubeadmCert,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := createKeyAndCSR(tt.args.kubeadmConfig, tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("createKeyAndCSR() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

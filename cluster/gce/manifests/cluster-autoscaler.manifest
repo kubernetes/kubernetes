@@ -11,6 +11,9 @@
     },
     "spec": {
         "securityContext": {
+            {{runAsUser}}
+            {{runAsGroup}}
+            {{supplementalGroups}}
             "seccompProfile": {
                 "type": "RuntimeDefault"
             }
@@ -19,7 +22,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "registry.k8s.io/autoscaling/cluster-autoscaler:v1.22.0",
+                "image": "registry.k8s.io/autoscaling/cluster-autoscaler:v1.26.1",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",

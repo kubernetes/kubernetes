@@ -25,26 +25,6 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
 
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
-
-kube::util::ensure_clean_working_dir
-
-_tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
-git worktree add -f -q "${_tmpdir}" HEAD
-kube::util::trap_add "git worktree remove -f ${_tmpdir}" EXIT
-cd "${_tmpdir}"
-
-# Update the mocks in ${_tmpdir}
-hack/update-mocks.sh
-
-# Test for diffs
-diffs=$(git status --porcelain | wc -l)
-if [[ ${diffs} -gt 0 ]]; then
-  echo "Mock files are out of date" >&2
-  git diff
-  echo "Please run 'hack/update-mocks.sh'" >&2
-  exit 1
-fi
+kube::verify::generated "Mock files are out of date" "Please run 'hack/update-mocks.sh'" hack/update-mocks.sh

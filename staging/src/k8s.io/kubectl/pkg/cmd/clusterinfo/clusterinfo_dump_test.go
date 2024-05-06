@@ -18,10 +18,10 @@ package clusterinfo
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
@@ -41,7 +41,7 @@ func TestSetupOutputWriterNoOp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, buf, _ := genericclioptions.NewTestIOStreams()
+			_, _, buf, _ := genericiooptions.NewTestIOStreams()
 			f := cmdtesting.NewTestFactory()
 			defer f.Cleanup()
 
@@ -60,10 +60,10 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	fullPath := path.Join(dir, file) + extension
+	fullPath := filepath.Join(dir, file) + extension
 	defer os.RemoveAll(dir)
 
-	_, _, buf, _ := genericclioptions.NewTestIOStreams()
+	_, _, buf, _ := genericiooptions.NewTestIOStreams()
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()
 

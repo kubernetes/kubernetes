@@ -32,6 +32,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/websocket"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
@@ -397,7 +397,7 @@ func TestWatchRead(t *testing.T) {
 						t.Fatalf("%s: Decode error: %v", name, err)
 					}
 					if e, a := object, gotObj; !apiequality.Semantic.DeepEqual(e, a) {
-						t.Errorf("%s: different: %s", name, diff.ObjectDiff(e, a))
+						t.Errorf("%s: different: %s", name, cmp.Diff(e, a))
 					}
 				}
 				w.Stop()
@@ -612,7 +612,7 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 }
 
 // serveWatch will serve a watch response according to the watcher and watchServer.
-// Before watchServer.ServeHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
+// Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
 func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preServeErr error) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer watcher.Stop()
@@ -622,7 +622,7 @@ func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preS
 			return
 		}
 
-		watchServer.ServeHTTP(w, req)
+		watchServer.HandleHTTP(w, req)
 	}
 }
 
@@ -647,7 +647,6 @@ func TestWatchHTTPErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
@@ -712,7 +711,6 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
@@ -771,7 +769,6 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 
@@ -814,7 +811,6 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
 	}
 

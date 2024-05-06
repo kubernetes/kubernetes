@@ -29,14 +29,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should be sent by kubelets and the scheduler about pods scheduling and running ", func(ctx context.Context) {
 
@@ -57,7 +59,7 @@ var _ = SIGDescribe("Events", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "p",
-						Image: framework.ServeHostnameImage,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Args:  []string{"serve-hostname"},
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					},
@@ -81,7 +83,7 @@ var _ = SIGDescribe("Events", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(ctx, options)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 		ginkgo.By("retrieving the pod")
 		podWithUID, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})

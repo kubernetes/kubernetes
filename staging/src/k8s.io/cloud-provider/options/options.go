@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -38,6 +39,7 @@ import (
 	ccmconfig "k8s.io/cloud-provider/config"
 	ccmconfigscheme "k8s.io/cloud-provider/config/install"
 	ccmconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
+	"k8s.io/cloud-provider/names"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
@@ -65,12 +67,32 @@ type CloudControllerManagerOptions struct {
 
 	Master string
 
+	WebhookServing *WebhookServingOptions
+	Webhook        *WebhookOptions
+
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
 }
 
+// ProviderDefaults are provided by the consumer when calling
+// NewCloudControllerManagerOptions(), so that they can customize certain flag
+// default values.
+type ProviderDefaults struct {
+	// WebhookBindAddress is the default address.  It can be overridden by "--webhook-bind-address".
+	WebhookBindAddress *net.IP
+	// WebhookBindPort is the default port.  It can be overridden by "--webhook-bind-port".
+	WebhookBindPort *int
+}
+
 // NewCloudControllerManagerOptions creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) {
+	return NewCloudControllerManagerOptionsWithProviderDefaults(ProviderDefaults{})
+}
+
+// NewCloudControllerManagerOptionsWithProviderDefaults creates a new
+// ExternalCMServer with a default config, but allows the cloud provider to
+// override a select number of default option values.
+func NewCloudControllerManagerOptionsWithProviderDefaults(defaults ProviderDefaults) (*CloudControllerManagerOptions, error) {
 	componentConfig, err := NewDefaultComponentConfig()
 	if err != nil {
 		return nil, err
@@ -86,6 +108,8 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 			ServiceControllerConfiguration: &componentConfig.ServiceController,
 		},
 		SecureServing:             apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		Webhook:                   NewWebhookOptions(),
+		WebhookServing:            NewWebhookServingOptions(defaults),
 		Authentication:            apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:             apiserveroptions.NewDelegatingAuthorizationOptions(),
 		NodeStatusUpdateFrequency: componentConfig.NodeStatusUpdateFrequency,
@@ -119,12 +143,18 @@ func NewDefaultComponentConfig() (*ccmconfig.CloudControllerManagerConfiguration
 }
 
 // Flags returns flags for a specific CloudController by section name
-func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
+func (o *CloudControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
-	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
+	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
 	o.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
-	o.NodeController.AddFlags(fss.FlagSet("node controller"))
-	o.ServiceController.AddFlags(fss.FlagSet("service controller"))
+	o.NodeController.AddFlags(fss.FlagSet(names.CloudNodeController))
+	o.ServiceController.AddFlags(fss.FlagSet(names.ServiceLBController))
+	if o.Webhook != nil {
+		o.Webhook.AddFlags(fss.FlagSet("webhook"), allWebhooks, disabledByDefaultWebhooks)
+	}
+	if o.WebhookServing != nil {
+		o.WebhookServing.AddFlags(fss.FlagSet("webhook serving"))
+	}
 
 	o.SecureServing.AddFlags(fss.FlagSet("secure serving"))
 	o.Authentication.AddFlags(fss.FlagSet("authentication"))
@@ -134,14 +164,13 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&o.Generic.ClientConnection.Kubeconfig, "kubeconfig", o.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
 	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
-
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
 }
 
 // ApplyTo fills up cloud controller manager config with options.
-func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent string) error {
+func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, userAgent string) error {
 	var err error
 
 	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
@@ -157,7 +186,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
 	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
 
-	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
+	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return err
 	}
 	if err = o.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
@@ -165,6 +194,16 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 	}
 	if err = o.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
 		return err
+	}
+	if o.Webhook != nil {
+		if err = o.Webhook.ApplyTo(&c.ComponentConfig.Webhook); err != nil {
+			return err
+		}
+	}
+	if o.WebhookServing != nil {
+		if err = o.WebhookServing.ApplyTo(&c.WebhookSecureServing); err != nil {
+			return err
+		}
 	}
 	if err = o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
@@ -183,7 +222,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 		return err
 	}
 
-	c.EventBroadcaster = record.NewBroadcaster()
+	c.EventBroadcaster = record.NewBroadcaster(record.WithContext(context.TODO())) // TODO: move broadcaster construction to a place where there is a proper context.
 	c.EventRecorder = c.EventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: userAgent})
 
 	rootClientBuilder := clientbuilder.SimpleControllerClientBuilder{
@@ -209,16 +248,26 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 }
 
 // Validate is used to validate config before launching the cloud controller manager
-func (o *CloudControllerManagerOptions) Validate(allControllers, disabledByDefaultControllers []string) error {
+func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) error {
 	errors := []error{}
 
-	errors = append(errors, o.Generic.Validate(allControllers, disabledByDefaultControllers)...)
+	errors = append(errors, o.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
 	errors = append(errors, o.KubeCloudShared.Validate()...)
 	errors = append(errors, o.ServiceController.Validate()...)
 	errors = append(errors, o.SecureServing.Validate()...)
 	errors = append(errors, o.Authentication.Validate()...)
 	errors = append(errors, o.Authorization.Validate()...)
 
+	if o.Webhook != nil {
+		errors = append(errors, o.Webhook.Validate(allWebhooks, disabledByDefaultWebhooks)...)
+	}
+	if o.WebhookServing != nil {
+		errors = append(errors, o.WebhookServing.Validate()...)
+
+		if o.WebhookServing.BindPort == o.SecureServing.BindPort && o.WebhookServing.BindPort != 0 {
+			errors = append(errors, fmt.Errorf("--webhook-secure-port cannot be the same value as --secure-port"))
+		}
+	}
 	if len(o.KubeCloudShared.CloudProvider.Name) == 0 {
 		errors = append(errors, fmt.Errorf("--cloud-provider cannot be empty"))
 	}
@@ -235,8 +284,8 @@ func resyncPeriod(c *config.Config) func() time.Duration {
 }
 
 // Config return a cloud controller manager config objective
-func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefaultControllers []string) (*config.Config, error) {
-	if err := o.Validate(allControllers, disabledByDefaultControllers); err != nil {
+func (o *CloudControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) (*config.Config, error) {
+	if err := o.Validate(allControllers, disabledByDefaultControllers, controllerAliases, allWebhooks, disabledByDefaultWebhooks); err != nil {
 		return nil, err
 	}
 
@@ -244,8 +293,14 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
+	if o.WebhookServing != nil {
+		if err := o.WebhookServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
+			return nil, fmt.Errorf("error creating self-signed certificates for webhook: %v", err)
+		}
+	}
+
 	c := &config.Config{}
-	if err := o.ApplyTo(c, CloudControllerManagerUserAgent); err != nil {
+	if err := o.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases, CloudControllerManagerUserAgent); err != nil {
 		return nil, err
 	}
 

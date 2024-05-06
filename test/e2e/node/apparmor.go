@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -31,7 +32,7 @@ import (
 
 var _ = SIGDescribe("AppArmor", func() {
 	f := framework.NewDefaultFramework("apparmor")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("load AppArmor profiles", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
@@ -45,12 +46,38 @@ var _ = SIGDescribe("AppArmor", func() {
 			e2ekubectl.LogFailedContainers(ctx, f.ClientSet, f.Namespace.Name, framework.Logf)
 		})
 
-		ginkgo.It("should enforce an AppArmor profile", func(ctx context.Context) {
-			e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, true)
+		ginkgo.It("should enforce an AppArmor profile specified on the pod", func(ctx context.Context) {
+			pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, true)
+			e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), true)
+		})
+
+		ginkgo.It("should enforce an AppArmor profile specified on the container", func(ctx context.Context) {
+			pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, true)
+			// Move AppArmor profile to the container.
+			pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+				AppArmorProfile: pod.Spec.SecurityContext.AppArmorProfile,
+			}
+			pod.Spec.SecurityContext = nil
+
+			e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), true)
+		})
+
+		ginkgo.It("should enforce an AppArmor profile specified in annotations", func(ctx context.Context) {
+			pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, true)
+			// Move AppArmor profile to the annotations.
+			profile := pod.Spec.SecurityContext.AppArmorProfile
+			key := v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + pod.Spec.Containers[0].Name
+			pod.Annotations = map[string]string{
+				key: v1.DeprecatedAppArmorBetaProfileNamePrefix + *profile.LocalhostProfile,
+			}
+			pod.Spec.SecurityContext = nil
+
+			e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), true)
 		})
 
 		ginkgo.It("can disable an AppArmor profile, using unconfined", func(ctx context.Context) {
-			e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), true, true)
+			pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, true, true)
+			e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), true)
 		})
 	})
 })

@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type EvictionLister interface {
 
 // evictionLister implements the EvictionLister interface.
 type evictionLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.Eviction]
 }
 
 // NewEvictionLister returns a new EvictionLister.
 func NewEvictionLister(indexer cache.Indexer) EvictionLister {
-	return &evictionLister{indexer: indexer}
-}
-
-// List lists all Evictions in the indexer.
-func (s *evictionLister) List(selector labels.Selector) (ret []*v1.Eviction, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Eviction))
-	})
-	return ret, err
+	return &evictionLister{listers.New[*v1.Eviction](indexer, v1.Resource("eviction"))}
 }
 
 // Evictions returns an object that can list and get Evictions.
 func (s *evictionLister) Evictions(namespace string) EvictionNamespaceLister {
-	return evictionNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return evictionNamespaceLister{listers.NewNamespaced[*v1.Eviction](s.ResourceIndexer, namespace)}
 }
 
 // EvictionNamespaceLister helps list and get Evictions.
@@ -74,26 +66,5 @@ type EvictionNamespaceLister interface {
 // evictionNamespaceLister implements the EvictionNamespaceLister
 // interface.
 type evictionNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Evictions in the indexer for a given namespace.
-func (s evictionNamespaceLister) List(selector labels.Selector) (ret []*v1.Eviction, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Eviction))
-	})
-	return ret, err
-}
-
-// Get retrieves the Eviction from the indexer for a given namespace and name.
-func (s evictionNamespaceLister) Get(name string) (*v1.Eviction, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("eviction"), name)
-	}
-	return obj.(*v1.Eviction), nil
+	listers.ResourceIndexer[*v1.Eviction]
 }

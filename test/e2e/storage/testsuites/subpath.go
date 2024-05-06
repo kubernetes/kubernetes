@@ -54,7 +54,6 @@ var (
 	probeFilePath   = probeVolumePath + "/probe-file"
 	fileName        = "test-file"
 	retryDuration   = 20
-	mountImage      = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 type subPathTestSuite struct {
@@ -117,7 +116,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("provisioning", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		l = local{}
@@ -155,7 +154,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		}
 
 		subPath := f.Namespace.Name
-		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, true)
+		l.pod = SubpathTestPod(f, subPath, string(volType), l.resource.VolSource, admissionapi.LevelPrivileged)
 		e2epod.SetNodeSelection(&l.pod.Spec, l.config.ClientNodeSelection)
 
 		l.formatPod = volumeFormatPod(f, l.resource.VolSource)
@@ -237,7 +236,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		TestBasicSubpath(ctx, f, f.Namespace.Name, l.pod)
 	})
 
-	ginkgo.It("should fail if subpath directory is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if subpath directory is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -253,7 +252,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	ginkgo.It("should fail if subpath file is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if subpath file is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -264,7 +263,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	ginkgo.It("should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if non-existent subpath is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -275,7 +274,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	ginkgo.It("should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]", func(ctx context.Context) {
+	f.It("should fail if subpath with backstepping is outside the volume", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -291,7 +290,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodFailSubpath(ctx, f, l.pod, false)
 	})
 
-	ginkgo.It("should support creating multiple subpath from same volumes [Slow]", func(ctx context.Context) {
+	f.It("should support creating multiple subpath from same volumes", f.WithSlow(), func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -317,7 +316,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testMultipleReads(ctx, f, l.pod, 0, filepath1, filepath2)
 	})
 
-	ginkgo.It("should support restarting containers using directory as subpath [Slow]", func(ctx context.Context) {
+	f.It("should support restarting containers using directory as subpath", f.WithSlow(), func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -328,7 +327,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodContainerRestart(ctx, f, l.pod)
 	})
 
-	ginkgo.It("should support restarting containers using file as subpath [Slow][LinuxOnly]", func(ctx context.Context) {
+	f.It("should support restarting containers using file as subpath", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
@@ -338,7 +337,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testPodContainerRestart(ctx, f, l.pod)
 	})
 
-	ginkgo.It("should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func(ctx context.Context) {
+	f.It("should unmount if pod is gracefully deleted while kubelet is down", f.WithDisruptive(), f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
@@ -351,7 +350,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testSubpathReconstruction(ctx, f, l.hostExec, l.pod, false)
 	})
 
-	ginkgo.It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func(ctx context.Context) {
+	f.It("should unmount if pod is force deleted while kubelet is down", f.WithDisruptive(), f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
@@ -422,7 +421,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		testReadFile(ctx, f, l.filePathInSubpath, l.pod, 0)
 	})
 
-	ginkgo.It("should verify container cannot write to subpath readonly volumes [Slow]", func(ctx context.Context) {
+	f.It("should verify container cannot write to subpath readonly volumes", f.WithSlow(), func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 		if l.roVolSource == nil {
@@ -509,7 +508,7 @@ func generateSuffixForPodName(s string) string {
 }
 
 // SubpathTestPod returns a pod spec for subpath tests
-func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource, privilegedSecurityContext bool) *v1.Pod {
+func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource, securityLevel admissionapi.Level) *v1.Pod {
 	var (
 		suffix          = generateSuffixForPodName(volumeType)
 		gracePeriod     = int64(1)
@@ -524,19 +523,19 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 	initSubpathContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-init-subpath-%s", suffix),
 		[]v1.VolumeMount{volumeSubpathMount, probeMount}, nil, "mounttest")
-	initSubpathContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
+	initSubpathContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(securityLevel)
 	initVolumeContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-init-volume-%s", suffix),
 		[]v1.VolumeMount{volumeMount, probeMount}, nil, "mounttest")
-	initVolumeContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
+	initVolumeContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(securityLevel)
 	subpathContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-container-subpath-%s", suffix),
 		[]v1.VolumeMount{volumeSubpathMount, probeMount}, nil, "mounttest")
-	subpathContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
+	subpathContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(securityLevel)
 	volumeContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-container-volume-%s", suffix),
 		[]v1.VolumeMount{volumeMount, probeMount}, nil, "mounttest")
-	volumeContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
+	volumeContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(securityLevel)
 
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -549,7 +548,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 					Name:            fmt.Sprintf("init-volume-%s", suffix),
 					Image:           e2epod.GetDefaultTestImage(),
 					VolumeMounts:    []v1.VolumeMount{volumeMount, probeMount},
-					SecurityContext: e2epod.GenerateContainerSecurityContext(privilegedSecurityContext),
+					SecurityContext: e2epod.GenerateContainerSecurityContext(securityLevel),
 				},
 				initSubpathContainer,
 				initVolumeContainer,
@@ -578,8 +577,8 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 }
 
 func containerIsUnused(container *v1.Container) bool {
-	// mountImage with nil command and nil Args or with just "mounttest" as Args does nothing. Leave everything else
-	return container.Image == mountImage && container.Command == nil &&
+	// agnhost image with nil command and nil Args or with just "mounttest" as Args does nothing. Leave everything else
+	return container.Image == imageutils.GetE2EImage(imageutils.Agnhost) && container.Command == nil &&
 		(container.Args == nil || (len(container.Args) == 1 && container.Args[0] == "mounttest"))
 }
 
@@ -927,7 +926,7 @@ func TestPodContainerRestartWithConfigmapModified(ctx context.Context, f *framew
 		subpath = k
 		break
 	}
-	pod := SubpathTestPod(f, subpath, "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: original.Name}}}, false)
+	pod := SubpathTestPod(f, subpath, "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: original.Name}}}, admissionapi.LevelBaseline)
 	pod.Spec.InitContainers[0].Command = e2epod.GenerateScriptCmd(fmt.Sprintf("touch %v", probeFilePath))
 
 	modifiedValue := modified.Data[subpath]
@@ -998,7 +997,7 @@ func testSubpathReconstruction(ctx context.Context, f *framework.Framework, host
 			podNode = &nodeList.Items[i]
 		}
 	}
-	framework.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
+	gomega.Expect(podNode).ToNot(gomega.BeNil(), "pod node should exist in schedulable nodes")
 
 	storageutils.TestVolumeUnmountsFromDeletedPodWithForceOption(ctx, f.ClientSet, f, pod, forceDelete, true, nil, volumePath)
 

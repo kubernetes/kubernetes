@@ -70,6 +70,10 @@ type ServerStorageVersion struct {
 	// The API server can decode objects encoded in these versions.
 	// The encodingVersion must be included in the decodableVersions.
 	DecodableVersions []string
+
+	// The API server can serve these versions.
+	// DecodableVersions must include all ServedVersions.
+	ServedVersions []string
 }
 
 // StorageVersionConditionType Indicates the storage version condition type
@@ -104,7 +108,6 @@ type StorageVersionCondition struct {
 	// +optional
 	ObservedGeneration int64
 	// Last time the condition transitioned from one status to another.
-	// +required
 	LastTransitionTime metav1.Time
 	// The reason for the condition's last transition.
 	// +required

@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -72,8 +72,8 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 	})
 	defer apiServer.Cleanup()
@@ -169,28 +169,37 @@ func TestEtcdStoragePath(t *testing.T) {
 				fixtureFilenameGroup = "core"
 			}
 			// find all versions of this group/kind in all versions of the serialization fixture testdata
-			previousReleaseGroupKindFiles, err := filepath.Glob("../../../staging/src/k8s.io/api/testdata/*/" + fixtureFilenameGroup + ".*." + expectedGVK.Kind + ".yaml")
+			releaseGroupKindFiles, err := filepath.Glob("../../../staging/src/k8s.io/api/testdata/*/" + fixtureFilenameGroup + ".*." + expectedGVK.Kind + ".yaml")
 			if err != nil {
 				t.Error(err)
 			}
-			if len(previousReleaseGroupKindFiles) == 0 && !allowMissingTestdataFixtures[expectedGVK] {
+			if len(releaseGroupKindFiles) == 0 && !allowMissingTestdataFixtures[expectedGVK] {
 				// We should at least find the HEAD fixtures
 				t.Errorf("No testdata serialization files found for %#v, cannot determine if previous releases could read this group/kind. Add this group-version to k8s.io/api/roundtrip_test.go", expectedGVK)
 			}
-			// find non-alpha versions of this group/kind understood by previous releases
+
+			// find non-alpha versions of this group/kind understood by current and previous releases
+			currentNonAlphaVersions := sets.NewString()
 			previousNonAlphaVersions := sets.NewString()
-			for _, previousReleaseGroupKindFile := range previousReleaseGroupKindFiles {
-				if serverVersion := filepath.Base(filepath.Dir(previousReleaseGroupKindFile)); serverVersion == "HEAD" {
-					continue
-				}
+			for _, previousReleaseGroupKindFile := range releaseGroupKindFiles {
 				parts := strings.Split(filepath.Base(previousReleaseGroupKindFile), ".")
 				version := parts[len(parts)-3]
 				if !strings.Contains(version, "alpha") {
-					previousNonAlphaVersions.Insert(version)
+					if serverVersion := filepath.Base(filepath.Dir(previousReleaseGroupKindFile)); serverVersion == "HEAD" {
+						currentNonAlphaVersions.Insert(version)
+					} else {
+						previousNonAlphaVersions.Insert(version)
+					}
 				}
 			}
-			if len(previousNonAlphaVersions) > 0 && !previousNonAlphaVersions.Has(expectedGVK.Version) {
-				t.Errorf("Previous releases understand non-alpha versions %q, but do not understand the expected current storage version %q. "+
+			if len(currentNonAlphaVersions) > 0 && strings.Contains(expectedGVK.Version, "alpha") {
+				t.Errorf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
+					currentNonAlphaVersions.List(),
+					expectedGVK.Version,
+				)
+			}
+			if !strings.Contains(expectedGVK.Version, "alpha") && len(previousNonAlphaVersions) > 0 && !previousNonAlphaVersions.Has(expectedGVK.Version) {
+				t.Errorf("Previous releases understand non-alpha versions %q, but do not understand the expected current non-alpha storage version %q. "+
 					"This means a current server will store data in etcd that is not understood by a previous version.",
 					previousNonAlphaVersions.List(),
 					expectedGVK.Version,
@@ -203,7 +212,7 @@ func TestEtcdStoragePath(t *testing.T) {
 			}
 
 			if !apiequality.Semantic.DeepDerivative(input, output) {
-				t.Errorf("Test stub for %s does not match: %s", kind, diff.ObjectGoPrintDiff(input, output))
+				t.Errorf("Test stub for %s does not match: %s", kind, cmp.Diff(input, output))
 			}
 
 			addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.ExpectedEtcdPath))

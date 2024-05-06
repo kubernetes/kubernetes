@@ -46,16 +46,16 @@ var (
 // e.g. Streaming data issues from the runtime or the runtime does not implement the
 // container events stream.
 func isEventedPLEGInUse() bool {
-	eventedPLEGUsageMu.Lock()
-	defer eventedPLEGUsageMu.Unlock()
+	eventedPLEGUsageMu.RLock()
+	defer eventedPLEGUsageMu.RUnlock()
 	return eventedPLEGUsage
 }
 
 // setEventedPLEGUsage should only be accessed from
 // Start/Stop of Evented PLEG.
 func setEventedPLEGUsage(enable bool) {
-	eventedPLEGUsageMu.RLock()
-	defer eventedPLEGUsageMu.RUnlock()
+	eventedPLEGUsageMu.Lock()
+	defer eventedPLEGUsageMu.Unlock()
 	eventedPLEGUsage = enable
 }
 
@@ -71,7 +71,7 @@ type EventedPLEG struct {
 	// For testability.
 	clock clock.Clock
 	// GenericPLEG is used to force relist when required.
-	genericPleg PodLifecycleEventGenerator
+	genericPleg podLifecycleEventGeneratorHandler
 	// The maximum number of retries when getting container events from the runtime.
 	eventedPlegMaxStreamRetries int
 	// Indicates relisting related parameters
@@ -87,17 +87,21 @@ type EventedPLEG struct {
 // NewEventedPLEG instantiates a new EventedPLEG object and return it.
 func NewEventedPLEG(runtime kubecontainer.Runtime, runtimeService internalapi.RuntimeService, eventChannel chan *PodLifecycleEvent,
 	cache kubecontainer.Cache, genericPleg PodLifecycleEventGenerator, eventedPlegMaxStreamRetries int,
-	relistDuration *RelistDuration, clock clock.Clock) PodLifecycleEventGenerator {
+	relistDuration *RelistDuration, clock clock.Clock) (PodLifecycleEventGenerator, error) {
+	handler, ok := genericPleg.(podLifecycleEventGeneratorHandler)
+	if !ok {
+		return nil, fmt.Errorf("%v doesn't implement podLifecycleEventGeneratorHandler interface", genericPleg)
+	}
 	return &EventedPLEG{
 		runtime:                     runtime,
 		runtimeService:              runtimeService,
 		eventChannel:                eventChannel,
 		cache:                       cache,
-		genericPleg:                 genericPleg,
+		genericPleg:                 handler,
 		eventedPlegMaxStreamRetries: eventedPlegMaxStreamRetries,
 		relistDuration:              relistDuration,
 		clock:                       clock,
-	}
+	}, nil
 }
 
 // Watch returns a channel from which the subscriber can receive PodLifecycleEvent events.
@@ -188,8 +192,11 @@ func (e *EventedPLEG) watchEventsChannel() {
 				}
 			}
 
-			err := e.runtimeService.GetContainerEvents(containerEventsResponseCh)
+			err := e.runtimeService.GetContainerEvents(containerEventsResponseCh, func(runtimeapi.RuntimeService_GetContainerEventsClient) {
+				metrics.EventedPLEGConn.Inc()
+			})
 			if err != nil {
+				metrics.EventedPLEGConnErr.Inc()
 				numAttempts++
 				e.Relist() // Force a relist to get the latest container and pods running metric.
 				klog.V(4).InfoS("Evented PLEG: Failed to get container events, retrying: ", "err", err)
@@ -228,7 +235,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			if klog.V(6).Enabled() {
 				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
 			} else {
-				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
+				klog.ErrorS(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID)
 			}
 		} else {
 			if klogV := klog.V(6); klogV.Enabled() {
@@ -245,6 +252,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 
 		e.updateRunningPodMetric(status)
 		e.updateRunningContainerMetric(status)
+		e.updateLatencyMetric(event)
 
 		if event.ContainerEventType == runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT {
 			for _, sandbox := range status.SandboxStatuses {
@@ -408,6 +416,11 @@ func (e *EventedPLEG) updateRunningContainerMetric(podStatus *kubecontainer.PodS
 			metrics.RunningContainerCount.WithLabelValues(string(state)).Add(float64(diff))
 		}
 	}
+}
+
+func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventResponse) {
+	duration := time.Duration(time.Now().UnixNano()-event.CreatedAt) * time.Nanosecond
+	metrics.EventedPLEGConnLatency.Observe(duration.Seconds())
 }
 
 func (e *EventedPLEG) UpdateCache(pod *kubecontainer.Pod, pid types.UID) (error, bool) {

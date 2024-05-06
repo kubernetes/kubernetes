@@ -26,7 +26,7 @@ import (
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var defaultResourceSpec = []configv1.ResourceSpec{
@@ -57,13 +57,13 @@ func pluginsNames(p *configv1.Plugins) []string {
 		p.PreEnqueue,
 		p.QueueSort,
 	}
-	n := sets.NewString()
+	n := sets.New[string]()
 	for _, e := range extensions {
 		for _, pg := range e.Enabled {
 			n.Insert(pg.Name)
 		}
 	}
-	return n.List()
+	return sets.List(n)
 }
 
 func setDefaults_KubeSchedulerProfile(logger klog.Logger, prof *configv1.KubeSchedulerProfile) {
@@ -71,7 +71,7 @@ func setDefaults_KubeSchedulerProfile(logger klog.Logger, prof *configv1.KubeSch
 	prof.Plugins = mergePlugins(logger, getDefaultPlugins(), prof.Plugins)
 	// Set default plugin configs.
 	scheme := GetPluginArgConversionScheme()
-	existingConfigs := sets.NewString()
+	existingConfigs := sets.New[string]()
 	for j := range prof.PluginConfig {
 		existingConfigs.Insert(prof.PluginConfig[j].Name)
 		args := prof.PluginConfig[j].Args.Object
@@ -105,7 +105,7 @@ func setDefaults_KubeSchedulerProfile(logger klog.Logger, prof *configv1.KubeSch
 func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfiguration) {
 	logger := klog.TODO() // called by generated code that doesn't pass a logger. See #115724
 	if obj.Parallelism == nil {
-		obj.Parallelism = pointer.Int32(16)
+		obj.Parallelism = ptr.To[int32](16)
 	}
 
 	if len(obj.Profiles) == 0 {
@@ -114,7 +114,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 	// Only apply a default scheduler name when there is a single profile.
 	// Validation will ensure that every profile has a non-empty unique name.
 	if len(obj.Profiles) == 1 && obj.Profiles[0].SchedulerName == nil {
-		obj.Profiles[0].SchedulerName = pointer.String(v1.DefaultSchedulerName)
+		obj.Profiles[0].SchedulerName = ptr.To(v1.DefaultSchedulerName)
 	}
 
 	// Add the default set of plugins and apply the configuration.
@@ -124,7 +124,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 	}
 
 	if obj.PercentageOfNodesToScore == nil {
-		obj.PercentageOfNodesToScore = pointer.Int32(config.DefaultPercentageOfNodesToScore)
+		obj.PercentageOfNodesToScore = ptr.To[int32](config.DefaultPercentageOfNodesToScore)
 	}
 
 	if len(obj.LeaderElection.ResourceLock) == 0 {
@@ -155,42 +155,42 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 
 	if obj.PodInitialBackoffSeconds == nil {
-		obj.PodInitialBackoffSeconds = pointer.Int64(1)
+		obj.PodInitialBackoffSeconds = ptr.To[int64](1)
 	}
 
 	if obj.PodMaxBackoffSeconds == nil {
-		obj.PodMaxBackoffSeconds = pointer.Int64(10)
+		obj.PodMaxBackoffSeconds = ptr.To[int64](10)
 	}
 
 	// Enable profiling by default in the scheduler
 	if obj.EnableProfiling == nil {
-		obj.EnableProfiling = pointer.Bool(true)
+		obj.EnableProfiling = ptr.To(true)
 	}
 
 	// Enable contention profiling by default if profiling is enabled
 	if *obj.EnableProfiling && obj.EnableContentionProfiling == nil {
-		obj.EnableContentionProfiling = pointer.Bool(true)
+		obj.EnableContentionProfiling = ptr.To(true)
 	}
 }
 
 func SetDefaults_DefaultPreemptionArgs(obj *configv1.DefaultPreemptionArgs) {
 	if obj.MinCandidateNodesPercentage == nil {
-		obj.MinCandidateNodesPercentage = pointer.Int32(10)
+		obj.MinCandidateNodesPercentage = ptr.To[int32](10)
 	}
 	if obj.MinCandidateNodesAbsolute == nil {
-		obj.MinCandidateNodesAbsolute = pointer.Int32(100)
+		obj.MinCandidateNodesAbsolute = ptr.To[int32](100)
 	}
 }
 
 func SetDefaults_InterPodAffinityArgs(obj *configv1.InterPodAffinityArgs) {
 	if obj.HardPodAffinityWeight == nil {
-		obj.HardPodAffinityWeight = pointer.Int32(1)
+		obj.HardPodAffinityWeight = ptr.To[int32](1)
 	}
 }
 
 func SetDefaults_VolumeBindingArgs(obj *configv1.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
-		obj.BindTimeoutSeconds = pointer.Int64(600)
+		obj.BindTimeoutSeconds = ptr.To[int64](600)
 	}
 	if len(obj.Shape) == 0 && feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
 		obj.Shape = []configv1.UtilizationShapePoint{

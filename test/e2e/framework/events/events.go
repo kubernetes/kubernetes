@@ -34,7 +34,7 @@ type Action func() error
 // Please note delivery of events is not guaranteed. Asserting on events can lead to flaky tests.
 func WaitTimeoutForEvent(ctx context.Context, c clientset.Interface, namespace, eventSelector, msg string, timeout time.Duration) error {
 	interval := 2 * time.Second
-	return wait.PollImmediateWithContext(ctx, interval, timeout, eventOccurred(c, namespace, eventSelector, msg))
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, true, eventOccurred(c, namespace, eventSelector, msg))
 }
 
 func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) wait.ConditionWithContextFunc {

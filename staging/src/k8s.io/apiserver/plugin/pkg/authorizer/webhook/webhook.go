@@ -20,20 +20,29 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/client-go/kubernetes/scheme"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/rest"
@@ -65,12 +74,14 @@ type WebhookAuthorizer struct {
 	unauthorizedTTL     time.Duration
 	retryBackoff        wait.Backoff
 	decisionOnError     authorizer.Decision
-	metrics             AuthorizerMetrics
+	metrics             metrics.AuthorizerMetrics
+	celMatcher          *authorizationcel.CELMatcher
+	name                string
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
-func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
-	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, metrics)
+func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics metrics.AuthorizerMetrics) (*WebhookAuthorizer, error) {
+	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, "")
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -92,27 +103,36 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
-func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff) (*WebhookAuthorizer, error) {
+func New(config *rest.Config, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, name string, metrics metrics.AuthorizerMetrics) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromConfig(config, version, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, AuthorizerMetrics{
-		RecordRequestTotal:   noopMetrics{}.RecordRequestTotal,
-		RecordRequestLatency: noopMetrics{}.RecordRequestLatency,
-	})
+	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matchConditions, metrics, name)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
+func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matchConditions []apiserver.WebhookMatchCondition, am metrics.AuthorizerMetrics, name string) (*WebhookAuthorizer, error) {
+	// compile all expressions once in validation and save the results to be used for eval later
+	cm, fieldErr := apiservervalidation.ValidateAndCompileMatchConditions(matchConditions)
+	if err := fieldErr.ToAggregate(); err != nil {
+		return nil, err
+	}
+	if cm != nil {
+		cm.AuthorizerType = "Webhook"
+		cm.AuthorizerName = name
+		cm.Metrics = am
+	}
 	return &WebhookAuthorizer{
 		subjectAccessReview: subjectAccessReview,
 		responseCache:       cache.NewLRUExpireCache(8192),
 		authorizedTTL:       authorizedTTL,
 		unauthorizedTTL:     unauthorizedTTL,
 		retryBackoff:        retryBackoff,
-		decisionOnError:     authorizer.DecisionNoOpinion,
-		metrics:             metrics,
+		decisionOnError:     decisionOnError,
+		metrics:             am,
+		celMatcher:          cm,
+		name:                name,
 	}, nil
 }
 
@@ -190,6 +210,24 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			Verb: attr.GetVerb(),
 		}
 	}
+	// skipping match when feature is not enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration) {
+		// Process Match Conditions before calling the webhook
+		matches, err := w.match(ctx, r)
+		// If at least one matchCondition evaluates to an error (but none are FALSE):
+		// If failurePolicy=Deny, then the webhook rejects the request
+		// If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
+		if err != nil {
+			return w.decisionOnError, "", err
+		}
+		// If at least one matchCondition successfully evaluates to FALSE,
+		// then the webhook is skipped.
+		if !matches {
+			return authorizer.DecisionNoOpinion, "", nil
+		}
+	}
+	// If all evaluated successfully and ALL matchConditions evaluate to TRUE,
+	// then the webhook is called.
 	key, err := json.Marshal(r.Spec)
 	if err != nil {
 		return w.decisionOnError, "", err
@@ -198,6 +236,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		r.Status = entry.(authorizationv1.SubjectAccessReviewStatus)
 	} else {
 		var result *authorizationv1.SubjectAccessReview
+		var metricsResult string
 		// WithExponentialBackoff will return SAR create error (sarErr) if any.
 		if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 			var sarErr error
@@ -206,6 +245,19 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			start := time.Now()
 			result, statusCode, sarErr = w.subjectAccessReview.Create(ctx, r, metav1.CreateOptions{})
 			latency := time.Since(start)
+
+			switch {
+			case sarErr == nil:
+				metricsResult = "success"
+			case ctx.Err() != nil:
+				metricsResult = "canceled"
+			case errors.Is(sarErr, context.DeadlineExceeded) || apierrors.IsTimeout(sarErr) || statusCode == http.StatusGatewayTimeout:
+				metricsResult = "timeout"
+			default:
+				metricsResult = "error"
+			}
+			w.metrics.RecordWebhookEvaluation(ctx, w.name, metricsResult)
+			w.metrics.RecordWebhookDuration(ctx, w.name, metricsResult, latency.Seconds())
 
 			if statusCode != 0 {
 				w.metrics.RecordRequestTotal(ctx, strconv.Itoa(statusCode))
@@ -221,6 +273,12 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			return sarErr
 		}, webhook.DefaultShouldRetry); err != nil {
 			klog.Errorf("Failed to make webhook authorizer request: %v", err)
+
+			// we're returning NoOpinion, and the parent context has not timed out or been canceled
+			if w.decisionOnError == authorizer.DecisionNoOpinion && ctx.Err() == nil {
+				w.metrics.RecordWebhookFailOpen(ctx, w.name, metricsResult)
+			}
+
 			return w.decisionOnError, "", err
 		}
 
@@ -254,6 +312,18 @@ func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]author
 	)
 	incomplete := true
 	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
+}
+
+// Match is used to evaluate the SubjectAccessReviewSpec against
+// the authorizer's matchConditions in the form of cel expressions
+// to return match or no match found, which then is used to
+// determine if the webhook should be skipped.
+func (w *WebhookAuthorizer) match(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error) {
+	// A nil celMatcher or zero saved CompilationResults matches all requests.
+	if w.celMatcher == nil || w.celMatcher.CompilationResults == nil {
+		return true, nil
+	}
+	return w.celMatcher.Eval(ctx, r)
 }
 
 func convertToSARExtra(extra map[string][]string) map[string]authorizationv1.ExtraValue {

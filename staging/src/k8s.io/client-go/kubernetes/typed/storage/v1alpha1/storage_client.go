@@ -30,6 +30,7 @@ type StorageV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	CSIStorageCapacitiesGetter
 	VolumeAttachmentsGetter
+	VolumeAttributesClassesGetter
 }
 
 // StorageV1alpha1Client is used to interact with features provided by the storage.k8s.io group.
@@ -43,6 +44,10 @@ func (c *StorageV1alpha1Client) CSIStorageCapacities(namespace string) CSIStorag
 
 func (c *StorageV1alpha1Client) VolumeAttachments() VolumeAttachmentInterface {
 	return newVolumeAttachments(c)
+}
+
+func (c *StorageV1alpha1Client) VolumeAttributesClasses() VolumeAttributesClassInterface {
+	return newVolumeAttributesClasses(c)
 }
 
 // NewForConfig creates a new StorageV1alpha1Client for the given config.

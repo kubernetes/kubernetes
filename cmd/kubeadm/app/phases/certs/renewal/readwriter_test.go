@@ -19,9 +19,11 @@ package renewal
 import (
 	"crypto"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -41,7 +43,7 @@ func TestPKICertificateReadWriter(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// creates a certificate
-	cert := writeTestCertificate(t, dir, "test", testCACert, testCAKey)
+	cert := writeTestCertificate(t, dir, "test", testCACert, testCAKey, testCertOrganization)
 
 	// Creates a pkiCertificateReadWriter
 	pkiReadWriter := newPKICertificateReadWriter(dir, "test")
@@ -145,8 +147,8 @@ func TestKubeconfigReadWriter(t *testing.T) {
 }
 
 // writeTestCertificate is a utility for creating a test certificate
-func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer) *x509.Certificate {
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, testCertCfg)
+func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer, organization []string) *x509.Certificate {
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, makeTestCertConfig(organization))
 	if err != nil {
 		t.Fatalf("couldn't generate certificate: %v", err)
 	}
@@ -164,7 +166,7 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 	cfg := &pkiutil.CertConfig{
 		Config: certutil.Config{
 			CommonName:   "test-common-name",
-			Organization: []string{"sig-cluster-lifecycle"},
+			Organization: testCertOrganization,
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			AltNames: certutil.AltNames{
 				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
@@ -198,4 +200,156 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 	}
 
 	return cert
+}
+
+func TestFileExists(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		// TODO: remove skip once the failing test has been fixed.
+		t.Skip("Skip failing test on Windows.")
+	}
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir: %v", err)
+	}
+	defer func() {
+		err = os.RemoveAll(tmpdir)
+		if err != nil {
+			t.Fatalf("Fail to remove tmpdir: %v", err)
+		}
+	}()
+	tmpfile, err := os.CreateTemp(tmpdir, "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpfile: %v", err)
+	}
+	tests := []struct {
+		name     string
+		filename string
+		want     bool
+	}{
+		{
+			name:     "file exist",
+			filename: tmpfile.Name(),
+			want:     true,
+		},
+		{
+			name:     "file does not exist",
+			filename: "foo",
+			want:     false,
+		},
+		{
+			name:     "file path is a dir",
+			filename: tmpdir,
+			want:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, _ := fileExists(tt.filename); got != tt.want {
+				t.Errorf("fileExists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPKICertificateReadWriterExists(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir: %v", err)
+	}
+	defer func() {
+		err = os.RemoveAll(tmpdir)
+		if err != nil {
+			t.Fatalf("Fail to remove tmpdir: %v", err)
+		}
+	}()
+	filename := "testfile"
+	tmpfilepath := filepath.Join(tmpdir, fmt.Sprintf(filename+".crt"))
+	err = os.WriteFile(tmpfilepath, nil, 0644)
+	if err != nil {
+		t.Fatalf("Couldn't write file: %v", err)
+	}
+	type fields struct {
+		baseName       string
+		certificateDir string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   bool
+	}{
+		{
+			name: "cert file exists",
+			fields: fields{
+				baseName:       filename,
+				certificateDir: tmpdir,
+			},
+			want: true,
+		},
+		{
+			name: "cert file does not exist",
+			fields: fields{
+				baseName:       "foo",
+				certificateDir: tmpdir,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rw := &pkiCertificateReadWriter{
+				baseName:       tt.fields.baseName,
+				certificateDir: tt.fields.certificateDir,
+			}
+			if got, _ := rw.Exists(); got != tt.want {
+				t.Errorf("pkiCertificateReadWriter.Exists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestKubeConfigReadWriterExists(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		// TODO: remove skip once the failing test has been fixed.
+		t.Skip("Skip failing test on Windows.")
+	}
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir: %v", err)
+	}
+	defer func() {
+		err = os.RemoveAll(tmpdir)
+		if err != nil {
+			t.Fatalf("Fail to remove tmpdir: %v", err)
+		}
+	}()
+	tmpfile, err := os.CreateTemp(tmpdir, "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpfile: %v", err)
+	}
+	tests := []struct {
+		name               string
+		kubeConfigFilePath string
+		want               bool
+	}{
+		{
+			name:               "file exists",
+			kubeConfigFilePath: tmpfile.Name(),
+			want:               true,
+		},
+		{
+			name:               "file does not exist",
+			kubeConfigFilePath: "foo",
+			want:               false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rw := &kubeConfigReadWriter{
+				kubeConfigFilePath: tt.kubeConfigFilePath,
+			}
+			if got, _ := rw.Exists(); got != tt.want {
+				t.Errorf("kubeConfigReadWriter.Exists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

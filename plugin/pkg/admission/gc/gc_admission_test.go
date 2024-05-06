@@ -28,15 +28,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/admission"
+	apiserveradmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/restmapper"
 	coretesting "k8s.io/client-go/testing"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 )
 
 type fakeAuthorizer struct{}
@@ -111,11 +112,10 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		},
 	}
 	gcAdmit := &gcPermissionsEnforcement{
-		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		Handler:   apiserveradmission.NewHandler(apiserveradmission.Create, apiserveradmission.Update),
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil)
 	fakeDiscoveryClient := &fakediscovery.FakeDiscovery{Fake: &coretesting.Fake{}}
 	fakeDiscoveryClient.Resources = []*metav1.APIResourceList{
 		{
@@ -133,14 +133,14 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 			},
 		},
 	}
-
 	restMapperRes, err := restmapper.GetAPIGroupResources(fakeDiscoveryClient)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, restMapper, nil)
-	initializersChain := admission.PluginInitializers{}
+	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil, restMapper)
+	pluginInitializer := controlplaneadmission.NewPluginInitializer(nil, nil)
+	initializersChain := apiserveradmission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)
 
@@ -349,14 +349,14 @@ func TestGCAdmission(t *testing.T) {
 				t.Error(err)
 			}
 
-			operation := admission.Create
+			operation := apiserveradmission.Create
 			var options runtime.Object = &metav1.CreateOptions{}
 			if tc.oldObj != nil {
-				operation = admission.Update
+				operation = apiserveradmission.Update
 				options = &metav1.UpdateOptions{}
 			}
 			user := &user.DefaultInfo{Name: tc.username}
-			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
+			attributes := apiserveradmission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
 
 			err = gcAdmit.Validate(context.TODO(), attributes, nil)
 			if !tc.checkError(err) {
@@ -668,14 +668,14 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 				gcAdmit.restMapper = tc.restMapperOverride
 			}
 
-			operation := admission.Create
+			operation := apiserveradmission.Create
 			var options runtime.Object = &metav1.CreateOptions{}
 			if tc.oldObj != nil {
-				operation = admission.Update
+				operation = apiserveradmission.Update
 				options = &metav1.UpdateOptions{}
 			}
 			user := &user.DefaultInfo{Name: tc.username}
-			attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
+			attributes := apiserveradmission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, options, false, user)
 
 			err = gcAdmit.Validate(context.TODO(), attributes, nil)
 			if !tc.checkError(err) {

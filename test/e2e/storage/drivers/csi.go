@@ -18,10 +18,10 @@ limitations under the License.
  * This file defines various csi volume test drivers for TestSuites.
  *
  * There are two ways, how to prepare test drivers:
- * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * 1) With containerized server (NFS, Ceph, iSCSI, ...)
  * It creates a server pod which defines one volume for the tests.
  * These tests work only when privileged containers are allowed, exporting
- * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
+ * various filesystems (ex: NFS) usually needs some mounting or
  * other privileged magic in the server pod.
  *
  * Note that the server containers are for testing purposes only and should not
@@ -61,6 +61,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -96,7 +97,6 @@ func initHostPathCSIDriver(name string, capabilities map[storageframework.Capabi
 	return &hostpathCSIDriver{
 		driverInfo: storageframework.DriverInfo{
 			Name:        name,
-			FeatureTag:  "",
 			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -139,17 +139,18 @@ var _ storageframework.EphemeralTestDriver = &hostpathCSIDriver{}
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver() storageframework.TestDriver {
 	capabilities := map[storageframework.Capability]bool{
-		storageframework.CapPersistence:         true,
-		storageframework.CapSnapshotDataSource:  true,
-		storageframework.CapMultiPODs:           true,
-		storageframework.CapBlock:               true,
-		storageframework.CapPVCDataSource:       true,
-		storageframework.CapControllerExpansion: true,
-		storageframework.CapOfflineExpansion:    true,
-		storageframework.CapOnlineExpansion:     true,
-		storageframework.CapSingleNodeVolume:    true,
-		storageframework.CapReadWriteOncePod:    true,
-		storageframework.CapMultiplePVsSameID:   true,
+		storageframework.CapPersistence:                    true,
+		storageframework.CapSnapshotDataSource:             true,
+		storageframework.CapMultiPODs:                      true,
+		storageframework.CapBlock:                          true,
+		storageframework.CapPVCDataSource:                  true,
+		storageframework.CapControllerExpansion:            true,
+		storageframework.CapOfflineExpansion:               true,
+		storageframework.CapOnlineExpansion:                true,
+		storageframework.CapSingleNodeVolume:               true,
+		storageframework.CapReadWriteOncePod:               true,
+		storageframework.CapMultiplePVsSameID:              true,
+		storageframework.CapFSResizeFromSourceNotSupported: true,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
@@ -378,7 +379,7 @@ type MockCSICall struct {
 	Method  string
 	Request struct {
 		VolumeContext map[string]string `json:"volume_context"`
-		Secret        map[string]string `json:"secret"`
+		Secrets       map[string]string `json:"secrets"`
 	}
 	FullError struct {
 		Code    codes.Code `json:"code"`
@@ -487,7 +488,6 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 	return &mockCSIDriver{
 		driverInfo: storageframework.DriverInfo{
 			Name:        "csi-mock",
-			FeatureTag:  "",
 			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -795,7 +795,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: storageframework.DriverInfo{
 			Name:        GCEPDCSIDriverName,
-			FeatureTag:  "[Serial]",
+			TestTags:    []interface{}{framework.WithSerial()},
 			MaxFileSize: storageframework.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "5Gi",
@@ -816,15 +816,16 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:   true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits:        false,
-				storageframework.CapTopology:            true,
-				storageframework.CapControllerExpansion: true,
-				storageframework.CapOfflineExpansion:    true,
-				storageframework.CapOnlineExpansion:     true,
-				storageframework.CapNodeExpansion:       true,
-				storageframework.CapSnapshotDataSource:  true,
-				storageframework.CapReadWriteOncePod:    true,
-				storageframework.CapMultiplePVsSameID:   true,
+				storageframework.CapVolumeLimits:                   false,
+				storageframework.CapTopology:                       true,
+				storageframework.CapControllerExpansion:            true,
+				storageframework.CapOfflineExpansion:               true,
+				storageframework.CapOnlineExpansion:                true,
+				storageframework.CapNodeExpansion:                  true,
+				storageframework.CapSnapshotDataSource:             true,
+				storageframework.CapReadWriteOncePod:               true,
+				storageframework.CapMultiplePVsSameID:              true,
+				storageframework.CapFSResizeFromSourceNotSupported: true, //TODO: remove when CI tests use the fixed driver with: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pull/972
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
@@ -853,8 +854,10 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 	if pattern.FsType == "xfs" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
-	if pattern.FeatureTag == "[Feature:Windows]" {
-		e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
+	for _, tag := range pattern.TestTags {
+		if framework.TagsEqual(tag, feature.Windows) {
+			e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
+		}
 	}
 }
 
@@ -891,6 +894,12 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 		return cfg
 	}
 
+	// Check if the cluster is already running gce-pd CSI Driver
+	deploy, err := f.ClientSet.AppsV1().Deployments("gce-pd-csi-driver").Get(ctx, "csi-gce-pd-controller", metav1.GetOptions{})
+	if err == nil && deploy != nil {
+		framework.Logf("The csi gce-pd driver is already installed.")
+		return cfg
+	}
 	ginkgo.By("deploying csi gce-pd driver")
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(ctx, f)
@@ -919,7 +928,7 @@ func (g *gcePDCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
-	err := utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)
+	err = utils.CreateFromManifests(ctx, f, driverNamespace, nil, manifests...)
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}

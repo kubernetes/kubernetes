@@ -22,22 +22,23 @@ package mount
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/unix"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
-	successCase :=
-		`/dev/0 /path/to/0 type0 flags 0 0
+	successCase := `/dev/0 /path/to/0 type0 flags 0 0
 /dev/1    /path/to/1   type1	flags 1 1
 /dev/2 /path/to/2 type2 flags,1,2=3 2 2
 `
@@ -148,10 +149,14 @@ func setEquivalent(set1, set2 []string) bool {
 func TestGetDeviceNameFromMount(t *testing.T) {
 	fm := NewFakeMounter(
 		[]MountPoint{
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/111"},
-			{Device: "/dev/disk/by-path/prefix-lun-1",
-				Path: "/mnt/222"},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/111",
+			},
+			{
+				Device: "/dev/disk/by-path/prefix-lun-1",
+				Path:   "/mnt/222",
+			},
 		})
 
 	tests := []struct {
@@ -203,7 +208,6 @@ func TestGetMountRefsByDev(t *testing.T) {
 	}
 
 	for i, test := range tests {
-
 		if refs, err := getMountRefsByDev(fm, test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
 			t.Errorf("%d. getMountRefsByDev(%q) = %v, %v; expected %v, nil", i, test.mountPath, refs, err, test.expectedRefs)
 		}
@@ -294,7 +298,6 @@ func TestPathWithinBase(t *testing.T) {
 		if PathWithinBase(test.fullPath, test.basePath) != test.expected {
 			t.Errorf("test %q failed: expected %v", test.name, test.expected)
 		}
-
 	}
 }
 
@@ -422,27 +425,31 @@ func TestSearchMountPoints(t *testing.T) {
 62 25 7:1 / /var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 95 25 7:1 / /var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test rw,relatime shared:38 - ext4 /dev/loop1 rw,data=ordered
 `,
-			[]string{"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
-				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test"},
+			[]string{
+				"/var/lib/kubelet/pods/f19fe4e2-5a63-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+				"/var/lib/kubelet/pods/4854a48b-5a64-11e8-962f-000c29bb0377/volumes/kubernetes.io~local-volume/local-pv-test",
+			},
 			nil,
 		},
 	}
-	tmpFile, err := ioutil.TempFile("", "test-get-filetype")
+	tmpFile, err := os.CreateTemp("", "test-get-filetype")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 	for _, v := range testcases {
-		tmpFile.Truncate(0)
-		tmpFile.Seek(0, 0)
-		tmpFile.WriteString(v.mountInfos)
-		tmpFile.Sync()
+		assert.NoError(t, tmpFile.Truncate(0))
+		_, err := tmpFile.Seek(0, 0)
+		assert.NoError(t, err)
+		_, err = tmpFile.WriteString(v.mountInfos)
+		assert.NoError(t, err)
+		assert.NoError(t, tmpFile.Sync())
 		refs, err := SearchMountPoints(v.source, tmpFile.Name())
 		if !reflect.DeepEqual(refs, v.expectedRefs) {
 			t.Errorf("test %q: expected Refs: %#v, got %#v", v.name, v.expectedRefs, refs)
 		}
-		if !reflect.DeepEqual(err, v.expectedErr) {
+		if err != v.expectedErr {
 			t.Errorf("test %q: expected err: %v, got %v", v.name, v.expectedErr, err)
 		}
 	}
@@ -459,7 +466,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 		mountFlags       []string
 	}{
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -468,7 +474,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -477,7 +482,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -486,7 +490,6 @@ func TestSensitiveMountOptions(t *testing.T) {
 			mountFlags:       []string{},
 		},
 		{
-
 			source:           "mySrc",
 			target:           "myTarget",
 			fstype:           "myFS",
@@ -649,41 +652,28 @@ func TestCheckUmountError(t *testing.T) {
 	}
 }
 
-func TestFormat(t *testing.T) {
+// TODO https://github.com/kubernetes/kubernetes/pull/117539#discussion_r1181873355
+func TestFormatConcurrency(t *testing.T) {
 	const (
 		formatCount    = 5
 		fstype         = "ext4"
 		output         = "complete"
-		cmdDuration    = 1 * time.Millisecond
 		defaultTimeout = 1 * time.Minute
 	)
 
 	tests := []struct {
-		desc           string
-		max            int
-		timeout        time.Duration
-		wantConcurrent int
+		desc    string
+		max     int
+		timeout time.Duration
 	}{
 		{
-			max:            0,
-			wantConcurrent: formatCount,
+			max: 2,
 		},
 		{
-			max:            -1,
-			wantConcurrent: formatCount,
+			max: 3,
 		},
 		{
-			max:            1,
-			wantConcurrent: 1,
-		},
-		{
-			max:            3,
-			wantConcurrent: 3,
-		},
-		{
-			max:            3,
-			timeout:        1 * time.Nanosecond,
-			wantConcurrent: formatCount,
+			max: 4,
 		},
 	}
 
@@ -693,20 +683,18 @@ func TestFormat(t *testing.T) {
 				tc.timeout = defaultTimeout
 			}
 
-			var concurrent, maxConcurrent int
+			var concurrent int
 			var mu sync.Mutex
+			witness := make(chan struct{})
 
 			exec := &testexec.FakeExec{}
 			for i := 0; i < formatCount; i++ {
 				exec.CommandScript = append(exec.CommandScript, makeFakeCommandAction(output, nil, func() {
 					mu.Lock()
 					concurrent++
-					if concurrent > maxConcurrent {
-						maxConcurrent = concurrent
-					}
 					mu.Unlock()
 
-					time.Sleep(cmdDuration)
+					<-witness
 
 					mu.Lock()
 					concurrent--
@@ -715,20 +703,151 @@ func TestFormat(t *testing.T) {
 			}
 			mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(tc.max, tc.timeout))
 
-			var wg sync.WaitGroup
-			for i := 0; i < formatCount; i++ {
-				wg.Add(1)
+			// we run max+1 goroutines and block the command execution
+			// only max goroutine should be running and the additional one should wait
+			// for one to be released
+			for i := 0; i < tc.max+1; i++ {
 				go func() {
-					defer wg.Done()
-					mounter.format(fstype, nil)
+					_, err := mounter.format(fstype, nil)
+					if err != nil {
+						t.Errorf("format(%q): %v", fstype, err)
+					}
 				}()
 			}
-			wg.Wait()
 
-			if maxConcurrent != tc.wantConcurrent {
-				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: %d", maxConcurrent, tc.wantConcurrent)
+			// wait for all goorutines to be scheduled
+			time.Sleep(100 * time.Millisecond)
+
+			mu.Lock()
+			if concurrent != tc.max {
+				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: %d", concurrent, tc.max)
 			}
+			mu.Unlock()
+
+			// signal the commands to finish the goroutines, this will allow the command
+			// that is pending to be executed
+			for i := 0; i < tc.max; i++ {
+				witness <- struct{}{}
+			}
+
+			// wait for all goroutines to acquire the lock and decrement the counter
+			time.Sleep(100 * time.Millisecond)
+
+			mu.Lock()
+			if concurrent != 1 {
+				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: 1", concurrent)
+			}
+			mu.Unlock()
+
+			// signal the pending command to finish, no more command should be running
+			close(witness)
+
+			// wait a few for the last goroutine to acquire the lock and decrements the counter down to zero
+			time.Sleep(10 * time.Millisecond)
+
+			mu.Lock()
+			if concurrent != 0 {
+				t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: 0", concurrent)
+			}
+			mu.Unlock()
 		})
+	}
+}
+
+// TODO https://github.com/kubernetes/kubernetes/pull/117539#discussion_r1181873355
+func TestFormatTimeout(t *testing.T) {
+	const (
+		formatCount    = 5
+		fstype         = "ext4"
+		output         = "complete"
+		maxConcurrency = 4
+		timeout        = 200 * time.Millisecond
+	)
+
+	var concurrent int
+	var mu sync.Mutex
+	witness := make(chan struct{})
+
+	exec := &testexec.FakeExec{}
+	for i := 0; i < formatCount; i++ {
+		exec.CommandScript = append(exec.CommandScript, makeFakeCommandAction(output, nil, func() {
+			mu.Lock()
+			concurrent++
+			mu.Unlock()
+
+			<-witness
+
+			mu.Lock()
+			concurrent--
+			mu.Unlock()
+		}))
+	}
+	mounter := NewSafeFormatAndMount(nil, exec, WithMaxConcurrentFormat(maxConcurrency, timeout))
+
+	for i := 0; i < maxConcurrency+1; i++ {
+		go func() {
+			_, err := mounter.format(fstype, nil)
+			if err != nil {
+				t.Errorf("format(%q): %v", fstype, err)
+			}
+		}()
+	}
+
+	// wait a bit more than the configured timeout
+	time.Sleep(timeout + 100*time.Millisecond)
+
+	mu.Lock()
+	if concurrent != maxConcurrency+1 {
+		t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: %d", concurrent, maxConcurrency+1)
+	}
+	mu.Unlock()
+
+	// signal the pending commands to finish
+	close(witness)
+	// wait for all goroutines to acquire the lock and decrement the counter
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	if concurrent != 0 {
+		t.Errorf("SafeFormatAndMount.format() got concurrency: %d, want: 0", concurrent)
+	}
+	mu.Unlock()
+}
+
+func TestGetUserNSBindMountOptions(t *testing.T) {
+	var testCases = map[string]struct {
+		flags        int64
+		mountoptions string
+	}{
+		"ro":            {flags: unix.MS_RDONLY, mountoptions: "ro"},
+		"nodev":         {flags: unix.MS_NODEV, mountoptions: "nodev"},
+		"noexec":        {flags: unix.MS_NOEXEC, mountoptions: "noexec"},
+		"nosuid":        {flags: unix.MS_NOSUID, mountoptions: "nosuid"},
+		"noatime":       {flags: unix.MS_NOATIME, mountoptions: "noatime"},
+		"relatime":      {flags: unix.MS_RELATIME, mountoptions: "relatime"},
+		"nodiratime":    {flags: unix.MS_NODIRATIME, mountoptions: "nodiratime"},
+		"ronodev":       {flags: unix.MS_RDONLY | unix.MS_NODEV, mountoptions: "nodev,ro"},
+		"ronodevnoexec": {flags: unix.MS_RDONLY | unix.MS_NODEV | unix.MS_NOEXEC, mountoptions: "nodev,noexec,ro"},
+	}
+
+	statfsMock := func(path string, buf *unix.Statfs_t) (err error) {
+		*buf = unix.Statfs_t{Flags: testCases[path].flags}
+		return nil
+	}
+
+	testGetUserNSBindMountOptionsSingleCase := func(t *testing.T) {
+		path := strings.Split(t.Name(), "/")[1]
+		options, _ := getUserNSBindMountOptions(path, statfsMock)
+		sort.Strings(options)
+		optionString := strings.Join(options, ",")
+		mountOptions := testCases[path].mountoptions
+		if optionString != mountOptions {
+			t.Fatalf(`Mountoptions differ. Wanted: %s, returned: %s`, mountOptions, optionString)
+		}
+	}
+
+	for k := range testCases {
+		t.Run(k, testGetUserNSBindMountOptionsSingleCase)
 	}
 }
 

@@ -30,6 +30,17 @@ type event struct {
 	isDeleted        bool
 	isCreated        bool
 	isProgressNotify bool
+	// isInitialEventsEndBookmark helps us keep track
+	// of whether we have sent an annotated bookmark event.
+	//
+	// when this variable is set to true,
+	// a special annotation will be added
+	// to the bookmark event.
+	//
+	// note that we decided to extend the event
+	// struct field to eliminate contention
+	// between startWatching and processEvent
+	isInitialEventsEndBookmark bool
 }
 
 // parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.

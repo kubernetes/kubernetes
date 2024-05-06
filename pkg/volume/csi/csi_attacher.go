@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -287,7 +288,9 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if c.csiClient == nil {
 		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
 		if err != nil {
-			return errors.New(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
+			// Treat the absence of the CSI driver as a transient error
+			// See https://github.com/kubernetes/kubernetes/issues/120268
+			return volumetypes.NewTransientOperationFailure(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
 		}
 	}
 	csi := c.csiClient
@@ -339,9 +342,10 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+	if err = filesystem.MkdirAllWithPathCheck(deviceMountPath, 0750); err != nil {
 		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
+
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 	dataDir := filepath.Dir(deviceMountPath)
 	data := map[string]string{
@@ -595,20 +599,21 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		driverName = data[volDataKey.driverName]
 		volID = data[volDataKey.volHandle]
 	} else {
-		klog.Error(log("UnmountDevice failed to load volume data file [%s]: %v", dataDir, err))
-
-		// The volume might have been mounted by old CSI volume plugin. Fall back to the old behavior: read PV from API server
-		driverName, volID, err = getDriverAndVolNameFromDeviceMountPath(c.k8s, deviceMountPath)
-		if err != nil {
-			klog.Errorf(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
-			return err
+		if errors.Is(err, os.ErrNotExist) {
+			klog.V(4).Info(log("attacher.UnmountDevice skipped because volume data file [%s] does not exist", dataDir))
+			return nil
 		}
+
+		klog.Errorf(log("attacher.UnmountDevice failed to get driver and volume name from device mount path: %v", err))
+		return err
 	}
 
 	if c.csiClient == nil {
 		c.csiClient, err = newCsiDriverClient(csiDriverName(driverName))
 		if err != nil {
-			return errors.New(log("attacher.UnmountDevice failed to create newCsiDriverClient: %v", err))
+			// Treat the absence of the CSI driver as a transient error
+			// See https://github.com/kubernetes/kubernetes/issues/120268
+			return volumetypes.NewTransientOperationFailure(log("attacher.UnmountDevice failed to create newCsiDriverClient: %v", err))
 		}
 	}
 	csi := c.csiClient
@@ -680,36 +685,6 @@ func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
 	result := sha256.Sum256([]byte(fmt.Sprintf("%s", csiSource.VolumeHandle)))
 	volSha := fmt.Sprintf("%x", result)
 	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), driver, volSha, globalMountInGlobalPath), nil
-}
-
-func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMountPath string) (string, string, error) {
-	// deviceMountPath structure: /var/lib/kubelet/plugins/kubernetes.io/csi/pv/{pvname}/globalmount
-	dir := filepath.Dir(deviceMountPath)
-	if file := filepath.Base(deviceMountPath); file != globalMountInGlobalPath {
-		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath failed, path did not end in %s", globalMountInGlobalPath))
-	}
-	// dir is now /var/lib/kubelet/plugins/kubernetes.io/csi/pv/{pvname}
-	pvName := filepath.Base(dir)
-
-	// Get PV and check for errors
-	pv, err := k8s.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
-	if err != nil {
-		return "", "", err
-	}
-	if pv == nil || pv.Spec.CSI == nil {
-		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath could not find CSI Persistent Volume Source for pv: %s", pvName))
-	}
-
-	// Get VolumeHandle and PluginName from pv
-	csiSource := pv.Spec.CSI
-	if csiSource.Driver == "" {
-		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath failed, driver name empty"))
-	}
-	if csiSource.VolumeHandle == "" {
-		return "", "", errors.New(log("getDriverAndVolNameFromDeviceMountPath failed, VolumeHandle empty"))
-	}
-
-	return csiSource.Driver, csiSource.VolumeHandle, nil
 }
 
 func verifyAttachmentStatus(attachment *storage.VolumeAttachment, volumeHandle string) (bool, error) {

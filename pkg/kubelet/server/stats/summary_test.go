@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +48,7 @@ var (
 	rlimitStats = getRlimitStats()
 )
 
-func TestSummaryProviderGetStats(t *testing.T) {
+func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	ctx := context.Background()
 	assert := assert.New(t)
 
@@ -81,7 +81,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
 	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, nil)
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil)
 	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
 	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
 	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
@@ -100,9 +100,10 @@ func TestSummaryProviderGetStats(t *testing.T) {
 	assert.Equal(summary.Node.StartTime, systemBootTime)
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
+	assert.Equal(summary.Node.Swap, cgroupStatsMap["/"].cs.Swap)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
 	assert.Equal(summary.Node.Fs, rootFsStats)
-	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ImageFs: imageFsStats})
+	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: imageFsStats, ImageFs: imageFsStats})
 
 	assert.Equal(len(summary.Node.SystemContainers), 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
@@ -112,6 +113,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/kubelet"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "misc",
@@ -120,6 +122,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/misc"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/misc"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "runtime",
@@ -128,6 +131,7 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/runtime"].cs.Swap,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "pods",
@@ -136,6 +140,106 @@ func TestSummaryProviderGetStats(t *testing.T) {
 		Memory:             cgroupStatsMap["/pods"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/pods"].cs.Swap,
+	})
+	assert.Equal(summary.Pods, podStats)
+}
+
+func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
+	ctx := context.Background()
+	assert := assert.New(t)
+
+	podStats := []statsapi.PodStats{
+		{
+			PodRef:      statsapi.PodReference{Name: "test-pod", Namespace: "test-namespace", UID: "UID_test-pod"},
+			StartTime:   metav1.NewTime(time.Now()),
+			Containers:  []statsapi.ContainerStats{*getContainerStats()},
+			Network:     getNetworkStats(),
+			VolumeStats: []statsapi.VolumeStats{*getVolumeStats()},
+		},
+	}
+	cgroupStatsMap := map[string]struct {
+		cs *statsapi.ContainerStats
+		ns *statsapi.NetworkStats
+	}{
+		"/":        {cs: getContainerStats(), ns: getNetworkStats()},
+		"/runtime": {cs: getContainerStats(), ns: getNetworkStats()},
+		"/misc":    {cs: getContainerStats(), ns: getNetworkStats()},
+		"/kubelet": {cs: getContainerStats(), ns: getNetworkStats()},
+		"/pods":    {cs: getContainerStats(), ns: getNetworkStats()},
+	}
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+
+	mockStatsProvider.EXPECT().GetNode().Return(node, nil)
+	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
+	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
+	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
+	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/kubepods", true).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
+
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, rootFsStats, nil)
+
+	kubeletCreationTime := metav1.Now()
+	systemBootTime := metav1.Now()
+	provider := summaryProviderImpl{kubeletCreationTime: kubeletCreationTime, systemBootTime: systemBootTime, provider: mockStatsProvider}
+	summary, err := provider.Get(ctx, true)
+	assert.NoError(err)
+
+	assert.Equal(summary.Node.NodeName, "test-node")
+	assert.Equal(summary.Node.StartTime, systemBootTime)
+	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
+	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
+	assert.Equal(summary.Node.Swap, cgroupStatsMap["/"].cs.Swap)
+	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
+	assert.Equal(summary.Node.Fs, rootFsStats)
+	// Since we are a split filesystem we want root filesystem to be container fs and image to be image filesystem
+	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: rootFsStats, ImageFs: imageFsStats})
+
+	assert.Equal(len(summary.Node.SystemContainers), 4)
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "kubelet",
+		StartTime:          kubeletCreationTime,
+		CPU:                cgroupStatsMap["/kubelet"].cs.CPU,
+		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/kubelet"].cs.Swap,
+	})
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "misc",
+		StartTime:          cgroupStatsMap["/misc"].cs.StartTime,
+		CPU:                cgroupStatsMap["/misc"].cs.CPU,
+		Memory:             cgroupStatsMap["/misc"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/misc"].cs.Swap,
+	})
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "runtime",
+		StartTime:          cgroupStatsMap["/runtime"].cs.StartTime,
+		CPU:                cgroupStatsMap["/runtime"].cs.CPU,
+		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/runtime"].cs.Swap,
+	})
+	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
+		Name:               "pods",
+		StartTime:          cgroupStatsMap["/pods"].cs.StartTime,
+		CPU:                cgroupStatsMap["/pods"].cs.CPU,
+		Memory:             cgroupStatsMap["/pods"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
+		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
+		Swap:               cgroupStatsMap["/pods"].cs.Swap,
 	})
 	assert.Equal(summary.Pods, podStats)
 }

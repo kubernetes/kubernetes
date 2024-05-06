@@ -66,6 +66,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
 				}
 			}
+			c.Fuzz(&obj.SelectableFields)
 			if obj.Conversion == nil {
 				obj.Conversion = &apiextensions.CustomResourceConversion{
 					Strategy: apiextensions.NoneConverter,
@@ -78,7 +79,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.PreserveUnknownFields = pointer.BoolPtr(true)
 			}
 
-			// Move per-version schema, subresources, additionalPrinterColumns to the top-level.
+			// Move per-version schema, subresources, additionalPrinterColumns, selectableFields to the top-level.
 			// This is required by validation in v1beta1, and by round-tripping in v1.
 			if len(obj.Versions) == 1 {
 				if obj.Versions[0].Schema != nil {
@@ -88,6 +89,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				if obj.Versions[0].AdditionalPrinterColumns != nil {
 					obj.AdditionalPrinterColumns = obj.Versions[0].AdditionalPrinterColumns
 					obj.Versions[0].AdditionalPrinterColumns = nil
+				}
+				if obj.Versions[0].SelectableFields != nil {
+					obj.SelectableFields = obj.Versions[0].SelectableFields
+					obj.Versions[0].SelectableFields = nil
 				}
 				if obj.Versions[0].Subresources != nil {
 					obj.Subresources = obj.Versions[0].Subresources
@@ -180,6 +185,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(obj *int64, c fuzz.Continue) {
 			// JSON only supports 53 bits because everything is a float
 			*obj = int64(c.Uint64()) & ((int64(1) << 53) - 1)
+		},
+		func(obj *apiextensions.ValidationRule, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			if obj.Reason != nil && *(obj.Reason) == "" {
+				obj.Reason = nil
+			}
 		},
 	}
 }

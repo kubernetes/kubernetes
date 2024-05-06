@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/cel-go/common/overloads"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -36,18 +35,10 @@ import (
 type String string
 
 var (
-	// StringType singleton.
-	StringType = NewTypeValue("string",
-		traits.AdderType,
-		traits.ComparerType,
-		traits.MatcherType,
-		traits.ReceiverType,
-		traits.SizerType)
-
-	stringOneArgOverloads = map[string]func(String, ref.Val) ref.Val{
-		overloads.Contains:   stringContains,
-		overloads.EndsWith:   stringEndsWith,
-		overloads.StartsWith: stringStartsWith,
+	stringOneArgOverloads = map[string]func(ref.Val, ref.Val) ref.Val{
+		overloads.Contains:   StringContains,
+		overloads.EndsWith:   StringEndsWith,
+		overloads.StartsWith: StringStartsWith,
 	}
 
 	stringWrapperType = reflect.TypeOf(&wrapperspb.StringValue{})
@@ -72,13 +63,10 @@ func (s String) Compare(other ref.Val) ref.Val {
 }
 
 // ConvertToNative implements ref.Val.ConvertToNative.
-func (s String) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (s String) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
 	case reflect.String:
-		if reflect.TypeOf(s).AssignableTo(typeDesc) {
-			return s, nil
-		}
-		return s.Value(), nil
+		return reflect.ValueOf(s).Convert(typeDesc).Interface(), nil
 	case reflect.Ptr:
 		switch typeDesc {
 		case anyValueType:
@@ -154,6 +142,11 @@ func (s String) Equal(other ref.Val) ref.Val {
 	return Bool(ok && s == otherString)
 }
 
+// IsZeroValue returns true if the string is empty.
+func (s String) IsZeroValue() bool {
+	return len(s) == 0
+}
+
 // Match implements traits.Matcher.Match.
 func (s String) Match(pattern ref.Val) ref.Val {
 	pat, ok := pattern.(String)
@@ -162,7 +155,7 @@ func (s String) Match(pattern ref.Val) ref.Val {
 	}
 	matched, err := regexp.MatchString(pat.Value().(string), s.Value().(string))
 	if err != nil {
-		return &Err{err}
+		return &Err{error: err}
 	}
 	return Bool(matched)
 }
@@ -189,30 +182,45 @@ func (s String) Type() ref.Type {
 }
 
 // Value implements ref.Val.Value.
-func (s String) Value() interface{} {
+func (s String) Value() any {
 	return string(s)
 }
 
-func stringContains(s String, sub ref.Val) ref.Val {
+// StringContains returns whether the string contains a substring.
+func StringContains(s, sub ref.Val) ref.Val {
+	str, ok := s.(String)
+	if !ok {
+		return MaybeNoSuchOverloadErr(s)
+	}
 	subStr, ok := sub.(String)
 	if !ok {
 		return MaybeNoSuchOverloadErr(sub)
 	}
-	return Bool(strings.Contains(string(s), string(subStr)))
+	return Bool(strings.Contains(string(str), string(subStr)))
 }
 
-func stringEndsWith(s String, suf ref.Val) ref.Val {
+// StringEndsWith returns whether the target string contains the input suffix.
+func StringEndsWith(s, suf ref.Val) ref.Val {
+	str, ok := s.(String)
+	if !ok {
+		return MaybeNoSuchOverloadErr(s)
+	}
 	sufStr, ok := suf.(String)
 	if !ok {
 		return MaybeNoSuchOverloadErr(suf)
 	}
-	return Bool(strings.HasSuffix(string(s), string(sufStr)))
+	return Bool(strings.HasSuffix(string(str), string(sufStr)))
 }
 
-func stringStartsWith(s String, pre ref.Val) ref.Val {
+// StringStartsWith returns whether the target string contains the input prefix.
+func StringStartsWith(s, pre ref.Val) ref.Val {
+	str, ok := s.(String)
+	if !ok {
+		return MaybeNoSuchOverloadErr(s)
+	}
 	preStr, ok := pre.(String)
 	if !ok {
 		return MaybeNoSuchOverloadErr(pre)
 	}
-	return Bool(strings.HasPrefix(string(s), string(preStr)))
+	return Bool(strings.HasPrefix(string(str), string(preStr)))
 }

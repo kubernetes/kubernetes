@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -73,7 +73,7 @@ func TestTopNodeAllMetricsFrom(t *testing.T) {
 		return true, expectedMetrics, nil
 	})
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdTopNode(tf, nil, streams)
 
@@ -140,7 +140,7 @@ func TestTopNodeWithNameMetricsFrom(t *testing.T) {
 		return true, &expectedMetrics, nil
 	})
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdTopNode(tf, nil, streams)
 
@@ -218,7 +218,7 @@ func TestTopNodeWithLabelSelectorMetricsFrom(t *testing.T) {
 		return true, expectedMetrics, nil
 	})
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdTopNode(tf, nil, streams)
 	cmd.Flags().Set("selector", label)
@@ -294,7 +294,7 @@ func TestTopNodeWithSortByCpuMetricsFrom(t *testing.T) {
 		return true, expectedMetrics, nil
 	})
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdTopNode(tf, nil, streams)
 	cmd.Flags().Set("sort-by", "cpu")
@@ -380,7 +380,7 @@ func TestTopNodeWithSortByMemoryMetricsFrom(t *testing.T) {
 		return true, expectedMetrics, nil
 	})
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	cmd := NewCmdTopNode(tf, nil, streams)
 	cmd.Flags().Set("sort-by", "memory")

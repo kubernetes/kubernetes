@@ -116,6 +116,10 @@ type LatencyTrackers struct {
 	// Validate webhooks are done in parallel, so max function is used.
 	ValidatingWebhookTracker DurationTracker
 
+	// APFQueueWaitTracker tracks the latency incurred by queue wait times
+	// from priority & fairness.
+	APFQueueWaitTracker DurationTracker
+
 	// StorageTracker tracks the latency incurred inside the storage layer,
 	// it accounts for the time it takes to send data to the underlying
 	// storage layer (etcd) and get the complete response back.
@@ -148,6 +152,13 @@ type LatencyTrackers struct {
 	// The Write method can be invoked multiple times, so we use a
 	// latency tracker that sums up the duration from each call.
 	ResponseWriteTracker DurationTracker
+
+	// DecodeTracker is used to track latency incurred inside the function
+	// that takes an object returned from the underlying storage layer
+	// (etcd) and performs decoding of the response object.
+	// When called multiple times, the latency incurred inside to
+	// decode func each time will be summed up.
+	DecodeTracker DurationTracker
 }
 
 type latencyTrackersKeyType int
@@ -168,10 +179,12 @@ func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) co
 	return WithValue(parent, latencyTrackersKey, &LatencyTrackers{
 		MutatingWebhookTracker:   newSumLatencyTracker(c),
 		ValidatingWebhookTracker: newMaxLatencyTracker(c),
+		APFQueueWaitTracker:      newMaxLatencyTracker(c),
 		StorageTracker:           newSumLatencyTracker(c),
 		TransformTracker:         newSumLatencyTracker(c),
 		SerializationTracker:     newSumLatencyTracker(c),
 		ResponseWriteTracker:     newSumLatencyTracker(c),
+		DecodeTracker:            newSumLatencyTracker(c),
 	})
 }
 
@@ -230,6 +243,25 @@ func TrackResponseWriteLatency(ctx context.Context, d time.Duration) {
 	}
 }
 
+// TrackAPFQueueWaitLatency is used to track latency incurred
+// by priority and fairness queues.
+func TrackAPFQueueWaitLatency(ctx context.Context, d time.Duration) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.APFQueueWaitTracker.TrackDuration(d)
+	}
+}
+
+// TrackDecodeLatency is used to track latency incurred inside the function
+// that takes an object returned from the underlying storage layer
+// (etcd) and performs decoding of the response object.
+// When called multiple times, the latency incurred inside to
+// decode func each time will be summed up.
+func TrackDecodeLatency(ctx context.Context, d time.Duration) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.DecodeTracker.TrackDuration(d)
+	}
+}
+
 // AuditAnnotationsFromLatencyTrackers will inspect each latency tracker
 // associated with the request context and return a set of audit
 // annotations that can be added to the API audit entry.
@@ -241,6 +273,7 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 		responseWriteLatencyKey     = "apiserver.latency.k8s.io/response-write"
 		mutatingWebhookLatencyKey   = "apiserver.latency.k8s.io/mutating-webhook"
 		validatingWebhookLatencyKey = "apiserver.latency.k8s.io/validating-webhook"
+		decodeLatencyKey            = "apiserver.latency.k8s.io/decode-response-object"
 	)
 
 	tracker, ok := LatencyTrackersFrom(ctx)
@@ -266,6 +299,9 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 	}
 	if latency := tracker.ValidatingWebhookTracker.GetLatency(); latency != 0 {
 		annotations[validatingWebhookLatencyKey] = latency.String()
+	}
+	if latency := tracker.DecodeTracker.GetLatency(); latency != 0 {
+		annotations[decodeLatencyKey] = latency.String()
 	}
 
 	return annotations

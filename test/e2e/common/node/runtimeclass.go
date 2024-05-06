@@ -38,27 +38,29 @@ import (
 	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.20
 		Testname: Pod with the non-existing RuntimeClass is rejected.
 		Description: The Pod requesting the non-existing RuntimeClass must be rejected.
 	*/
-	framework.ConformanceIt("should reject a Pod requesting a non-existent RuntimeClass [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should reject a Pod requesting a non-existent RuntimeClass", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := f.Namespace.Name + "-nonexistent"
 		expectPodRejection(ctx, f, e2eruntimeclass.NewRuntimeClassPod(rcName))
 	})
 
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler not being installed.
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func(ctx context.Context) {
+	f.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", nodefeature.RuntimeHandler, func(ctx context.Context) {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(ctx, f, "unconfigured-handler", handler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
@@ -77,12 +79,12 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		// Check the pod is still not running
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+		gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
 	})
 
 	// This test requires that the PreconfiguredRuntimeClassHandler has already been set up on nodes.
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler installed and working.
-	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func(ctx context.Context) {
+	f.It("should run a Pod requesting a RuntimeClass with a configured handler", nodefeature.RuntimeHandler, func(ctx context.Context) {
 		if err := e2eruntimeclass.NodeSupportsPreconfiguredRuntimeClassHandler(ctx, f); err != nil {
 			e2eskipper.Skipf("Skipping test as node does not have E2E runtime class handler preconfigured in container runtime config: %v", err)
 		}
@@ -101,7 +103,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		depends on container runtime and preconfigured handler. Runtime-specific functionality
 		is not being tested here.
 	*/
-	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass without PodOverhead", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := createRuntimeClass(ctx, f, "preconfigured-handler", e2eruntimeclass.PreconfiguredRuntimeClassHandler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
 		pod := e2epod.NewPodClient(f).Create(ctx, e2eruntimeclass.NewRuntimeClassPod(rcName))
@@ -110,12 +112,12 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		pods, err := e2epod.WaitForPodsWithLabelScheduled(ctx, f.ClientSet, f.Namespace.Name, label)
 		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
 
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 		scheduledPod := &pods.Items[0]
-		framework.ExpectEqual(scheduledPod.Name, pod.Name)
+		gomega.Expect(scheduledPod.Name).To(gomega.Equal(pod.Name))
 
 		// Overhead should not be set
-		framework.ExpectEqual(len(scheduledPod.Spec.Overhead), 0)
+		gomega.Expect(scheduledPod.Spec.Overhead).To(gomega.BeEmpty())
 	})
 
 	/*
@@ -126,7 +128,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		depends on container runtime and preconfigured handler. Runtime-specific functionality
 		is not being tested here.
 	*/
-	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass and initialize its Overhead [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should schedule a Pod requesting a RuntimeClass and initialize its Overhead", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := createRuntimeClass(ctx, f, "preconfigured-handler", e2eruntimeclass.PreconfiguredRuntimeClassHandler, &nodev1.Overhead{
 			PodFixed: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10m"),
@@ -140,12 +142,12 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		pods, err := e2epod.WaitForPodsWithLabelScheduled(ctx, f.ClientSet, f.Namespace.Name, label)
 		framework.ExpectNoError(err, "Failed to schedule Pod with the RuntimeClass")
 
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 		scheduledPod := &pods.Items[0]
-		framework.ExpectEqual(scheduledPod.Name, pod.Name)
+		gomega.Expect(scheduledPod.Name).To(gomega.Equal(pod.Name))
 
-		framework.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceCPU], resource.MustParse("10m"))
-		framework.ExpectEqual(scheduledPod.Spec.Overhead[v1.ResourceMemory], resource.MustParse("1Mi"))
+		gomega.Expect(scheduledPod.Spec.Overhead[v1.ResourceCPU]).To(gomega.Equal(resource.MustParse("10m")))
+		gomega.Expect(scheduledPod.Spec.Overhead[v1.ResourceMemory]).To(gomega.Equal(resource.MustParse("1Mi")))
 	})
 
 	/*
@@ -153,7 +155,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		Testname: Pod with the deleted RuntimeClass is rejected.
 		Description: Pod requesting the deleted RuntimeClass must be rejected.
 	*/
-	framework.ConformanceIt("should reject a Pod requesting a deleted RuntimeClass [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should reject a Pod requesting a deleted RuntimeClass", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := createRuntimeClass(ctx, f, "delete-me", "runc", nil)
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 
@@ -186,7 +188,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery document.
 		The runtimeclasses resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	framework.ConformanceIt(" should support RuntimeClasses API operations", func(ctx context.Context) {
+	framework.ConformanceIt("should support RuntimeClasses API operations", func(ctx context.Context) {
 		// Setup
 		rcVersion := "v1"
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
@@ -281,24 +283,24 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		ginkgo.By("getting")
 		gottenRC, err := rcClient.Get(ctx, rc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenRC.UID, createdRC.UID)
+		gomega.Expect(gottenRC.UID).To(gomega.Equal(createdRC.UID))
 
 		ginkgo.By("listing")
 		rcs, err := rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(rcs.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(rcs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("patching")
 		patchedRC, err := rcClient.Patch(ctx, createdRC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedRC.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedRC.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedRC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
 		updatedRC, err := rcClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedRC.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedRC.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAdded, sawPatched, sawUpdated := false, false, false; !sawAdded && !sawPatched && !sawUpdated; {
@@ -346,14 +348,14 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 		rcs, err = rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(rcs.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(rcs.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
 		err = rcClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		rcs, err = rcClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(rcs.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(rcs.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 })
 
@@ -375,7 +377,7 @@ func createRuntimeClass(ctx context.Context, f *framework.Framework, name, handl
 
 func expectPodRejection(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-	framework.ExpectError(err, "should be forbidden")
+	gomega.Expect(err).To(gomega.HaveOccurred(), "should be forbidden")
 	if !apierrors.IsForbidden(err) {
 		framework.Failf("expected forbidden error, got %#v", err)
 	}

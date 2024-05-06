@@ -55,7 +55,7 @@ kubelet<->dynamic resource allocation plugin interaction.
 
 To try out the feature, build Kubernetes, then in one console run:
 ```console
-RUNTIME_CONFIG="resource.k8s.io/v1alpha1" FEATURE_GATES=DynamicResourceAllocation=true ALLOW_PRIVILEGED=1 ./hack/local-up-cluster.sh -O
+RUNTIME_CONFIG="resource.k8s.io/v1alpha2" FEATURE_GATES=DynamicResourceAllocation=true ALLOW_PRIVILEGED=1 ./hack/local-up-cluster.sh -O
 ```
 
 In another:

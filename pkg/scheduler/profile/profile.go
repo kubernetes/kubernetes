@@ -18,6 +18,7 @@ limitations under the License.
 package profile
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -34,24 +35,24 @@ import (
 type RecorderFactory func(string) events.EventRecorder
 
 // newProfile builds a Profile for the given configuration.
-func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
-	stopCh <-chan struct{}, opts ...frameworkruntime.Option) (framework.Framework, error) {
+func newProfile(ctx context.Context, cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
+	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
 	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
-	return frameworkruntime.NewFramework(r, &cfg, stopCh, opts...)
+	return frameworkruntime.NewFramework(ctx, r, &cfg, opts...)
 }
 
 // Map holds frameworks indexed by scheduler name.
 type Map map[string]framework.Framework
 
 // NewMap builds the frameworks given by the configuration, indexed by name.
-func NewMap(cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
-	stopCh <-chan struct{}, opts ...frameworkruntime.Option) (Map, error) {
+func NewMap(ctx context.Context, cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
+	opts ...frameworkruntime.Option) (Map, error) {
 	m := make(Map)
 	v := cfgValidator{m: m}
 
 	for _, cfg := range cfgs {
-		p, err := newProfile(cfg, r, recorderFact, stopCh, opts...)
+		p, err := newProfile(ctx, cfg, r, recorderFact, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("creating profile for scheduler name %s: %v", cfg.SchedulerName, err)
 		}
@@ -67,6 +68,18 @@ func NewMap(cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, rec
 func (m Map) HandlesSchedulerName(name string) bool {
 	_, ok := m[name]
 	return ok
+}
+
+// Close closes all frameworks registered in this map.
+func (m Map) Close() error {
+	var errs []error
+	for name, f := range m {
+		err := f.Close()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("framework %s failed to close: %w", name, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // NewRecorderFactory returns a RecorderFactory for the broadcaster.

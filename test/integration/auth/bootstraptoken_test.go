@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type bootstrapSecrets []*corev1.Secret
@@ -119,14 +120,15 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret})))
 
-			kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+			kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 					opts.Authorization.Modes = []string{"AlwaysAllow"}
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.Authentication.Authenticator = authenticator
+					config.ControlPlane.Generic.Authentication.Authenticator = authenticator
 				},
 			})
 			defer tearDownFn()

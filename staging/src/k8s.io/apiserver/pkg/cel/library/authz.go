@@ -156,7 +156,7 @@ import (
 // allowed
 //
 // Returns true if the authorizer's decision for the check is "allow".  Note that if the authorizer's decision is
-// "no opinion", that both the 'allowed' and 'denied' functions will return false.
+// "no opinion", that the 'allowed' function will return false.
 //
 //	<Decision>.allowed() <bool>
 //
@@ -174,6 +174,26 @@ import (
 // Examples:
 //
 //	authorizer.path('/healthz').check('GET').reason()
+//
+// errored
+//
+// Returns true if the authorization check resulted in an error.
+//
+//	<Decision>.errored() <bool>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').namespace('default').check('create').errored() // Returns true if the authorization check resulted in an error
+//
+// error
+//
+// If the authorization check resulted in an error, returns the error. Otherwise, returns the empty string.
+//
+//	<Decision>.error() <string>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').namespace('default').check('create').error()
 func Authz() cel.EnvOption {
 	return cel.Lib(authzLib)
 }
@@ -181,6 +201,10 @@ func Authz() cel.EnvOption {
 var authzLib = &authz{}
 
 type authz struct{}
+
+func (*authz) LibraryName() string {
+	return "k8s.authz"
+}
 
 var authzLibraryDecls = map[string][]cel.FunctionOpt{
 	"path": {
@@ -209,6 +233,12 @@ var authzLibraryDecls = map[string][]cel.FunctionOpt{
 			cel.BinaryBinding(pathCheckCheck)),
 		cel.MemberOverload("resourcecheck_check", []*cel.Type{ResourceCheckType, cel.StringType}, DecisionType,
 			cel.BinaryBinding(resourceCheckCheck))},
+	"errored": {
+		cel.MemberOverload("decision_errored", []*cel.Type{DecisionType}, cel.BoolType,
+			cel.UnaryBinding(decisionErrored))},
+	"error": {
+		cel.MemberOverload("decision_error", []*cel.Type{DecisionType}, cel.StringType,
+			cel.UnaryBinding(decisionError))},
 	"allowed": {
 		cel.MemberOverload("decision_allowed", []*cel.Type{DecisionType}, cel.BoolType,
 			cel.UnaryBinding(decisionAllowed))},
@@ -384,6 +414,27 @@ func resourceCheckCheck(arg1, arg2 ref.Val) ref.Val {
 	return resourceCheck.Authorize(context.TODO(), apiVerb)
 }
 
+func decisionErrored(arg ref.Val) ref.Val {
+	decision, ok := arg.(decisionVal)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	return types.Bool(decision.err != nil)
+}
+
+func decisionError(arg ref.Val) ref.Val {
+	decision, ok := arg.(decisionVal)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	if decision.err == nil {
+		return types.String("")
+	}
+	return types.String(decision.err.Error())
+}
+
 func decisionAllowed(arg ref.Val) ref.Val {
 	decision, ok := arg.(decisionVal)
 	if !ok {
@@ -478,10 +529,7 @@ func (a pathCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 	}
 
 	decision, reason, err := a.authorizer.authAuthorizer.Authorize(ctx, attr)
-	if err != nil {
-		return types.NewErr("error in authorization check: %v", err)
-	}
-	return newDecision(decision, reason)
+	return newDecision(decision, err, reason)
 }
 
 type groupCheckVal struct {
@@ -516,18 +564,16 @@ func (a resourceCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 		User:            a.groupCheck.authorizer.userInfo,
 	}
 	decision, reason, err := a.groupCheck.authorizer.authAuthorizer.Authorize(ctx, attr)
-	if err != nil {
-		return types.NewErr("error in authorization check: %v", err)
-	}
-	return newDecision(decision, reason)
+	return newDecision(decision, err, reason)
 }
 
-func newDecision(authDecision authorizer.Decision, reason string) decisionVal {
-	return decisionVal{receiverOnlyObjectVal: receiverOnlyVal(DecisionType), authDecision: authDecision, reason: reason}
+func newDecision(authDecision authorizer.Decision, err error, reason string) decisionVal {
+	return decisionVal{receiverOnlyObjectVal: receiverOnlyVal(DecisionType), authDecision: authDecision, err: err, reason: reason}
 }
 
 type decisionVal struct {
 	receiverOnlyObjectVal
+	err          error
 	authDecision authorizer.Decision
 	reason       string
 }
@@ -536,7 +582,7 @@ type decisionVal struct {
 // any object type that has receiver functions but does not expose any fields to
 // CEL.
 type receiverOnlyObjectVal struct {
-	typeValue *types.TypeValue
+	typeValue *types.Type
 }
 
 // receiverOnlyVal returns a receiverOnlyObjectVal for the given type.

@@ -52,8 +52,8 @@ spec:
         # Refer to details about the installer in https://cos.googlesource.com/cos/tools/+/refs/heads/master/src/cmd/cos_gpu_installer/
         # and the COS release notes (https://cloud.google.com/container-optimized-os/docs/release-notes) to determine version COS GPU installer for a given version of COS.
 
-        # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.0.27 - suitable for COS M97 as per https://cloud.google.com/container-optimized-os/docs/release-notes
-      - image: gcr.io/cos-cloud/cos-gpu-installer:v2.0.27
+        # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.1.10 - suitable for COS M109 as per https://cloud.google.com/container-optimized-os/docs/release-notes
+      - image: gcr.io/cos-cloud/cos-gpu-installer:v2.1.10
         name: nvidia-driver-installer
         resources:
           requests:

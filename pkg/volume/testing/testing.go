@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/exec"
 	testingexec "k8s.io/utils/exec/testing"
@@ -81,7 +83,8 @@ const (
 	SuccessAndFailOnMountDeviceName = "success-and-failed-mount-device-name"
 
 	// FailWithInUseVolumeName will cause NodeExpandVolume to result in FailedPrecondition error
-	FailWithInUseVolumeName = "fail-expansion-in-use"
+	FailWithInUseVolumeName       = "fail-expansion-in-use"
+	FailWithUnSupportedVolumeName = "fail-expansion-unsupported"
 
 	FailVolumeExpansion = "fail-expansion-test"
 
@@ -94,6 +97,8 @@ const (
 	volumeNotMounted     = "volumeNotMounted"
 	volumeMountUncertain = "volumeMountUncertain"
 	volumeMounted        = "volumeMounted"
+
+	FailNewMounter = "fail-new-mounter"
 )
 
 // CommandScript is used to pre-configure a command that will be executed and
@@ -207,7 +212,6 @@ var _ volume.RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.AttachableVolumePlugin = &FakeVolumePlugin{}
-var _ volume.VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ volume.DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.NodeExpandableVolumePlugin = &FakeVolumePlugin{}
 
@@ -297,6 +301,9 @@ func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (
 func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
+	if spec.Name() == FailNewMounter {
+		return nil, fmt.Errorf("AlwaysFailNewMounter")
+	}
 	fakeVolume := plugin.getFakeVolume(&plugin.Mounters)
 	fakeVolume.Lock()
 	defer fakeVolume.Unlock()
@@ -441,11 +448,11 @@ func (plugin *FakeVolumePlugin) Recycle(pvName string, spec *volume.Spec, eventR
 	return nil
 }
 
-func (plugin *FakeVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *FakeVolumePlugin) NewDeleter(logger klog.Logger, spec *volume.Spec) (volume.Deleter, error) {
 	return &FakeDeleter{"/attributesTransferredFromSpec", volume.MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+func (plugin *FakeVolumePlugin) NewProvisioner(logger klog.Logger, options volume.VolumeOptions) (volume.Provisioner, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.LastProvisionerOptions = options
@@ -493,8 +500,12 @@ func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOption
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}
+	if resizeOptions.VolumeSpec.Name() == FailWithUnSupportedVolumeName {
+		return false, volumetypes.NewOperationNotSupportedError("volume-unsupported")
+	}
+
 	if resizeOptions.VolumeSpec.Name() == AlwaysFailNodeExpansion {
-		return false, fmt.Errorf("Test failure: NodeExpand")
+		return false, fmt.Errorf("test failure: NodeExpand")
 	}
 
 	if resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
@@ -862,8 +873,8 @@ func (fv *FakeVolume) GetSetUpDeviceCallCount() int {
 
 // Block volume support
 func (fv *FakeVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	fv.RLock()
-	defer fv.RUnlock()
+	fv.Lock()
+	defer fv.Unlock()
 	fv.GlobalMapPathCallCount++
 	return fv.getGlobalMapPath()
 }
@@ -1700,7 +1711,7 @@ func CreateTestPVC(capacity string, accessModes []v1.PersistentVolumeAccessMode)
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: accessModes,
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
 				},

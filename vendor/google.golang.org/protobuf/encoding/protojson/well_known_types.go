@@ -176,7 +176,7 @@ func (d decoder) unmarshalAny(m protoreflect.Message) error {
 	// Use another decoder to parse the unread bytes for @type field. This
 	// avoids advancing a read from current decoder because the current JSON
 	// object may contain the fields of the embedded type.
-	dec := decoder{d.Clone(), UnmarshalOptions{}}
+	dec := decoder{d.Clone(), UnmarshalOptions{RecursionLimit: d.opts.RecursionLimit}}
 	tok, err := findTypeURL(dec)
 	switch err {
 	case errEmptyObject:
@@ -308,48 +308,29 @@ Loop:
 // array) in order to advance the read to the next JSON value. It relies on
 // the decoder returning an error if the types are not in valid sequence.
 func (d decoder) skipJSONValue() error {
-	tok, err := d.Read()
-	if err != nil {
-		return err
-	}
-	// Only need to continue reading for objects and arrays.
-	switch tok.Kind() {
-	case json.ObjectOpen:
-		for {
-			tok, err := d.Read()
-			if err != nil {
-				return err
-			}
-			switch tok.Kind() {
-			case json.ObjectClose:
-				return nil
-			case json.Name:
-				// Skip object field value.
-				if err := d.skipJSONValue(); err != nil {
-					return err
-				}
-			}
+	var open int
+	for {
+		tok, err := d.Read()
+		if err != nil {
+			return err
 		}
-
-	case json.ArrayOpen:
-		for {
-			tok, err := d.Peek()
-			if err != nil {
-				return err
+		switch tok.Kind() {
+		case json.ObjectClose, json.ArrayClose:
+			open--
+		case json.ObjectOpen, json.ArrayOpen:
+			open++
+			if open > d.opts.RecursionLimit {
+				return errors.New("exceeded max recursion depth")
 			}
-			switch tok.Kind() {
-			case json.ArrayClose:
-				d.Read()
-				return nil
-			default:
-				// Skip array item.
-				if err := d.skipJSONValue(); err != nil {
-					return err
-				}
-			}
+		case json.EOF:
+			// This can only happen if there's a bug in Decoder.Read.
+			// Avoid an infinite loop if this does happen.
+			return errors.New("unexpected EOF")
+		}
+		if open == 0 {
+			return nil
 		}
 	}
-	return nil
 }
 
 // unmarshalAnyValue unmarshals the given custom-type message from the JSON
@@ -814,15 +795,21 @@ func (d decoder) unmarshalTimestamp(m protoreflect.Message) error {
 		return d.unexpectedTokenError(tok)
 	}
 
-	t, err := time.Parse(time.RFC3339Nano, tok.ParsedString())
+	s := tok.ParsedString()
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return d.newError(tok.Pos(), "invalid %v value %v", genid.Timestamp_message_fullname, tok.RawString())
 	}
-	// Validate seconds. No need to validate nanos because time.Parse would have
-	// covered that already.
+	// Validate seconds.
 	secs := t.Unix()
 	if secs < minTimestampSeconds || secs > maxTimestampSeconds {
 		return d.newError(tok.Pos(), "%v value out of range: %v", genid.Timestamp_message_fullname, tok.RawString())
+	}
+	// Validate subseconds.
+	i := strings.LastIndexByte(s, '.')  // start of subsecond field
+	j := strings.LastIndexAny(s, "Z-+") // start of timezone field
+	if i >= 0 && j >= i && j-i > len(".999999999") {
+		return d.newError(tok.Pos(), "invalid %v value %v", genid.Timestamp_message_fullname, tok.RawString())
 	}
 
 	fds := m.Descriptor().Fields()

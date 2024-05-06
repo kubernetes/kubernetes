@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	"github.com/go-openapi/jsonreference"
-	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 )
 
 // Interfaces

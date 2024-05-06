@@ -1,5 +1,5 @@
-//go:build !windows
-// +build !windows
+//go:build !linux && !windows
+// +build !linux,!windows
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -20,6 +20,8 @@ limitations under the License.
 package stats
 
 import (
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
@@ -27,4 +29,24 @@ import (
 // It should return (nil, nil) for platforms other than Windows.
 func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
 	return nil, nil
+}
+
+func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.PodSandboxStats,
+	ps *statsapi.PodStats, fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+	containerMap map[string]*runtimeapi.Container,
+	podSandbox *runtimeapi.PodSandbox,
+	rootFsInfo *cadvisorapiv2.FsInfo, updateCPUNanoCoreUsage bool) error {
+	return nil
+}
+
+func addCRIPodNetworkStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+}
+
+func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+}
+
+func addCRIPodCPUStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+}
+
+func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
 }

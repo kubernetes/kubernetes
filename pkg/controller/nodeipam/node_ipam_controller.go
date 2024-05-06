@@ -24,7 +24,6 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	networkinginformers "k8s.io/client-go/informers/networking/v1alpha1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -65,8 +64,6 @@ type Controller struct {
 	secondaryServiceCIDR *net.IPNet
 	kubeClient           clientset.Interface
 	eventBroadcaster     record.EventBroadcaster
-	// Method for easy mocking in unittest.
-	lookupIP func(host string) ([]net.IP, error)
 
 	nodeLister         corelisters.NodeLister
 	nodeInformerSynced cache.InformerSynced
@@ -83,7 +80,6 @@ type Controller struct {
 func NewNodeIpamController(
 	ctx context.Context,
 	nodeInformer coreinformers.NodeInformer,
-	clusterCIDRInformer networkinginformers.ClusterCIDRInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
@@ -92,7 +88,6 @@ func NewNodeIpamController(
 	nodeCIDRMaskSizes []int,
 	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 
-	logger := klog.FromContext(ctx)
 	if kubeClient == nil {
 		return nil, fmt.Errorf("kubeClient is nil when starting Controller")
 	}
@@ -114,8 +109,7 @@ func NewNodeIpamController(
 	ic := &Controller{
 		cloud:                cloud,
 		kubeClient:           kubeClient,
-		eventBroadcaster:     record.NewBroadcaster(),
-		lookupIP:             net.LookupIP,
+		eventBroadcaster:     record.NewBroadcaster(record.WithContext(ctx)),
 		clusterCIDRs:         clusterCIDRs,
 		serviceCIDR:          serviceCIDR,
 		secondaryServiceCIDR: secondaryServiceCIDR,
@@ -125,7 +119,7 @@ func NewNodeIpamController(
 	// TODO: Abstract this check into a generic controller manager should run method.
 	if ic.allocatorType == ipam.IPAMFromClusterAllocatorType || ic.allocatorType == ipam.IPAMFromCloudAllocatorType {
 		var err error
-		ic.legacyIPAM, err = createLegacyIPAM(logger, ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
+		ic.legacyIPAM, err = createLegacyIPAM(ctx, ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +133,7 @@ func NewNodeIpamController(
 			NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
 		}
 
-		ic.cidrAllocator, err = ipam.New(ctx, kubeClient, cloud, nodeInformer, clusterCIDRInformer, ic.allocatorType, allocatorParams)
+		ic.cidrAllocator, err = ipam.New(ctx, kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +150,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
-	nc.eventBroadcaster.StartStructuredLogging(0)
+	nc.eventBroadcaster.StartStructuredLogging(3)
 	nc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: nc.kubeClient.CoreV1().Events("")})
 	defer nc.eventBroadcaster.Shutdown()
 	klog.FromContext(ctx).Info("Starting ipam controller")

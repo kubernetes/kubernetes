@@ -13,7 +13,7 @@ import (
 /*
 The EntryDescription decorator allows you to pass a format string to DescribeTable() and Entry().  This format string is used to generate entry names via:
 
-    fmt.Sprintf(formatString, parameters...)
+	fmt.Sprintf(formatString, parameters...)
 
 where parameters are the parameters passed into the entry.
 
@@ -32,20 +32,21 @@ DescribeTable describes a table-driven spec.
 
 For example:
 
-    DescribeTable("a simple table",
-        func(x int, y int, expected bool) {
-            Ω(x > y).Should(Equal(expected))
-        },
-        Entry("x > y", 1, 0, true),
-        Entry("x == y", 0, 0, false),
-        Entry("x < y", 0, 1, false),
-    )
+	DescribeTable("a simple table",
+	    func(x int, y int, expected bool) {
+	        Ω(x > y).Should(Equal(expected))
+	    },
+	    Entry("x > y", 1, 0, true),
+	    Entry("x == y", 0, 0, false),
+	    Entry("x < y", 0, 1, false),
+	)
 
 You can learn more about DescribeTable here: https://onsi.github.io/ginkgo/#table-specs
 And can explore some Table patterns here: https://onsi.github.io/ginkgo/#table-specs-patterns
 */
 func DescribeTable(description string, args ...interface{}) bool {
-	generateTable(description, args...)
+	GinkgoHelper()
+	generateTable(description, false, args...)
 	return true
 }
 
@@ -53,8 +54,9 @@ func DescribeTable(description string, args ...interface{}) bool {
 You can focus a table with `FDescribeTable`.  This is equivalent to `FDescribe`.
 */
 func FDescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	args = append(args, internal.Focus)
-	generateTable(description, args...)
+	generateTable(description, false, args...)
 	return true
 }
 
@@ -62,8 +64,9 @@ func FDescribeTable(description string, args ...interface{}) bool {
 You can mark a table as pending with `PDescribeTable`.  This is equivalent to `PDescribe`.
 */
 func PDescribeTable(description string, args ...interface{}) bool {
+	GinkgoHelper()
 	args = append(args, internal.Pending)
-	generateTable(description, args...)
+	generateTable(description, false, args...)
 	return true
 }
 
@@ -71,6 +74,71 @@ func PDescribeTable(description string, args ...interface{}) bool {
 You can mark a table as pending with `XDescribeTable`.  This is equivalent to `XDescribe`.
 */
 var XDescribeTable = PDescribeTable
+
+/*
+DescribeTableSubtree describes a table-driven spec that generates a set of tests for each entry.
+
+For example:
+
+	DescribeTableSubtree("a subtree table",
+	    func(url string, code int, message string) {
+			var resp *http.Response
+			BeforeEach(func() {
+				var err error
+				resp, err = http.Get(url)
+				Expect(err).NotTo(HaveOccurred())
+				DeferCleanup(resp.Body.Close)
+			})
+
+			It("should return the expected status code", func() {
+				Expect(resp.StatusCode).To(Equal(code))
+			})
+
+			It("should return the expected message", func() {
+				body, err := ioutil.ReadAll(resp.Body)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(body)).To(Equal(message))
+			})
+	    },
+	    Entry("default response", "example.com/response", http.StatusOK, "hello world"),
+	    Entry("missing response", "example.com/missing", http.StatusNotFound, "wat?"),
+	)
+
+Note that you **must** place define an It inside the body function.
+
+You can learn more about DescribeTableSubtree here: https://onsi.github.io/ginkgo/#table-specs
+And can explore some Table patterns here: https://onsi.github.io/ginkgo/#table-specs-patterns
+*/
+func DescribeTableSubtree(description string, args ...interface{}) bool {
+	GinkgoHelper()
+	generateTable(description, true, args...)
+	return true
+}
+
+/*
+You can focus a table with `FDescribeTableSubtree`.  This is equivalent to `FDescribe`.
+*/
+func FDescribeTableSubtree(description string, args ...interface{}) bool {
+	GinkgoHelper()
+	args = append(args, internal.Focus)
+	generateTable(description, true, args...)
+	return true
+}
+
+/*
+You can mark a table as pending with `PDescribeTableSubtree`.  This is equivalent to `PDescribe`.
+*/
+func PDescribeTableSubtree(description string, args ...interface{}) bool {
+	GinkgoHelper()
+	args = append(args, internal.Pending)
+	generateTable(description, true, args...)
+	return true
+}
+
+/*
+You can mark a table as pending with `XDescribeTableSubtree`.  This is equivalent to `XDescribe`.
+*/
+var XDescribeTableSubtree = PDescribeTableSubtree
 
 /*
 TableEntry represents an entry in a table test.  You generally use the `Entry` constructor.
@@ -95,26 +163,29 @@ If you want to generate interruptible specs simply write a Table function that a
 You can learn more about Entry here: https://onsi.github.io/ginkgo/#table-specs
 */
 func Entry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
 You can focus a particular entry with FEntry.  This is equivalent to FIt.
 */
 func FEntry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
 	decorations = append(decorations, internal.Focus)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
 You can mark a particular entry as pending with PEntry.  This is equivalent to PIt.
 */
 func PEntry(description interface{}, args ...interface{}) TableEntry {
+	GinkgoHelper()
 	decorations, parameters := internal.PartitionDecorations(args...)
 	decorations = append(decorations, internal.Pending)
-	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(1)}
+	return TableEntry{description: description, decorations: decorations, parameters: parameters, codeLocation: types.NewCodeLocation(0)}
 }
 
 /*
@@ -125,13 +196,14 @@ var XEntry = PEntry
 var contextType = reflect.TypeOf(new(context.Context)).Elem()
 var specContextType = reflect.TypeOf(new(SpecContext)).Elem()
 
-func generateTable(description string, args ...interface{}) {
-	cl := types.NewCodeLocation(2)
+func generateTable(description string, isSubtree bool, args ...interface{}) {
+	GinkgoHelper()
+	cl := types.NewCodeLocation(0)
 	containerNodeArgs := []interface{}{cl}
 
 	entries := []TableEntry{}
-	var itBody interface{}
-	var itBodyType reflect.Type
+	var internalBody interface{}
+	var internalBodyType reflect.Type
 
 	var tableLevelEntryDescription interface{}
 	tableLevelEntryDescription = func(args ...interface{}) string {
@@ -159,11 +231,11 @@ func generateTable(description string, args ...interface{}) {
 		case t.Kind() == reflect.Func && t.NumOut() == 1 && t.Out(0) == reflect.TypeOf(""):
 			tableLevelEntryDescription = arg
 		case t.Kind() == reflect.Func:
-			if itBody != nil {
+			if internalBody != nil {
 				exitIfErr(types.GinkgoErrors.MultipleEntryBodyFunctionsForTable(cl))
 			}
-			itBody = arg
-			itBodyType = reflect.TypeOf(itBody)
+			internalBody = arg
+			internalBodyType = reflect.TypeOf(internalBody)
 		default:
 			containerNodeArgs = append(containerNodeArgs, arg)
 		}
@@ -193,39 +265,47 @@ func generateTable(description string, args ...interface{}) {
 				err = types.GinkgoErrors.InvalidEntryDescription(entry.codeLocation)
 			}
 
-			itNodeArgs := []interface{}{entry.codeLocation}
-			itNodeArgs = append(itNodeArgs, entry.decorations...)
+			internalNodeArgs := []interface{}{entry.codeLocation}
+			internalNodeArgs = append(internalNodeArgs, entry.decorations...)
 
 			hasContext := false
-			if itBodyType.NumIn() > 0. {
-				if itBodyType.In(0).Implements(specContextType) {
+			if internalBodyType.NumIn() > 0. {
+				if internalBodyType.In(0).Implements(specContextType) {
 					hasContext = true
-				} else if itBodyType.In(0).Implements(contextType) && (len(entry.parameters) == 0 || !reflect.TypeOf(entry.parameters[0]).Implements(contextType)) {
+				} else if internalBodyType.In(0).Implements(contextType) && (len(entry.parameters) == 0 || !reflect.TypeOf(entry.parameters[0]).Implements(contextType)) {
 					hasContext = true
 				}
 			}
 
 			if err == nil {
-				err = validateParameters(itBody, entry.parameters, "Table Body function", entry.codeLocation, hasContext)
+				err = validateParameters(internalBody, entry.parameters, "Table Body function", entry.codeLocation, hasContext)
 			}
 
 			if hasContext {
-				itNodeArgs = append(itNodeArgs, func(c SpecContext) {
+				internalNodeArgs = append(internalNodeArgs, func(c SpecContext) {
 					if err != nil {
 						panic(err)
 					}
-					invokeFunction(itBody, append([]interface{}{c}, entry.parameters...))
+					invokeFunction(internalBody, append([]interface{}{c}, entry.parameters...))
 				})
+				if isSubtree {
+					exitIfErr(types.GinkgoErrors.ContextsCannotBeUsedInSubtreeTables(cl))
+				}
 			} else {
-				itNodeArgs = append(itNodeArgs, func() {
+				internalNodeArgs = append(internalNodeArgs, func() {
 					if err != nil {
 						panic(err)
 					}
-					invokeFunction(itBody, entry.parameters)
+					invokeFunction(internalBody, entry.parameters)
 				})
 			}
 
-			pushNode(internal.NewNode(deprecationTracker, types.NodeTypeIt, description, itNodeArgs...))
+			internalNodeType := types.NodeTypeIt
+			if isSubtree {
+				internalNodeType = types.NodeTypeContainer
+			}
+
+			pushNode(internal.NewNode(deprecationTracker, internalNodeType, description, internalNodeArgs...))
 		}
 	})
 

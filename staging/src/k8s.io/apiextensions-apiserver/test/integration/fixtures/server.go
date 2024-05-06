@@ -31,6 +31,8 @@ import (
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	servertesting "k8s.io/apiextensions-apiserver/pkg/cmd/server/testing"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -88,7 +90,7 @@ users:
 		"--kubeconfig", fakeKubeConfig.Name(),
 		// disable admission and filters that require talking to kube-apiserver
 		"--enable-priority-and-fairness=false",
-		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"},
+		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ValidatingAdmissionPolicy"},
 		flags...,
 	), nil)
 	if err != nil {
@@ -145,10 +147,15 @@ func StartDefaultServerWithClientsAndEtcd(t servertesting.Logger, extraFlags ...
 		return nil, nil, nil, nil, "", err
 	}
 
-	RESTOptionsGetter, err := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
-	if err != nil {
-		return nil, nil, nil, nil, "", err
+	var resourceTransformers storagevalue.ResourceTransformers
+	if len(options.RecommendedOptions.Etcd.EncryptionProviderConfigFilepath) != 0 {
+		// be clever in tests to reconstruct the transformers, for encryption integration tests
+		config := genericapiserver.Config{}
+		options.RecommendedOptions.Etcd.ApplyTo(&config)
+		resourceTransformers = config.ResourceTransformers
 	}
+
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, resourceTransformers, nil)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "hopefully-ignored-group", Resource: "hopefully-ignored-resources"})
 	if err != nil {
 		return nil, nil, nil, nil, "", err

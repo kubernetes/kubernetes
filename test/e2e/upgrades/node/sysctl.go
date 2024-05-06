@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -59,7 +60,7 @@ func (t *SysctlUpgradeTest) Test(ctx context.Context, f *framework.Framework, do
 		ginkgo.By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(ctx, t.validPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
+		gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 	}
 
 	ginkgo.By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
@@ -68,7 +69,7 @@ func (t *SysctlUpgradeTest) Test(ctx context.Context, f *framework.Framework, do
 		framework.ExpectNoError(err)
 	}
 	if err == nil {
-		framework.ExpectNotEqual(pod.Status.Phase, v1.PodRunning)
+		gomega.Expect(pod.Status.Phase).NotTo(gomega.Equal(v1.PodRunning))
 	}
 
 	t.verifySafeSysctlWork(ctx, f)
@@ -105,7 +106,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(ctx context.Context, 
 	ginkgo.By("Making sure the invalid pod failed")
 	ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, invalidPod)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
+	gomega.Expect(ev.Reason).To(gomega.Equal(sysctl.ForbiddenReason))
 
 	return invalidPod
 }

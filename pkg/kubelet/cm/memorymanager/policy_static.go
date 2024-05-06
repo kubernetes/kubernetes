@@ -34,6 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const policyTypeStatic policyType = "Static"
@@ -49,7 +51,10 @@ type staticPolicy struct {
 	systemReserved systemReservedMemory
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
-	// initContainersReusableMemory contains the memory allocated for init containers that can be reused
+	// initContainersReusableMemory contains the memory allocated for init
+	// containers that can be reused.
+	// Note that the restartable init container memory is not included here,
+	// because it is not reusable.
 	initContainersReusableMemory reusableMemory
 }
 
@@ -91,7 +96,7 @@ func (p *staticPolicy) Start(s state.State) error {
 }
 
 // Allocate call is idempotent
-func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	// allocate the memory only for guaranteed pods
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
@@ -99,6 +104,13 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 	podUID := string(pod.UID)
 	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+	// container belongs in an exclusively allocated pool
+	metrics.MemoryManagerPinningRequestTotal.Inc()
+	defer func() {
+		if rerr != nil {
+			metrics.MemoryManagerPinningErrorsTotal.Inc()
+		}
+	}()
 	if blocks := s.GetMemoryBlocks(podUID, container.Name); blocks != nil {
 		p.updatePodReusableMemory(pod, container, blocks)
 
@@ -318,9 +330,10 @@ func regenerateHints(pod *v1.Pod, ctn *v1.Container, ctnBlocks []state.Block, re
 }
 
 func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
+	// Maximun resources requested by init containers at any given time.
 	reqRsrcsByInitCtrs := make(map[v1.ResourceName]uint64)
-	reqRsrcsByAppCtrs := make(map[v1.ResourceName]uint64)
-
+	// Total resources requested by restartable init containers.
+	reqRsrcsByRestartableInitCtrs := make(map[v1.ResourceName]uint64)
 	for _, ctr := range pod.Spec.InitContainers {
 		reqRsrcs, err := getRequestedResources(pod, &ctr)
 
@@ -332,12 +345,17 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 				reqRsrcsByInitCtrs[rsrcName] = uint64(0)
 			}
 
-			if reqRsrcs[rsrcName] > reqRsrcsByInitCtrs[rsrcName] {
-				reqRsrcsByInitCtrs[rsrcName] = qty
+			// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+			// for the detail.
+			if types.IsRestartableInitContainer(&ctr) {
+				reqRsrcsByRestartableInitCtrs[rsrcName] += qty
+			} else if reqRsrcsByRestartableInitCtrs[rsrcName]+qty > reqRsrcsByInitCtrs[rsrcName] {
+				reqRsrcsByInitCtrs[rsrcName] = reqRsrcsByRestartableInitCtrs[rsrcName] + qty
 			}
 		}
 	}
 
+	reqRsrcsByAppCtrs := make(map[v1.ResourceName]uint64)
 	for _, ctr := range pod.Spec.Containers {
 		reqRsrcs, err := getRequestedResources(pod, &ctr)
 
@@ -353,12 +371,17 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 		}
 	}
 
+	reqRsrcs := make(map[v1.ResourceName]uint64)
 	for rsrcName := range reqRsrcsByAppCtrs {
-		if reqRsrcsByInitCtrs[rsrcName] > reqRsrcsByAppCtrs[rsrcName] {
-			reqRsrcsByAppCtrs[rsrcName] = reqRsrcsByInitCtrs[rsrcName]
+		// Total resources requested by long-running containers.
+		reqRsrcsByLongRunningCtrs := reqRsrcsByAppCtrs[rsrcName] + reqRsrcsByRestartableInitCtrs[rsrcName]
+		reqRsrcs[rsrcName] = reqRsrcsByLongRunningCtrs
+
+		if reqRsrcs[rsrcName] < reqRsrcsByInitCtrs[rsrcName] {
+			reqRsrcs[rsrcName] = reqRsrcsByInitCtrs[rsrcName]
 		}
 	}
-	return reqRsrcsByAppCtrs, nil
+	return reqRsrcs, nil
 }
 
 func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
@@ -415,12 +438,12 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 	requestedResources := map[v1.ResourceName]uint64{}
 	resources := container.Resources.Requests
 	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// ResourcesAllocated holds the value of Container.Resources.Requests when the pod was admitted.
+	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
 	// We should return this value because this is what kubelet agreed to allocate for the container
 	// and the value configured with runtime.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			resources = cs.ResourcesAllocated
+			resources = cs.AllocatedResources
 		}
 	}
 	for resourceName, quantity := range resources {
@@ -856,7 +879,7 @@ func (p *staticPolicy) updatePodReusableMemory(pod *v1.Pod, container *v1.Contai
 		}
 	}
 
-	if isInitContainer(pod, container) {
+	if isRegularInitContainer(pod, container) {
 		if _, ok := p.initContainersReusableMemory[podUID]; !ok {
 			p.initContainersReusableMemory[podUID] = map[string]map[v1.ResourceName]uint64{}
 		}
@@ -905,6 +928,12 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 				break
 			}
 
+			if types.IsRestartableInitContainer(&initContainer) {
+				// we should not reuse the resource from any restartable init
+				// container
+				continue
+			}
+
 			initContainerBlocks := s.GetMemoryBlocks(podUID, initContainer.Name)
 			if len(initContainerBlocks) == 0 {
 				continue
@@ -938,10 +967,10 @@ func (p *staticPolicy) updateInitContainersMemoryBlocks(s state.State, pod *v1.P
 	}
 }
 
-func isInitContainer(pod *v1.Pod, container *v1.Container) bool {
+func isRegularInitContainer(pod *v1.Pod, container *v1.Container) bool {
 	for _, initContainer := range pod.Spec.InitContainers {
 		if initContainer.Name == container.Name {
-			return true
+			return !types.IsRestartableInitContainer(&initContainer)
 		}
 	}
 

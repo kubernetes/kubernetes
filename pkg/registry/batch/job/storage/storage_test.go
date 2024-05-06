@@ -19,6 +19,8 @@ package storage
 import (
 	"testing"
 
+	"k8s.io/utils/ptr"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -137,9 +139,10 @@ func TestCreate(t *testing.T) {
 		// invalid (empty selector)
 		&batch.Job{
 			Spec: batch.JobSpec{
-				Completions: validJob.Spec.Completions,
-				Selector:    &metav1.LabelSelector{},
-				Template:    validJob.Spec.Template,
+				ManualSelector: ptr.To(false),
+				Completions:    validJob.Spec.Completions,
+				Selector:       &metav1.LabelSelector{},
+				Template:       validJob.Spec.Template,
 			},
 		},
 	)

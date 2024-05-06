@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // Package v1beta1 contains definition of kms-plugin's gRPC service.
+// Deprecated: KMSv1 is deprecated in v1.28 and will only receive security updates going forward. Use KMSv2 instead.
 package v1beta1
 
 // IsVersionCheckMethod determines whether the supplied method is a version check against kms-plugin.

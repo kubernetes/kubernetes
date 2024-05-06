@@ -243,59 +243,6 @@ kube::util::find-binary() {
   kube::util::find-binary-for-platform "$1" "$(kube::util::host_platform)"
 }
 
-# Run all known doc generators (today gendocs and genman for kubectl)
-# $1 is the directory to put those generated documents
-kube::util::gen-docs() {
-  local dest="$1"
-
-  # Find binary
-  gendocs=$(kube::util::find-binary "gendocs")
-  genkubedocs=$(kube::util::find-binary "genkubedocs")
-  genman=$(kube::util::find-binary "genman")
-  genyaml=$(kube::util::find-binary "genyaml")
-
-  mkdir -p "${dest}/docs/user-guide/kubectl/"
-  "${gendocs}" "${dest}/docs/user-guide/kubectl/"
-  mkdir -p "${dest}/docs/admin/"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
-  "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
-  "${genkubedocs}" "${dest}/docs/admin/" "kubeadm"
-
-  mkdir -p "${dest}/docs/man/man1/"
-  "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
-  "${genman}" "${dest}/docs/man/man1/" "kube-controller-manager"
-  "${genman}" "${dest}/docs/man/man1/" "kube-proxy"
-  "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
-  "${genman}" "${dest}/docs/man/man1/" "kubelet"
-  "${genman}" "${dest}/docs/man/man1/" "kubectl"
-  "${genman}" "${dest}/docs/man/man1/" "kubeadm"
-
-  mkdir -p "${dest}/docs/yaml/kubectl/"
-  "${genyaml}" "${dest}/docs/yaml/kubectl/"
-
-  # create the list of generated files
-  pushd "${dest}" > /dev/null || return 1
-  touch docs/.generated_docs
-  find . -type f | cut -sd / -f 2- | LC_ALL=C sort > docs/.generated_docs
-  popd > /dev/null || return 1
-}
-
-# Removes previously generated docs-- we don't want to check them in. $KUBE_ROOT
-# must be set.
-kube::util::remove-gen-docs() {
-  if [ -e "${KUBE_ROOT}/docs/.generated_docs" ]; then
-    # remove all of the old docs; we don't want to check them in.
-    while read -r file; do
-      rm "${KUBE_ROOT}/${file}" 2>/dev/null || true
-    done <"${KUBE_ROOT}/docs/.generated_docs"
-    # The docs/.generated_docs file lists itself, so we don't need to explicitly
-    # delete it.
-  fi
-}
-
 # Takes a group/version and returns the path to its location on disk, sans
 # "pkg". E.g.:
 # * default behavior: extensions/v1beta1 -> apis/extensions/v1beta1
@@ -322,14 +269,14 @@ kube::util::group-version-to-pkg-path() {
     # Change "foo.bar.k8s.io/v1" -> "foo/v1" notation.
     local simple_gv="${group_version/.*k8s.io/}"
     if [[ "${api}" = "${simple_gv}" ]]; then
-      echo "vendor/k8s.io/api/${simple_gv}"
+      echo "staging/src/k8s.io/api/${simple_gv}"
       return
     fi
   done
 
   # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
-    echo "vendor/k8s.io/api/core/v1"
+    echo "staging/src/k8s.io/api/core/v1"
     return
   fi
 
@@ -342,13 +289,13 @@ kube::util::group-version-to-pkg-path() {
       echo "pkg/apis/core"
       ;;
     meta/v1)
-      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
+      echo "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1"
       ;;
     meta/v1beta1)
-      echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
+      echo "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1"
       ;;
     internal.apiserver.k8s.io/v1alpha1)
-      echo "vendor/k8s.io/api/apiserverinternal/v1alpha1"
+      echo "staging/src/k8s.io/api/apiserverinternal/v1alpha1"
       ;;
     *.k8s.io)
       echo "pkg/apis/${group_version%.*k8s.io}"
@@ -729,7 +676,8 @@ function kube::util::ensure-cfssl {
 # Check if we have "docker buildx" commands available
 #
 function kube::util::ensure-docker-buildx {
-  if docker buildx >/dev/null 2>&1; then
+  # podman returns 0 on `docker buildx version`, docker on `docker buildx`. One of them must succeed.
+  if docker buildx version >/dev/null 2>&1 || docker buildx >/dev/null 2>&1; then
     return 0
   else
     echo "ERROR: docker buildx not available. Docker 19.03 or higher is required with experimental features enabled"
@@ -831,8 +779,8 @@ function kube::util::md5() {
 # kube::util::read-array
 # Reads in stdin and adds it line by line to the array provided. This can be
 # used instead of "mapfile -t", and is bash 3 compatible.  If the named array
-# exists and is an array, it will be used.  Otherwise it will be unset and
-# recreated.
+# exists and is an array, it will be overwritten.  Otherwise it will be unset
+# and recreated.
 #
 # Assumed vars:
 #   $1 (name of array to create/modify)

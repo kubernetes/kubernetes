@@ -18,7 +18,7 @@ package output
 
 import (
 	"encoding/xml"
-	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
 	"testing"
@@ -52,7 +52,7 @@ func TestGinkgoOutput(t *testing.T, expected TestResult, runSpecsArgs ...interfa
 	ginkgo.RunSpecs(fakeT, "Logging Suite", runSpecsArgs...)
 
 	var actual reporters.JUnitTestSuites
-	data, err := ioutil.ReadFile(junitFile)
+	data, err := os.ReadFile(junitFile)
 	require.NoError(t, err)
 	err = xml.Unmarshal(data, &actual)
 	require.NoError(t, err)
@@ -110,6 +110,7 @@ func simplify(in string, expected TestResult) string {
 	out := normalizeLocation(in)
 	out = stripTimes(out)
 	out = stripAddresses(out)
+	out = normalizeInitFunctions(out)
 	if expected.NormalizeOutput != nil {
 		out = expected.NormalizeOutput(out)
 	}
@@ -176,5 +177,14 @@ func normalizeLocation(in string) string {
 	out = functionArgs.ReplaceAllString(out, "$1()")
 	out = testFailureOutput.ReplaceAllString(out, "")
 	out = klogPrefix.ReplaceAllString(out, "<klog> ")
+	return out
+}
+
+var initFunc = regexp.MustCompile(`(init\.+func|glob\.+func)`)
+
+// normalizeInitFunctions maps both init.func (used by Go >= 1.22) and
+// glob..func (used by Go < 1.22) to <init.func>.
+func normalizeInitFunctions(in string) string {
+	out := initFunc.ReplaceAllString(in, "<init.func>")
 	return out
 }

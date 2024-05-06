@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -59,7 +60,7 @@ func runControlPlane() func(c workflow.RunData) error {
 		}
 
 		// otherwise, retrieve all the info required for control plane upgrade
-		cfg := data.Cfg()
+		cfg := data.InitCfg()
 		client := data.Client()
 		dryRun := data.DryRun()
 		etcdUpgrade := data.EtcdUpgrade()
@@ -72,10 +73,16 @@ func runControlPlane() func(c workflow.RunData) error {
 			return upgrade.DryRunStaticPodUpgrade(patchesDir, cfg)
 		}
 
-		waiter := apiclient.NewKubeWaiter(data.Client(), upgrade.UpgradeManifestTimeout, os.Stdout)
+		waiter := apiclient.NewKubeWaiter(data.Client(), data.Cfg().Timeouts.UpgradeManifests.Duration, os.Stdout)
 
 		if err := upgrade.PerformStaticPodUpgrade(client, waiter, cfg, etcdUpgrade, renewCerts, patchesDir); err != nil {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")
+		}
+
+		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
+			if err := upgrade.PerformAddonsUpgrade(client, cfg, data.OutputWriter()); err != nil {
+				return errors.Wrap(err, "failed to perform addons upgrade")
+			}
 		}
 
 		fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")

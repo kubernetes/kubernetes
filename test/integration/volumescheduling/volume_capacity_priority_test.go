@@ -48,7 +48,7 @@ func mergeNodeLabels(node *v1.Node, labels map[string]string) *v1.Node {
 
 func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
 	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
-	testutil.SyncInformerFactory(testCtx)
+	testutil.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	clientset := testCtx.ClientSet
@@ -71,13 +71,12 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-			testutil.CleanupTest(t, testCtx)
 		},
 	}
 }
 
 func TestVolumeCapacityPriority(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeCapacityPriority, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeCapacityPriority, true)
 
 	config := setupClusterForVolumeCapacityPriority(t, "volume-capacity-priority", 0, 0)
 	defer config.teardown()
@@ -305,7 +304,7 @@ func setPVCapacity(pv *v1.PersistentVolume, capacity resource.Quantity) *v1.Pers
 }
 
 func setPVCRequestStorage(pvc *v1.PersistentVolumeClaim, request resource.Quantity) *v1.PersistentVolumeClaim {
-	pvc.Spec.Resources = v1.ResourceRequirements{
+	pvc.Spec.Resources = v1.VolumeResourceRequirements{
 		Requests: v1.ResourceList{
 			v1.ResourceName(v1.ResourceStorage): request,
 		},

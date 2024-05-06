@@ -37,7 +37,7 @@ message DaemonSet {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The desired behavior of this daemon set.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -63,7 +63,7 @@ message DaemonSetCondition {
 
   // Last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -79,7 +79,7 @@ message DaemonSetList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // A list of daemon sets.
   repeated DaemonSet items = 2;
@@ -92,14 +92,14 @@ message DaemonSetSpec {
   // If empty, defaulted to labels on Pod template.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 1;
 
   // An object that describes the pod that will be created.
   // The DaemonSet will create exactly one copy of this pod on every node
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
-  optional k8s.io.api.core.v1.PodTemplateSpec template = 2;
+  optional .k8s.io.api.core.v1.PodTemplateSpec template = 2;
 
   // An update strategy to replace existing DaemonSet pods with new pods.
   // +optional
@@ -176,6 +176,8 @@ message DaemonSetStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated DaemonSetCondition conditions = 10;
 }
 
@@ -203,7 +205,7 @@ message DaemonSetUpdateStrategy {
 message Deployment {
   // Standard object metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the Deployment.
   // +optional
@@ -223,10 +225,10 @@ message DeploymentCondition {
   optional string status = 2;
 
   // The last time this condition was updated.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 6;
 
   // Last time the condition transitioned from one status to another.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 7;
 
   // The reason for the condition's last transition.
   optional string reason = 4;
@@ -239,7 +241,7 @@ message DeploymentCondition {
 message DeploymentList {
   // Standard list metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Deployments.
   repeated Deployment items = 2;
@@ -269,10 +271,10 @@ message DeploymentSpec {
   // Label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.
-  optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
+  optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
@@ -343,6 +345,8 @@ message DeploymentStatus {
   // Represents the latest available observations of a deployment's current state.
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated DeploymentCondition conditions = 6;
 
   // Count of hash collisions for the Deployment. The Deployment controller uses this
@@ -406,6 +410,7 @@ message HTTPIngressPath {
 // or '#'.
 message HTTPIngressRuleValue {
   // A collection of paths that map requests to backends.
+  // +listType=atomic
   repeated HTTPIngressPath paths = 1;
 }
 
@@ -422,6 +427,7 @@ message IPBlock {
   // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
+  // +listType=atomic
   repeated string except = 2;
 }
 
@@ -434,7 +440,7 @@ message Ingress {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec is the desired state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -455,13 +461,13 @@ message IngressBackend {
 
   // Specifies the port of the referenced service.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
 
   // Resource is an ObjectRef to another Kubernetes resource in the namespace
   // of the Ingress object. If resource is specified, serviceName and servicePort
   // must not be specified.
   // +optional
-  optional k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
+  optional .k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
 }
 
 // IngressList is a collection of Ingress.
@@ -469,7 +475,7 @@ message IngressList {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Ingress.
   repeated Ingress items = 2;
@@ -495,6 +501,7 @@ message IngressLoadBalancerIngress {
 message IngressLoadBalancerStatus {
   // Ingress is a list containing ingress points for the load-balancer.
   // +optional
+  // +listType=atomic
   repeated IngressLoadBalancerIngress ingress = 1;
 }
 
@@ -602,11 +609,13 @@ message IngressSpec {
   // through the SNI TLS extension, if the ingress controller fulfilling the
   // ingress supports SNI.
   // +optional
+  // +listType=atomic
   repeated IngressTLS tls = 2;
 
   // A list of host rules used to configure the Ingress. If unspecified, or
   // no rule matches, all traffic is sent to the default backend.
   // +optional
+  // +listType=atomic
   repeated IngressRule rules = 3;
 }
 
@@ -624,6 +633,7 @@ message IngressTLS {
   // wildcard host setting for the loadbalancer controller fulfilling this
   // Ingress, if left unspecified.
   // +optional
+  // +listType=atomic
   repeated string hosts = 1;
 
   // SecretName is the name of the secret used to terminate SSL traffic on 443.
@@ -641,16 +651,11 @@ message NetworkPolicy {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior for this NetworkPolicy.
   // +optional
   optional NetworkPolicySpec spec = 2;
-
-  // Status is the current state of the NetworkPolicy.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
-  optional NetworkPolicyStatus status = 3;
 }
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule.
@@ -664,6 +669,7 @@ message NetworkPolicyEgressRule {
   // If this field is present and contains at least one item, then this rule allows
   // traffic only if the traffic matches at least one port in the list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPort ports = 1;
 
   // List of destinations for outgoing traffic of pods selected for this rule.
@@ -672,6 +678,7 @@ message NetworkPolicyEgressRule {
   // destination). If this field is present and contains at least one item, this rule
   // allows traffic only if the traffic matches at least one item in the to list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPeer to = 2;
 }
 
@@ -684,6 +691,7 @@ message NetworkPolicyIngressRule {
   // If this field is present and contains at least one item, then this rule allows traffic
   // only if the traffic matches at least one port in the list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPort ports = 1;
 
   // List of sources which should be able to access the pods selected for this rule.
@@ -692,6 +700,7 @@ message NetworkPolicyIngressRule {
   // If this field is present and contains at least one item, this rule allows traffic only if the
   // traffic matches at least one item in the from list.
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyPeer from = 2;
 }
 
@@ -701,7 +710,7 @@ message NetworkPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of schema objects.
   repeated NetworkPolicy items = 2;
@@ -716,7 +725,7 @@ message NetworkPolicyPeer {
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // Selects Namespaces using cluster-scoped labels. This field follows standard label
   // selector semantics; if present but empty, it selects all namespaces.
@@ -725,7 +734,7 @@ message NetworkPolicyPeer {
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
 
   // IPBlock defines policy on a particular IPBlock. If this field is set then
   // neither of the other fields can be.
@@ -745,7 +754,7 @@ message NetworkPolicyPort {
   // numbers.
   // If present, only traffic on the specified protocol AND port will be matched.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // If set, indicates that the range of ports from port to endPort, inclusive,
   // should be allowed by the policy. This field cannot be defined if the port field
@@ -762,7 +771,7 @@ message NetworkPolicySpec {
   // same set of pods.  In this case, the ingress rules for each are combined additively.
   // This field is NOT optional and follows standard label selector semantics.
   // An empty podSelector matches all pods in this namespace.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // List of ingress rules to be applied to the selected pods.
   // Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
@@ -772,6 +781,7 @@ message NetworkPolicySpec {
   // If this field is empty then this NetworkPolicy does not allow any traffic
   // (and serves solely to ensure that the pods it selects are isolated by default).
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyIngressRule ingress = 2;
 
   // List of egress rules to be applied to the selected pods. Outgoing traffic is
@@ -782,6 +792,7 @@ message NetworkPolicySpec {
   // solely to ensure that the pods it selects are isolated by default).
   // This field is beta-level in 1.8
   // +optional
+  // +listType=atomic
   repeated NetworkPolicyEgressRule egress = 3;
 
   // List of rule types that the NetworkPolicy relates to.
@@ -795,19 +806,8 @@ message NetworkPolicySpec {
   // an Egress section and would otherwise default to just [ "Ingress" ]).
   // This field is beta-level in 1.8
   // +optional
+  // +listType=atomic
   repeated string policyTypes = 4;
-}
-
-// NetworkPolicyStatus describe the current state of the NetworkPolicy.
-message NetworkPolicyStatus {
-  // Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
-  // Current service state
-  // +optional
-  // +patchMergeKey=type
-  // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=type
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
@@ -818,7 +818,7 @@ message ReplicaSet {
   // be the same as the Pod(s) that the ReplicaSet manages.
   // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the ReplicaSet.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -844,7 +844,7 @@ message ReplicaSetCondition {
 
   // The last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -860,7 +860,7 @@ message ReplicaSetList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ReplicaSets.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller
@@ -887,13 +887,13 @@ message ReplicaSetSpec {
   // Label keys and values that must match in order to be controlled by this replica set.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
   // insufficient replicas are detected.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
-  optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
+  optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
@@ -922,6 +922,8 @@ message ReplicaSetStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated ReplicaSetCondition conditions = 6;
 }
 
@@ -949,7 +951,7 @@ message RollingUpdateDaemonSet {
   // 70% of original number of DaemonSet pods are available at all times during
   // the update.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 
   // The maximum number of nodes with an existing available DaemonSet pod that
   // can have an updated DaemonSet pod during during an update.
@@ -971,7 +973,7 @@ message RollingUpdateDaemonSet {
   // cause evictions during disruption.
   // This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
 // Spec to control the desired behavior of rolling update.
@@ -987,7 +989,7 @@ message RollingUpdateDeployment {
   // that the total number of pods available at all times during the update is at
   // least 70% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
 
   // The maximum number of pods that can be scheduled above the desired number of
   // pods.
@@ -1001,14 +1003,14 @@ message RollingUpdateDeployment {
   // new RC can be scaled up further, ensuring that total number of pods running
   // at any time during the update is at most 130% of desired pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
 // represents a scaling request for a resource.
 message Scale {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
   // +optional

@@ -23,7 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 stability_check_setup() {
-  kube::golang::verify_go_version
   kube::util::ensure-temp-dir
   cd "${KUBE_ROOT}"
   kube::golang::setup_env
@@ -36,6 +35,7 @@ function find_files_to_check() {
     git ls-files -cmo --exclude-standard \
         ':!:vendor/*'        `# catches vendor/...` \
         ':!:*/vendor/*'      `# catches any subdir/vendor/...` \
+        ':!:*/testdata/*'    `# catches any subdir/testdata/...` \
         ':!:third_party/*'   `# catches third_party/...` \
         ':!:*/third_party/*' `# catches third_party/...` \
         ':!:hack/*'          `# catches hack/...` \
@@ -59,6 +59,7 @@ reset=$(tput sgr0)
 function kube::validate::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
+  temp_file2=$(mktemp)
   doValidate=$(find_files_to_check -z \
       | sort -z \
       | KUBE_ROOT=${KUBE_ROOT} xargs -0 -L 200 \
@@ -73,12 +74,16 @@ function kube::validate::stablemetrics() {
 
   if $doValidate; then
     echo -e "${green}Diffing test/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
-    if diff -u "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file"; then
-      echo -e "${green}\nPASS metrics stability verification ${reset}"
-      return 0
-    fi
   fi
-
+  doSort=$(KUBE_ROOT=${KUBE_ROOT} go run "test/instrumentation/sort/main.go" --sort-file="${temp_file}" 1>"${temp_file2}")
+  if ! $doSort; then
+    echo "${red}!!! sorting metrics has failed! ${reset}" >&2
+    exit 1
+  fi
+  if diff -u "$KUBE_ROOT/test/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file2"; then
+    echo -e "${green}\nPASS metrics stability verification ${reset}"
+    return 0
+  fi
   echo "${red}!!! Metrics Stability static analysis has failed!${reset}" >&2
   echo "${red}!!! Please run ./hack/update-generated-stable-metrics.sh to update the golden list.${reset}" >&2
   exit 1
@@ -115,7 +120,7 @@ function kube::validate::test::stablemetrics() {
 function kube::update::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
-
+  temp_file2=$(mktemp)
   doCheckStability=$(find_files_to_check -z \
       | sort -z \
       | KUBE_ROOT=${KUBE_ROOT} xargs -0 -L 200 \
@@ -133,6 +138,12 @@ function kube::update::stablemetrics() {
     exit 1
   fi
   mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
+  doSort=$(go run "test/instrumentation/sort/main.go" --sort-file="${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml" 1>"${temp_file2}")
+  if ! $doSort; then
+    echo "${red}!!! sorting metrics has failed! ${reset}" >&2
+    exit 1
+  fi
+  mv -f "$temp_file2" "${KUBE_ROOT}/test/instrumentation/testdata/stable-metrics-list.yaml"
   echo "${green}Updated golden list of stable metrics.${reset}"
 }
 

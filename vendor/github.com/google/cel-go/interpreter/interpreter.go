@@ -18,30 +18,23 @@
 package interpreter
 
 import (
+	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/containers"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/interpreter/functions"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // Interpreter generates a new Interpretable from a checked or unchecked expression.
 type Interpreter interface {
 	// NewInterpretable creates an Interpretable from a checked expression and an
 	// optional list of InterpretableDecorator values.
-	NewInterpretable(checked *exprpb.CheckedExpr,
-		decorators ...InterpretableDecorator) (Interpretable, error)
-
-	// NewUncheckedInterpretable returns an Interpretable from a parsed expression
-	// and an optional list of InterpretableDecorator values.
-	NewUncheckedInterpretable(expr *exprpb.Expr,
-		decorators ...InterpretableDecorator) (Interpretable, error)
+	NewInterpretable(exprAST *ast.AST, decorators ...InterpretableDecorator) (Interpretable, error)
 }
 
 // EvalObserver is a functional interface that accepts an expression id and an observed value.
 // The id identifies the expression that was evaluated, the programStep is the Interpretable or Qualifier that
 // was evaluated and value is the result of the evaluation.
-type EvalObserver func(id int64, programStep interface{}, value ref.Val)
+type EvalObserver func(id int64, programStep any, value ref.Val)
 
 // Observe constructs a decorator that calls all the provided observers in order after evaluating each Interpretable
 // or Qualifier during program evaluation.
@@ -49,7 +42,7 @@ func Observe(observers ...EvalObserver) InterpretableDecorator {
 	if len(observers) == 1 {
 		return decObserveEval(observers[0])
 	}
-	observeFn := func(id int64, programStep interface{}, val ref.Val) {
+	observeFn := func(id int64, programStep any, val ref.Val) {
 		for _, observer := range observers {
 			observer(id, programStep, val)
 		}
@@ -96,7 +89,7 @@ func TrackState(state EvalState) InterpretableDecorator {
 // This decorator is not thread-safe, and the EvalState must be reset between Eval()
 // calls.
 func EvalStateObserver(state EvalState) EvalObserver {
-	return func(id int64, programStep interface{}, val ref.Val) {
+	return func(id int64, programStep any, val ref.Val) {
 		state.SetValue(id, val)
 	}
 }
@@ -156,8 +149,8 @@ func CompileRegexConstants(regexOptimizations ...*RegexOptimization) Interpretab
 type exprInterpreter struct {
 	dispatcher  Dispatcher
 	container   *containers.Container
-	provider    ref.TypeProvider
-	adapter     ref.TypeAdapter
+	provider    types.Provider
+	adapter     types.Adapter
 	attrFactory AttributeFactory
 }
 
@@ -165,8 +158,8 @@ type exprInterpreter struct {
 // throughout the Eval of all Interpretable instances generated from it.
 func NewInterpreter(dispatcher Dispatcher,
 	container *containers.Container,
-	provider ref.TypeProvider,
-	adapter ref.TypeAdapter,
+	provider types.Provider,
+	adapter types.Adapter,
 	attrFactory AttributeFactory) Interpreter {
 	return &exprInterpreter{
 		dispatcher:  dispatcher,
@@ -176,20 +169,9 @@ func NewInterpreter(dispatcher Dispatcher,
 		attrFactory: attrFactory}
 }
 
-// NewStandardInterpreter builds a Dispatcher and TypeProvider with support for all of the CEL
-// builtins defined in the language definition.
-func NewStandardInterpreter(container *containers.Container,
-	provider ref.TypeProvider,
-	adapter ref.TypeAdapter,
-	resolver AttributeFactory) Interpreter {
-	dispatcher := NewDispatcher()
-	dispatcher.Add(functions.StandardOverloads()...)
-	return NewInterpreter(dispatcher, container, provider, adapter, resolver)
-}
-
 // NewIntepretable implements the Interpreter interface method.
 func (i *exprInterpreter) NewInterpretable(
-	checked *exprpb.CheckedExpr,
+	checked *ast.AST,
 	decorators ...InterpretableDecorator) (Interpretable, error) {
 	p := newPlanner(
 		i.dispatcher,
@@ -199,19 +181,5 @@ func (i *exprInterpreter) NewInterpretable(
 		i.container,
 		checked,
 		decorators...)
-	return p.Plan(checked.GetExpr())
-}
-
-// NewUncheckedIntepretable implements the Interpreter interface method.
-func (i *exprInterpreter) NewUncheckedInterpretable(
-	expr *exprpb.Expr,
-	decorators ...InterpretableDecorator) (Interpretable, error) {
-	p := newUncheckedPlanner(
-		i.dispatcher,
-		i.provider,
-		i.adapter,
-		i.attrFactory,
-		i.container,
-		decorators...)
-	return p.Plan(expr)
+	return p.Plan(checked.Expr())
 }

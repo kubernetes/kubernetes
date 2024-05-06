@@ -97,6 +97,18 @@ func waitForStatus(ctx context.Context, c clientset.Interface, set *appsv1.State
 	return set
 }
 
+// waitForPodNames waits for the StatefulSet's pods to match expected names.
+func waitForPodNames(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, expectedPodNames []string) {
+	e2estatefulset.WaitForState(ctx, c, set,
+		func(intSet *appsv1.StatefulSet, pods *v1.PodList) (bool, error) {
+			if err := expectPodNames(pods, expectedPodNames); err != nil {
+				framework.Logf("Currently %v", err)
+				return false, nil
+			}
+			return true, nil
+		})
+}
+
 // waitForStatus waits for the StatefulSetStatus's CurrentReplicas to be equal to expectedReplicas
 // The returned StatefulSet contains such a StatefulSetStatus
 func waitForStatusCurrentReplicas(ctx context.Context, c clientset.Interface, set *appsv1.StatefulSet, expectedReplicas int32) *appsv1.StatefulSet {

@@ -52,6 +52,8 @@ type Version interface {
 type ImageSpec struct {
 	// ID of the image.
 	Image string
+	// Runtime handler used to pull this image
+	RuntimeHandler string
 	// The annotations for the image.
 	// This should be passed to CRI during image pulls and returned when images are listed.
 	Annotations []Annotation
@@ -158,6 +160,10 @@ type ImageService interface {
 	RemoveImage(ctx context.Context, image ImageSpec) error
 	// ImageStats returns Image statistics.
 	ImageStats(ctx context.Context) (*ImageStats, error)
+	// ImageFsInfo returns a list of file systems for containers/images
+	ImageFsInfo(ctx context.Context) (*runtimeapi.ImageFsInfoResponse, error)
+	// GetImageSize returns the size of the image
+	GetImageSize(ctx context.Context, image ImageSpec) (uint64, error)
 }
 
 // Attacher interface allows to attach a container.
@@ -282,6 +288,10 @@ type Container struct {
 	Image string
 	// The id of the image used by the container.
 	ImageID string
+	// The digested reference of the image used by the container.
+	ImageRef string
+	// Runtime handler used to pull the image if any.
+	ImageRuntimeHandler string
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
@@ -327,6 +337,8 @@ type ContainerResources struct {
 }
 
 // Status represents the status of a container.
+//
+// Status does not contain VolumeMap because CRI API is unaware of volume names.
 type Status struct {
 	// ID of the container.
 	ID ContainerID
@@ -347,6 +359,10 @@ type Status struct {
 	Image string
 	// ID of the image.
 	ImageID string
+	// The digested reference of the image used by the container.
+	ImageRef string
+	// Runtime handler used to pull the image if any.
+	ImageRuntimeHandler string
 	// Hash of the container, used for comparison.
 	Hash uint64
 	// Hash of the container over fields with Resources field zero'd out.
@@ -424,6 +440,9 @@ type Mount struct {
 	HostPath string
 	// Whether the mount is read-only.
 	ReadOnly bool
+	// Whether the mount is recursive read-only.
+	// Must not be true if ReadOnly is false.
+	RecursiveReadOnly bool
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
 	// Requested propagation mode
@@ -480,12 +499,6 @@ type RunContainerOptions struct {
 	ReadOnly bool
 	// hostname for pod containers
 	Hostname string
-	// EnableHostUserNamespace sets userns=host when users request host namespaces (pid, ipc, net),
-	// are using non-namespaced capabilities (mknod, sys_time, sys_module), the pod contains a privileged container,
-	// or using host path volumes.
-	// This should only be enabled when the container runtime is performing user remapping AND if the
-	// experimental behavior is desired.
-	EnableHostUserNamespace bool
 }
 
 // VolumeInfo contains information about the volume.
@@ -522,6 +535,8 @@ const (
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
 	Conditions []RuntimeCondition
+	// Handlers is an array of current available handlers
+	Handlers []RuntimeHandler
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
@@ -538,10 +553,32 @@ func (r *RuntimeStatus) GetRuntimeCondition(t RuntimeConditionType) *RuntimeCond
 // String formats the runtime status into human readable string.
 func (r *RuntimeStatus) String() string {
 	var ss []string
+	var sh []string
 	for _, c := range r.Conditions {
 		ss = append(ss, c.String())
 	}
-	return fmt.Sprintf("Runtime Conditions: %s", strings.Join(ss, ", "))
+	for _, h := range r.Handlers {
+		sh = append(sh, h.String())
+	}
+	return fmt.Sprintf("Runtime Conditions: %s; Handlers: %s", strings.Join(ss, ", "), strings.Join(sh, ", "))
+}
+
+// RuntimeHandler contains condition information for the runtime handler.
+type RuntimeHandler struct {
+	// Name is the handler name.
+	Name string
+	// SupportsRecursiveReadOnlyMounts is true if the handler has support for
+	// recursive read-only mounts.
+	SupportsRecursiveReadOnlyMounts bool
+	// SupportsUserNamespaces is true if the handler has support for
+	// user namespaces.
+	SupportsUserNamespaces bool
+}
+
+// String formats the runtime handler into human readable string.
+func (h *RuntimeHandler) String() string {
+	return fmt.Sprintf("Name=%s SupportsRecursiveReadOnlyMounts: %v SupportsUserNamespaces: %v",
+		h.Name, h.SupportsRecursiveReadOnlyMounts, h.SupportsUserNamespaces)
 }
 
 // RuntimeCondition contains condition information for the runtime.

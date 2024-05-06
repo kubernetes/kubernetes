@@ -156,7 +156,9 @@ func (o *openAPI) buildRequestBody(parameters []common.Parameter, consumes []str
 			}
 			r := &spec3.RequestBody{
 				RequestBodyProps: spec3.RequestBodyProps{
-					Content: map[string]*spec3.MediaType{},
+					Content:     map[string]*spec3.MediaType{},
+					Description: param.Description(),
+					Required:    param.Required(),
 				},
 			}
 			for _, consume := range consumes {
@@ -172,9 +174,9 @@ func (o *openAPI) buildRequestBody(parameters []common.Parameter, consumes []str
 	return nil, nil
 }
 
-func newOpenAPI(config *common.Config) openAPI {
+func newOpenAPI(config *common.OpenAPIV3Config) openAPI {
 	o := openAPI{
-		config: common.ConvertConfigToV3(config),
+		config: config,
 		spec: &spec3.OpenAPI{
 			Version: "3.0.0",
 			Info:    config.Info,
@@ -313,16 +315,19 @@ func (o *openAPI) buildOpenAPISpec(webServices []common.RouteContainer) error {
 // BuildOpenAPISpec builds OpenAPI v3 spec given a list of route containers and common.Config to customize it.
 //
 // Deprecated: BuildOpenAPISpecFromRoutes should be used instead.
-func BuildOpenAPISpec(webServices []*restful.WebService, config *common.Config) (*spec3.OpenAPI, error) {
+func BuildOpenAPISpec(webServices []*restful.WebService, config *common.OpenAPIV3Config) (*spec3.OpenAPI, error) {
 	return BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(webServices), config)
 }
 
 // BuildOpenAPISpecFromRoutes builds OpenAPI v3 spec given a list of route containers and common.Config to customize it.
-func BuildOpenAPISpecFromRoutes(webServices []common.RouteContainer, config *common.Config) (*spec3.OpenAPI, error) {
+func BuildOpenAPISpecFromRoutes(webServices []common.RouteContainer, config *common.OpenAPIV3Config) (*spec3.OpenAPI, error) {
 	a := newOpenAPI(config)
 	err := a.buildOpenAPISpec(webServices)
 	if err != nil {
 		return nil, err
+	}
+	if config.PostProcessSpec != nil {
+		return config.PostProcessSpec(a.spec)
 	}
 	return a.spec, nil
 }
@@ -330,7 +335,7 @@ func BuildOpenAPISpecFromRoutes(webServices []common.RouteContainer, config *com
 // BuildOpenAPIDefinitionsForResource builds a partial OpenAPI spec given a sample object and common.Config to customize it.
 // BuildOpenAPIDefinitionsForResources returns the OpenAPI spec which includes the definitions for the
 // passed type names.
-func BuildOpenAPIDefinitionsForResources(config *common.Config, names ...string) (map[string]*spec.Schema, error) {
+func BuildOpenAPIDefinitionsForResources(config *common.OpenAPIV3Config, names ...string) (map[string]*spec.Schema, error) {
 	o := newOpenAPI(config)
 	// We can discard the return value of toSchema because all we care about is the side effect of calling it.
 	// All the models created for this resource get added to o.swagger.Definitions

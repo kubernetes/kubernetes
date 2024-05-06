@@ -52,14 +52,34 @@ func TestPullImageWithError(t *testing.T) {
 	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
+	// trying to pull an image with an invalid name should return an error
+	imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: ":invalid"}, nil, nil)
+	assert.Error(t, err)
+	assert.Equal(t, "", imageRef)
+
 	fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
-	imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
+	imageRef, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.Error(t, err)
 	assert.Equal(t, "", imageRef)
 
 	images, err := fakeManager.ListImages(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(images))
+}
+
+func TestPullImageWithInvalidImageName(t *testing.T) {
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	imageList := []string{"FAIL", "http://fail", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"}
+	fakeImageService.SetFakeImages(imageList)
+	for _, val := range imageList {
+		ctx := context.Background()
+		imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: val}, nil, nil)
+		assert.Error(t, err)
+		assert.Equal(t, "", imageRef)
+
+	}
 }
 
 func TestListImages(t *testing.T) {
@@ -79,6 +99,30 @@ func TestListImages(t *testing.T) {
 	}
 
 	assert.Equal(t, expected.List(), actual.List())
+}
+
+func TestListImagesPinnedField(t *testing.T) {
+	ctx := context.Background()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	imagesPinned := map[string]bool{
+		"1111": false,
+		"2222": true,
+		"3333": false,
+	}
+	imageList := []string{}
+	for image, pinned := range imagesPinned {
+		fakeImageService.SetFakeImagePinned(image, pinned)
+		imageList = append(imageList, image)
+	}
+	fakeImageService.SetFakeImages(imageList)
+
+	actualImages, err := fakeManager.ListImages(ctx)
+	assert.NoError(t, err)
+	for _, image := range actualImages {
+		assert.Equal(t, imagesPinned[image.ID], image.Pinned)
+	}
 }
 
 func TestListImagesWithError(t *testing.T) {
@@ -103,6 +147,20 @@ func TestGetImageRef(t *testing.T) {
 	imageRef, err := fakeManager.GetImageRef(ctx, kubecontainer.ImageSpec{Image: image})
 	assert.NoError(t, err)
 	assert.Equal(t, image, imageRef)
+}
+
+func TestImageSize(t *testing.T) {
+	ctx := context.Background()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	const imageSize = uint64(64)
+	fakeImageService.SetFakeImageSize(imageSize)
+	image := "busybox"
+	fakeImageService.SetFakeImages([]string{image})
+	actualSize, err := fakeManager.GetImageSize(ctx, kubecontainer.ImageSpec{Image: image})
+	assert.NoError(t, err)
+	assert.Equal(t, imageSize, actualSize)
 }
 
 func TestGetImageRefImageNotAvailableLocally(t *testing.T) {
@@ -269,6 +327,62 @@ func TestPullWithSecrets(t *testing.T) {
 		_, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
 		require.NoError(t, err)
 		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName, Annotations: make(map[string]string)}, test.expectedAuth, description)
+	}
+}
+
+func TestPullWithSecretsWithError(t *testing.T) {
+	ctx := context.Background()
+
+	dockerCfg := map[string]map[string]map[string]string{
+		"auths": {
+			"index.docker.io/v1/": {
+				"email": "passed-email",
+				"auth":  "cGFzc2VkLXVzZXI6cGFzc2VkLXBhc3N3b3Jk",
+			},
+		},
+	}
+
+	dockerConfigJSON, err := json.Marshal(dockerCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		name              string
+		imageName         string
+		passedSecrets     []v1.Secret
+		shouldInjectError bool
+	}{
+		{
+			name:          "invalid docker secret",
+			imageName:     "ubuntu",
+			passedSecrets: []v1.Secret{{Type: v1.SecretTypeDockercfg, Data: map[string][]byte{v1.DockerConfigKey: []byte("invalid")}}},
+		},
+		{
+			name:      "secret provided, pull failed",
+			imageName: "ubuntu",
+			passedSecrets: []v1.Secret{
+				{Type: v1.SecretTypeDockerConfigJson, Data: map[string][]byte{v1.DockerConfigKey: dockerConfigJSON}},
+			},
+			shouldInjectError: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+			assert.NoError(t, err)
+
+			if test.shouldInjectError {
+				fakeImageService.InjectError("PullImage", fmt.Errorf("test-error"))
+			}
+
+			imageRef, err := fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
+			assert.Error(t, err)
+			assert.Equal(t, "", imageRef)
+
+			images, err := fakeManager.ListImages(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, 0, len(images))
+		})
 	}
 }
 

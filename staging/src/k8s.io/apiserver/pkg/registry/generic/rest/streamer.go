@@ -46,6 +46,10 @@ type LocationStreamer struct {
 	// TLSVerificationErrorCounter is an optional value that will Inc every time a TLS error is encountered.  This can
 	// be wired a single prometheus counter instance to get counts overall.
 	TLSVerificationErrorCounter CounterMetric
+	// DeprecatedTLSVerificationErrorCounter is a temporary field used to rename
+	// the kube_apiserver_pod_logs_pods_logs_backend_tls_failure_total metric
+	// with a one release deprecation period in 1.27.0.
+	DeprecatedTLSVerificationErrorCounter CounterMetric
 }
 
 // a LocationStreamer must implement a rest.ResourceStreamer
@@ -87,6 +91,9 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 		// TODO prefer segregate TLS errors more reliably, but we do want to increment a count
 		if strings.Contains(err.Error(), "x509:") && s.TLSVerificationErrorCounter != nil {
 			s.TLSVerificationErrorCounter.Inc()
+			if s.DeprecatedTLSVerificationErrorCounter != nil {
+				s.DeprecatedTLSVerificationErrorCounter.Inc()
+			}
 		}
 		return nil, false, "", err
 	}

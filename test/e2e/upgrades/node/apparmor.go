@@ -63,7 +63,8 @@ func (t *AppArmorUpgradeTest) Setup(ctx context.Context, f *framework.Framework)
 
 	// Create the initial test pod.
 	ginkgo.By("Creating a long-running AppArmor enabled pod.")
-	t.pod = e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, false)
+	pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, false)
+	t.pod = e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(ctx, f)
@@ -92,14 +93,15 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(ctx context.Context, f *framework
 	ginkgo.By("Verifying an AppArmor profile is continuously enforced for a pod")
 	pod, err := e2epod.NewPodClient(f).Get(ctx, t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
-	framework.ExpectEqual(pod.Status.Phase, v1.PodRunning, "Pod should stay running")
+	gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning), "Pod should stay running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "Container should be running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].RestartCount).To(gomega.BeZero(), "Container should not need to be restarted")
 }
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is enforced for a new pod")
-	e2esecurity.CreateAppArmorTestPod(ctx, f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, true)
+	pod := e2esecurity.AppArmorTestPod(f.Namespace.Name, false, true)
+	t.pod = e2esecurity.RunAppArmorTestPod(ctx, pod, f.ClientSet, e2epod.NewPodClient(f), true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(ctx context.Context, f *framework.Framework) {

@@ -20,6 +20,7 @@ go_library(
         "receiver.go",
         "sizer.go",
         "traits.go",
+        "zeroer.go",
     ],
     importpath = "github.com/google/cel-go/common/types/traits",
     deps = [

@@ -27,15 +27,16 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func newDControllerRef(d *apps.Deployment) *metav1.OwnerReference {
@@ -393,32 +394,32 @@ func TestResolveFenceposts(t *testing.T) {
 		expectError       bool
 	}{
 		{
-			maxSurge:          newString("0%"),
-			maxUnavailable:    newString("0%"),
+			maxSurge:          ptr.To("0%"),
+			maxUnavailable:    ptr.To("0%"),
 			desired:           0,
 			expectSurge:       0,
 			expectUnavailable: 1,
 			expectError:       false,
 		},
 		{
-			maxSurge:          newString("39%"),
-			maxUnavailable:    newString("39%"),
+			maxSurge:          ptr.To("39%"),
+			maxUnavailable:    ptr.To("39%"),
 			desired:           10,
 			expectSurge:       4,
 			expectUnavailable: 3,
 			expectError:       false,
 		},
 		{
-			maxSurge:          newString("oops"),
-			maxUnavailable:    newString("39%"),
+			maxSurge:          ptr.To("oops"),
+			maxUnavailable:    ptr.To("39%"),
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
 			expectError:       true,
 		},
 		{
-			maxSurge:          newString("55%"),
-			maxUnavailable:    newString("urg"),
+			maxSurge:          ptr.To("55%"),
+			maxUnavailable:    ptr.To("urg"),
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
@@ -426,14 +427,14 @@ func TestResolveFenceposts(t *testing.T) {
 		},
 		{
 			maxSurge:          nil,
-			maxUnavailable:    newString("39%"),
+			maxUnavailable:    ptr.To("39%"),
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 3,
 			expectError:       false,
 		},
 		{
-			maxSurge:          newString("39%"),
+			maxSurge:          ptr.To("39%"),
 			maxUnavailable:    nil,
 			desired:           10,
 			expectSurge:       4,
@@ -454,12 +455,10 @@ func TestResolveFenceposts(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", num), func(t *testing.T) {
 			var maxSurge, maxUnavail *intstr.IntOrString
 			if test.maxSurge != nil {
-				surge := intstr.FromString(*test.maxSurge)
-				maxSurge = &surge
+				maxSurge = ptr.To(intstr.FromString(*test.maxSurge))
 			}
 			if test.maxUnavailable != nil {
-				unavail := intstr.FromString(*test.maxUnavailable)
-				maxUnavail = &unavail
+				maxUnavail = ptr.To(intstr.FromString(*test.maxUnavailable))
 			}
 			surge, unavail, err := ResolveFenceposts(maxSurge, maxUnavail, test.desired)
 			if err != nil && !test.expectError {
@@ -475,17 +474,13 @@ func TestResolveFenceposts(t *testing.T) {
 	}
 }
 
-func newString(s string) *string {
-	return &s
-}
-
 func TestNewRSNewReplicas(t *testing.T) {
 	tests := []struct {
 		Name          string
 		strategyType  apps.DeploymentStrategyType
 		depReplicas   int32
 		newRSReplicas int32
-		maxSurge      int
+		maxSurge      int32
 		expected      int32
 	}{
 		{
@@ -514,14 +509,8 @@ func TestNewRSNewReplicas(t *testing.T) {
 			*(newDeployment.Spec.Replicas) = test.depReplicas
 			newDeployment.Spec.Strategy = apps.DeploymentStrategy{Type: test.strategyType}
 			newDeployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
-				MaxUnavailable: func(i int) *intstr.IntOrString {
-					x := intstr.FromInt(i)
-					return &x
-				}(1),
-				MaxSurge: func(i int) *intstr.IntOrString {
-					x := intstr.FromInt(i)
-					return &x
-				}(test.maxSurge),
+				MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+				MaxSurge:       ptr.To(intstr.FromInt32(test.maxSurge)),
 			}
 			*(newRC.Spec.Replicas) = test.newRSReplicas
 			rs, err := NewRSNewReplicas(&newDeployment, []*apps.ReplicaSet{&rs5}, &newRC)
@@ -704,8 +693,8 @@ func TestDeploymentComplete(t *testing.T) {
 				Replicas: &desired,
 				Strategy: apps.DeploymentStrategy{
 					RollingUpdate: &apps.RollingUpdateDeployment{
-						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxSurge)),
+						MaxUnavailable: ptr.To(intstr.FromInt32(maxUnavailable)),
+						MaxSurge:       ptr.To(intstr.FromInt32(maxSurge)),
 					},
 					Type: apps.RollingUpdateDeploymentStrategyType,
 				},
@@ -944,7 +933,8 @@ func TestDeploymentTimedOut(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nowFn = test.nowFn
-			if got, exp := DeploymentTimedOut(&test.d, &test.d.Status), test.expected; got != exp {
+			_, ctx := ktesting.NewTestContext(t)
+			if got, exp := DeploymentTimedOut(ctx, &test.d, &test.d.Status), test.expected; got != exp {
 				t.Errorf("expected timeout: %t, got: %t", exp, got)
 			}
 		})
@@ -958,7 +948,7 @@ func TestMaxUnavailable(t *testing.T) {
 				Replicas: func(i int32) *int32 { return &i }(replicas),
 				Strategy: apps.DeploymentStrategy{
 					RollingUpdate: &apps.RollingUpdateDeployment{
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+						MaxSurge:       ptr.To(intstr.FromInt32(1)),
 						MaxUnavailable: &maxUnavailable,
 					},
 					Type: apps.RollingUpdateDeploymentStrategyType,
@@ -973,22 +963,22 @@ func TestMaxUnavailable(t *testing.T) {
 	}{
 		{
 			name:       "maxUnavailable less than replicas",
-			deployment: deployment(10, intstr.FromInt(5)),
+			deployment: deployment(10, intstr.FromInt32(5)),
 			expected:   int32(5),
 		},
 		{
 			name:       "maxUnavailable equal replicas",
-			deployment: deployment(10, intstr.FromInt(10)),
+			deployment: deployment(10, intstr.FromInt32(10)),
 			expected:   int32(10),
 		},
 		{
 			name:       "maxUnavailable greater than replicas",
-			deployment: deployment(5, intstr.FromInt(10)),
+			deployment: deployment(5, intstr.FromInt32(10)),
 			expected:   int32(5),
 		},
 		{
 			name:       "maxUnavailable with replicas is 0",
-			deployment: deployment(0, intstr.FromInt(10)),
+			deployment: deployment(0, intstr.FromInt32(10)),
 			expected:   int32(0),
 		},
 		{
@@ -1040,11 +1030,13 @@ func TestAnnotationUtils(t *testing.T) {
 
 	//Test Case 1: Check if anotations are copied properly from deployment to RS
 	t.Run("SetNewReplicaSetAnnotations", func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
+
 		//Try to set the increment revision from 11 through 20
 		for i := 10; i < 20; i++ {
 
 			nextRevision := fmt.Sprintf("%d", i+1)
-			SetNewReplicaSetAnnotations(&tDeployment, &tRS, nextRevision, true, 5)
+			SetNewReplicaSetAnnotations(ctx, &tDeployment, &tRS, nextRevision, true, 5)
 			//Now the ReplicaSets Revision Annotation should be i+1
 
 			if i >= 12 {
@@ -1251,11 +1243,11 @@ func TestGetDeploymentsForReplicaSet(t *testing.T) {
 }
 
 func TestMinAvailable(t *testing.T) {
-	maxSurge := func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1))
+	maxSurge := ptr.To(intstr.FromInt32(1))
 	deployment := func(replicas int32, maxUnavailable intstr.IntOrString) *apps.Deployment {
 		return &apps.Deployment{
 			Spec: apps.DeploymentSpec{
-				Replicas: pointer.Int32(replicas),
+				Replicas: ptr.To(replicas),
 				Strategy: apps.DeploymentStrategy{
 					RollingUpdate: &apps.RollingUpdateDeployment{
 						MaxSurge:       maxSurge,
@@ -1273,29 +1265,29 @@ func TestMinAvailable(t *testing.T) {
 	}{
 		{
 			name:       "replicas greater than maxUnavailable",
-			deployment: deployment(10, intstr.FromInt(5)),
+			deployment: deployment(10, intstr.FromInt32(5)),
 			expected:   5,
 		},
 		{
 			name:       "replicas equal maxUnavailable",
-			deployment: deployment(10, intstr.FromInt(10)),
+			deployment: deployment(10, intstr.FromInt32(10)),
 			expected:   0,
 		},
 		{
 			name:       "replicas less than maxUnavailable",
-			deployment: deployment(5, intstr.FromInt(10)),
+			deployment: deployment(5, intstr.FromInt32(10)),
 			expected:   0,
 		},
 		{
 			name:       "replicas is 0",
-			deployment: deployment(0, intstr.FromInt(10)),
+			deployment: deployment(0, intstr.FromInt32(10)),
 			expected:   0,
 		},
 		{
 			name: "minAvailable with Recreate deployment strategy",
 			deployment: &apps.Deployment{
 				Spec: apps.DeploymentSpec{
-					Replicas: pointer.Int32(10),
+					Replicas: ptr.To[int32](10),
 					Strategy: apps.DeploymentStrategy{
 						Type: apps.RecreateDeploymentStrategyType,
 					},

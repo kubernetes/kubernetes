@@ -82,28 +82,21 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 }
 
 func autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLifecycleControllerConfiguration(in *v1alpha1.NodeLifecycleControllerConfiguration, out *config.NodeLifecycleControllerConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
-		return err
-	}
 	out.NodeEvictionRate = in.NodeEvictionRate
 	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
-	out.PodEvictionTimeout = in.PodEvictionTimeout
+	// WARNING: in.PodEvictionTimeout requires manual conversion: does not exist in peer-type
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 	return nil
 }
 
 func autoConvert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLifecycleControllerConfiguration(in *config.NodeLifecycleControllerConfiguration, out *v1alpha1.NodeLifecycleControllerConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableTaintManager, &out.EnableTaintManager, s); err != nil {
-		return err
-	}
 	out.NodeEvictionRate = in.NodeEvictionRate
 	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
 	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
-	out.PodEvictionTimeout = in.PodEvictionTimeout
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 	return nil

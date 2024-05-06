@@ -31,6 +31,8 @@ const (
 	containerTopologyScope = "container"
 	// podTopologyScope specifies the TopologyManagerScope per pod.
 	podTopologyScope = "pod"
+	// noneTopologyScope specifies the TopologyManagerScope when topologyPolicyName is none.
+	noneTopologyScope = "none"
 )
 
 type podTopologyHints map[string]map[string]TopologyHint

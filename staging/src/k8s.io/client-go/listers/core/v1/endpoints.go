@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type EndpointsLister interface {
 
 // endpointsLister implements the EndpointsLister interface.
 type endpointsLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.Endpoints]
 }
 
 // NewEndpointsLister returns a new EndpointsLister.
 func NewEndpointsLister(indexer cache.Indexer) EndpointsLister {
-	return &endpointsLister{indexer: indexer}
-}
-
-// List lists all Endpoints in the indexer.
-func (s *endpointsLister) List(selector labels.Selector) (ret []*v1.Endpoints, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Endpoints))
-	})
-	return ret, err
+	return &endpointsLister{listers.New[*v1.Endpoints](indexer, v1.Resource("endpoints"))}
 }
 
 // Endpoints returns an object that can list and get Endpoints.
 func (s *endpointsLister) Endpoints(namespace string) EndpointsNamespaceLister {
-	return endpointsNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return endpointsNamespaceLister{listers.NewNamespaced[*v1.Endpoints](s.ResourceIndexer, namespace)}
 }
 
 // EndpointsNamespaceLister helps list and get Endpoints.
@@ -74,26 +66,5 @@ type EndpointsNamespaceLister interface {
 // endpointsNamespaceLister implements the EndpointsNamespaceLister
 // interface.
 type endpointsNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Endpoints in the indexer for a given namespace.
-func (s endpointsNamespaceLister) List(selector labels.Selector) (ret []*v1.Endpoints, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Endpoints))
-	})
-	return ret, err
-}
-
-// Get retrieves the Endpoints from the indexer for a given namespace and name.
-func (s endpointsNamespaceLister) Get(name string) (*v1.Endpoints, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("endpoints"), name)
-	}
-	return obj.(*v1.Endpoints), nil
+	listers.ResourceIndexer[*v1.Endpoints]
 }

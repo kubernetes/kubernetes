@@ -28,12 +28,17 @@ import (
 
 type AuthenticationV1Interface interface {
 	RESTClient() rest.Interface
+	SelfSubjectReviewsGetter
 	TokenReviewsGetter
 }
 
 // AuthenticationV1Client is used to interact with features provided by the authentication.k8s.io group.
 type AuthenticationV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AuthenticationV1Client) SelfSubjectReviews() SelfSubjectReviewInterface {
+	return newSelfSubjectReviews(c)
 }
 
 func (c *AuthenticationV1Client) TokenReviews() TokenReviewInterface {

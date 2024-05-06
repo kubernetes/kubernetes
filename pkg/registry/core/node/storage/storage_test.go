@@ -32,7 +32,6 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -192,7 +191,7 @@ func TestResourceLocation(t *testing.T) {
 		node  *api.Node
 		query string
 		host  string
-		err   error
+		err   bool
 	}
 
 	testCases := []testCase{{
@@ -215,19 +214,19 @@ func TestResourceLocation(t *testing.T) {
 		node:  newNode("node0", setNodeIPAddress("127.0.0.1")),
 		query: "node0",
 		host:  "",
-		err:   proxyutil.ErrAddressNotAllowed,
+		err:   true,
 	}, {
 		name:  "non-proxyable hostname with kubelet port in query",
 		node:  newNode("node0", setNodeIPAddress("127.0.0.1")),
 		query: "node0:5000",
 		host:  "",
-		err:   proxyutil.ErrAddressNotAllowed,
+		err:   true,
 	}, {
 		name:  "non-proxyable hostname with kubelet port in status",
 		node:  newNode("node0", setNodeIPAddress("127.0.0.1"), setNodeDaemonEndpoint(443)),
 		query: "node0",
 		host:  "",
-		err:   proxyutil.ErrAddressNotAllowed,
+		err:   true,
 	}}
 
 	for _, testCase := range testCases {
@@ -245,18 +244,13 @@ func TestResourceLocation(t *testing.T) {
 			redirector := rest.Redirector(storage)
 			location, _, err := redirector.ResourceLocation(ctx, testCase.query)
 
-			if err != nil && testCase.err != nil {
-				if err.Error() != testCase.err.Error() {
-					t.Fatalf("Unexpected error: %v, expected: %v", err, testCase.err)
+			if err != nil {
+				if !testCase.err {
+					t.Fatalf("Unexpected error: %v", err)
 				}
-
 				return
-			}
-
-			if err != nil && testCase.err == nil {
-				t.Fatalf("Unexpected error: %v, expected: %v", err, testCase.err)
-			} else if err == nil && testCase.err != nil {
-				t.Fatalf("Expected error but got none, err: %v", testCase.err)
+			} else if testCase.err {
+				t.Fatalf("Expected error but got none")
 			}
 
 			if location == nil {

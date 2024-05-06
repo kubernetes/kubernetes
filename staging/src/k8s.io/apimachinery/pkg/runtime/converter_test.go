@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,6 +91,7 @@ type F struct {
 	G []int             `json:"fg"`
 	H []bool            `json:"fh"`
 	I []float32         `json:"fi"`
+	J []byte            `json:"fj"`
 }
 
 type G struct {
@@ -194,7 +195,7 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 	if !reflect.DeepEqual(item, unmarshalledObj) {
-		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
+		t.Errorf("Object changed during JSON operations, diff: %v", cmp.Diff(item, unmarshalledObj))
 		return
 	}
 
@@ -213,7 +214,7 @@ func doRoundTrip(t *testing.T, item interface{}) {
 	}
 
 	if !reflect.DeepEqual(item, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+		t.Errorf("Object changed, diff: %v", cmp.Diff(item, newObj))
 	}
 }
 
@@ -687,7 +688,7 @@ func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr
 	}
 
 	if expectedErr == nil && !reflect.DeepEqual(unmarshalledObj, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(unmarshalledObj, newObj))
+		t.Errorf("Object changed, diff: %v", cmp.Diff(unmarshalledObj, newObj))
 	}
 }
 
@@ -749,6 +750,10 @@ func TestUnrecognized(t *testing.T) {
 		},
 		{
 			data: "{\"ff\":[\"abc\"],\"fg\":[123],\"fh\":[true,false]}",
+			obj:  &F{},
+		},
+		{
+			data: "{\"fj\":\"\"}",
 			obj:  &F{},
 		},
 		{
@@ -916,7 +921,7 @@ func TestFloatIntConversion(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(obj, unmarshalled) {
-		t.Errorf("Incorrect conversion, diff: %v", diff.ObjectReflectDiff(obj, unmarshalled))
+		t.Errorf("Incorrect conversion, diff: %v", cmp.Diff(obj, unmarshalled))
 	}
 }
 
@@ -938,7 +943,7 @@ func TestIntFloatConversion(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(obj, unmarshalled) {
-		t.Errorf("Incorrect conversion, diff: %v", diff.ObjectReflectDiff(obj, unmarshalled))
+		t.Errorf("Incorrect conversion, diff: %v", cmp.Diff(obj, unmarshalled))
 	}
 }
 

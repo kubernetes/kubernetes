@@ -1,18 +1,19 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+# Disable inheritance as this is owned by sig-node (should mirror same contents as pkg/kubelet/OWNERS)
+options:
+  no_parent_owners: true
 approvers:
   - dims
   - feiskyer
-  - Random-Liu
-  - derekwaynecarr
-  - dchen1107
-  - yujuhong
-  - sig-node-api-approvers
+  - sig-node-approvers
   - api-approvers
+  - sig-node-cri-approvers
 reviewers:
   - sig-node-reviewers
   - dims
 labels:
   - sig/node
+  - area/kubelet
 emeritus_approvers:
   - resouer

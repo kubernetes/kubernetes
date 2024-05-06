@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -52,6 +53,8 @@ func TestCreateToken(t *testing.T) {
 		boundObjectUID  string
 		audiences       []string
 		duration        time.Duration
+
+		enableNodeBindingFeature bool
 
 		serverResponseToken string
 		serverResponseError string
@@ -118,6 +121,13 @@ status:
 			expectStderr:    `error: supported --bound-object-kind values are Pod, Secret`,
 		},
 		{
+			test:                     "bad bound object kind (node feature enabled)",
+			name:                     "mysa",
+			enableNodeBindingFeature: true,
+			boundObjectKind:          "Foo",
+			expectStderr:             `error: supported --bound-object-kind values are Node, Pod, Secret`,
+		},
+		{
 			test:            "missing bound object name",
 			name:            "mysa",
 			boundObjectKind: "Pod",
@@ -158,7 +168,30 @@ status:
 			serverResponseToken: "abc",
 			expectStdout:        "abc",
 		},
+		{
+			test: "valid bound object (Node)",
+			name: "mysa",
 
+			enableNodeBindingFeature: true,
+			boundObjectKind:          "Node",
+			boundObjectName:          "mynode",
+			boundObjectUID:           "myuid",
+
+			expectRequestPath: "/api/v1/namespaces/test/serviceaccounts/mysa/token",
+			expectTokenRequest: &authenticationv1.TokenRequest{
+				TypeMeta: metav1.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenRequest"},
+				Spec: authenticationv1.TokenRequestSpec{
+					BoundObjectRef: &authenticationv1.BoundObjectReference{
+						Kind:       "Node",
+						APIVersion: "v1",
+						Name:       "mynode",
+						UID:        "myuid",
+					},
+				},
+			},
+			serverResponseToken: "abc",
+			expectStdout:        "abc",
+		},
 		{
 			test:         "invalid audience",
 			name:         "mysa",
@@ -186,7 +219,7 @@ status:
 			test:         "invalid duration",
 			name:         "mysa",
 			duration:     -1,
-			expectStderr: `error: --duration must be positive`,
+			expectStderr: `error: --duration must be greater than or equal to 0`,
 		},
 		{
 			test:         "invalid duration unit",
@@ -210,7 +243,22 @@ status:
 			serverResponseToken: "abc",
 			expectStdout:        "abc",
 		},
+		{
+			test: "zero duration act as default",
+			name: "mysa",
 
+			duration: 0 * time.Second,
+
+			expectRequestPath: "/api/v1/namespaces/test/serviceaccounts/mysa/token",
+			expectTokenRequest: &authenticationv1.TokenRequest{
+				TypeMeta: metav1.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenRequest"},
+				Spec: authenticationv1.TokenRequestSpec{
+					ExpirationSeconds: nil,
+				},
+			},
+			serverResponseToken: "abc",
+			expectStdout:        "abc",
+		},
 		{
 			test: "server error",
 			name: "mysa",
@@ -299,7 +347,7 @@ status:
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-			ioStreams, _, stdout, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, stdout, _ := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdCreateToken(tf, ioStreams)
 			if test.output != "" {
 				cmd.Flags().Set("output", test.output)
@@ -318,6 +366,10 @@ status:
 			}
 			if test.duration != 0 {
 				cmd.Flags().Set("duration", test.duration.String())
+			}
+			if test.enableNodeBindingFeature {
+				os.Setenv("KUBECTL_NODE_BOUND_TOKENS", "true")
+				defer os.Unsetenv("KUBECTL_NODE_BOUND_TOKENS")
 			}
 			cmd.Run(cmd, []string{test.name})
 

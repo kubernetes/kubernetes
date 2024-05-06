@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -23,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 )
 
+// (I am unsure if this test has any value since it only tests the fake implementation)
 func TestSetGetLocalAddresses(t *testing.T) {
 	fake := NewFakeNetlinkHandle(false)
 	_ = ipvs.NetLinkHandle(fake) // Ensure that the interface is honored
@@ -43,9 +47,14 @@ func TestSetGetLocalAddresses(t *testing.T) {
 	if !addr.Equal(expected) {
 		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, addr)
 	}
-	fake.SetLocalAddresses("kube-ipvs0", "4.3.2.1")
+	fake.SetLocalAddresses("kube-ipvs0", "1.2.3.4", "4.3.2.1")
 	addr, _ = fake.GetAllLocalAddresses()
 	expected = sets.New("1.2.3.4", "4.3.2.1")
+	if !addr.Equal(expected) {
+		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, addr)
+	}
+	addr, _ = fake.GetAllLocalAddressesExcept("kube-ipvs0")
+	expected = sets.New("1.2.3.4")
 	if !addr.Equal(expected) {
 		t.Errorf("Unexpected mismatch, expected: %v, got: %v", expected, addr)
 	}

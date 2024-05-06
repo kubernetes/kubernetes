@@ -200,12 +200,12 @@ func Invalid(field *Path, value interface{}, detail string) *Error {
 // NotSupported returns a *Error indicating "unsupported value".
 // This is used to report unknown values for enumerated fields (e.g. a list of
 // valid values).
-func NotSupported(field *Path, value interface{}, validValues []string) *Error {
+func NotSupported[T ~string](field *Path, value interface{}, validValues []T) *Error {
 	detail := ""
 	if len(validValues) > 0 {
 		quotedValues := make([]string, len(validValues))
 		for i, v := range validValues {
-			quotedValues[i] = strconv.Quote(v)
+			quotedValues[i] = strconv.Quote(fmt.Sprint(v))
 		}
 		detail = "supported values: " + strings.Join(quotedValues, ", ")
 	}

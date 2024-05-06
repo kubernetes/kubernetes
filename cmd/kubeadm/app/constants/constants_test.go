@@ -50,6 +50,19 @@ func TestGetAdminKubeConfigPath(t *testing.T) {
 	}
 }
 
+func TestGetSuperAdminKubeConfigPath(t *testing.T) {
+	expected := filepath.Join(KubernetesDir, SuperAdminKubeConfigFileName)
+	actual := GetSuperAdminKubeConfigPath()
+
+	if actual != expected {
+		t.Errorf(
+			"failed GetSuperAdminKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
+			expected,
+			actual,
+		)
+	}
+}
+
 func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
 	expected := filepath.FromSlash("/etc/kubernetes/bootstrap-kubelet.conf")
 	actual := GetBootstrapKubeletKubeConfigPath()
@@ -245,7 +258,7 @@ func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 		{
 			name:           "invalid versionInfo; placeholder version is returned",
 			versionInfo:    &apimachineryversion.Info{},
-			expectedResult: defaultKubernetesPlaceholderVersion,
+			expectedResult: DefaultKubernetesPlaceholderVersion,
 		},
 		{
 			name:           "valid skew of -1",

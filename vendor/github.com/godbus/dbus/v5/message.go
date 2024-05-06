@@ -208,7 +208,7 @@ func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 // The possibly returned error can be an error of the underlying reader, an
 // InvalidMessageError or a FormatError.
 func DecodeMessage(rd io.Reader) (msg *Message, err error) {
-	return DecodeMessageWithFDs(rd, make([]int, 0));
+	return DecodeMessageWithFDs(rd, make([]int, 0))
 }
 
 type nullwriter struct{}
@@ -227,8 +227,8 @@ func (msg *Message) CountFds() (int, error) {
 }
 
 func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds []int, err error) {
-	if err := msg.IsValid(); err != nil {
-		return make([]int, 0), err
+	if err := msg.validateHeader(); err != nil {
+		return nil, err
 	}
 	var vs [7]interface{}
 	switch order {
@@ -237,7 +237,7 @@ func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds 
 	case binary.BigEndian:
 		vs[0] = byte('B')
 	default:
-		return make([]int, 0), errors.New("dbus: invalid byte order")
+		return nil, errors.New("dbus: invalid byte order")
 	}
 	body := new(bytes.Buffer)
 	fds = make([]int, 0)
@@ -284,8 +284,13 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (err error) 
 }
 
 // IsValid checks whether msg is a valid message and returns an
-// InvalidMessageError if it is not.
+// InvalidMessageError or FormatError if it is not.
 func (msg *Message) IsValid() error {
+	var b bytes.Buffer
+	return msg.EncodeTo(&b, nativeEndian)
+}
+
+func (msg *Message) validateHeader() error {
 	if msg.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected|FlagAllowInteractiveAuthorization) != 0 {
 		return InvalidMessageError("invalid flags")
 	}
@@ -330,6 +335,7 @@ func (msg *Message) IsValid() error {
 			return InvalidMessageError("missing signature")
 		}
 	}
+
 	return nil
 }
 

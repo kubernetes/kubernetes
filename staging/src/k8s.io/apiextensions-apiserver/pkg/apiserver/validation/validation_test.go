@@ -601,7 +601,7 @@ func TestValidateCustomResource(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.schema})
+			validator, _, err := NewSchemaValidator(&tt.schema)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -689,7 +689,7 @@ func TestItemsProperty(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.args.schema})
+			validator, _, err := NewSchemaValidator(&tt.args.schema)
 			if err != nil {
 				t.Fatal(err)
 			}

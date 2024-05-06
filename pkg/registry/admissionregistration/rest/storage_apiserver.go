@@ -19,6 +19,7 @@ package rest
 import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -50,6 +51,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1.SchemeGroupVersion.Version] = storageMap
 	}
 
+	if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[admissionregistrationv1beta1.SchemeGroupVersion.Version] = storageMap
+	}
+
 	if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
@@ -60,6 +67,14 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
+
+	// use a simple wrapper so that initialization order won't cause a nil getter
+	var policyGetter rest.Getter
+
+	r, err := resolver.NewDiscoveryResourceResolver(p.DiscoveryClient)
+	if err != nil {
+		return storage, err
+	}
 
 	// validatingwebhookconfigurations
 	if resource := "validatingwebhookconfigurations"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1.SchemeGroupVersion.WithResource(resource)) {
@@ -79,6 +94,26 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource] = mutatingStorage
 	}
 
+	// validatingadmissionpolicies
+	if resource := "validatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1.SchemeGroupVersion.WithResource(resource)) {
+		policyStorage, policyStatusStorage, err := validatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
+		if err != nil {
+			return storage, err
+		}
+		policyGetter = policyStorage
+		storage[resource] = policyStorage
+		storage[resource+"/status"] = policyStatusStorage
+	}
+
+	// validatingadmissionpolicybindings
+	if resource := "validatingadmissionpolicybindings"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1.SchemeGroupVersion.WithResource(resource)) {
+		policyBindingStorage, err := policybindingstorage.NewREST(restOptionsGetter, p.Authorizer, &policybindingstorage.DefaultPolicyGetter{Getter: policyGetter}, r)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = policyBindingStorage
+	}
+
 	return storage, nil
 }
 
@@ -95,16 +130,51 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 
 	// validatingadmissionpolicies
 	if resource := "validatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		policyStorage, err := validatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
+		policyStorage, policyStatusStorage, err := validatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
 		if err != nil {
 			return storage, err
 		}
 		policyGetter = policyStorage
 		storage[resource] = policyStorage
+		storage[resource+"/status"] = policyStatusStorage
 	}
 
 	// validatingadmissionpolicybindings
 	if resource := "validatingadmissionpolicybindings"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		policyBindingStorage, err := policybindingstorage.NewREST(restOptionsGetter, p.Authorizer, &policybindingstorage.DefaultPolicyGetter{Getter: policyGetter}, r)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = policyBindingStorage
+	}
+
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	// use a simple wrapper so that initialization order won't cause a nil getter
+	var policyGetter rest.Getter
+
+	r, err := resolver.NewDiscoveryResourceResolver(p.DiscoveryClient)
+	if err != nil {
+		return storage, err
+	}
+
+	// validatingadmissionpolicies
+	if resource := "validatingadmissionpolicies"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		policyStorage, policyStatusStorage, err := validatingadmissionpolicystorage.NewREST(restOptionsGetter, p.Authorizer, r)
+		if err != nil {
+			return storage, err
+		}
+		policyGetter = policyStorage
+		storage[resource] = policyStorage
+		storage[resource+"/status"] = policyStatusStorage
+	}
+
+	// validatingadmissionpolicybindings
+	if resource := "validatingadmissionpolicybindings"; apiResourceConfigSource.ResourceEnabled(admissionregistrationv1beta1.SchemeGroupVersion.WithResource(resource)) {
 		policyBindingStorage, err := policybindingstorage.NewREST(restOptionsGetter, p.Authorizer, &policybindingstorage.DefaultPolicyGetter{Getter: policyGetter}, r)
 		if err != nil {
 			return storage, err

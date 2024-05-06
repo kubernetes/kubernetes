@@ -35,6 +35,7 @@ type DevicesProvider interface {
 // PodsProvider knows how to provide the pods admitted by the node
 type PodsProvider interface {
 	GetPods() []*v1.Pod
+	GetPodByName(namespace, name string) (*v1.Pod, bool)
 }
 
 // CPUsProvider knows how to provide the cpus used by the given container
@@ -50,4 +51,17 @@ type MemoryProvider interface {
 	GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory
 	// GetAllocatableMemory returns the allocatable memory from the node
 	GetAllocatableMemory() []*podresourcesapi.ContainerMemory
+}
+
+type DynamicResourcesProvider interface {
+	// GetDynamicResources returns information about dynamic resources assigned to pods and containers
+	GetDynamicResources(pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource
+}
+
+type PodResourcesProviders struct {
+	Pods             PodsProvider
+	Devices          DevicesProvider
+	Cpus             CPUsProvider
+	Memory           MemoryProvider
+	DynamicResources DynamicResourcesProvider
 }

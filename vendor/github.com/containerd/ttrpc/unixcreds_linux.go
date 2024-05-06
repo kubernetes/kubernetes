@@ -29,7 +29,7 @@ import (
 
 type UnixCredentialsFunc func(*unix.Ucred) error
 
-func (fn UnixCredentialsFunc) Handshake(ctx context.Context, conn net.Conn) (net.Conn, interface{}, error) {
+func (fn UnixCredentialsFunc) Handshake(_ context.Context, conn net.Conn) (net.Conn, interface{}, error) {
 	uc, err := requireUnixSocket(conn)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: require unix socket: %w", err)
@@ -50,7 +50,7 @@ func (fn UnixCredentialsFunc) Handshake(ctx context.Context, conn net.Conn) (net
 	}
 
 	if ucredErr != nil {
-		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: failed to retrieve socket peer credentials: %w", err)
+		return nil, nil, fmt.Errorf("ttrpc.UnixCredentialsFunc: failed to retrieve socket peer credentials: %w", ucredErr)
 	}
 
 	if err := fn(ucred); err != nil {
@@ -86,10 +86,6 @@ func UnixSocketRequireRoot() UnixCredentialsFunc {
 func UnixSocketRequireSameUser() UnixCredentialsFunc {
 	euid, egid := os.Geteuid(), os.Getegid()
 	return UnixSocketRequireUidGid(euid, egid)
-}
-
-func requireRoot(ucred *unix.Ucred) error {
-	return requireUidGid(ucred, 0, 0)
 }
 
 func requireUidGid(ucred *unix.Ucred, uid, gid int) error {

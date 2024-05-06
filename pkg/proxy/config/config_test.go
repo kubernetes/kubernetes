@@ -32,7 +32,8 @@ import (
 	informers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
-	utilpointer "k8s.io/utils/pointer"
+	klogtesting "k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 type sortedServices []*v1.Service
@@ -226,6 +227,7 @@ func (h *EndpointSliceHandlerMock) ValidateEndpointSlices(t *testing.T, expected
 }
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -235,7 +237,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
@@ -250,6 +252,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -259,7 +262,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
@@ -286,6 +289,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 }
 
 func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -295,7 +299,7 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -320,6 +324,7 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -329,7 +334,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
 	handler := NewEndpointSliceHandlerMock()
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -345,7 +350,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"2.2.2.2"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	endpoints2 := &discoveryv1.EndpointSlice{
 		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
@@ -355,7 +360,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"4.4.4.4"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints1)
 	fakeWatch.Add(endpoints2)
@@ -366,6 +371,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -375,7 +381,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
 	handler := NewEndpointSliceHandlerMock()
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -391,7 +397,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"2.2.2.2"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	endpoints2 := &discoveryv1.EndpointSlice{
 		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
@@ -401,7 +407,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"4.4.4.4"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints1)
 	fakeWatch.Add(endpoints2)
@@ -419,7 +425,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		}, {
 			Addresses: []string{"6.6.6.6"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Add(endpoints3)
 	endpoints = []*discoveryv1.EndpointSlice{endpoints2, endpoints1, endpoints3}
@@ -433,7 +439,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 		Endpoints: []discoveryv1.Endpoint{{
 			Addresses: []string{"7.7.7.7"},
 		}},
-		Ports: []discoveryv1.EndpointPort{{Port: utilpointer.Int32(80)}},
+		Ports: []discoveryv1.EndpointPort{{Port: ptr.To[int32](80)}},
 	}
 	fakeWatch.Modify(endpoints1v2)
 	endpoints = []*discoveryv1.EndpointSlice{endpoints2, endpoints1v2, endpoints3}

@@ -22,10 +22,9 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/discovery"
 	openapiclient "k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
@@ -58,8 +57,8 @@ func TestExplainInvalidArgs(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericclioptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
+	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
 	err := opts.Complete(tf, cmd, []string{})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -85,8 +84,8 @@ func TestExplainNotExistResource(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericclioptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
+	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
 	err := opts.Complete(tf, cmd, []string{"foo"})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -186,9 +185,7 @@ func TestExplainOpenAPIV3(t *testing.T) {
 	}
 	cases = append(cases, explainV2Cases...)
 
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ExplainOpenapiV3}, t, func(t *testing.T) {
-		runExplainTestCases(t, cases)
-	})
+	runExplainTestCases(t, cases)
 }
 
 func runExplainTestCases(t *testing.T, cases []explainTestCase) {
@@ -209,7 +206,7 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 
 	type catchFatal error
 
@@ -279,20 +276,43 @@ func runExplainTestCases(t *testing.T, cases []explainTestCase) {
 	}
 }
 
-func TestAlphaEnablement(t *testing.T) {
-	alphas := map[cmdutil.FeatureGate]string{
-		cmdutil.ExplainOpenapiV3: "output",
-	}
-	for feature, flag := range alphas {
-		f := cmdtesting.NewTestFactory()
-		defer f.Cleanup()
+// OpenAPI V2 specifications retrieval -- should never be called.
+func panicOpenAPISchemaFn() (openapi.Resources, error) {
+	panic("should never be called")
+}
 
-		cmd := explain.NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
-
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
-			cmd := explain.NewCmdExplain("kubectl", f, genericclioptions.NewTestIOStreamsDiscard())
-			require.NotNil(t, cmd.Flags().Lookup(flag), "flag %q should be registered with the %q feature enabled", flag, feature)
-		})
+// OpenAPI V3 specifications retrieval does *not* retrieve V2 specifications.
+func TestExplainOpenAPIV3DoesNotLoadOpenAPIV2Specs(t *testing.T) {
+	// Set up OpenAPI V3 specifications endpoint for explain.
+	fakeServer, err := clienttestutil.NewFakeOpenAPIV3Server(filepath.Join(testDataPath, "openapi", "v3"))
+	if err != nil {
+		t.Fatalf("error starting fake openapi server: %v", err.Error())
 	}
+	defer fakeServer.HttpServer.Close()
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+	tf.OpenAPIV3ClientFunc = func() (openapiclient.Client, error) {
+		fakeDiscoveryClient := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{Host: fakeServer.HttpServer.URL})
+		return fakeDiscoveryClient.OpenAPIV3(), nil
+	}
+	// OpenAPI V2 specifications retrieval will panic if called.
+	tf.OpenAPISchemaFunc = panicOpenAPISchemaFn
+
+	// Explain the following resources, validating the command does not panic.
+	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
+	resources := []string{"pods", "services", "endpoints", "configmaps"}
+	for _, resource := range resources {
+		cmd.Run(cmd, []string{resource})
+	}
+	// Verify retrieving OpenAPI V2 specifications will panic.
+	defer func() {
+		if panicErr := recover(); panicErr == nil {
+			t.Fatal("expecting panic for openapi v2 retrieval")
+		}
+	}()
+	// Set OpenAPI V2 output flag for explain.
+	if err := cmd.Flags().Set("output", "plaintext-openapiv2"); err != nil {
+		t.Fatal(err)
+	}
+	cmd.Run(cmd, []string{"pods"})
 }

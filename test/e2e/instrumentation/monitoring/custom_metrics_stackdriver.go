@@ -18,6 +18,7 @@ package monitoring
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	gcm "google.golang.org/api/monitoring/v3"
@@ -30,6 +31,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
@@ -54,9 +56,9 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for old resource model [Feature:StackdriverCustomMetrics]", func(ctx context.Context) {
+	f.It("should run Custom Metrics - Stackdriver Adapter for old resource model", feature.StackdriverCustomMetrics, func(ctx context.Context) {
 		kubeClient := f.ClientSet
 		config, err := framework.LoadConfig()
 		if err != nil {
@@ -71,7 +73,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		testCustomMetrics(ctx, f, kubeClient, customMetricsClient, discoveryClient, AdapterForOldResourceModel)
 	})
 
-	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for new resource model [Feature:StackdriverCustomMetrics]", func(ctx context.Context) {
+	f.It("should run Custom Metrics - Stackdriver Adapter for new resource model", feature.StackdriverCustomMetrics, func(ctx context.Context) {
 		kubeClient := f.ClientSet
 		config, err := framework.LoadConfig()
 		if err != nil {
@@ -86,7 +88,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		testCustomMetrics(ctx, f, kubeClient, customMetricsClient, discoveryClient, AdapterForNewResourceModel)
 	})
 
-	ginkgo.It("should run Custom Metrics - Stackdriver Adapter for external metrics [Feature:StackdriverExternalMetrics]", func(ctx context.Context) {
+	f.It("should run Custom Metrics - Stackdriver Adapter for external metrics", feature.StackdriverExternalMetrics, func(ctx context.Context) {
 		kubeClient := f.ClientSet
 		config, err := framework.LoadConfig()
 		if err != nil {
@@ -111,6 +113,9 @@ func testCustomMetrics(ctx context.Context, f *framework.Framework, kubeClient c
 	// Set up a cluster: create a custom metric and set up k8s-sd adapter
 	err = CreateDescriptors(gcmService, projectID)
 	if err != nil {
+		if strings.Contains(err.Error(), "Request throttled") {
+			e2eskipper.Skipf("Skipping...hitting rate limits on creating and updating metrics/labels")
+		}
 		framework.Failf("Failed to create metric descriptor: %s", err)
 	}
 	ginkgo.DeferCleanup(CleanupDescriptors, gcmService, projectID)
@@ -157,6 +162,9 @@ func testExternalMetrics(ctx context.Context, f *framework.Framework, kubeClient
 	// Set up a cluster: create a custom metric and set up k8s-sd adapter
 	err = CreateDescriptors(gcmService, projectID)
 	if err != nil {
+		if strings.Contains(err.Error(), "Request throttled") {
+			e2eskipper.Skipf("Skipping...hitting rate limits on creating and updating metrics/labels")
+		}
 		framework.Failf("Failed to create metric descriptor: %s", err)
 	}
 	ginkgo.DeferCleanup(CleanupDescriptors, gcmService, projectID)

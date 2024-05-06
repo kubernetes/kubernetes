@@ -32,6 +32,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -115,7 +116,9 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			resyncPeriod := 12 * time.Hour
 			informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
+			tCtx := ktesting.Init(t)
 			epsController := endpointslice.NewController(
+				tCtx,
 				informers.Core().V1().Pods(),
 				informers.Core().V1().Services(),
 				informers.Core().V1().Nodes(),
@@ -125,10 +128,8 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				1*time.Second)
 
 			// Start informer and controllers
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			informers.Start(stopCh)
-			go epsController.Run(1, stopCh)
+			informers.Start(tCtx.Done())
+			go epsController.Run(tCtx, 1)
 
 			// Create namespace
 			ns := framework.CreateNamespaceOrDie(client, "test-endpoints-terminating", t)
@@ -158,7 +159,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 						"foo": "bar",
 					},
 					Ports: []corev1.ServicePort{
-						{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt(443)},
+						{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
 					},
 				},
 			}

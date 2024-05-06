@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package informers provides generated informers for Kubernetes APIs.
-package informers
+package informers // import "k8s.io/client-go/informers"

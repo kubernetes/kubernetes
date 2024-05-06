@@ -112,6 +112,14 @@ func NewPrometheusMachineCollector(i infoProvider, includedMetrics container.Met
 				},
 			},
 			{
+				name:      "machine_swap_bytes",
+				help:      "Amount of swap memory available on the machine.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(machineInfo *info.MachineInfo) metricValues {
+					return metricValues{{value: float64(machineInfo.SwapCapacity), timestamp: machineInfo.Timestamp}}
+				},
+			},
+			{
 				name:        "machine_dimm_count",
 				help:        "Number of RAM DIMM (all types memory modules) value labeled by dimm type.",
 				valueType:   prometheus.GaugeValue,

@@ -23,13 +23,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	client "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -37,6 +40,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 type diffFlags struct {
@@ -74,7 +78,11 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 				flags.schedulerManifestPath); err != nil {
 				return err
 			}
-			return runDiff(flags, args)
+
+			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
+				return err
+			}
+			return runDiff(cmd.Flags(), flags, args, configutil.FetchInitConfigurationFromCluster)
 		},
 	}
 
@@ -107,48 +115,51 @@ func validateManifestsPath(manifests ...string) (err error) {
 	return nil
 }
 
-func runDiff(flags *diffFlags, args []string) error {
-	var err error
-	var cfg *kubeadmapi.InitConfiguration
-	if flags.cfgPath != "" {
-		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
-	} else {
-		var client *client.Clientset
-		client, err = kubeconfigutil.ClientSetFromFile(flags.kubeConfigPath)
-		if err != nil {
-			return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
-		}
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade/diff", false, false)
+// FetchInitConfigurationFunc defines the signature of the function which will fetch InitConfiguration from cluster.
+type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
+
+func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfigurationFromCluster FetchInitConfigurationFunc) error {
+	externalCfg := &v1beta4.UpgradeConfiguration{}
+	opt := configutil.LoadOrDefaultConfigurationOptions{}
+	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
+	if err != nil {
+		return err
 	}
+	client, err := kubeconfigutil.ClientSetFromFile(flags.kubeConfigPath)
+	if err != nil {
+		return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+	}
+	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", false, true)
 	if err != nil {
 		return err
 	}
 
-	// If the version is specified in config file, pick up that value.
-	if cfg.KubernetesVersion != "" {
-		flags.newK8sVersionStr = cfg.KubernetesVersion
+	// Pick up the version from the ClusterConfiguration.
+	if initCfg.KubernetesVersion != "" {
+		flags.newK8sVersionStr = initCfg.KubernetesVersion
+	}
+	if upgradeCfg.Diff.KubernetesVersion != "" {
+		flags.newK8sVersionStr = upgradeCfg.Diff.KubernetesVersion
 	}
 
-	// If the new version is already specified in config file, version arg is optional.
+	// Version must be specified via version arg if it's not set in ClusterConfiguration.
 	if flags.newK8sVersionStr == "" {
 		if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
 			return err
 		}
 	}
-
 	// If option was specified in both args and config file, args will overwrite the config file.
 	if len(args) == 1 {
 		flags.newK8sVersionStr = args[0]
 	}
-
 	_, err = version.ParseSemantic(flags.newK8sVersionStr)
 	if err != nil {
 		return err
 	}
 
-	cfg.ClusterConfiguration.KubernetesVersion = flags.newK8sVersionStr
+	initCfg.ClusterConfiguration.KubernetesVersion = flags.newK8sVersionStr
 
-	specs := controlplane.GetStaticPodSpecs(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint)
+	specs := controlplane.GetStaticPodSpecs(&initCfg.ClusterConfiguration, &initCfg.LocalAPIEndpoint, nil)
 	for spec, pod := range specs {
 		var path string
 		switch spec {
@@ -162,7 +173,6 @@ func runDiff(flags *diffFlags, args []string) error {
 			klog.Errorf("[diff] unknown spec %v", spec)
 			continue
 		}
-
 		newManifest, err := kubeadmutil.MarshalToYaml(&pod, corev1.SchemeGroupVersion)
 		if err != nil {
 			return err
@@ -181,7 +191,7 @@ func runDiff(flags *diffFlags, args []string) error {
 			B:        difflib.SplitLines(string(newManifest)),
 			FromFile: path,
 			ToFile:   "new manifest",
-			Context:  flags.contextLines,
+			Context:  cmdutil.ValueFromFlagsOrConfig(fs, "context-lines", upgradeCfg.Diff.DiffContextLines, flags.contextLines).(int),
 		}
 
 		difflib.WriteUnifiedDiff(flags.out, diff)

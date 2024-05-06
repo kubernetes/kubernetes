@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2021 The Kubernetes Authors.
 
@@ -20,6 +23,7 @@ import (
 	"context"
 
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/node"
@@ -33,13 +37,13 @@ var upgradeTests = []upgrades.Test{
 	&node.NvidiaGPUUpgradeTest{},
 }
 
-var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
+var _ = SIGDescribe("gpu Upgrade", feature.GPUUpgrade, func() {
 	f := framework.NewDefaultFramework("gpu-upgrade")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("master upgrade", func() {
-		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func(ctx context.Context) {
+		f.It("should NOT disrupt gpu pod", feature.GPUMasterUpgrade, func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
@@ -52,7 +56,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 		})
 	})
 	ginkgo.Describe("cluster upgrade", func() {
-		ginkgo.It("should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]", func(ctx context.Context) {
+		f.It("should be able to run gpu pod after upgrade", feature.GPUClusterUpgrade, func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 
@@ -65,7 +69,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 		})
 	})
 	ginkgo.Describe("cluster downgrade", func() {
-		ginkgo.It("should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]", func(ctx context.Context) {
+		f.It("should be able to run gpu pod after downgrade", feature.GPUClusterDowngrade, func(ctx context.Context) {
 			upgCtx, err := common.GetUpgradeContext(f.ClientSet.Discovery())
 			framework.ExpectNoError(err)
 

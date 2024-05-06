@@ -60,7 +60,7 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*pkiutil.Cert
 		}
 	}
 
-	k.config.PublicKeyAlgorithm = ic.ClusterConfiguration.PublicKeyAlgorithm()
+	k.config.EncryptionAlgorithm = ic.ClusterConfiguration.EncryptionAlgorithmType()
 	return &k.config, nil
 }
 
@@ -291,7 +291,7 @@ func KubeadmCertKubeletClient() *KubeadmCert {
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
 				CommonName:   kubeadmconstants.APIServerKubeletClientCertCommonName,
-				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
+				Organization: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 		},
@@ -352,7 +352,7 @@ func KubeadmCertEtcdServer() *KubeadmCert {
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
 				// TODO: etcd 3.2 introduced an undocumented requirement for ClientAuth usage on the
-				// server cert: https://github.com/coreos/etcd/issues/9785#issuecomment-396715692
+				// server cert: https://github.com/etcd-io/etcd/issues/9785#issuecomment-396715692
 				// Once the upstream issue is resolved, this should be returned to only allowing
 				// ServerAuth usage.
 				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
@@ -393,9 +393,8 @@ func KubeadmCertEtcdHealthcheck() *KubeadmCert {
 		CAName:   "etcd-ca",
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
-				CommonName:   kubeadmconstants.EtcdHealthcheckClientCertCommonName,
-				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				CommonName: kubeadmconstants.EtcdHealthcheckClientCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 		},
 	}
@@ -410,9 +409,8 @@ func KubeadmCertEtcdAPIClient() *KubeadmCert {
 		CAName:   "etcd-ca",
 		config: pkiutil.CertConfig{
 			Config: certutil.Config{
-				CommonName:   kubeadmconstants.APIServerEtcdClientCertCommonName,
-				Organization: []string{kubeadmconstants.SystemPrivilegedGroup},
-				Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				CommonName: kubeadmconstants.APIServerEtcdClientCertCommonName,
+				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 		},
 	}

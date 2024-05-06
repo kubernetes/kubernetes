@@ -23,9 +23,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
+	"os"
 
 	credinternal "google.golang.org/grpc/internal/credentials"
 )
@@ -166,7 +166,7 @@ func NewClientTLSFromCert(cp *x509.CertPool, serverNameOverride string) Transpor
 // it will override the virtual host name of authority (e.g. :authority header
 // field) in requests.
 func NewClientTLSFromFile(certFile, serverNameOverride string) (TransportCredentials, error) {
-	b, err := ioutil.ReadFile(certFile)
+	b, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, err
 	}

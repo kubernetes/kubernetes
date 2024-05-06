@@ -21,6 +21,6 @@ go_library(
     ],
     importpath = "github.com/google/cel-go/parser/gen",
     deps = [
-        "@com_github_antlr_antlr4_runtime_go_antlr//:go_default_library",
+        "@com_github_antlr4_go_antlr_v4//:go_default_library",
     ],
 )

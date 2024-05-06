@@ -57,5 +57,5 @@ func leastRequestedScore(requested, capacity int64) int64 {
 		return 0
 	}
 
-	return ((capacity - requested) * int64(framework.MaxNodeScore)) / capacity
+	return ((capacity - requested) * framework.MaxNodeScore) / capacity
 }

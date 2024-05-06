@@ -19,7 +19,10 @@ package validatingadmissionpolicy
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -56,6 +59,7 @@ func (v *validatingAdmissionPolicyStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears the status of an validatingAdmissionPolicy before creation.
 func (v *validatingAdmissionPolicyStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	ic := obj.(*admissionregistration.ValidatingAdmissionPolicy)
+	ic.Status = admissionregistration.ValidatingAdmissionPolicyStatus{}
 	ic.Generation = 1
 }
 
@@ -63,6 +67,9 @@ func (v *validatingAdmissionPolicyStrategy) PrepareForCreate(ctx context.Context
 func (v *validatingAdmissionPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newIC := obj.(*admissionregistration.ValidatingAdmissionPolicy)
 	oldIC := old.(*admissionregistration.ValidatingAdmissionPolicy)
+
+	// Prevent any update on the Status object
+	newIC.Status = oldIC.Status
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
@@ -119,4 +126,68 @@ func (v *validatingAdmissionPolicyStrategy) WarningsOnUpdate(ctx context.Context
 // only be allowed if version match.
 func (v *validatingAdmissionPolicyStrategy) AllowUnconditionalUpdate() bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (v *validatingAdmissionPolicyStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"admissionregistration.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"admissionregistration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"admissionregistration.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
+type validatingAdmissionPolicyStatusStrategy struct {
+	*validatingAdmissionPolicyStrategy
+}
+
+// ValidateUpdate is the default update validation of an update to the status object.
+func (s *validatingAdmissionPolicyStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidateValidatingAdmissionPolicyStatusUpdate(obj.(*admissionregistration.ValidatingAdmissionPolicy), old.(*admissionregistration.ValidatingAdmissionPolicy))
+}
+
+// PrepareForUpdate differs from the main strategy where setting the spec is not
+// allowed, but setting status is OK.
+func (s *validatingAdmissionPolicyStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newIC := obj.(*admissionregistration.ValidatingAdmissionPolicy)
+	oldIC := old.(*admissionregistration.ValidatingAdmissionPolicy)
+
+	// Prevent any update on the Spec object from Status Strategy
+	newIC.Spec = oldIC.Spec
+
+	metav1.ResetObjectMetaForStatus(&newIC.ObjectMeta, &oldIC.ObjectMeta)
+	// No change in the generation.
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (s *validatingAdmissionPolicyStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"admissionregistration.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+		"admissionregistration.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+		"admissionregistration.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+	}
+}
+
+// NewStatusStrategy creates a strategy for operating the status object.
+func NewStatusStrategy(policyStrategy *validatingAdmissionPolicyStrategy) *validatingAdmissionPolicyStatusStrategy {
+	return &validatingAdmissionPolicyStatusStrategy{validatingAdmissionPolicyStrategy: policyStrategy}
 }

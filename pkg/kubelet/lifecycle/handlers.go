@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,6 +86,14 @@ func (hr *handlerRunner) Run(ctx context.Context, containerID kubecontainer.Cont
 			klog.V(1).ErrorS(err, "HTTP lifecycle hook for Container in Pod failed", "path", handler.HTTPGet.Path, "containerName", container.Name, "pod", klog.KObj(pod))
 		}
 		return msg, err
+	case handler.Sleep != nil:
+		err := hr.runSleepHandler(ctx, handler.Sleep.Seconds)
+		var msg string
+		if err != nil {
+			msg = fmt.Sprintf("Sleep lifecycle hook (%d) for Container %q in Pod %q failed - error: %v", handler.Sleep.Seconds, container.Name, format.Pod(pod), err)
+			klog.V(1).ErrorS(err, "Sleep lifecycle hook for Container in Pod failed", "sleepSeconds", handler.Sleep.Seconds, "containerName", container.Name, "pod", klog.KObj(pod))
+		}
+		return msg, err
 	default:
 		err := fmt.Errorf("invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
@@ -117,6 +125,21 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
+func (hr *handlerRunner) runSleepHandler(ctx context.Context, seconds int64) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepAction) {
+		return nil
+	}
+	c := time.After(time.Duration(seconds) * time.Second)
+	select {
+	case <-ctx.Done():
+		// unexpected termination
+		metrics.LifecycleHandlerSleepTerminated.Inc()
+		return fmt.Errorf("container terminated before sleep hook finished")
+	case <-c:
+		return nil
+	}
+}
+
 func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder) error {
 	host := handler.HTTPGet.Host
 	podIP := host
@@ -133,56 +156,32 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 		podIP = host
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
-		req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, podIP, "lifecycle")
-		if err != nil {
-			return err
-		}
-		resp, err := hr.httpDoer.Do(req)
-		discardHTTPRespBody(resp)
-
-		if isHTTPResponseError(err) {
-			klog.V(1).ErrorS(err, "HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host)
-
-			req := req.Clone(context.Background())
-			req.URL.Scheme = "http"
-			req.Header.Del("Authorization")
-			resp, httpErr := hr.httpDoer.Do(req)
-
-			// clear err since the fallback succeeded
-			if httpErr == nil {
-				metrics.LifecycleHandlerHTTPFallbacks.Inc()
-				if eventRecorder != nil {
-					// report the fallback with an event
-					eventRecorder.Event(pod, v1.EventTypeWarning, "LifecycleHTTPFallback", fmt.Sprintf("request to HTTPS lifecycle hook %s got HTTP response, retry with HTTP succeeded", req.URL.Host))
-				}
-				err = nil
-			}
-			discardHTTPRespBody(resp)
-		}
-		return err
-	}
-
-	// Deprecated code path.
-	var port int
-	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {
-		port = 80
-	} else {
-		var err error
-		port, err = resolvePort(handler.HTTPGet.Port, container)
-		if err != nil {
-			return err
-		}
-	}
-
-	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := httpprobe.NewRequestForHTTPGetAction(handler.HTTPGet, container, podIP, "lifecycle")
 	if err != nil {
 		return err
 	}
 	resp, err := hr.httpDoer.Do(req)
-
 	discardHTTPRespBody(resp)
+
+	if isHTTPResponseError(err) {
+		klog.V(1).ErrorS(err, "HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host)
+
+		req := req.Clone(context.Background())
+		req.URL.Scheme = "http"
+		req.Header.Del("Authorization")
+		resp, httpErr := hr.httpDoer.Do(req)
+
+		// clear err since the fallback succeeded
+		if httpErr == nil {
+			metrics.LifecycleHandlerHTTPFallbacks.Inc()
+			if eventRecorder != nil {
+				// report the fallback with an event
+				eventRecorder.Event(pod, v1.EventTypeWarning, "LifecycleHTTPFallback", fmt.Sprintf("request to HTTPS lifecycle hook %s got HTTP response, retry with HTTP succeeded", req.URL.Host))
+			}
+			err = nil
+		}
+		discardHTTPRespBody(resp)
+	}
 	return err
 }
 

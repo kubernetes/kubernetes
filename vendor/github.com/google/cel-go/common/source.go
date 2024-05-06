@@ -64,7 +64,6 @@ type sourceImpl struct {
 	runes.Buffer
 	description string
 	lineOffsets []int32
-	idOffsets   map[int64]int32
 }
 
 var _ runes.Buffer = &sourceImpl{}
@@ -92,7 +91,6 @@ func NewStringSource(contents string, description string) Source {
 		Buffer:      runes.NewBuffer(contents),
 		description: description,
 		lineOffsets: offsets,
-		idOffsets:   map[int64]int32{},
 	}
 }
 
@@ -102,7 +100,6 @@ func NewInfoSource(info *exprpb.SourceInfo) Source {
 		Buffer:      runes.NewBuffer(""),
 		description: info.GetLocation(),
 		lineOffsets: info.GetLineOffsets(),
-		idOffsets:   info.GetPositions(),
 	}
 }
 

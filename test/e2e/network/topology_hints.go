@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -40,9 +41,9 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
+var _ = common.SIGDescribe(feature.TopologyHints, func() {
 	f := framework.NewDefaultFramework("topology-hints")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// filled in BeforeEach
 	var c clientset.Interface
@@ -53,7 +54,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 	})
 
 	ginkgo.It("should distribute endpoints evenly", func(ctx context.Context) {
-		portNum := 9376
+		portNum := int32(9376)
 		thLabels := map[string]string{labelKey: clientLabelValue}
 		img := imageutils.GetE2EImage(imageutils.Agnhost)
 		ports := []v1.ContainerPort{{ContainerPort: int32(portNum)}}
@@ -65,7 +66,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "topology-hints",
 				Annotations: map[string]string{
-					v1.AnnotationTopologyAwareHints: "Auto",
+					v1.AnnotationTopologyMode: "Auto",
 				},
 			},
 			Spec: v1.ServiceSpec{
@@ -74,7 +75,7 @@ var _ = common.SIGDescribe("[Feature:Topology Hints]", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "example",
 					Port:       80,
-					TargetPort: intstr.FromInt(portNum),
+					TargetPort: intstr.FromInt32(portNum),
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},

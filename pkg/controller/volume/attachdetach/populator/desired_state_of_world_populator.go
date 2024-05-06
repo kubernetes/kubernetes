@@ -19,6 +19,7 @@ limitations under the License.
 package populator
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -43,7 +44,7 @@ import (
 // each one exists in the desired state of the world cache
 // if it has volumes.
 type DesiredStateOfWorldPopulator interface {
-	Run(stopCh <-chan struct{})
+	Run(ctx context.Context)
 }
 
 // NewDesiredStateOfWorldPopulator returns a new instance of DesiredStateOfWorldPopulator.
@@ -90,35 +91,36 @@ type desiredStateOfWorldPopulator struct {
 	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 }
 
-func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
-	wait.Until(dswp.populatorLoopFunc(), dswp.loopSleepDuration, stopCh)
+func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context) {
+	wait.UntilWithContext(ctx, dswp.populatorLoopFunc(ctx), dswp.loopSleepDuration)
 }
 
-func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
-	return func() {
-		dswp.findAndRemoveDeletedPods()
+func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc(ctx context.Context) func(ctx context.Context) {
+	return func(ctx context.Context) {
+		logger := klog.FromContext(ctx)
+		dswp.findAndRemoveDeletedPods(logger)
 
 		// findAndAddActivePods is called periodically, independently of the main
 		// populator loop.
 		if time.Since(dswp.timeOfLastListPods) < dswp.listPodsRetryDuration {
-			klog.V(5).Infof(
-				"Skipping findAndAddActivePods(). Not permitted until %v (listPodsRetryDuration %v).",
-				dswp.timeOfLastListPods.Add(dswp.listPodsRetryDuration),
-				dswp.listPodsRetryDuration)
+			logger.V(5).Info(
+				"Skipping findAndAddActivePods(). Not permitted until the retry time is reached",
+				"retryTime", dswp.timeOfLastListPods.Add(dswp.listPodsRetryDuration),
+				"retryDuration", dswp.listPodsRetryDuration)
 
 			return
 		}
-		dswp.findAndAddActivePods()
+		dswp.findAndAddActivePods(logger)
 	}
 }
 
 // Iterate through all pods in desired state of world, and remove if they no
 // longer exist in the informer
-func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
+func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.Logger) {
 	for dswPodUID, dswPodToAdd := range dswp.desiredStateOfWorld.GetPodToAdd() {
 		dswPodKey, err := kcache.MetaNamespaceKeyFunc(dswPodToAdd.Pod)
 		if err != nil {
-			klog.Errorf("MetaNamespaceKeyFunc failed for pod %q (UID %q) with: %v", dswPodKey, dswPodUID, err)
+			logger.Error(err, "MetaNamespaceKeyFunc failed for pod", "podName", dswPodKey, "podUID", dswPodUID)
 			continue
 		}
 
@@ -133,7 +135,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		case errors.IsNotFound(err):
 			// if we can't find the pod, we need to delete it below
 		case err != nil:
-			klog.Errorf("podLister Get failed for pod %q (UID %q) with %v", dswPodKey, dswPodUID, err)
+			logger.Error(err, "podLister Get failed for pod", "podName", dswPodKey, "podUID", dswPodUID)
 			continue
 		default:
 			volumeActionFlag := util.DetermineVolumeAction(
@@ -145,7 +147,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 				informerPodUID := volutil.GetUniquePodName(informerPod)
 				// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
 				if informerPodUID == dswPodUID {
-					klog.V(10).Infof("Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
+					logger.V(10).Info("Verified podfrom dsw exists in pod informer", "podName", dswPodKey, "podUID", dswPodUID)
 					continue
 				}
 			}
@@ -153,7 +155,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 		// the pod from dsw does not exist in pod informer, or it does not match the unique identifier retrieved
 		// from the informer, delete it from dsw
-		klog.V(1).Infof("Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
+		logger.V(1).Info("Removing pod from dsw because it does not exist in pod informer", "podName", dswPodKey, "podUID", dswPodUID)
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
 
@@ -163,21 +165,21 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		// The result is returned from CSIDriverLister which is from local cache. So this is not an expensive call.
 		volumeAttachable := volutil.IsAttachableVolume(volumeToAttach.VolumeSpec, dswp.volumePluginMgr)
 		if !volumeAttachable {
-			klog.Infof("Volume %v changes from attachable to non-attachable.", volumeToAttach.VolumeName)
+			logger.Info("Volume changes from attachable to non-attachable", "volumeName", volumeToAttach.VolumeName)
 			for _, scheduledPod := range volumeToAttach.ScheduledPods {
 				podUID := volutil.GetUniquePodName(scheduledPod)
 				dswp.desiredStateOfWorld.DeletePod(podUID, volumeToAttach.VolumeName, volumeToAttach.NodeName)
-				klog.V(4).Infof("Removing podUID: %v, volume: %v on node: %v from desired state of world"+
-					" because of the change of volume attachability.", podUID, volumeToAttach.VolumeName, volumeToAttach.NodeName)
+				logger.V(4).Info("Removing podUID and volume on node from desired state of world"+
+					" because of the change of volume attachability", "node", klog.KRef("", string(volumeToAttach.NodeName)), "podUID", podUID, "volumeName", volumeToAttach.VolumeName)
 			}
 		}
 	}
 }
 
-func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
+func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods(logger klog.Logger) {
 	pods, err := dswp.podLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("podLister List failed: %v", err)
+		logger.Error(err, "PodLister List failed")
 		return
 	}
 	dswp.timeOfLastListPods = time.Now()
@@ -187,7 +189,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 			// Do not add volumes for terminated pods
 			continue
 		}
-		util.ProcessPodVolumes(pod, true,
+		util.ProcessPodVolumes(logger, pod, true,
 			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.csiMigratedPluginManager, dswp.intreeToCSITranslator)
 
 	}

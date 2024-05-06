@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
@@ -48,26 +49,26 @@ import (
 
 var (
 	eventsLong = templates.LongDesc(i18n.T(`
-		Display events
+		Display events.
 
 		Prints a table of the most important information about events.
 		You can request events for a namespace, for all namespace, or
 		filtered to only those pertaining to a specified resource.`))
 
 	eventsExample = templates.Examples(i18n.T(`
-	# List recent events in the default namespace.
+	# List recent events in the default namespace
 	kubectl events
 
-	# List recent events in all namespaces.
+	# List recent events in all namespaces
 	kubectl events --all-namespaces
 
-	# List recent events for the specified pod, then wait for more events and list them as they arrive.
+	# List recent events for the specified pod, then wait for more events and list them as they arrive
 	kubectl events --for pod/web-pod-13je7 --watch
 
-	# List recent events in given format. Supported ones, apart from default, are json and yaml.
+	# List recent events in YAML format
 	kubectl events -oyaml
 
-	# List recent only events in given event types
+	# List recent only events of type 'Warning' or 'Normal'
 	kubectl events --types=Warning,Normal`))
 )
 
@@ -84,11 +85,11 @@ type EventsFlags struct {
 	ForObject     string
 	FilterTypes   []string
 	ChunkSize     int64
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewEventsFlags returns a default EventsFlags
-func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *EventsFlags {
+func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *EventsFlags {
 	return &EventsFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("events").WithTypeSetter(scheme.Scheme),
@@ -112,15 +113,15 @@ type EventsOptions struct {
 
 	PrintObj printers.ResourcePrinterFunc
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewCmdEvents creates a new events command
-func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--event=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
+		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--types=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("List events"),
 		Long:                  eventsLong,
@@ -228,6 +229,7 @@ func (o *EventsOptions) Run() error {
 	if o.forName != "" {
 		listOptions.FieldSelector = fields.AndSelectors(
 			fields.OneTermEqualSelector("involvedObject.kind", o.forGVK.Kind),
+			fields.OneTermEqualSelector("involvedObject.apiVersion", o.forGVK.GroupVersion().String()),
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
 	if o.Watch {
@@ -386,11 +388,18 @@ func decodeResourceTypeName(mapper meta.RESTMapper, s string) (gvk schema.GroupV
 	}
 	resource, name := seg[0], seg[1]
 
-	var gvr schema.GroupVersionResource
-	gvr, err = mapper.ResourceFor(schema.GroupVersionResource{Resource: resource})
-	if err != nil {
-		return
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resource))
+	gvr := schema.GroupVersionResource{}
+	if fullySpecifiedGVR != nil {
+		gvr, _ = mapper.ResourceFor(*fullySpecifiedGVR)
 	}
+	if gvr.Empty() {
+		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
+		if err != nil {
+			return
+		}
+	}
+
 	gvk, err = mapper.KindFor(gvr)
 	if err != nil {
 		return

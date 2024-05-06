@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
@@ -37,7 +39,7 @@ import (
 // setupNodeStatusUpdate creates all the needed objects for testing.
 // the initial environment has 2 nodes with no volumes attached
 // and adds one volume to attach to each node to the actual state of the world
-func setupNodeStatusUpdate(ctx context.Context, t *testing.T) (cache.ActualStateOfWorld, *fake.Clientset, NodeStatusUpdater) {
+func setupNodeStatusUpdate(logger klog.Logger, t *testing.T) (cache.ActualStateOfWorld, *fake.Clientset, NodeStatusUpdater) {
 	testNode1 := corev1.Node{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Node",
@@ -83,11 +85,11 @@ func setupNodeStatusUpdate(ctx context.Context, t *testing.T) (cache.ActualState
 	nodeName2 := types.NodeName("testnode-2")
 	devicePath := "fake/device/path"
 
-	_, err = asw.AddVolumeNode(volumeName1, volumeSpec1, nodeName1, devicePath, true)
+	_, err = asw.AddVolumeNode(logger, volumeName1, volumeSpec1, nodeName1, devicePath, true)
 	if err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
 	}
-	_, err = asw.AddVolumeNode(volumeName2, volumeSpec2, nodeName2, devicePath, true)
+	_, err = asw.AddVolumeNode(logger, volumeName2, volumeSpec2, nodeName2, devicePath, true)
 	if err != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
 	}
@@ -101,14 +103,15 @@ func setupNodeStatusUpdate(ctx context.Context, t *testing.T) (cache.ActualState
 // checks that each node status.volumesAttached is of length 1 and contains the correct volume
 func TestNodeStatusUpdater_UpdateNodeStatuses_TwoNodesUpdate(t *testing.T) {
 	ctx := context.Background()
-	asw, fakeKubeClient, nsu := setupNodeStatusUpdate(ctx, t)
+	logger := klog.FromContext(ctx)
+	asw, fakeKubeClient, nsu := setupNodeStatusUpdate(logger, t)
 
-	err := nsu.UpdateNodeStatuses()
+	err := nsu.UpdateNodeStatuses(logger)
 	if err != nil {
 		t.Fatalf("UpdateNodeStatuses failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	needToReport := asw.GetVolumesToReportAttached()
+	needToReport := asw.GetVolumesToReportAttached(logger)
 	if len(needToReport) != 0 {
 		t.Fatalf("len(asw.GetVolumesToReportAttached()) Expected: <0> Actual: <%v>", len(needToReport))
 	}
@@ -138,7 +141,8 @@ func TestNodeStatusUpdater_UpdateNodeStatuses_TwoNodesUpdate(t *testing.T) {
 
 func TestNodeStatusUpdater_UpdateNodeStatuses_FailureInFirstUpdate(t *testing.T) {
 	ctx := context.Background()
-	asw, fakeKubeClient, nsu := setupNodeStatusUpdate(ctx, t)
+	logger := klog.FromContext(ctx)
+	asw, fakeKubeClient, nsu := setupNodeStatusUpdate(logger, t)
 
 	var failedNode string
 	failedOnce := false
@@ -153,12 +157,12 @@ func TestNodeStatusUpdater_UpdateNodeStatuses_FailureInFirstUpdate(t *testing.T)
 		return false, nil, nil
 	})
 
-	err := nsu.UpdateNodeStatuses()
+	err := nsu.UpdateNodeStatuses(logger)
 	if errors.Is(err, failureErr) {
 		t.Fatalf("UpdateNodeStatuses failed. Expected: <test generated error> Actual: <%v>", err)
 	}
 
-	needToReport := asw.GetVolumesToReportAttached()
+	needToReport := asw.GetVolumesToReportAttached(logger)
 	if len(needToReport) != 1 {
 		t.Fatalf("len(asw.GetVolumesToReportAttached()) Expected: <1> Actual: <%v>", len(needToReport))
 	}
@@ -194,14 +198,15 @@ func TestNodeStatusUpdater_UpdateNodeStatuses_FailureInFirstUpdate(t *testing.T)
 // checks that testnode-1 status.volumesAttached is of length 1 and contains the correct volume
 func TestNodeStatusUpdater_UpdateNodeStatusForNode(t *testing.T) {
 	ctx := context.Background()
-	asw, fakeKubeClient, nsu := setupNodeStatusUpdate(ctx, t)
+	logger := klog.FromContext(ctx)
+	asw, fakeKubeClient, nsu := setupNodeStatusUpdate(logger, t)
 
-	err := nsu.UpdateNodeStatusForNode("testnode-1")
+	err := nsu.UpdateNodeStatusForNode(logger, "testnode-1")
 	if err != nil {
 		t.Fatalf("UpdateNodeStatuses failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	needToReport := asw.GetVolumesToReportAttached()
+	needToReport := asw.GetVolumesToReportAttached(logger)
 	if len(needToReport) != 1 {
 		t.Fatalf("len(asw.GetVolumesToReportAttached()) Expected: <1> Actual: <%v>", len(needToReport))
 	}

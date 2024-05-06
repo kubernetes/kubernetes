@@ -133,6 +133,35 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				ResourceRequest: true,
 			},
 		},
+		{
+			name: "resource with no version",
+			args: args{
+				spec: authorizationapi.SubjectAccessReviewSpec{
+					User: "bob",
+					ResourceAttributes: &authorizationapi.ResourceAttributes{
+						Namespace:   "myns",
+						Verb:        "create",
+						Group:       "extensions",
+						Resource:    "deployments",
+						Subresource: "scale",
+						Name:        "mydeployment",
+					},
+				},
+			},
+			want: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name: "bob",
+				},
+				APIGroup:        "extensions",
+				APIVersion:      "*",
+				Namespace:       "myns",
+				Verb:            "create",
+				Resource:        "deployments",
+				Subresource:     "scale",
+				Name:            "mydeployment",
+				ResourceRequest: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

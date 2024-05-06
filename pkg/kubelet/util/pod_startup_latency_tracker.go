@@ -41,6 +41,8 @@ type basicPodStartupLatencyTracker struct {
 	// protect against concurrent read and write on pods map
 	lock sync.Mutex
 	pods map[types.UID]*perPodState
+	// metrics for the first network pod only
+	firstNetworkPodSeen bool
 	// For testability
 	clock clock.Clock
 }
@@ -102,6 +104,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 		klog.InfoS("Observed pod startup duration",
 			"pod", klog.KObj(pod),
 			"podStartSLOduration", podStartSLOduration,
+			"podStartE2EDuration", podStartingDuration,
 			"podCreationTimestamp", pod.CreationTimestamp.Time,
 			"firstStartedPulling", state.firstStartedPulling,
 			"lastFinishedPulling", state.lastFinishedPulling,
@@ -109,7 +112,14 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			"watchObservedRunningTime", when)
 
 		metrics.PodStartSLIDuration.WithLabelValues().Observe(podStartSLOduration)
+		metrics.PodStartTotalDuration.WithLabelValues().Observe(podStartingDuration.Seconds())
 		state.metricRecorded = true
+		// if is the first Pod with network track the start values
+		// these metrics will help to identify problems with the CNI plugin
+		if !pod.Spec.HostNetwork && !p.firstNetworkPodSeen {
+			metrics.FirstNetworkPodStartSLIDuration.Set(podStartSLOduration)
+			p.firstNetworkPodSeen = true
+		}
 	}
 }
 

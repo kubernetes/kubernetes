@@ -18,9 +18,9 @@ package benchmark
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,6 +30,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/logs/json/register"
@@ -75,18 +77,62 @@ func BenchmarkEncoding(b *testing.B) {
 				state := klog.CaptureState()
 				defer state.Restore()
 
-				var output bytesWritten
+				// To make the tests a bit more realistic, at
+				// least do system calls during each write.
+				output := newBytesWritten(b, "/dev/null")
 				c := logsapi.NewLoggingConfiguration()
 				c.Format = format
 				o := logsapi.LoggingOptions{
-					ErrorStream: &output,
-					InfoStream:  &output,
+					ErrorStream: output,
+					InfoStream:  output,
 				}
-				klog.SetOutput(&output)
+				klog.SetOutput(output)
+				defer func() {
+					if err := logsapi.ResetForTest(nil); err != nil {
+						b.Errorf("error resetting logsapi: %v", err)
+					}
+				}()
 				if err := logsapi.ValidateAndApplyWithOptions(c, &o, nil); err != nil {
 					b.Fatalf("Unexpected error configuring logging: %v", err)
 				}
 				logger := klog.Background()
+
+				// Edit and run with this if branch enabled to use slog instead of zapr for JSON.
+				if format == "json" && false {
+					var level slog.LevelVar
+					level.Set(slog.Level(-3)) // hack
+					logger = logr.FromSlogHandler(slog.NewJSONHandler(output, &slog.HandlerOptions{
+						AddSource: true,
+						Level:     &level,
+						ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+							switch a.Key {
+							case slog.TimeKey:
+								// Could be user-supplied "time".
+								if a.Value.Kind() == slog.KindTime {
+									return slog.Float64("ts", float64(a.Value.Time().UnixMicro())/1000)
+								}
+							case slog.LevelKey:
+								level := a.Value.Any().(slog.Level)
+								if level >= slog.LevelError {
+									// No verbosity on errors.
+									return slog.Attr{}
+								}
+								if level >= 0 {
+									return slog.Int("v", 0)
+								}
+								return slog.Int("v", int(-level))
+							case slog.SourceKey:
+								caller := zapcore.EntryCaller{
+									Defined: true,
+									File:    a.Value.String(),
+								}
+								return slog.String("caller", caller.TrimmedPath())
+							}
+							return a
+						},
+					}))
+				}
+
 				b.ResetTimer()
 				start := time.Now()
 				total := int64(0)
@@ -104,7 +150,7 @@ func BenchmarkEncoding(b *testing.B) {
 				// Report messages/s instead of ns/op because "op" varies.
 				b.ReportMetric(0, "ns/op")
 				b.ReportMetric(float64(total)/duration.Seconds(), "msgs/s")
-				fileSizes[filepath.Base(b.Name())] = int(output)
+				fileSizes[filepath.Base(b.Name())] = int(output.bytesWritten)
 			}
 
 			b.Run("printf", func(b *testing.B) {
@@ -119,7 +165,7 @@ func BenchmarkEncoding(b *testing.B) {
 				test(b, "json", prints)
 			})
 
-			b.Log(fmt.Sprintf("%s: file sizes: %v\n", path, fileSizes))
+			b.Logf("%s: file sizes: %v\n", path, fileSizes)
 		})
 		return nil
 	}); err != nil {
@@ -209,6 +255,10 @@ func benchmarkOutputFormatStream(b *testing.B, config loadGeneratorConfig, disca
 		if err := c.Options.JSON.InfoBufferSize.Set("64Ki"); err != nil {
 			b.Fatalf("Error setting buffer size: %v", err)
 		}
+		c.Options.Text.SplitStream = true
+		if err := c.Options.Text.InfoBufferSize.Set("64Ki"); err != nil {
+			b.Fatalf("Error setting buffer size: %v", err)
+		}
 	}
 	var files []*os.File
 	if discard {
@@ -238,6 +288,11 @@ func benchmarkOutputFormatStream(b *testing.B, config loadGeneratorConfig, disca
 	}
 
 	klog.SetOutput(o.ErrorStream)
+	defer func() {
+		if err := logsapi.ResetForTest(nil); err != nil {
+			b.Errorf("error resetting logsapi: %v", err)
+		}
+	}()
 	if err := logsapi.ValidateAndApplyWithOptions(c, &o, featureGate); err != nil {
 		b.Fatalf("Unexpected error configuring logging: %v", err)
 	}
@@ -287,11 +342,11 @@ func generateOutput(b *testing.B, config loadGeneratorConfig, files ...*os.File)
 	b.Logf("Wrote %d log entries in %s -> %.1f/s", total, duration, float64(total)/duration.Seconds())
 	for i, file := range files {
 		if file != nil {
-			pos, err := file.Seek(0, os.SEEK_END)
+			pos, err := file.Seek(0, io.SeekEnd)
 			if err != nil {
 				b.Fatal(err)
 			}
-			if _, err := file.Seek(0, os.SEEK_SET); err != nil {
+			if _, err := file.Seek(0, io.SeekStart); err != nil {
 				b.Fatal(err)
 			}
 			max := 50

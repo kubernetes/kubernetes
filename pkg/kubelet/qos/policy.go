@@ -65,7 +65,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	memoryRequest := container.Resources.Requests.Memory().Value()
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			memoryRequest = cs.ResourcesAllocated.Memory().Value()
+			memoryRequest = cs.AllocatedResources.Memory().Value()
 		}
 	}
 	oomScoreAdjust := 1000 - (1000*memoryRequest)/memoryCapacity

@@ -29,8 +29,18 @@ import (
 	"k8s.io/kubectl/pkg/util/term"
 )
 
+type explainError string
+
+func (e explainError) Error() string {
+	return string(e)
+}
+
 func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 	return tmpl.Funcs(map[string]interface{}{
+		"throw": func(e string, args ...any) (string, error) {
+			errString := fmt.Sprintf(e, args...)
+			return "", explainError(errString)
+		},
 		"toJson": func(obj any) (string, error) {
 			res, err := json.Marshal(obj)
 			return string(res), err
@@ -174,6 +184,9 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 			}
 
 			return copyDict, nil
+		},
+		"list": func(values ...any) ([]any, error) {
+			return values, nil
 		},
 		"add": func(value, operand int) int {
 			return value + operand

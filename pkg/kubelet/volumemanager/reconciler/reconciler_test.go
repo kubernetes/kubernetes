@@ -19,7 +19,6 @@ package reconciler
 import (
 	"crypto/md5"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -1278,6 +1277,16 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			newPVSize:       resource.MustParse("15G"),
 			oldPVSize:       resource.MustParse("13G"),
 		},
+		{
+			name:            "expand-fs-volume with unsupported error",
+			volumeMode:      &fsMode,
+			expansionFailed: false,
+			pvName:          volumetesting.FailWithUnSupportedVolumeName,
+			pvcSize:         resource.MustParse("10G"),
+			pvcStatusSize:   resource.MustParse("10G"),
+			newPVSize:       resource.MustParse("15G"),
+			oldPVSize:       resource.MustParse("13G"),
+		},
 	}
 
 	for _, tc := range tests {
@@ -1394,7 +1403,7 @@ func getTestPVC(pvName string, volumeMode *v1.PersistentVolumeMode, specSize, st
 			UID:  "pvcuid",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: specSize,
 				},
@@ -2244,7 +2253,7 @@ func getInlineFakePod(podName, podUUID, outerName, innerName string) *v1.Pod {
 	return pod
 }
 
-func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Reconciler, *volumetesting.FakeVolumePlugin) {
+func getReconciler(kubeletDir string, t *testing.T, volumePaths []string, kubeClient *fake.Clientset) (Reconciler, *volumetesting.FakeVolumePlugin) {
 	node := getFakeNode()
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNodeAndRoot(t, node, kubeletDir)
 	tmpKubeletPodDir := filepath.Join(kubeletDir, "pods")
@@ -2252,7 +2261,10 @@ func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Recon
 
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
+	if kubeClient == nil {
+		kubeClient = createTestClient()
+	}
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -2281,174 +2293,113 @@ func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Recon
 	return rc, fakePlugin
 }
 
-func TestSyncStates(t *testing.T) {
-	type podInfo struct {
-		podName         string
-		podUID          string
-		outerVolumeName string
-		innerVolumeName string
-	}
-	defaultPodInfo := podInfo{
-		podName:         "pod1",
-		podUID:          "pod1uid",
-		outerVolumeName: "volume-name",
-		innerVolumeName: "volume-name",
-	}
-	tests := []struct {
-		name                 string
-		volumePaths          []string
-		createMountPoint     bool
-		podInfos             []podInfo
-		postSyncStatCallback func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
-		verifyFunc           func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
-	}{
-		{
-			name: "when two pods are using same volume and both are deleted",
-			volumePaths: []string{
-				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
-				filepath.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
-			},
-			createMountPoint: true,
-			podInfos:         []podInfo{},
-			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
-				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
-				if len(mountedPods) != 2 {
-					return fmt.Errorf("expected 2 pods to in asw got %d", len(mountedPods))
-				}
-				return nil
-			},
-		},
-		{
-			name: "when two pods are using same volume and one of them is deleted",
-			volumePaths: []string{
-				filepath.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
-				filepath.Join("pod2uid", "volumes", "fake-plugin", "volume-name"),
-			},
-			createMountPoint: true,
-			podInfos:         []podInfo{defaultPodInfo},
-			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
-				// for pod that is deleted, volume is considered as mounted
-				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
-				if len(mountedPods) != 1 {
-					return fmt.Errorf("expected 1 pods to in asw got %d", len(mountedPods))
-				}
-				if types.UniquePodName("pod2uid") != mountedPods[0].PodName {
-					return fmt.Errorf("expected mounted pod to be %s got %s", "pod2uid", mountedPods[0].PodName)
-				}
-				return nil
-			},
-		},
-		{
-			name: "when reconstruction fails for a volume, volumes should be cleaned up",
-			volumePaths: []string{
-				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
-			},
-			createMountPoint: false,
-			podInfos:         []podInfo{},
-			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
-				return retryWithExponentialBackOff(reconcilerSyncWaitDuration, func() (bool, error) {
-					err := volumetesting.VerifyTearDownCallCount(1, fakePlugin)
-					if err != nil {
-						return false, nil
-					}
-					return true, nil
-				})
-			},
-		},
-		{
-			name: "when volume exists in dsow, volume should be recorded in skipped during reconstruction",
-			volumePaths: []string{
-				filepath.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
-			},
-			createMountPoint: true,
-			podInfos:         []podInfo{defaultPodInfo},
-			postSyncStatCallback: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
-				skippedVolumes := rcInstance.skippedDuringReconstruction
-				if len(skippedVolumes) != 1 {
-					return fmt.Errorf("expected 1 pods to in skippedDuringReconstruction got %d", len(skippedVolumes))
-				}
-				rcInstance.processReconstructedVolumes()
-				return nil
-			},
-			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
-				mountedPods := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
-				if len(mountedPods) != 1 {
-					return fmt.Errorf("expected 1 pods to in mounted volume list got %d", len(mountedPods))
-				}
-				mountedPodVolume := mountedPods[0]
-				addedViaReconstruction := rcInstance.actualStateOfWorld.IsVolumeReconstructed(mountedPodVolume.VolumeName, mountedPodVolume.PodName)
-				if !addedViaReconstruction {
-					return fmt.Errorf("expected volume %s to be marked as added via reconstruction", mountedPodVolume.VolumeName)
-				}
+func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
+	// Calls Run() with two reconstructed volumes.
+	// Verifies the devicePaths + volume attachability are reconstructed from node.status.
 
-				// check device mount state
-				attachedVolumes := rcInstance.actualStateOfWorld.GetAttachedVolumes()
-				if len(attachedVolumes) != 1 {
-					return fmt.Errorf("expected 1 volume to be unmounted, got %d", len(attachedVolumes))
-				}
-				firstAttachedVolume := attachedVolumes[0]
-				if !firstAttachedVolume.DeviceMayBeMounted() {
-					return fmt.Errorf("expected %s volume to be mounted in uncertain state", firstAttachedVolume.VolumeName)
-				}
-
-				// also skippedVolumes map should be empty
-				skippedVolumes := rcInstance.skippedDuringReconstruction
-				if len(skippedVolumes) > 0 {
-					return fmt.Errorf("expected 0 pods in skipped volumes found %d", len(skippedVolumes))
-				}
-				return nil
+	// Arrange
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(nodeName),
+		},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/fake-device1",
+					DevicePath: "fake/path",
+				},
 			},
 		},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tmpKubeletDir, err := os.MkdirTemp("", "")
-			if err != nil {
-				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
-			}
-			defer os.RemoveAll(tmpKubeletDir)
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	kubeClient := createTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		fakeHandler))
+	rc := NewReconciler(
+		kubeClient,
+		true, /* controllerAttachDetachEnabled */
+		reconcilerLoopSleepDuration,
+		waitForAttachTimeout,
+		nodeName,
+		dsw,
+		asw,
+		hasAddedPods,
+		oex,
+		mount.NewFakeMounter(nil),
+		hostutil.NewFakeHostUtil(nil),
+		volumePluginMgr,
+		kubeletPodsDir)
+	reconciler := rc.(*reconciler)
 
-			// create kubelet pod directory
-			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
-			os.MkdirAll(tmpKubeletPodDir, 0755)
+	// The pod has two volumes, fake-device1 is attachable, fake-device2 is not.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+				{
+					Name: "volume-name2",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device2",
+						},
+					},
+				},
+			},
+		},
+	}
 
-			mountPaths := []string{}
+	volumeSpec1 := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	volumeName1 := util.GetUniqueVolumeName(fakePlugin.GetPluginName(), "fake-device1")
+	volumeSpec2 := &volume.Spec{Volume: &pod.Spec.Volumes[1]}
+	volumeName2 := util.GetUniqueVolumeName(fakePlugin.GetPluginName(), "fake-device2")
 
-			// create pod and volume directories so as reconciler can find them.
-			for _, volumePath := range tc.volumePaths {
-				vp := filepath.Join(tmpKubeletPodDir, volumePath)
-				if tc.createMountPoint {
-					mountPaths = append(mountPaths, vp)
-				}
-				os.MkdirAll(vp, 0755)
-			}
+	assert.NoError(t, asw.AddAttachUncertainReconstructedVolume(volumeName1, volumeSpec1, nodeName, ""))
+	assert.NoError(t, asw.MarkDeviceAsUncertain(volumeName1, "/dev/badly/reconstructed", "/var/lib/kubelet/plugins/global1", ""))
+	assert.NoError(t, asw.AddAttachUncertainReconstructedVolume(volumeName2, volumeSpec2, nodeName, ""))
+	assert.NoError(t, asw.MarkDeviceAsUncertain(volumeName2, "/dev/reconstructed", "/var/lib/kubelet/plugins/global2", ""))
 
-			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
-			rcInstance, _ := rc.(*reconciler)
+	assert.False(t, reconciler.StatesHasBeenSynced())
 
-			for _, tpodInfo := range tc.podInfos {
-				pod := getInlineFakePod(tpodInfo.podName, tpodInfo.podUID, tpodInfo.outerVolumeName, tpodInfo.innerVolumeName)
-				volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-				podName := util.GetUniquePodName(pod)
-				volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
-					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* SELinuxContext */)
-				if err != nil {
-					t.Fatalf("error adding volume %s to dsow: %v", volumeSpec.Name(), err)
-				}
-				rcInstance.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, "")
-			}
+	reconciler.volumesNeedUpdateFromNodeStatus = append(reconciler.volumesNeedUpdateFromNodeStatus, volumeName1, volumeName2)
+	// Act - run reconcile loop just once.
+	// "volumesNeedUpdateFromNodeStatus" is not empty, so no unmount will be triggered.
+	reconciler.reconcile()
 
-			rcInstance.syncStates(tmpKubeletPodDir)
-			if tc.postSyncStatCallback != nil {
-				err := tc.postSyncStatCallback(rcInstance, fakePlugin)
-				if err != nil {
-					t.Errorf("test %s, postSyncStatCallback failed: %v", tc.name, err)
-				}
-			}
+	// Assert
+	assert.True(t, reconciler.StatesHasBeenSynced())
+	assert.Empty(t, reconciler.volumesNeedUpdateFromNodeStatus)
 
-			if err := tc.verifyFunc(rcInstance, fakePlugin); err != nil {
-				t.Errorf("test %s failed: %v", tc.name, err)
-			}
-		})
+	attachedVolumes := asw.GetAttachedVolumes()
+	assert.Equalf(t, len(attachedVolumes), 2, "two volumes in ASW expected")
+	for _, vol := range attachedVolumes {
+		if vol.VolumeName == volumeName1 {
+			// devicePath + attachability must have been updated from node.status
+			assert.True(t, vol.PluginIsAttachable)
+			assert.Equal(t, vol.DevicePath, "fake/path")
+		}
+		if vol.VolumeName == volumeName2 {
+			// only attachability was updated from node.status
+			assert.False(t, vol.PluginIsAttachable)
+			assert.Equal(t, vol.DevicePath, "/dev/reconstructed")
+		}
 	}
 }

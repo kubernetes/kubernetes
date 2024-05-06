@@ -85,7 +85,7 @@ type APIResourceDiscovery struct {
 	Resource string
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
 	// APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior.
-	// This value will be null if an APIService reports subresources but supports no operations on the parent resource
+	// This value will be null or empty if an APIService reports subresources but supports no operations on the parent resource
 	ResponseKind *v1.GroupVersionKind
 	// scope indicates the scope of a resource, either Cluster or Namespaced
 	Scope ResourceScope
@@ -134,7 +134,7 @@ type APISubresourceDiscovery struct {
 	// for this resource across all versions.
 	Subresource string
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
-	// Some subresources do not return normal resources, these will have null return types.
+	// Some subresources do not return normal resources, these will have null or empty return types.
 	ResponseKind *v1.GroupVersionKind
 	// acceptedTypes describes the kinds that this endpoint accepts.
 	// Subresources may accept the standard content types or define

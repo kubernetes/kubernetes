@@ -301,7 +301,8 @@ func TestJSONInput(t *testing.T) {
 		{"id": "i3", "x":  8, "y":  3 },
 		{"id": "i4", "x": -6, "y": -1 },
 		{"id": "i5", "x":  0, "y":  2, "z": 1 },
-		{"id": "i6", "x":  1, "y":  4 }
+		{"id": "i6", "x":  1, "y":  4 },
+		{"id": "i7", "x":  null, "y":  4 }
 	]`)
 	var pointsData interface{}
 	err := json.Unmarshal(pointsJSON, &pointsData)
@@ -311,6 +312,7 @@ func TestJSONInput(t *testing.T) {
 	pointsTests := []jsonpathTest{
 		{"exists filter", "{[?(@.z)].id}", pointsData, "i2 i5", false},
 		{"bracket key", "{[0]['id']}", pointsData, "i1", false},
+		{"nil value", "{[-1]['x']}", pointsData, "null", false},
 	}
 	testJSONPath(pointsTests, false, t)
 }

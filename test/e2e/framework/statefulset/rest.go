@@ -25,12 +25,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
@@ -96,7 +96,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 	// pvs are global, so we need to wait for the exact ones bound to the statefulset pvcs.
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
-	pvcPollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pvcPollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
@@ -116,7 +116,7 @@ func DeleteAllStatefulSets(ctx context.Context, c clientset.Interface, ns string
 		errList = append(errList, fmt.Sprintf("Timeout waiting for pvc deletion."))
 	}
 
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvList, err := c.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
@@ -151,7 +151,7 @@ func Scale(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, c
 	ss = update(ctx, c, ns, name, count)
 
 	var statefulPodList *v1.PodList
-	pollErr := wait.PollImmediateWithContext(ctx, StatefulSetPoll, StatefulSetTimeout, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		statefulPodList = GetPodList(ctx, c, ss)
 		if int32(len(statefulPodList.Items)) == count {
 			return true, nil
@@ -247,21 +247,23 @@ func ExecInStatefulPods(ctx context.Context, c clientset.Interface, ss *appsv1.S
 }
 
 // update updates a statefulset, and it is only used within rest.go
-func update(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) *appsv1.StatefulSet {
-	for i := 0; i < 3; i++ {
-		ss, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
+func update(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) (ss *appsv1.StatefulSet) {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var err error
+		ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get statefulset %q: %v", name, err)
 		}
+		if *(ss.Spec.Replicas) == replicas {
+			return nil
+		}
 		*(ss.Spec.Replicas) = replicas
 		ss, err = c.AppsV1().StatefulSets(ns).Update(ctx, ss, metav1.UpdateOptions{})
-		if err == nil {
-			return ss
-		}
-		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
-			framework.Failf("failed to update statefulset %q: %v", name, err)
-		}
+		return err
+	})
+	if err == nil {
+		return ss
 	}
-	framework.Failf("too many retries draining statefulset %q", name)
+	framework.Failf("failed to update statefulset  %q: %v", name, err)
 	return nil
 }

@@ -16,9 +16,9 @@
 package decls
 
 import (
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 var (
@@ -62,6 +62,12 @@ func NewAbstractType(name string, paramTypes ...*exprpb.Type) *exprpb.Type {
 			AbstractType: &exprpb.Type_AbstractType{
 				Name:           name,
 				ParameterTypes: paramTypes}}}
+}
+
+// NewOptionalType constructs an abstract type indicating that the parameterized type
+// may be contained within the object.
+func NewOptionalType(paramType *exprpb.Type) *exprpb.Type {
+	return NewAbstractType("optional_type", paramType)
 }
 
 // NewFunctionType creates a function invocation contract, typically only used

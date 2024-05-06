@@ -1,6 +1,7 @@
 package gomega
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -52,13 +53,29 @@ func BeNil() types.GomegaMatcher {
 }
 
 // BeTrue succeeds if actual is true
+//
+// In general, it's better to use `BeTrueBecause(reason)` to provide a more useful error message if a true check fails.
 func BeTrue() types.GomegaMatcher {
 	return &matchers.BeTrueMatcher{}
 }
 
 // BeFalse succeeds if actual is false
+//
+// In general, it's better to use `BeFalseBecause(reason)` to provide a more useful error message if a false check fails.
 func BeFalse() types.GomegaMatcher {
 	return &matchers.BeFalseMatcher{}
+}
+
+// BeTrueBecause succeeds if actual is true and displays the provided reason if it is false
+// fmt.Sprintf is used to render the reason
+func BeTrueBecause(format string, args ...any) types.GomegaMatcher {
+	return &matchers.BeTrueMatcher{Reason: fmt.Sprintf(format, args...)}
+}
+
+// BeFalseBecause succeeds if actual is false and displays the provided reason if it is true.
+// fmt.Sprintf is used to render the reason
+func BeFalseBecause(format string, args ...any) types.GomegaMatcher {
+	return &matchers.BeFalseMatcher{Reason: fmt.Sprintf(format, args...)}
 }
 
 // HaveOccurred succeeds if actual is a non-nil error
@@ -87,17 +104,45 @@ func Succeed() types.GomegaMatcher {
 	return &matchers.SucceedMatcher{}
 }
 
-// MatchError succeeds if actual is a non-nil error that matches the passed in string/error.
+// MatchError succeeds if actual is a non-nil error that matches the passed in
+// string, error, function, or matcher.
 //
 // These are valid use-cases:
 //
-//	Expect(err).Should(MatchError("an error")) //asserts that err.Error() == "an error"
-//	Expect(err).Should(MatchError(SomeError)) //asserts that err == SomeError (via reflect.DeepEqual)
+// When passed a string:
 //
-// It is an error for err to be nil or an object that does not implement the Error interface
-func MatchError(expected interface{}) types.GomegaMatcher {
+//	Expect(err).To(MatchError("an error"))
+//
+// asserts that err.Error() == "an error"
+//
+// When passed an error:
+//
+//	Expect(err).To(MatchError(SomeError))
+//
+// First checks if errors.Is(err, SomeError).
+// If that fails then it checks if reflect.DeepEqual(err, SomeError) repeatedly for err and any errors wrapped by err
+//
+// When passed a matcher:
+//
+//	Expect(err).To(MatchError(ContainSubstring("sprocket not found")))
+//
+// the matcher is passed err.Error().  In this case it asserts that err.Error() contains substring "sprocket not found"
+//
+// When passed a func(err) bool and a description:
+//
+//	Expect(err).To(MatchError(os.IsNotExist, "IsNotExist"))
+//
+// the function is passed err and matches if the return value is true.  The description is required to allow Gomega
+// to print a useful error message.
+//
+// It is an error for err to be nil or an object that does not implement the
+// Error interface
+//
+// The optional second argument is a description of the error function, if used.  This is required when passing a function but is ignored in all other cases.
+func MatchError(expected interface{}, functionErrorDescription ...any) types.GomegaMatcher {
 	return &matchers.MatchErrorMatcher{
-		Expected: expected,
+		Expected:           expected,
+		FuncErrDescription: functionErrorDescription,
 	}
 }
 
@@ -349,6 +394,20 @@ func ConsistOf(elements ...interface{}) types.GomegaMatcher {
 	}
 }
 
+// HaveExactElements succeeds if actual contains elements that precisely match the elemets passed into the matcher. The ordering of the elements does matter.
+// By default HaveExactElements() uses Equal() to match the elements, however custom matchers can be passed in instead.  Here are some examples:
+//
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements("Foo", "FooBar"))
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements("Foo", ContainSubstring("Bar")))
+//	Expect([]string{"Foo", "FooBar"}).Should(HaveExactElements(ContainSubstring("Foo"), ContainSubstring("Foo")))
+//
+// Actual must be an array or slice.
+func HaveExactElements(elements ...interface{}) types.GomegaMatcher {
+	return &matchers.HaveExactElementsMatcher{
+		Elements: elements,
+	}
+}
+
 // ContainElements succeeds if actual contains the passed in elements. The ordering of the elements does not matter.
 // By default ContainElements() uses Equal() to match the elements, however custom matchers can be passed in instead. Here are some examples:
 //
@@ -364,7 +423,7 @@ func ContainElements(elements ...interface{}) types.GomegaMatcher {
 }
 
 // HaveEach succeeds if actual solely contains elements that match the passed in element.
-// Please note that if actual is empty, HaveEach always will succeed.
+// Please note that if actual is empty, HaveEach always will fail.
 // By default HaveEach() uses Equal() to perform the match, however a
 // matcher can be passed in instead:
 //

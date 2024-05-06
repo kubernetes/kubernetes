@@ -31,6 +31,8 @@ import (
 	"k8s.io/utils/clock"
 
 	"k8s.io/klog/v2"
+
+	clientgofeaturegate "k8s.io/client-go/features"
 )
 
 // SharedInformer provides eventually consistent linkage of its
@@ -205,10 +207,7 @@ type SharedInformer interface {
 	//
 	// Must be set before starting the informer.
 	//
-	// Note: Since the object given to the handler may be already shared with
-	//	other goroutines, it is advisable to copy the object being
-	//  transform before mutating it at all and returning the copy to prevent
-	//	data races.
+	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
 	// IsStopped reports whether the informer has already been stopped.
@@ -337,11 +336,9 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 		},
 		stopCh)
 	if err != nil {
-		klog.V(2).Infof("stop requested")
 		return false
 	}
 
-	klog.V(4).Infof("caches populated")
 	return true
 }
 
@@ -414,6 +411,10 @@ func (v *dummyController) HasSynced() bool {
 }
 
 func (v *dummyController) LastSyncResourceVersion() string {
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
+		return v.informer.LastSyncResourceVersion()
+	}
+
 	return ""
 }
 
@@ -462,27 +463,29 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		klog.Warningf("The sharedIndexInformer has started, run more than once is not allowed")
 		return
 	}
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KnownObjects:          s.indexer,
-		EmitDeltaTypeReplaced: true,
-	})
-
-	cfg := &Config{
-		Queue:             fifo,
-		ListerWatcher:     s.listerWatcher,
-		ObjectType:        s.objectType,
-		ObjectDescription: s.objectDescription,
-		FullResyncPeriod:  s.resyncCheckPeriod,
-		RetryOnError:      false,
-		ShouldResync:      s.processor.shouldResync,
-
-		Process:           s.HandleDeltas,
-		WatchErrorHandler: s.watchErrorHandler,
-	}
 
 	func() {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
+
+		fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			KnownObjects:          s.indexer,
+			EmitDeltaTypeReplaced: true,
+			Transformer:           s.transform,
+		})
+
+		cfg := &Config{
+			Queue:             fifo,
+			ListerWatcher:     s.listerWatcher,
+			ObjectType:        s.objectType,
+			ObjectDescription: s.objectDescription,
+			FullResyncPeriod:  s.resyncCheckPeriod,
+			RetryOnError:      false,
+			ShouldResync:      s.processor.shouldResync,
+
+			Process:           s.HandleDeltas,
+			WatchErrorHandler: s.watchErrorHandler,
+		}
 
 		s.controller = New(cfg)
 		s.controller.(*controller).clock = s.clock
@@ -543,8 +546,8 @@ func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if s.started {
-		return fmt.Errorf("informer has already started")
+	if s.stopped {
+		return fmt.Errorf("indexer was not added because it has stopped already")
 	}
 
 	return s.indexer.AddIndexers(indexers)
@@ -637,7 +640,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool
 	defer s.blockDeltas.Unlock()
 
 	if deltas, ok := obj.(Deltas); ok {
-		return processDeltas(s, s.indexer, s.transform, deltas, isInInitialList)
+		return processDeltas(s, s.indexer, deltas, isInInitialList)
 	}
 	return errors.New("object given as Process argument is not Deltas")
 }

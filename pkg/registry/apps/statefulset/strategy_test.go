@@ -153,7 +153,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 	}
 
 	t.Run("when StatefulSetAutoDeletePVC feature gate is enabled, PersistentVolumeClaimRetentionPolicy should be updated", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 		// Test creation
 		ps := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -193,7 +193,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		}
 	})
 	t.Run("when StatefulSetAutoDeletePVC feature gate is disabled, PersistentVolumeClaimRetentionPolicy should not be updated", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 		// Test creation
 		ps := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -308,7 +308,7 @@ func generateStatefulSetWithMinReadySeconds(minReadySeconds int32) *apps.Statefu
 func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	rollingUpdate := apps.RollingUpdateStatefulSetStrategy{}
 	if maxUnavailable != nil {
-		maxUnavailableIntStr := intstr.FromInt(*maxUnavailable)
+		maxUnavailableIntStr := intstr.FromInt32(int32(*maxUnavailable))
 		rollingUpdate = apps.RollingUpdateStatefulSetStrategy{
 			MaxUnavailable: &maxUnavailableIntStr,
 		}
@@ -452,8 +452,8 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, tc.enableMaxUnavailable)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, tc.enableStatefulSetStartOrdinal)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, tc.enableMaxUnavailable)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, tc.enableStatefulSetStartOrdinal)
 			old := tc.oldSS.DeepCopy()
 
 			dropStatefulSetDisabledFields(tc.ss, tc.oldSS)
@@ -471,7 +471,7 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 }
 
 func TestStatefulSetStartOrdinalEnablement(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)
 	ss := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
 	expectedSS := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
 	ss.Spec.Replicas = 1
@@ -493,7 +493,7 @@ func TestStatefulSetStartOrdinalEnablement(t *testing.T) {
 	}
 
 	// Validate that the ordinals field is retained when StatefulSetStartOridnal is disabled.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)
 	ssWhenDisabled := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
 	ssWhenDisabled.Spec.Replicas = 2
 
@@ -513,7 +513,7 @@ func TestStatefulSetStartOrdinalEnablement(t *testing.T) {
 	}
 
 	// Validate that the ordinal field is after re-enablement.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, false)
 	ssWhenEnabled := makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2))
 	ssWhenEnabled.Spec.Replicas = 3
 

@@ -18,6 +18,7 @@ package openapi
 
 import (
 	"context"
+	"net/url"
 
 	"k8s.io/kube-openapi/pkg/handler3"
 )
@@ -29,18 +30,41 @@ type GroupVersion interface {
 }
 
 type groupversion struct {
-	client *client
-	item   handler3.OpenAPIV3DiscoveryGroupVersion
+	client          *client
+	item            handler3.OpenAPIV3DiscoveryGroupVersion
+	useClientPrefix bool
 }
 
-func newGroupVersion(client *client, item handler3.OpenAPIV3DiscoveryGroupVersion) *groupversion {
-	return &groupversion{client: client, item: item}
+func newGroupVersion(client *client, item handler3.OpenAPIV3DiscoveryGroupVersion, useClientPrefix bool) *groupversion {
+	return &groupversion{client: client, item: item, useClientPrefix: useClientPrefix}
 }
 
 func (g *groupversion) Schema(contentType string) ([]byte, error) {
-	return g.client.restClient.Get().
-		RequestURI(g.item.ServerRelativeURL).
-		SetHeader("Accept", contentType).
-		Do(context.TODO()).
-		Raw()
+	if !g.useClientPrefix {
+		return g.client.restClient.Get().
+			RequestURI(g.item.ServerRelativeURL).
+			SetHeader("Accept", contentType).
+			Do(context.TODO()).
+			Raw()
+	}
+
+	locator, err := url.Parse(g.item.ServerRelativeURL)
+	if err != nil {
+		return nil, err
+	}
+
+	path := g.client.restClient.Get().
+		AbsPath(locator.Path).
+		SetHeader("Accept", contentType)
+
+	// Other than root endpoints(openapiv3/apis), resources have hash query parameter to support etags.
+	// However, absPath does not support handling query parameters internally,
+	// so that hash query parameter is added manually
+	for k, value := range locator.Query() {
+		for _, v := range value {
+			path.Param(k, v)
+		}
+	}
+
+	return path.Do(context.TODO()).Raw()
 }

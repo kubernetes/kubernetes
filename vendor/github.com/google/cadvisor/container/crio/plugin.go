@@ -40,7 +40,7 @@ func (p *plugin) InitializeFSContext(context *fs.Context) error {
 	if err != nil {
 		klog.V(5).Infof("CRI-O not connected: %v", err)
 	} else {
-		context.Crio = fs.CrioContext{Root: crioInfo.StorageRoot}
+		context.Crio = fs.CrioContext{Root: crioInfo.StorageRoot, ImageStore: crioInfo.StorageImage, Driver: crioInfo.StorageDriver}
 	}
 	return nil
 }

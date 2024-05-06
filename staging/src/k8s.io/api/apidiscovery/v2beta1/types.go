@@ -92,7 +92,7 @@ type APIResourceDiscovery struct {
 	Resource string `json:"resource" protobuf:"bytes,1,opt,name=resource"`
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
 	// APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior.
-	// This value will be null if an APIService reports subresources but supports no operations on the parent resource
+	// This value will be null or empty if an APIService reports subresources but supports no operations on the parent resource
 	ResponseKind *v1.GroupVersionKind `json:"responseKind,omitempty" protobuf:"bytes,2,opt,name=responseKind"`
 	// scope indicates the scope of a resource, either Cluster or Namespaced
 	Scope ResourceScope `json:"scope" protobuf:"bytes,3,opt,name=scope"`
@@ -141,7 +141,7 @@ type APISubresourceDiscovery struct {
 	// for this resource across all versions.
 	Subresource string `json:"subresource" protobuf:"bytes,1,opt,name=subresource"`
 	// responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
-	// Some subresources do not return normal resources, these will have null return types.
+	// Some subresources do not return normal resources, these will have null or empty return types.
 	ResponseKind *v1.GroupVersionKind `json:"responseKind,omitempty" protobuf:"bytes,2,opt,name=responseKind"`
 	// acceptedTypes describes the kinds that this endpoint accepts.
 	// Subresources may accept the standard content types or define

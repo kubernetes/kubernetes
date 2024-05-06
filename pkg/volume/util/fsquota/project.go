@@ -22,7 +22,6 @@ package fsquota
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -267,7 +266,7 @@ func writeProjectFile(base *os.File, projects []projectType) (string, error) {
 		return "", err
 	}
 	mode := stat.Mode() & os.ModePerm
-	f, err := ioutil.TempFile(filepath.Dir(oname), filepath.Base(oname))
+	f, err := os.CreateTemp(filepath.Dir(oname), filepath.Base(oname))
 	if err != nil {
 		return "", err
 	}

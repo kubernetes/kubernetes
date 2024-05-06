@@ -46,6 +46,8 @@ type Manager struct {
 	cas map[string]*CAExpirationHandler
 }
 
+type certConfigMutatorFunc func(*certutil.Config) error
+
 // CertificateRenewHandler defines required info for renewing a certificate
 type CertificateRenewHandler struct {
 	// Name of the certificate to be used for UX.
@@ -66,6 +68,10 @@ type CertificateRenewHandler struct {
 
 	// readwriter defines a CertificateReadWriter to be used for certificate renewal
 	readwriter certificateReadWriter
+
+	// certConfigMutators holds the mutator functions that can be applied to the input cert config object
+	// These functions will be run in series.
+	certConfigMutators []certConfigMutatorFunc
 }
 
 // CAExpirationHandler defines required info for CA expiration check
@@ -109,17 +115,19 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 		for _, cert := range certs {
 			// create a ReadWriter for certificates stored in the K8s local PKI
 			pkiReadWriter := newPKICertificateReadWriter(rm.cfg.CertificatesDir, cert.BaseName)
+			certConfigMutators := loadCertConfigMutators(cert.BaseName)
 
 			// adds the certificateRenewHandler.
 			// PKI certificates are indexed by name, that is a well know constant defined
 			// in the certsphase package and that can be reused across all the kubeadm codebase
 			rm.certificates[cert.Name] = &CertificateRenewHandler{
-				Name:       cert.Name,
-				LongName:   cert.LongName,
-				FileName:   cert.BaseName,
-				CAName:     ca.Name,
-				CABaseName: ca.BaseName, //Nb. this is a path for etcd certs (they are stored in a subfolder)
-				readwriter: pkiReadWriter,
+				Name:               cert.Name,
+				LongName:           cert.LongName,
+				FileName:           cert.BaseName,
+				CAName:             ca.Name,
+				CABaseName:         ca.BaseName, // Nb. this is a path for etcd certs (they are stored in a subfolder)
+				readwriter:         pkiReadWriter,
+				certConfigMutators: certConfigMutators,
 			}
 		}
 
@@ -140,6 +148,10 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 		{
 			longName: "certificate embedded in the kubeconfig file for the admin to use and for kubeadm itself",
 			fileName: kubeadmconstants.AdminKubeConfigFileName,
+		},
+		{
+			longName: "certificate embedded in the kubeconfig file for the super-admin",
+			fileName: kubeadmconstants.SuperAdminKubeConfigFileName,
 		},
 		{
 			longName: "certificate embedded in the kubeconfig file for the controller manager to use",
@@ -226,9 +238,16 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	}
 
 	// extract the certificate config
+	certConfig := certToConfig(cert)
+	for _, f := range handler.certConfigMutators {
+		if err := f(&certConfig); err != nil {
+			return false, err
+		}
+	}
+
 	cfg := &pkiutil.CertConfig{
-		Config:             certToConfig(cert),
-		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
+		Config:              certConfig,
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
 	}
 
 	// reads the CA
@@ -269,9 +288,15 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	}
 
 	// extracts the certificate config
+	certConfig := certToConfig(cert)
+	for _, f := range handler.certConfigMutators {
+		if err := f(&certConfig); err != nil {
+			return err
+		}
+	}
 	cfg := &pkiutil.CertConfig{
-		Config:             certToConfig(cert),
-		PublicKeyAlgorithm: rm.cfg.PublicKeyAlgorithm(),
+		Config:              certConfig,
+		EncryptionAlgorithm: rm.cfg.EncryptionAlgorithmType(),
 	}
 
 	// generates the CSR request and save it
@@ -297,7 +322,7 @@ func (rm *Manager) CertificateExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCertificateExpirationInfo returns certificate expiration info.
@@ -333,7 +358,7 @@ func (rm *Manager) CAExists(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a known certificate", name)
 	}
 
-	return handler.readwriter.Exists(), nil
+	return handler.readwriter.Exists()
 }
 
 // GetCAExpirationInfo returns CA expiration info.
@@ -395,4 +420,8 @@ func certToConfig(cert *x509.Certificate) certutil.Config {
 		},
 		Usages: cert.ExtKeyUsage,
 	}
+}
+
+func loadCertConfigMutators(certBaseName string) []certConfigMutatorFunc {
+	return nil
 }

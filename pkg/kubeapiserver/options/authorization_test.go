@@ -173,6 +173,13 @@ func TestBuiltInAuthorizationOptionsAddFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if !opts.AreLegacyFlagsSet() {
+		t.Fatal("legacy flags should have been configured")
+	}
+
+	// setting the method to nil since methods can't be compared with reflect.DeepEqual
+	opts.AreLegacyFlagsSet = nil
+
 	if !reflect.DeepEqual(opts, expected) {
 		t.Error(cmp.Diff(opts, expected))
 	}

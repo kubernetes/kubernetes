@@ -19,6 +19,7 @@ package csi
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -26,9 +27,6 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -117,7 +115,6 @@ func TestNodeExpand(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeExpandSecret, tc.enableCSINodeExpandSecret)()
 			plug, tmpDir := newTestPlugin(t, nil)
 			defer os.RemoveAll(tmpDir)
 
@@ -190,5 +187,30 @@ func TestNodeExpand(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNodeExpandNoClientError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "expandable", "test-vol"), false)
+
+	newSize, _ := resource.ParseQuantity("20Gi")
+
+	resizeOptions := volume.NodeResizeOptions{
+		VolumeSpec:      spec,
+		NewSize:         newSize,
+		DeviceMountPath: "/foo/bar",
+		DeviceStagePath: "/foo/bar",
+		DevicePath:      "/mnt/foobar",
+	}
+
+	_, err := plug.NodeExpand(resizeOptions)
+
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
+		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
 	}
 }

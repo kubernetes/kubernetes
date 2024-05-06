@@ -77,6 +77,25 @@ message Affinity {
   optional PodAntiAffinity podAntiAffinity = 3;
 }
 
+// AppArmorProfile defines a pod or container's AppArmor settings.
+// +union
+message AppArmorProfile {
+  // type indicates which kind of AppArmor profile will be applied.
+  // Valid options are:
+  //   Localhost - a profile pre-loaded on the node.
+  //   RuntimeDefault - the container runtime's default profile.
+  //   Unconfined - no AppArmor enforcement.
+  // +unionDiscriminator
+  optional string type = 1;
+
+  // localhostProfile indicates a profile loaded on the node that should be used.
+  // The profile must be preconfigured on the node to work.
+  // Must match the loaded name of the profile.
+  // Must be set if and only if type is "Localhost".
+  // +optional
+  optional string localhostProfile = 2;
+}
+
 // AttachedVolume describes a volume attached to a node
 message AttachedVolume {
   // Name of the attached volume
@@ -93,6 +112,7 @@ message AvoidPods {
   // Bounded-sized list of signatures of pods that should avoid this node, sorted
   // in timestamp order from oldest to newest. Size of the slice is unspecified.
   // +optional
+  // +listType=atomic
   repeated PreferAvoidPodsEntry preferAvoidPods = 1;
 }
 
@@ -162,7 +182,7 @@ message Binding {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The target object that you want to bind to the standard object.
   optional ObjectReference target = 2;
@@ -228,7 +248,6 @@ message CSIPersistentVolumeSource {
   // nodeExpandSecretRef is a reference to the secret object containing
   // sensitive information to pass to the CSI driver to complete the CSI
   // NodeExpandVolume call.
-  // This is an alpha field and requires enabling CSINodeExpandSecret feature gate.
   // This field is optional, may be omitted if no secret is required. If the
   // secret object contains more than one secret, all secrets are passed.
   // +optional
@@ -270,10 +289,12 @@ message CSIVolumeSource {
 message Capabilities {
   // Added capabilities
   // +optional
+  // +listType=atomic
   repeated string add = 1;
 
   // Removed capabilities
   // +optional
+  // +listType=atomic
   repeated string drop = 2;
 }
 
@@ -282,6 +303,7 @@ message Capabilities {
 message CephFSPersistentVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -315,6 +337,7 @@ message CephFSPersistentVolumeSource {
 message CephFSVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -413,15 +436,9 @@ message ClaimSource {
   //
   // The template will be used to create a new ResourceClaim, which will
   // be bound to this pod. When this pod is deleted, the ResourceClaim
-  // will also be deleted. The name of the ResourceClaim will be <pod
-  // name>-<resource name>, where <resource name> is the
-  // PodResourceClaim.Name. Pod validation will reject the pod if the
-  // concatenated name is not valid for a ResourceClaim (e.g. too long).
-  //
-  // An existing ResourceClaim with that name that is not owned by the
-  // pod will not be used for the pod to avoid using an unrelated
-  // resource by mistake. Scheduling and pod startup are then blocked
-  // until the unrelated ResourceClaim is removed.
+  // will also be deleted. The pod name and resource name, along with a
+  // generated component, will be used to form a unique name for the
+  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
   //
   // This field is immutable and no changes will be made to the
   // corresponding ResourceClaim by the control plane after creating the
@@ -436,6 +453,40 @@ message ClientIPConfig {
   // Default value is 10800(for 3 hours).
   // +optional
   optional int32 timeoutSeconds = 1;
+}
+
+// ClusterTrustBundleProjection describes how to select a set of
+// ClusterTrustBundle objects and project their contents into the pod
+// filesystem.
+message ClusterTrustBundleProjection {
+  // Select a single ClusterTrustBundle by object name.  Mutually-exclusive
+  // with signerName and labelSelector.
+  // +optional
+  optional string name = 1;
+
+  // Select all ClusterTrustBundles that match this signer name.
+  // Mutually-exclusive with name.  The contents of all selected
+  // ClusterTrustBundles will be unified and deduplicated.
+  // +optional
+  optional string signerName = 2;
+
+  // Select all ClusterTrustBundles that match this label selector.  Only has
+  // effect if signerName is set.  Mutually-exclusive with name.  If unset,
+  // interpreted as "match nothing".  If set but empty, interpreted as "match
+  // everything".
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 3;
+
+  // If true, don't block pod startup if the referenced ClusterTrustBundle(s)
+  // aren't available.  If using name, then the named ClusterTrustBundle is
+  // allowed not to exist.  If using signerName, then the combination of
+  // signerName and labelSelector is allowed to match zero
+  // ClusterTrustBundles.
+  // +optional
+  optional bool optional = 5;
+
+  // Relative path from the volume root to write the bundle.
+  optional string path = 4;
 }
 
 // Information about the condition of a component.
@@ -465,12 +516,14 @@ message ComponentStatus {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // List of component conditions observed
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated ComponentCondition conditions = 2;
 }
 
@@ -480,7 +533,7 @@ message ComponentStatusList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ComponentStatus objects.
   repeated ComponentStatus items = 2;
@@ -491,7 +544,7 @@ message ConfigMap {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Immutable, if set to true, ensures that data stored in the ConfigMap cannot
   // be updated (only object metadata can be modified).
@@ -551,7 +604,7 @@ message ConfigMapKeySelector {
 message ConfigMapList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of ConfigMaps.
   repeated ConfigMap items = 2;
@@ -601,6 +654,7 @@ message ConfigMapProjection {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // optional specify whether the ConfigMap or its keys must be defined
@@ -625,6 +679,7 @@ message ConfigMapVolumeSource {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // defaultMode is optional: mode bits used to set permissions on created files by default.
@@ -665,6 +720,7 @@ message Container {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string command = 3;
 
   // Arguments to the entrypoint.
@@ -676,6 +732,7 @@ message Container {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string args = 4;
 
   // Container's working directory.
@@ -707,6 +764,7 @@ message Container {
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
   // +optional
+  // +listType=atomic
   repeated EnvFromSource envFrom = 19;
 
   // List of environment variables to set in the container.
@@ -714,6 +772,8 @@ message Container {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EnvVar env = 7;
 
   // Compute Resources required by this container.
@@ -728,16 +788,39 @@ message Container {
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
 
+  // RestartPolicy defines the restart behavior of individual containers in a pod.
+  // This field may only be set for init containers, and the only allowed value is "Always".
+  // For non-init containers or when this field is not specified,
+  // the restart behavior is defined by the Pod's restart policy and the container type.
+  // Setting the RestartPolicy as "Always" for the init container will have the following effect:
+  // this init container will be continually restarted on
+  // exit until all regular containers have terminated. Once all regular
+  // containers have completed, all init containers with restartPolicy "Always"
+  // will be shut down. This lifecycle differs from normal init containers and
+  // is often referred to as a "sidecar" container. Although this init
+  // container still starts in the init container sequence, it does not wait
+  // for the container to complete before proceeding to the next init
+  // container. Instead, the next init container starts immediately after this
+  // init container is started, or after any startupProbe has successfully
+  // completed.
+  // +featureGate=SidecarContainers
+  // +optional
+  optional string restartPolicy = 24;
+
   // Pod volumes to mount into the container's filesystem.
   // Cannot be updated.
   // +optional
   // +patchMergeKey=mountPath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
   repeated VolumeMount volumeMounts = 9;
 
   // volumeDevices is the list of block devices to be used by the container.
   // +patchMergeKey=devicePath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=devicePath
   // +optional
   repeated VolumeDevice volumeDevices = 21;
 
@@ -831,6 +914,7 @@ message ContainerImage {
   // Names by which this image is known.
   // e.g. ["kubernetes.example/hyperkube:v1.0.7", "cloud-vendor.registry.example/cloud-vendor/hyperkube:v1.0.7"]
   // +optional
+  // +listType=atomic
   repeated string names = 1;
 
   // The size of the image in bytes.
@@ -868,15 +952,15 @@ message ContainerPort {
   optional string hostIP = 5;
 }
 
-// ContainerResizePolicy represents resource resize policy for a single container.
+// ContainerResizePolicy represents resource resize policy for the container.
 message ContainerResizePolicy {
-  // Name of the resource type to which this resource resize policy applies.
+  // Name of the resource to which this resource resize policy applies.
   // Supported values: cpu, memory.
   optional string resourceName = 1;
 
-  // Resource resize policy applicable to the specified resource name.
-  // If not specified, it defaults to RestartNotRequired.
-  optional string policy = 2;
+  // Restart policy to apply when specified resource is resized.
+  // If not specified, it defaults to NotRequired.
+  optional string restartPolicy = 2;
 }
 
 // ContainerState holds a possible state of container.
@@ -900,7 +984,7 @@ message ContainerState {
 message ContainerStateRunning {
   // Time at which the container was last (re-)started
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startedAt = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startedAt = 1;
 }
 
 // ContainerStateTerminated is a terminated state of a container.
@@ -922,11 +1006,11 @@ message ContainerStateTerminated {
 
   // Time at which previous execution of the container started
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startedAt = 5;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startedAt = 5;
 
   // Time at which the container last terminated
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time finishedAt = 6;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time finishedAt = 6;
 
   // Container's ID in the format '<type>://<container_id>'
   // +optional
@@ -1004,18 +1088,27 @@ message ContainerStatus {
   // +optional
   optional bool started = 9;
 
-  // ResourcesAllocated represents the compute resources allocated for this container by the
+  // AllocatedResources represents the compute resources allocated for this container by the
   // node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission
   // and after successfully admitting desired pod resize.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> resourcesAllocated = 10;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 10;
 
   // Resources represents the compute resource requests and limits that have been successfully
   // enacted on the running container after it has been started or has been successfully resized.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional ResourceRequirements resources = 11;
+
+  // Status of volume mounts.
+  // +optional
+  // +patchMergeKey=mountPath
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
+  // +featureGate=RecursiveReadOnlyMounts
+  repeated VolumeMountStatus volumeMounts = 12;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1030,6 +1123,7 @@ message DaemonEndpoint {
 message DownwardAPIProjection {
   // Items is a list of DownwardAPIVolume file
   // +optional
+  // +listType=atomic
   repeated DownwardAPIVolumeFile items = 1;
 }
 
@@ -1038,7 +1132,7 @@ message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
   optional string path = 1;
 
-  // Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+  // Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
   // +optional
   optional ObjectFieldSelector fieldRef = 2;
 
@@ -1062,6 +1156,7 @@ message DownwardAPIVolumeFile {
 message DownwardAPIVolumeSource {
   // Items is a list of downward API volume file
   // +optional
+  // +listType=atomic
   repeated DownwardAPIVolumeFile items = 1;
 
   // Optional: mode bits to use on created files by default. Must be a
@@ -1091,9 +1186,9 @@ message EmptyDirVolumeSource {
   // The maximum usage on memory medium EmptyDir would be the minimum value between
   // the SizeLimit specified here and the sum of memory limits of all containers in a pod.
   // The default is nil which means that the limit is undefined.
-  // More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir
   // +optional
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 2;
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 2;
 }
 
 // EndpointAddress is a tuple that describes single IP address.
@@ -1137,10 +1232,19 @@ message EndpointPort {
   optional string protocol = 3;
 
   // The application protocol for this port.
+  // This is used as a hint for implementations to offer richer behavior for protocols that they understand.
   // This field follows standard Kubernetes label syntax.
-  // Un-prefixed names are reserved for IANA standard service names (as per
+  // Valid values are either:
+  //
+  // * Un-prefixed protocol names - reserved for IANA standard service names (as per
   // RFC-6335 and https://www.iana.org/assignments/service-names).
-  // Non-standard protocols should use prefixed names such as
+  //
+  // * Kubernetes-defined prefixed names:
+  //   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+  //   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+  //   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+  //
+  // * Other protocols should use implementation-defined prefixed names such as
   // mycompany.com/my-custom-protocol.
   // +optional
   optional string appProtocol = 4;
@@ -1163,16 +1267,19 @@ message EndpointSubset {
   // IP addresses which offer the related ports that are marked as ready. These endpoints
   // should be considered safe for load balancers and clients to utilize.
   // +optional
+  // +listType=atomic
   repeated EndpointAddress addresses = 1;
 
   // IP addresses which offer the related ports but are not currently marked as ready
   // because they have not yet finished starting, have recently failed a readiness check,
   // or have recently failed a liveness check.
   // +optional
+  // +listType=atomic
   repeated EndpointAddress notReadyAddresses = 2;
 
   // Port numbers available on the related IP addresses.
   // +optional
+  // +listType=atomic
   repeated EndpointPort ports = 3;
 }
 
@@ -1193,7 +1300,7 @@ message Endpoints {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The set of all endpoints is the union of all subsets. Addresses are placed into
   // subsets according to the IPs they share. A single address with multiple ports,
@@ -1203,6 +1310,7 @@ message Endpoints {
   // NotReadyAddresses in the same subset.
   // Sets of addresses and ports that comprise a service.
   // +optional
+  // +listType=atomic
   repeated EndpointSubset subsets = 2;
 }
 
@@ -1211,7 +1319,7 @@ message EndpointsList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of endpoints.
   repeated Endpoints items = 2;
@@ -1322,6 +1430,7 @@ message EphemeralContainerCommon {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string command = 3;
 
   // Arguments to the entrypoint.
@@ -1333,6 +1442,7 @@ message EphemeralContainerCommon {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string args = 4;
 
   // Container's working directory.
@@ -1358,6 +1468,7 @@ message EphemeralContainerCommon {
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
   // +optional
+  // +listType=atomic
   repeated EnvFromSource envFrom = 19;
 
   // List of environment variables to set in the container.
@@ -1365,6 +1476,8 @@ message EphemeralContainerCommon {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EnvVar env = 7;
 
   // Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
@@ -1378,16 +1491,28 @@ message EphemeralContainerCommon {
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
 
+  // Restart policy for the container to manage the restart behavior of each
+  // container within a pod.
+  // This may only be set for init containers. You cannot set this field on
+  // ephemeral containers.
+  // +featureGate=SidecarContainers
+  // +optional
+  optional string restartPolicy = 24;
+
   // Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers.
   // Cannot be updated.
   // +optional
   // +patchMergeKey=mountPath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
   repeated VolumeMount volumeMounts = 9;
 
   // volumeDevices is the list of block devices to be used by the container.
   // +patchMergeKey=devicePath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=devicePath
   // +optional
   repeated VolumeDevice volumeDevices = 21;
 
@@ -1497,7 +1622,7 @@ message EphemeralVolumeSource {
 message Event {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The object that this event is about.
   optional ObjectReference involvedObject = 2;
@@ -1519,11 +1644,11 @@ message Event {
 
   // The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time firstTimestamp = 6;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time firstTimestamp = 6;
 
   // The time at which the most recent occurrence of this event was recorded.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTimestamp = 7;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTimestamp = 7;
 
   // The number of times this event has occurred.
   // +optional
@@ -1535,7 +1660,7 @@ message Event {
 
   // Time when this Event was first observed.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime eventTime = 10;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime eventTime = 10;
 
   // Data about the Event series this event represents or nil if it's a singleton Event.
   // +optional
@@ -1563,7 +1688,7 @@ message EventList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of events
   repeated Event items = 2;
@@ -1576,7 +1701,7 @@ message EventSeries {
   optional int32 count = 1;
 
   // Time of the last occurrence observed
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime lastObservedTime = 2;
 }
 
 // EventSource contains information for an event.
@@ -1598,6 +1723,7 @@ message ExecAction {
   // a shell, you need to explicitly call out to that shell.
   // Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
   // +optional
+  // +listType=atomic
   repeated string command = 1;
 }
 
@@ -1607,6 +1733,7 @@ message ExecAction {
 message FCVolumeSource {
   // targetWWNs is Optional: FC target worldwide names (WWNs)
   // +optional
+  // +listType=atomic
   repeated string targetWWNs = 1;
 
   // lun is Optional: FC target lun number
@@ -1628,6 +1755,7 @@ message FCVolumeSource {
   // wwids Optional: FC volume world wide identifiers (wwids)
   // Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
   // +optional
+  // +listType=atomic
   repeated string wwids = 5;
 }
 
@@ -1826,7 +1954,7 @@ message HTTPGetAction {
   // Name or number of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // Host name to connect to, defaults to the pod IP. You probably want to set
   // "Host" in httpHeaders instead.
@@ -1840,12 +1968,14 @@ message HTTPGetAction {
 
   // Custom headers to set in the request. HTTP allows repeated headers.
   // +optional
+  // +listType=atomic
   repeated HTTPHeader httpHeaders = 5;
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes
 message HTTPHeader {
-  // The header field name
+  // The header field name.
+  // This will be canonicalized upon output, so case-variant names will be understood as the same header.
   optional string name = 1;
 
   // The header field value
@@ -1856,10 +1986,18 @@ message HTTPHeader {
 // pod's hosts file.
 message HostAlias {
   // IP address of the host file entry.
+  // +required
   optional string ip = 1;
 
   // Hostnames for the above IP address.
+  // +listType=atomic
   repeated string hostnames = 2;
+}
+
+// HostIP represents a single IP address allocated to the host.
+message HostIP {
+  // IP is the IP address assigned to the host
+  optional string ip = 1;
 }
 
 // Represents a host path mapped into a pod.
@@ -1912,6 +2050,7 @@ message ISCSIPersistentVolumeSource {
   // portals is the iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
+  // +listType=atomic
   repeated string portals = 7;
 
   // chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
@@ -1968,6 +2107,7 @@ message ISCSIVolumeSource {
   // portals is the iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
+  // +listType=atomic
   repeated string portals = 7;
 
   // chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
@@ -2050,6 +2190,11 @@ message LifecycleHandler {
   // lifecycle hooks will fail in runtime when tcp handler is specified.
   // +optional
   optional TCPSocketAction tcpSocket = 3;
+
+  // Sleep represents the duration that the container should sleep before being terminated.
+  // +featureGate=PodLifecycleSleepAction
+  // +optional
+  optional SleepAction sleep = 4;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
@@ -2057,7 +2202,7 @@ message LimitRange {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the limits enforced.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -2072,23 +2217,23 @@ message LimitRangeItem {
 
   // Max usage constraints on this kind by resource name.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> max = 2;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> max = 2;
 
   // Min usage constraints on this kind by resource name.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> min = 3;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> min = 3;
 
   // Default resource requirement limit value by resource name if resource limit is omitted.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> default = 4;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> default = 4;
 
   // DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> defaultRequest = 5;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> defaultRequest = 5;
 
   // MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> maxLimitRequestRatio = 6;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> maxLimitRequestRatio = 6;
 }
 
 // LimitRangeList is a list of LimitRange items.
@@ -2096,7 +2241,7 @@ message LimitRangeList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
   // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -2106,6 +2251,7 @@ message LimitRangeList {
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 message LimitRangeSpec {
   // Limits is the list of LimitRangeItem objects that are enforced.
+  // +listType=atomic
   repeated LimitRangeItem limits = 1;
 }
 
@@ -2114,10 +2260,10 @@ message List {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of objects
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension items = 2;
+  repeated .k8s.io.apimachinery.pkg.runtime.RawExtension items = 2;
 }
 
 // LoadBalancerIngress represents the status of a load-balancer ingress point:
@@ -2133,6 +2279,15 @@ message LoadBalancerIngress {
   // +optional
   optional string hostname = 2;
 
+  // IPMode specifies how the load-balancer IP behaves, and may only be specified when the ip field is specified.
+  // Setting this to "VIP" indicates that traffic is delivered to the node with
+  // the destination set to the load-balancer's IP and port.
+  // Setting this to "Proxy" indicates that traffic is delivered to the node or pod with
+  // the destination set to the node's IP and node port or the pod's IP and port.
+  // Service implementations may use this information to adjust traffic routing.
+  // +optional
+  optional string ipMode = 3;
+
   // Ports is a list of records of service ports
   // If used, every port defined in the service should have an entry in it
   // +listType=atomic
@@ -2145,6 +2300,7 @@ message LoadBalancerStatus {
   // Ingress is a list containing ingress points for the load-balancer.
   // Traffic intended for the service should be sent to these ingress points.
   // +optional
+  // +listType=atomic
   repeated LoadBalancerIngress ingress = 1;
 }
 
@@ -2153,9 +2309,15 @@ message LoadBalancerStatus {
 // +structType=atomic
 message LocalObjectReference {
   // Name of the referent.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // This field is effectively required, but due to backwards compatibility is
+  // allowed to be empty. Instances of this type with an empty value here are
+  // almost certainly wrong.
   // TODO: Add other useful fields. apiVersion, kind, uid?
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   // +optional
+  // +default=""
+  // +kubebuilder:default=""
+  // TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
   optional string name = 1;
 }
 
@@ -2171,6 +2333,24 @@ message LocalVolumeSource {
   // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a filesystem if unspecified.
   // +optional
   optional string fsType = 2;
+}
+
+// ModifyVolumeStatus represents the status object of ControllerModifyVolume operation
+message ModifyVolumeStatus {
+  // targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled
+  optional string targetVolumeAttributesClassName = 1;
+
+  // status is the status of the ControllerModifyVolume operation. It can be in any of following states:
+  //  - Pending
+  //    Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as
+  //    the specified VolumeAttributesClass not existing.
+  //  - InProgress
+  //    InProgress indicates that the volume is being modified.
+  //  - Infeasible
+  //   Infeasible indicates that the request has been rejected as invalid by the CSI driver. To
+  // 	  resolve the error, a valid VolumeAttributesClass needs to be specified.
+  // Note: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.
+  optional string status = 2;
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -2197,7 +2377,7 @@ message Namespace {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of the Namespace.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -2219,7 +2399,7 @@ message NamespaceCondition {
   optional string status = 2;
 
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // +optional
   optional string reason = 5;
@@ -2233,7 +2413,7 @@ message NamespaceList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Namespace objects in the list.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
@@ -2245,6 +2425,7 @@ message NamespaceSpec {
   // Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
   // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
+  // +listType=atomic
   repeated string finalizers = 1;
 }
 
@@ -2259,6 +2440,8 @@ message NamespaceStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated NamespaceCondition conditions = 2;
 }
 
@@ -2268,7 +2451,7 @@ message Node {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of a node.
   // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -2312,6 +2495,7 @@ message NodeAffinity {
   // "weight" to the sum if the node matches the corresponding matchExpressions; the
   // node(s) with the highest sum are the most preferred.
   // +optional
+  // +listType=atomic
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
@@ -2325,11 +2509,11 @@ message NodeCondition {
 
   // Last time we got an update on a given condition.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastHeartbeatTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastHeartbeatTime = 3;
 
   // Last time the condition transit from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
   // +optional
@@ -2409,7 +2593,7 @@ message NodeList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of nodes
   repeated Node items = 2;
@@ -2422,11 +2606,24 @@ message NodeProxyOptions {
   optional string path = 1;
 }
 
-// NodeResources is an object for conveying resource information about a node.
-// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
-message NodeResources {
-  // Capacity represents the available resources of a node
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
+// NodeRuntimeHandler is a set of runtime handler information.
+message NodeRuntimeHandler {
+  // Runtime handler name.
+  // Empty for the default runtime handler.
+  // +optional
+  optional string name = 1;
+
+  // Supported features.
+  // +optional
+  optional NodeRuntimeHandlerFeatures features = 2;
+}
+
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+message NodeRuntimeHandlerFeatures {
+  // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional bool recursiveReadOnlyMounts = 1;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -2435,6 +2632,7 @@ message NodeResources {
 // +structType=atomic
 message NodeSelector {
   // Required. A list of node selector terms. The terms are ORed.
+  // +listType=atomic
   repeated NodeSelectorTerm nodeSelectorTerms = 1;
 }
 
@@ -2454,6 +2652,7 @@ message NodeSelectorRequirement {
   // array must have a single element, which will be interpreted as an integer.
   // This array is replaced during a strategic merge patch.
   // +optional
+  // +listType=atomic
   repeated string values = 3;
 }
 
@@ -2464,10 +2663,12 @@ message NodeSelectorRequirement {
 message NodeSelectorTerm {
   // A list of node selector requirements by node's labels.
   // +optional
+  // +listType=atomic
   repeated NodeSelectorRequirement matchExpressions = 1;
 
   // A list of node selector requirements by node's fields.
   // +optional
+  // +listType=atomic
   repeated NodeSelectorRequirement matchFields = 2;
 }
 
@@ -2482,6 +2683,7 @@ message NodeSpec {
   // each of IPv4 and IPv6.
   // +optional
   // +patchStrategy=merge
+  // +listType=set
   repeated string podCIDRs = 7;
 
   // ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
@@ -2495,6 +2697,7 @@ message NodeSpec {
 
   // If specified, the node's taints.
   // +optional
+  // +listType=atomic
   repeated Taint taints = 5;
 
   // Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.
@@ -2512,12 +2715,12 @@ message NodeStatus {
   // Capacity represents the total resources of a node.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
   // Allocatable represents the resources of a node that are available for scheduling.
   // Defaults to Capacity.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatable = 2;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatable = 2;
 
   // NodePhase is the recently observed lifecycle phase of the node.
   // More info: https://kubernetes.io/docs/concepts/nodes/node/#phase
@@ -2530,6 +2733,8 @@ message NodeStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated NodeCondition conditions = 4;
 
   // List of addresses reachable to the node.
@@ -2545,6 +2750,8 @@ message NodeStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated NodeAddress addresses = 5;
 
   // Endpoints of daemons running on the Node.
@@ -2558,19 +2765,28 @@ message NodeStatus {
 
   // List of container images on this node
   // +optional
+  // +listType=atomic
   repeated ContainerImage images = 8;
 
   // List of attachable volumes in use (mounted) by the node.
   // +optional
+  // +listType=atomic
   repeated string volumesInUse = 9;
 
   // List of volumes that are attached to the node.
   // +optional
+  // +listType=atomic
   repeated AttachedVolume volumesAttached = 10;
 
   // Status of the config assigned to the node via the dynamic Kubelet config feature.
   // +optional
   optional NodeConfigStatus config = 11;
+
+  // The available runtime handlers.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  // +listType=atomic
+  repeated NodeRuntimeHandler runtimeHandlers = 12;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -2688,7 +2904,7 @@ message PersistentVolume {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines a specification of a persistent volume owned by the cluster.
   // Provisioned by an administrator.
@@ -2709,7 +2925,7 @@ message PersistentVolumeClaim {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the desired characteristics of a volume requested by a pod author.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
@@ -2723,7 +2939,7 @@ message PersistentVolumeClaim {
   optional PersistentVolumeClaimStatus status = 3;
 }
 
-// PersistentVolumeClaimCondition contails details about state of pvc
+// PersistentVolumeClaimCondition contains details about state of pvc
 message PersistentVolumeClaimCondition {
   optional string type = 1;
 
@@ -2731,14 +2947,14 @@ message PersistentVolumeClaimCondition {
 
   // lastProbeTime is the time we probed the condition.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // lastTransitionTime is the time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // reason is a unique, this should be a short, machine understandable string that gives the reason
-  // for condition's last transition. If it reports "ResizeStarted" that means the underlying
+  // for condition's last transition. If it reports "Resizing" that means the underlying
   // persistent volume is being resized.
   // +optional
   optional string reason = 5;
@@ -2753,7 +2969,7 @@ message PersistentVolumeClaimList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of persistent volume claims.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
@@ -2766,11 +2982,12 @@ message PersistentVolumeClaimSpec {
   // accessModes contains the desired access modes the volume should have.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
   // +optional
+  // +listType=atomic
   repeated string accessModes = 1;
 
   // selector is a label query over volumes to consider for binding.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
 
   // resources represents the minimum resources the volume should have.
   // If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
@@ -2778,7 +2995,7 @@ message PersistentVolumeClaimSpec {
   // status field of the claim.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
   // +optional
-  optional ResourceRequirements resources = 2;
+  optional VolumeResourceRequirements resources = 2;
 
   // volumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
@@ -2830,6 +3047,22 @@ message PersistentVolumeClaimSpec {
   // (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
   // +optional
   optional TypedObjectReference dataSourceRef = 8;
+
+  // volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+  // If specified, the CSI driver will create or update the volume with the attributes defined
+  // in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,
+  // it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass
+  // will be applied to the claim but it's not allowed to reset this field to empty string once it is set.
+  // If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass
+  // will be set by the persistentvolume controller if it exists.
+  // If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
+  // set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
+  // exists.
+  // More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
+  // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string volumeAttributesClassName = 9;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2841,38 +3074,101 @@ message PersistentVolumeClaimStatus {
   // accessModes contains the actual access modes the volume backing the PVC has.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
   // +optional
+  // +listType=atomic
   repeated string accessModes = 2;
 
   // capacity represents the actual resources of the underlying volume.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
 
   // conditions is the current Condition of persistent volume claim. If underlying persistent volume is being
-  // resized then the Condition will be set to 'ResizeStarted'.
+  // resized then the Condition will be set to 'Resizing'.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated PersistentVolumeClaimCondition conditions = 4;
 
-  // allocatedResources is the storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may
-  // be larger than the actual capacity when a volume expansion operation is requested.
+  // allocatedResources tracks the resources allocated to a PVC including its capacity.
+  // Key names follow standard Kubernetes label syntax. Valid values are either:
+  // 	* Un-prefixed keys:
+  // 		- storage - the capacity of the volume.
+  // 	* Custom resources must use implementation-defined prefixed names such as "example.com/my-custom-resource"
+  // Apart from above values - keys that are unprefixed or have kubernetes.io prefix are considered
+  // reserved and hence may not be used.
+  //
+  // Capacity reported here may be larger than the actual capacity when a volume expansion operation
+  // is requested.
   // For storage quota, the larger value from allocatedResources and PVC.spec.resources is used.
   // If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.
   // If a volume expansion capacity request is lowered, allocatedResources is only
   // lowered if there are no expansion operations in progress and if the actual volume capacity
   // is equal or lower than the requested capacity.
+  //
+  // A controller that receives PVC update with previously unknown resourceName
+  // should ignore the update for the purpose it was designed. For example - a controller that
+  // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
+  // resources associated with PVC.
+  //
   // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
   // +featureGate=RecoverVolumeExpansionFailure
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 5;
 
-  // resizeStatus stores status of resize operation.
-  // ResizeStatus is not set by default but when expansion is complete resizeStatus is set to empty
-  // string by resize controller or kubelet.
+  // allocatedResourceStatuses stores status of resource being resized for the given PVC.
+  // Key names follow standard Kubernetes label syntax. Valid values are either:
+  // 	* Un-prefixed keys:
+  // 		- storage - the capacity of the volume.
+  // 	* Custom resources must use implementation-defined prefixed names such as "example.com/my-custom-resource"
+  // Apart from above values - keys that are unprefixed or have kubernetes.io prefix are considered
+  // reserved and hence may not be used.
+  //
+  // ClaimResourceStatus can be in any of following states:
+  // 	- ControllerResizeInProgress:
+  // 		State set when resize controller starts resizing the volume in control-plane.
+  // 	- ControllerResizeFailed:
+  // 		State set when resize has failed in resize controller with a terminal error.
+  // 	- NodeResizePending:
+  // 		State set when resize controller has finished resizing the volume but further resizing of
+  // 		volume is needed on the node.
+  // 	- NodeResizeInProgress:
+  // 		State set when kubelet starts resizing the volume.
+  // 	- NodeResizeFailed:
+  // 		State set when resizing has failed in kubelet with a terminal error. Transient errors don't set
+  // 		NodeResizeFailed.
+  // For example: if expanding a PVC for more capacity - this field can be one of the following states:
+  // 	- pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeInProgress"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "ControllerResizeFailed"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizePending"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeInProgress"
+  //      - pvc.status.allocatedResourceStatus['storage'] = "NodeResizeFailed"
+  // When this field is not set, it means that no resize operation is in progress for the given PVC.
+  //
+  // A controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus
+  // should ignore the update for the purpose it was designed. For example - a controller that
+  // only is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid
+  // resources associated with PVC.
+  //
   // This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.
   // +featureGate=RecoverVolumeExpansionFailure
+  // +mapType=granular
   // +optional
-  optional string resizeStatus = 6;
+  map<string, string> allocatedResourceStatuses = 7;
+
+  // currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.
+  // When unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string currentVolumeAttributesClassName = 8;
+
+  // ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.
+  // When this is unset, there is no ModifyVolume operation being attempted.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional ModifyVolumeStatus modifyVolumeStatus = 9;
 }
 
 // PersistentVolumeClaimTemplate is used to produce
@@ -2883,7 +3179,7 @@ message PersistentVolumeClaimTemplate {
   // validation.
   //
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // The specification for the PersistentVolumeClaim. The entire content is
   // copied unchanged into the PVC that gets created from this
@@ -2912,7 +3208,7 @@ message PersistentVolumeList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of persistent volumes.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
@@ -3031,7 +3327,7 @@ message PersistentVolumeSpec {
   // capacity is the description of the persistent volume's resources and capacity.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
   // persistentVolumeSource is the actual volume backing the persistent volume.
   optional PersistentVolumeSource persistentVolumeSource = 2;
@@ -3039,6 +3335,7 @@ message PersistentVolumeSpec {
   // accessModes contains all ways the volume can be mounted.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
   // +optional
+  // +listType=atomic
   repeated string accessModes = 3;
 
   // claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
@@ -3066,6 +3363,7 @@ message PersistentVolumeSpec {
   // simply fail if one is invalid.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
   // +optional
+  // +listType=atomic
   repeated string mountOptions = 7;
 
   // volumeMode defines if a volume is intended to be used with a formatted filesystem
@@ -3077,6 +3375,17 @@ message PersistentVolumeSpec {
   // This field influences the scheduling of pods that use this volume.
   // +optional
   optional VolumeNodeAffinity nodeAffinity = 9;
+
+  // Name of VolumeAttributesClass to which this persistent volume belongs. Empty value
+  // is not allowed. When this field is not set, it indicates that this volume does not belong to any
+  // VolumeAttributesClass. This field is mutable and can be changed by the CSI driver
+  // after a volume has been updated successfully to a new class.
+  // For an unbound PersistentVolume, the volumeAttributesClassName will be matched with unbound
+  // PersistentVolumeClaims during the binding process.
+  // This is an alpha field and requires enabling VolumeAttributesClass feature.
+  // +featureGate=VolumeAttributesClass
+  // +optional
+  optional string volumeAttributesClassName = 10;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -3094,6 +3403,13 @@ message PersistentVolumeStatus {
   // for machine parsing and tidy display in the CLI.
   // +optional
   optional string reason = 3;
+
+  // lastPhaseTransitionTime is the time the phase transitioned from one to another
+  // and automatically resets to current time everytime a volume phase transitions.
+  // This is a beta field and requires the PersistentVolumeLastPhaseTransitionTime feature to be enabled (enabled by default).
+  // +featureGate=PersistentVolumeLastPhaseTransitionTime
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastPhaseTransitionTime = 4;
 }
 
 // Represents a Photon Controller persistent disk resource.
@@ -3113,7 +3429,7 @@ message Pod {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -3139,6 +3455,7 @@ message PodAffinity {
   // When there are multiple elements, the lists of nodes corresponding to each
   // podAffinityTerm are intersected, i.e. all terms must be satisfied.
   // +optional
+  // +listType=atomic
   repeated PodAffinityTerm requiredDuringSchedulingIgnoredDuringExecution = 1;
 
   // The scheduler will prefer to schedule pods to nodes that satisfy
@@ -3151,6 +3468,7 @@ message PodAffinity {
   // "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
   // node(s) with the highest sum are the most preferred.
   // +optional
+  // +listType=atomic
   repeated WeightedPodAffinityTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
@@ -3162,14 +3480,16 @@ message PodAffinity {
 // a pod of the set of pods is running
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
+  // If it's null, this PodAffinityTerm matches with no Pods.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 1;
 
   // namespaces specifies a static list of namespace names that the term applies to.
   // The term is applied to the union of the namespaces listed in this field
   // and the ones selected by namespaceSelector.
   // null or empty namespaces list and null namespaceSelector means "this pod's namespace".
   // +optional
+  // +listType=atomic
   repeated string namespaces = 2;
 
   // This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
@@ -3185,7 +3505,33 @@ message PodAffinityTerm {
   // null selector and null or empty namespaces list means "this pod's namespace".
   // An empty selector ({}) matches all namespaces.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
+
+  // MatchLabelKeys is a set of pod label keys to select which pods will
+  // be taken into consideration. The keys are used to lookup values from the
+  // incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)`
+  // to select the group of existing pods which pods will be taken into consideration
+  // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+  // pod labels will be ignored. The default value is empty.
+  // The same key is forbidden to exist in both matchLabelKeys and labelSelector.
+  // Also, matchLabelKeys cannot be set when labelSelector isn't set.
+  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // +listType=atomic
+  // +optional
+  repeated string matchLabelKeys = 5;
+
+  // MismatchLabelKeys is a set of pod label keys to select which pods will
+  // be taken into consideration. The keys are used to lookup values from the
+  // incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)`
+  // to select the group of existing pods which pods will be taken into consideration
+  // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
+  // pod labels will be ignored. The default value is empty.
+  // The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
+  // Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
+  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // +listType=atomic
+  // +optional
+  repeated string mismatchLabelKeys = 6;
 }
 
 // Pod anti affinity is a group of inter pod anti affinity scheduling rules.
@@ -3198,6 +3544,7 @@ message PodAntiAffinity {
   // When there are multiple elements, the lists of nodes corresponding to each
   // podAffinityTerm are intersected, i.e. all terms must be satisfied.
   // +optional
+  // +listType=atomic
   repeated PodAffinityTerm requiredDuringSchedulingIgnoredDuringExecution = 1;
 
   // The scheduler will prefer to schedule pods to nodes that satisfy
@@ -3210,6 +3557,7 @@ message PodAntiAffinity {
   // "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
   // node(s) with the highest sum are the most preferred.
   // +optional
+  // +listType=atomic
   repeated WeightedPodAffinityTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
@@ -3259,11 +3607,11 @@ message PodCondition {
 
   // Last time we probed the condition.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
 
   // Last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // Unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
@@ -3281,12 +3629,14 @@ message PodDNSConfig {
   // This will be appended to the base nameservers generated from DNSPolicy.
   // Duplicated nameservers will be removed.
   // +optional
+  // +listType=atomic
   repeated string nameservers = 1;
 
   // A list of DNS search domains for host-name lookup.
   // This will be appended to the base search paths generated from DNSPolicy.
   // Duplicated search paths will be removed.
   // +optional
+  // +listType=atomic
   repeated string searches = 2;
 
   // A list of DNS resolver options.
@@ -3294,6 +3644,7 @@ message PodDNSConfig {
   // Duplicated entries will be removed. Resolution options given in Options
   // will override those that appear in the base DNSPolicy.
   // +optional
+  // +listType=atomic
   repeated PodDNSConfigOption options = 3;
 }
 
@@ -3335,15 +3686,13 @@ message PodExecOptions {
   optional string container = 5;
 
   // Command is the remote command to execute. argv array. Not executed within a shell.
+  // +listType=atomic
   repeated string command = 6;
 }
 
-// IP address information for entries in the (plural) PodIPs field.
-// Each entry includes:
-//
-// 	IP: An IP address allocated to the pod. Routable at least within the cluster.
+// PodIP represents a single IP address allocated to the pod.
 message PodIP {
-  // ip is an IP address (IPv4 or IPv6) assigned to the pod
+  // IP is the IP address assigned to the pod
   optional string ip = 1;
 }
 
@@ -3352,7 +3701,7 @@ message PodList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pods.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md
@@ -3385,7 +3734,7 @@ message PodLogOptions {
   // If this value is in the future, no logs will be returned.
   // Only one of sinceSeconds or sinceTime may be specified.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time sinceTime = 5;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time sinceTime = 5;
 
   // If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line
   // of log output. Defaults to false.
@@ -3432,6 +3781,7 @@ message PodPortForwardOptions {
   // List of ports to forward
   // Required when using WebSockets
   // +optional
+  // +listType=atomic
   repeated int32 ports = 1;
 }
 
@@ -3458,6 +3808,24 @@ message PodResourceClaim {
 
   // Source describes where to find the ResourceClaim.
   optional ClaimSource source = 2;
+}
+
+// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
+// which references a ResourceClaimTemplate. It stores the generated name for
+// the corresponding ResourceClaim.
+message PodResourceClaimStatus {
+  // Name uniquely identifies this resource claim inside the pod.
+  // This must match the name of an entry in pod.spec.resourceClaims,
+  // which implies that the string must be a DNS_LABEL.
+  optional string name = 1;
+
+  // ResourceClaimName is the name of the ResourceClaim that was
+  // generated for the Pod in the namespace of the Pod. If this is
+  // unset, then generating a ResourceClaim was not necessary. The
+  // pod.spec.resourceClaims entry can be ignored in this case.
+  //
+  // +optional
+  optional string resourceClaimName = 2;
 }
 
 // PodSchedulingGate is associated to a Pod to guard its scheduling.
@@ -3522,6 +3890,7 @@ message PodSecurityContext {
   // even if they are not included in this list.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
+  // +listType=atomic
   repeated int64 supplementalGroups = 4;
 
   // A special supplemental group that applies to all containers in a pod.
@@ -3541,6 +3910,7 @@ message PodSecurityContext {
   // sysctls (by the container runtime) might fail to launch.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
+  // +listType=atomic
   repeated Sysctl sysctls = 7;
 
   // fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
@@ -3557,6 +3927,11 @@ message PodSecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 10;
+
+  // appArmorProfile is the AppArmor options to use by the containers in this pod.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 11;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -3564,7 +3939,7 @@ message PodSecurityContext {
 message PodSignature {
   // Reference to controller whose pods should avoid this node.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.OwnerReference podController = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.OwnerReference podController = 1;
 }
 
 // PodSpec is a description of a pod.
@@ -3574,6 +3949,8 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -3591,6 +3968,8 @@ message PodSpec {
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated Container initContainers = 20;
 
   // List of containers belonging to the pod.
@@ -3599,6 +3978,8 @@ message PodSpec {
   // Cannot be updated.
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated Container containers = 2;
 
   // List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
@@ -3608,6 +3989,8 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EphemeralContainer ephemeralContainers = 34;
 
   // Restart policy for all containers within the pod.
@@ -3655,7 +4038,7 @@ message PodSpec {
   // +optional
   optional string serviceAccountName = 8;
 
-  // DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
+  // DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
   // +k8s:conversion-gen=false
   // +optional
@@ -3665,9 +4048,11 @@ message PodSpec {
   // +optional
   optional bool automountServiceAccountToken = 21;
 
-  // NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
-  // the scheduler simply schedules this pod onto that node, assuming that it fits resource
-  // requirements.
+  // NodeName indicates in which node this pod is scheduled.
+  // If empty, this pod is a candidate for scheduling by the scheduler defined in schedulerName.
+  // Once this field is set, the kubelet for this node becomes responsible for the lifecycle of this pod.
+  // This field should not be used to express a desire for the pod to be scheduled on a specific node.
+  // https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
   // +optional
   optional string nodeName = 10;
 
@@ -3710,6 +4095,8 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated LocalObjectReference imagePullSecrets = 15;
 
   // Specifies the hostname of the Pod
@@ -3733,13 +4120,16 @@ message PodSpec {
 
   // If specified, the pod's tolerations.
   // +optional
+  // +listType=atomic
   repeated Toleration tolerations = 22;
 
   // HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
-  // file if specified. This is only valid for non-hostNetwork pods.
+  // file if specified.
   // +optional
   // +patchMergeKey=ip
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=ip
   repeated HostAlias hostAliases = 23;
 
   // If specified, indicates the pod's priority. "system-node-critical" and
@@ -3770,6 +4160,7 @@ message PodSpec {
   // all conditions specified in the readiness gates have status equal to "True"
   // More info: https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates
   // +optional
+  // +listType=atomic
   repeated PodReadinessGate readinessGates = 28;
 
   // RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used
@@ -3800,7 +4191,7 @@ message PodSpec {
   // defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero.
   // More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> overhead = 32;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> overhead = 32;
 
   // TopologySpreadConstraints describes how a group of pods ought to spread across topology
   // domains. Scheduler will schedule pods in a way which abides by the constraints.
@@ -3831,6 +4222,7 @@ message PodSpec {
   // - spec.hostPID
   // - spec.hostIPC
   // - spec.hostUsers
+  // - spec.securityContext.appArmorProfile
   // - spec.securityContext.seLinuxOptions
   // - spec.securityContext.seccompProfile
   // - spec.securityContext.fsGroup
@@ -3840,6 +4232,7 @@ message PodSpec {
   // - spec.securityContext.runAsUser
   // - spec.securityContext.runAsGroup
   // - spec.securityContext.supplementalGroups
+  // - spec.containers[*].securityContext.appArmorProfile
   // - spec.containers[*].securityContext.seLinuxOptions
   // - spec.containers[*].securityContext.seccompProfile
   // - spec.containers[*].securityContext.capabilities
@@ -3871,13 +4264,10 @@ message PodSpec {
   //
   // SchedulingGates can only be set at pod creation time, and be removed only afterwards.
   //
-  // This is a beta feature enabled by the PodSchedulingReadiness feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=PodSchedulingReadiness
   // +optional
   repeated PodSchedulingGate schedulingGates = 38;
 
@@ -3930,6 +4320,8 @@ message PodStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated PodCondition conditions = 2;
 
   // A human readable message indicating details about why the pod is in this condition.
@@ -3951,11 +4343,23 @@ message PodStatus {
   // +optional
   optional string nominatedNodeName = 11;
 
-  // IP address of the host to which the pod is assigned. Empty if not yet scheduled.
+  // hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet.
+  // A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will
+  // not be updated even if there is a node is assigned to pod
   // +optional
   optional string hostIP = 5;
 
-  // IP address allocated to the pod. Routable at least within the cluster.
+  // hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must
+  // match the hostIP field. This list is empty if the pod has not started yet.
+  // A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will
+  // not be updated even if there is a node is assigned to this pod.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=ip
+  // +listType=atomic
+  repeated HostIP hostIPs = 16;
+
+  // podIP address allocated to the pod. Routable at least within the cluster.
   // Empty if not yet allocated.
   // +optional
   optional string podIP = 6;
@@ -3966,22 +4370,26 @@ message PodStatus {
   // +optional
   // +patchStrategy=merge
   // +patchMergeKey=ip
+  // +listType=map
+  // +listMapKey=ip
   repeated PodIP podIPs = 12;
 
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
 
   // The list has one entry per init container in the manifest. The most recent successful
   // init container will have ready = true, the most recently started container will have
   // startTime set.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
+  // +listType=atomic
   repeated ContainerStatus initContainerStatuses = 10;
 
   // The list has one entry per container in the manifest.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   // +optional
+  // +listType=atomic
   repeated ContainerStatus containerStatuses = 8;
 
   // The Quality of Service (QOS) classification assigned to the pod based on resource requirements
@@ -3992,6 +4400,7 @@ message PodStatus {
 
   // Status for any ephemeral containers that have run in this pod.
   // +optional
+  // +listType=atomic
   repeated ContainerStatus ephemeralContainerStatuses = 13;
 
   // Status of resources resize desired for pod's containers.
@@ -4000,6 +4409,15 @@ message PodStatus {
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional string resize = 14;
+
+  // Status of resource claims.
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
+  // +featureGate=DynamicResourceAllocation
+  // +optional
+  repeated PodResourceClaimStatus resourceClaimStatuses = 15;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
@@ -4007,7 +4425,7 @@ message PodStatusResult {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Most recently observed status of the pod.
   // This data may not be up to date.
@@ -4023,7 +4441,7 @@ message PodTemplate {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Template defines the pods that will be created from this pod template.
   // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -4036,7 +4454,7 @@ message PodTemplateList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of pod templates
   repeated PodTemplate items = 2;
@@ -4047,7 +4465,7 @@ message PodTemplateSpec {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the pod.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -4109,7 +4527,7 @@ message PreferAvoidPodsEntry {
 
   // Time at which this entry was added to the list.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time evictionTime = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time evictionTime = 2;
 
   // (brief) reason why this entry was added to the list.
   // +optional
@@ -4200,6 +4618,7 @@ message ProbeHandler {
 message ProjectedVolumeSource {
   // sources is the list of volume projections
   // +optional
+  // +listType=atomic
   repeated VolumeProjection sources = 1;
 
   // defaultMode are the mode bits used to set permissions on created files by default.
@@ -4249,6 +4668,7 @@ message QuobyteVolumeSource {
 message RBDPersistentVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // image is the rados image name.
@@ -4300,6 +4720,7 @@ message RBDPersistentVolumeSource {
 message RBDVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // image is the rados image name.
@@ -4351,7 +4772,7 @@ message RangeAllocation {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Range is string that identifies the range represented by 'data'.
   optional string range = 2;
@@ -4366,7 +4787,7 @@ message ReplicationController {
   // be the same as the Pod(s) that the replication controller manages.
   // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the specification of the desired behavior of the replication controller.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -4392,7 +4813,7 @@ message ReplicationControllerCondition {
 
   // The last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
@@ -4408,7 +4829,7 @@ message ReplicationControllerList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of replication controllers.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller
@@ -4474,6 +4895,8 @@ message ReplicationControllerStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated ReplicationControllerCondition conditions = 6;
 }
 
@@ -4497,7 +4920,7 @@ message ResourceFieldSelector {
 
   // Specifies the output format of the exposed resources, defaults to "1"
   // +optional
-  optional k8s.io.apimachinery.pkg.api.resource.Quantity divisor = 3;
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity divisor = 3;
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -4505,7 +4928,7 @@ message ResourceQuota {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired quota.
   // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -4523,7 +4946,7 @@ message ResourceQuotaList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ResourceQuota objects.
   // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
@@ -4535,11 +4958,12 @@ message ResourceQuotaSpec {
   // hard is the set of desired hard limits for each named resource.
   // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
   // A collection of filters that must match each object tracked by a quota.
   // If not specified, the quota matches all objects.
   // +optional
+  // +listType=atomic
   repeated string scopes = 2;
 
   // scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
@@ -4554,11 +4978,11 @@ message ResourceQuotaStatus {
   // Hard is the set of enforced hard limits for each named resource.
   // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
   // Used is the current observed total usage of the resource in the namespace.
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> used = 2;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> used = 2;
 }
 
 // ResourceRequirements describes the compute resource requirements.
@@ -4566,14 +4990,14 @@ message ResourceRequirements {
   // Limits describes the maximum amount of compute resources allowed.
   // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
 
   // Requests describes the minimum amount of compute resources required.
   // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
   // otherwise to an implementation-defined value. Requests cannot exceed Limits.
   // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
   // +optional
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 
   // Claims lists the names of resources, defined in spec.resourceClaims,
   // that are used by this container.
@@ -4707,6 +5131,7 @@ message ScaleIOVolumeSource {
 message ScopeSelector {
   // A list of scope selector requirements by scope of the resources.
   // +optional
+  // +listType=atomic
   repeated ScopedResourceSelectorRequirement matchExpressions = 1;
 }
 
@@ -4725,6 +5150,7 @@ message ScopedResourceSelectorRequirement {
   // the values array must be empty.
   // This array is replaced during a strategic merge patch.
   // +optional
+  // +listType=atomic
   repeated string values = 3;
 }
 
@@ -4744,7 +5170,7 @@ message SeccompProfile {
   // localhostProfile indicates a profile defined in a file on the node should be used.
   // The profile must be preconfigured on the node to work.
   // Must be a descending path, relative to the kubelet's configured seccomp profile location.
-  // Must only be set if type is "Localhost".
+  // Must be set if type is "Localhost". Must NOT be set for any other type.
   // +optional
   optional string localhostProfile = 2;
 }
@@ -4755,7 +5181,7 @@ message Secret {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Immutable, if set to true, ensures that data stored in the Secret cannot
   // be updated (only object metadata can be modified).
@@ -4818,7 +5244,7 @@ message SecretList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of secret objects.
   // More info: https://kubernetes.io/docs/concepts/configuration/secret
@@ -4842,6 +5268,7 @@ message SecretProjection {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // optional field specify whether the Secret or its key must be defined
@@ -4881,6 +5308,7 @@ message SecretVolumeSource {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // defaultMode is Optional: mode bits used to set permissions on created files by default.
@@ -4985,6 +5413,12 @@ message SecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 11;
+
+  // appArmorProfile is the AppArmor options to use by this container. If set, this profile
+  // overrides the pod's appArmorProfile.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 12;
 }
 
 // SerializedReference is a reference to serialized object.
@@ -5001,7 +5435,7 @@ message Service {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of a service.
   // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -5024,7 +5458,7 @@ message ServiceAccount {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Secrets is a list of the secrets in the same namespace that pods running using this ServiceAccount are allowed to use.
   // Pods are only limited to this list if this service account has a "kubernetes.io/enforce-mountable-secrets" annotation set to "true".
@@ -5034,6 +5468,8 @@ message ServiceAccount {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated ObjectReference secrets = 2;
 
   // ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
@@ -5041,6 +5477,7 @@ message ServiceAccount {
   // can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
   // More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
   // +optional
+  // +listType=atomic
   repeated LocalObjectReference imagePullSecrets = 3;
 
   // AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
@@ -5054,7 +5491,7 @@ message ServiceAccountList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ServiceAccounts.
   // More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
@@ -5092,7 +5529,7 @@ message ServiceList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of services
   repeated Service items = 2;
@@ -5115,10 +5552,19 @@ message ServicePort {
   optional string protocol = 2;
 
   // The application protocol for this port.
+  // This is used as a hint for implementations to offer richer behavior for protocols that they understand.
   // This field follows standard Kubernetes label syntax.
-  // Un-prefixed names are reserved for IANA standard service names (as per
+  // Valid values are either:
+  //
+  // * Un-prefixed protocol names - reserved for IANA standard service names (as per
   // RFC-6335 and https://www.iana.org/assignments/service-names).
-  // Non-standard protocols should use prefixed names such as
+  //
+  // * Kubernetes-defined prefixed names:
+  //   * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
+  //   * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
+  //   * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
+  //
+  // * Other protocols should use implementation-defined prefixed names such as
   // mycompany.com/my-custom-protocol.
   // +optional
   optional string appProtocol = 6;
@@ -5135,7 +5581,7 @@ message ServicePort {
   // omitted or set equal to the 'port' field.
   // More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
   // +optional
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString targetPort = 4;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString targetPort = 4;
 
   // The port on each node on which this service is exposed when type is
   // NodePort or LoadBalancer.  Usually assigned by the system. If a value is
@@ -5252,6 +5698,7 @@ message ServiceSpec {
   // at a node with this IP.  A common example is external load-balancers
   // that are not part of the Kubernetes system.
   // +optional
+  // +listType=atomic
   repeated string externalIPs = 5;
 
   // Supports "ClientIP" and "None". Used to maintain session affinity.
@@ -5266,10 +5713,9 @@ message ServiceSpec {
   // This feature depends on whether the underlying cloud-provider supports specifying
   // the loadBalancerIP when a load balancer is created.
   // This field will be ignored if the cloud-provider does not support the feature.
-  // Deprecated: This field was under-specified and its meaning varies across implementations,
-  // and it cannot support dual-stack.
-  // As of Kubernetes v1.24, users are encouraged to use implementation-specific annotations when available.
-  // This field may be removed in a future API version.
+  // Deprecated: This field was under-specified and its meaning varies across implementations.
+  // Using it is non-portable and it may not support dual-stack.
+  // Users are encouraged to use implementation-specific annotations when available.
   // +optional
   optional string loadBalancerIP = 8;
 
@@ -5278,6 +5724,7 @@ message ServiceSpec {
   // cloud-provider does not support the feature."
   // More info: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/
   // +optional
+  // +listType=atomic
   repeated string loadBalancerSourceRanges = 9;
 
   // externalName is the external reference that discovery mechanisms will
@@ -5393,6 +5840,17 @@ message ServiceSpec {
   // (possibly modified by topology and other features).
   // +optional
   optional string internalTrafficPolicy = 22;
+
+  // TrafficDistribution offers a way to express preferences for how traffic is
+  // distributed to Service endpoints. Implementations can use this field as a
+  // hint, but are not required to guarantee strict adherence. If the field is
+  // not set, the implementation will apply its default routing strategy. If set
+  // to "PreferClose", implementations should prioritize endpoints that are
+  // topologically close (e.g., same zone).
+  // This is an alpha field and requires enabling ServiceTrafficDistribution feature.
+  // +featureGate=ServiceTrafficDistribution
+  // +optional
+  optional string trafficDistribution = 23;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -5408,7 +5866,7 @@ message ServiceStatus {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=type
-  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 2;
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 2;
 }
 
 // SessionAffinityConfig represents the configurations of session affinity.
@@ -5416,6 +5874,12 @@ message SessionAffinityConfig {
   // clientIP contains the configurations of Client IP based session affinity.
   // +optional
   optional ClientIPConfig clientIP = 1;
+}
+
+// SleepAction describes a "sleep" action.
+message SleepAction {
+  // Seconds is the number of seconds to sleep.
+  optional int64 seconds = 1;
 }
 
 // Represents a StorageOS persistent volume resource.
@@ -5496,7 +5960,7 @@ message TCPSocketAction {
   // Number or name of the port to access on the container.
   // Number must be in the range 1 to 65535.
   // Name must be an IANA_SVC_NAME.
-  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
+  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 1;
 
   // Optional: Host name to connect to, defaults to the pod IP.
   // +optional
@@ -5521,7 +5985,7 @@ message Taint {
   // TimeAdded represents the time at which the taint was added.
   // It is only written for NoExecute taints.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
 }
 
 // The pod this Toleration is attached to tolerates any taint that matches
@@ -5565,6 +6029,7 @@ message TopologySelectorLabelRequirement {
 
   // An array of string values. One value must match the label to be selected.
   // Each entry in Values is ORed.
+  // +listType=atomic
   repeated string values = 2;
 }
 
@@ -5577,6 +6042,7 @@ message TopologySelectorLabelRequirement {
 message TopologySelectorTerm {
   // A list of topology selector requirements by labels.
   // +optional
+  // +listType=atomic
   repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
 }
 
@@ -5643,7 +6109,7 @@ message TopologySpreadConstraint {
   // Pods that match this label selector are counted to determine the number of pods
   // in their corresponding topology domain.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 4;
 
   // MinDomains indicates a minimum number of eligible domains.
   // When the number of eligible domains with matching topology keys is less than minDomains,
@@ -5667,8 +6133,6 @@ message TopologySpreadConstraint {
   // In this situation, new pod with the same labelSelector cannot be scheduled,
   // because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
   // it will violate MaxSkew.
-  //
-  // This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
   // +optional
   optional int32 minDomains = 5;
 
@@ -5697,8 +6161,12 @@ message TopologySpreadConstraint {
   // spreading will be calculated. The keys are used to lookup values from the
   // incoming pod labels, those key-value labels are ANDed with labelSelector
   // to select the group of existing pods over which spreading will be calculated
-  // for the incoming pod. Keys that don't exist in the incoming pod labels will
+  // for the incoming pod. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
+  // MatchLabelKeys cannot be set when LabelSelector isn't set.
+  // Keys that don't exist in the incoming pod labels will
   // be ignored. A null or empty list means only match against labelSelector.
+  //
+  // This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
   // +listType=atomic
   // +optional
   repeated string matchLabelKeys = 8;
@@ -5774,6 +6242,27 @@ message VolumeMount {
   // +optional
   optional bool readOnly = 2;
 
+  // RecursiveReadOnly specifies whether read-only mounts should be handled
+  // recursively.
+  //
+  // If ReadOnly is false, this field has no meaning and must be unspecified.
+  //
+  // If ReadOnly is true, and this field is set to Disabled, the mount is not made
+  // recursively read-only.  If this field is set to IfPossible, the mount is made
+  // recursively read-only, if it is supported by the container runtime.  If this
+  // field is set to Enabled, the mount is made recursively read-only if it is
+  // supported by the container runtime, otherwise the pod will not be started and
+  // an error will be generated to indicate the reason.
+  //
+  // If this field is set to IfPossible or Enabled, MountPropagation must be set to
+  // None (or be unspecified, which defaults to None).
+  //
+  // If this field is not specified, it is treated as an equivalent of Disabled.
+  //
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 7;
+
   // Path within the container at which the volume should be mounted.  Must
   // not contain ':'.
   optional string mountPath = 3;
@@ -5787,6 +6276,8 @@ message VolumeMount {
   // to container and the other way around.
   // When not set, MountPropagationNone is used.
   // This field is beta in 1.10.
+  // When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+  // (which defaults to None).
   // +optional
   optional string mountPropagation = 5;
 
@@ -5796,6 +6287,26 @@ message VolumeMount {
   // SubPathExpr and SubPath are mutually exclusive.
   // +optional
   optional string subPathExpr = 6;
+}
+
+// VolumeMountStatus shows status of volume mounts.
+message VolumeMountStatus {
+  // Name corresponds to the name of the original VolumeMount.
+  optional string name = 1;
+
+  // MountPath corresponds to the original VolumeMount.
+  optional string mountPath = 2;
+
+  // ReadOnly corresponds to the original VolumeMount.
+  // +optional
+  optional bool readOnly = 3;
+
+  // RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+  // An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+  // depending on the mount result.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 4;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.
@@ -5821,6 +6332,39 @@ message VolumeProjection {
   // serviceAccountToken is information about the serviceAccountToken data to project
   // +optional
   optional ServiceAccountTokenProjection serviceAccountToken = 4;
+
+  // ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
+  // of ClusterTrustBundle objects in an auto-updating file.
+  //
+  // Alpha, gated by the ClusterTrustBundleProjection feature gate.
+  //
+  // ClusterTrustBundle objects can either be selected by name, or by the
+  // combination of signer name and a label selector.
+  //
+  // Kubelet performs aggressive normalization of the PEM contents written
+  // into the pod filesystem.  Esoteric PEM features such as inter-block
+  // comments and block headers are stripped.  Certificates are deduplicated.
+  // The ordering of certificates within the file is arbitrary, and Kubelet
+  // may change the order over time.
+  //
+  // +featureGate=ClusterTrustBundleProjection
+  // +optional
+  optional ClusterTrustBundleProjection clusterTrustBundle = 5;
+}
+
+// VolumeResourceRequirements describes the storage resource requirements for a volume.
+message VolumeResourceRequirements {
+  // Limits describes the maximum amount of compute resources allowed.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> limits = 1;
+
+  // Requests describes the minimum amount of compute resources required.
+  // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+  // otherwise to an implementation-defined value. Requests cannot exceed Limits.
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 2;
 }
 
 // Represents the source of a volume to mount.
@@ -6040,12 +6584,9 @@ message WindowsSecurityContextOptions {
   optional string runAsUserName = 3;
 
   // HostProcess determines if a container should be run as a 'Host Process' container.
-  // This field is alpha-level and will only be honored by components that enable the
-  // WindowsHostProcessContainers feature flag. Setting this field without the feature
-  // flag will result in errors when validating the Pod. All of a Pod's containers must
-  // have the same effective HostProcess value (it is not allowed to have a mix of HostProcess
-  // containers and non-HostProcess containers).  In addition, if HostProcess is true
-  // then HostNetwork must also be set to true.
+  // All of a Pod's containers must have the same effective HostProcess value
+  // (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+  // In addition, if HostProcess is true then HostNetwork must also be set to true.
   // +optional
   optional bool hostProcess = 4;
 }

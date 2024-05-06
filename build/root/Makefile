@@ -35,16 +35,19 @@ BASH_ENV := ./hack/lib/logging.sh
 
 # Define variables so `make --warn-undefined-variables` works.
 PRINT_HELP ?=
+WHAT ?=
+TESTS ?=
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
+# Be pedantic about undefined variables.
+MAKEFLAGS += --warn-undefined-variables
 .SUFFIXES:
 
 # Constants used throughout.
 .EXPORT_ALL_VARIABLES:
 OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
-PRJ_SRC_PATH := k8s.io/kubernetes
 
 ifdef KUBE_GOFLAGS
 $(info KUBE_GOFLAGS is now deprecated. Please use GOFLAGS instead.)
@@ -63,9 +66,9 @@ define ALL_HELP_INFO
 # Build code.
 #
 # Args:
-#   WHAT: Directory names to build.  If any of these directories has a 'main'
-#     package, the build will produce executable files under $(OUT_DIR)/bin.
-#     If not specified, "everything" will be built.
+#   WHAT: Directory or Go package names to build.  If any of these directories
+#   has a 'main' package, the build will produce executable files under
+#   $(OUT_DIR)/bin.  If not specified, "everything" will be built.
 #     "vendor/<module>/<path>" is accepted as alias for "<module>/<path>".
 #     "ginkgo" is an alias for the ginkgo CLI.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
@@ -79,9 +82,9 @@ define ALL_HELP_INFO
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
 #   make all DBG=1
-#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
-#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
-#           information.
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to
+#     use code debugging tools like delve. When DBG is unspecified, it defaults
+#     to "-s -w" which strips debug information.
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)
@@ -123,9 +126,12 @@ endef
 ifeq ($(PRINT_HELP),y)
 verify:
 	echo "$$VERIFY_HELP_INFO"
-else
+else ifeq ($(origin KUBE_VERIFY_GIT_BRANCH), undefined)
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh
+else
+verify:
+	hack/make-rules/verify.sh
 endif
 
 define QUICK_VERIFY_HELP_INFO
@@ -190,10 +196,12 @@ define TEST_IT_HELP_INFO
 # Args:
 #   WHAT: Directory names to test.  All *_test.go files under these
 #     directories will be run.  If not specified, "everything" will be tested.
+#   KUBE_TEST_ARGS: Arguments to pass to the resulting go test invocation.
 #
 # Example:
 #   make test-integration
 #   make test-integration WHAT=./test/integration/kubelet GOFLAGS="-v -coverpkg=./pkg/kubelet/..." KUBE_COVER="y"
+#   make test-integration WHAT=./test/integration/pods GOFLAGS="-v" KUBE_TEST_ARGS='-run ^TestPodUpdateActiveDeadlineSeconds$$'
 endef
 .PHONY: test-integration
 ifeq ($(PRINT_HELP),y)
@@ -201,7 +209,8 @@ test-integration:
 	echo "$$TEST_IT_HELP_INFO"
 else
 test-integration:
-	hack/make-rules/test-integration.sh $(WHAT)
+	# KUBE_TEST_ARGS is explicitly passed here in order to ensure that we are preserving any dollar signs in the value.
+	KUBE_TEST_ARGS='$(value KUBE_TEST_ARGS)' hack/make-rules/test-integration.sh $(WHAT)
 endif
 
 define TEST_E2E_NODE_HELP_INFO
@@ -213,7 +222,7 @@ define TEST_E2E_NODE_HELP_INFO
 #    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
 #  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
 #    Defaults to "".
-#  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
+#  RUN_UNTIL_FAILURE: If true, pass --until-it-fails=true to ginkgo so tests are run
 #    repeatedly until they fail.  Defaults to false.
 #  REMOTE: If true, run the tests on a remote host.  Defaults to false.
 #  REMOTE_MODE: For REMOTE=true only.  Mode for remote execution (eg. gce, ssh).
@@ -228,7 +237,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
 #    Defaults to "/run/containerd/containerd.sock".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
-#    Used when RUNTIME is set to "remote".
+#    Defaults to CONTAINER_RUNTIME_ENDPOINT.
 #  IMAGE_CONFIG_FILE: path to a file containing image configuration.
 #  IMAGE_CONFIG_DIR: path to image config files.
 #  SYSTEM_SPEC_NAME: The name of the system spec to be used for validating the
@@ -254,9 +263,15 @@ define TEST_E2E_NODE_HELP_INFO
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #    Defaults to false.
 #  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
+#  SSH_USER: For REMOTE=true only  SSH username to use.
 #  SSH_KEY: For REMOTE=true only. Path to SSH key to use.
 #  SSH_OPTIONS: For REMOTE=true only. SSH options to use.
+#  INSTANCE_TYPE: For REMOTE=true only. Machine type to use.
+#  NODE_ENV: For REMOTE=true only. Additional metadata keys to add the instance.
 #  RUNTIME_CONFIG: The runtime configuration for the API server on the node e2e tests.
+#  E2E_TEST_DEBUG_TOOL: one of dlv/delve/gdb. Runs the test/e2e_node test binary
+#    interactively under the chosen debugger. Only works for REMOTE=false and
+#    in combination with DBG=1.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
@@ -307,16 +322,6 @@ clean:
 	build/make-clean.sh
 	hack/make-rules/clean.sh
 endif
-
-
-# TODO(thockin): Remove this in v1.29.
-.PHONY: generated_files
-generated_files:
-	echo "'make generated_files' is deprecated.  Please use hack/update-codegen.sh instead."
-ifneq ($(PRINT_HELP), y)
-	false
-endif
-
 
 define VET_HELP_INFO
 # Run 'go vet'.

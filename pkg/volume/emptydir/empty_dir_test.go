@@ -21,7 +21,6 @@ package emptydir
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -634,7 +633,7 @@ func (md *testMountDetector) GetMountMedium(path string, requestedMedium v1.Stor
 }
 
 func TestSetupHugepages(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "TestSetupHugepages")
+	tmpdir, err := os.MkdirTemp("", "TestSetupHugepages")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1045,7 +1044,7 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeMemoryBackedVolumes, testCase.featureGateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeMemoryBackedVolumes, testCase.featureGateEnabled)
 			spec := &volume.Spec{
 				Volume: &v1.Volume{
 					VolumeSource: v1.VolumeSource{

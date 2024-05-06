@@ -25,11 +25,13 @@ import (
 	"reflect"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
+	"github.com/google/go-cmp/cmp"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -278,10 +280,10 @@ users:
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(certConfig, test.expectedCertConfig) {
-				t.Errorf("Unexpected certConfig: %s", diff.ObjectDiff(certConfig, test.expectedCertConfig))
+				t.Errorf("Unexpected certConfig: %s", cmp.Diff(certConfig, test.expectedCertConfig))
 			}
 			if !reflect.DeepEqual(clientConfig, test.expectedClientConfig) {
-				t.Errorf("Unexpected clientConfig: %s", diff.ObjectDiff(clientConfig, test.expectedClientConfig))
+				t.Errorf("Unexpected clientConfig: %s", cmp.Diff(clientConfig, test.expectedClientConfig))
 			}
 		})
 	}
@@ -324,8 +326,8 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	os.WriteFile(f.Name(), testData, os.FileMode(0755))
+	defer utiltesting.CloseAndRemove(t, f)
+	f.Write(testData)
 
 	config, err := loadRESTClientConfig(f.Name())
 	if err != nil {
@@ -341,7 +343,7 @@ users:
 	}
 
 	if !reflect.DeepEqual(config, expectedConfig) {
-		t.Errorf("Unexpected config: %s", diff.ObjectDiff(config, expectedConfig))
+		t.Errorf("Unexpected config: %s", cmp.Diff(config, expectedConfig))
 	}
 }
 

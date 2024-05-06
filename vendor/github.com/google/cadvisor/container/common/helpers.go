@@ -16,7 +16,6 @@ package common
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -76,7 +75,11 @@ func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.Mach
 		dir, err := os.Stat(cgroupPathDir)
 		if err == nil && dir.ModTime().Before(lowestTime) {
 			lowestTime = dir.ModTime()
+		} else if os.IsNotExist(err) {
+			// Directory does not exist, skip checking for files within.
+			continue
 		}
+
 		// The modified time of the cgroup directory sometimes changes whenever a subcontainer is created.
 		// eg. /docker will have creation time matching the creation of latest docker container.
 		// Use clone_children/events as a workaround as it isn't usually modified. It is only likely changed
@@ -235,7 +238,7 @@ func readString(dirpath string, file string) string {
 	cgroupFile := path.Join(dirpath, file)
 
 	// Read
-	out, err := ioutil.ReadFile(cgroupFile)
+	out, err := os.ReadFile(cgroupFile)
 	if err != nil {
 		// Ignore non-existent files
 		if !os.IsNotExist(err) {
@@ -436,4 +439,21 @@ func (m deviceIdentifierMap) Find(major, minor uint64, namer DeviceNamer) string
 	s, _ := namer.DeviceName(major, minor)
 	m[d] = s
 	return s
+}
+
+// RemoveNetMetrics is used to remove any network metrics from the given MetricSet.
+// It returns the original set as is if remove is false, or if there are no metrics
+// to remove.
+func RemoveNetMetrics(metrics container.MetricSet, remove bool) container.MetricSet {
+	if !remove {
+		return metrics
+	}
+
+	// Check if there is anything we can remove, to avoid useless copying.
+	if !metrics.HasAny(container.AllNetworkMetrics) {
+		return metrics
+	}
+
+	// A copy of all metrics except for network ones.
+	return metrics.Difference(container.AllNetworkMetrics)
 }

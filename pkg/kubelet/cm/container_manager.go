@@ -31,7 +31,6 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/utils/cpuset"
 )
 
 type ActivePodsFunc func() []*v1.Pod
@@ -127,13 +127,15 @@ type ContainerManager interface {
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
 
-	// Implements the podresources Provider API for CPUs, Memory and Devices
+	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider
 	podresources.MemoryProvider
+	podresources.DynamicResourcesProvider
 }
 
 type NodeConfig struct {
+	NodeName              types.NodeName
 	RuntimeCgroupsName    string
 	SystemCgroupsName     string
 	KubeletCgroupsName    string
@@ -145,25 +147,25 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	QOSReserved                              map[v1.ResourceName]int64
-	CPUManagerPolicy                         string
-	CPUManagerPolicyOptions                  map[string]string
-	TopologyManagerScope                     string
-	CPUManagerReconcilePeriod                time.Duration
-	ExperimentalMemoryManagerPolicy          string
-	ExperimentalMemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
-	PodPidsLimit                             int64
-	EnforceCPULimits                         bool
-	CPUCFSQuotaPeriod                        time.Duration
-	TopologyManagerPolicy                    string
-	ExperimentalTopologyManagerPolicyOptions map[string]string
+	QOSReserved                             map[v1.ResourceName]int64
+	CPUManagerPolicy                        string
+	CPUManagerPolicyOptions                 map[string]string
+	TopologyManagerScope                    string
+	CPUManagerReconcilePeriod               time.Duration
+	ExperimentalMemoryManagerPolicy         string
+	ExperimentalMemoryManagerReservedMemory []kubeletconfig.MemoryReservation
+	PodPidsLimit                            int64
+	EnforceCPULimits                        bool
+	CPUCFSQuotaPeriod                       time.Duration
+	TopologyManagerPolicy                   string
+	TopologyManagerPolicyOptions            map[string]string
 }
 
 type NodeAllocatableConfig struct {
 	KubeReservedCgroupName   string
 	SystemReservedCgroupName string
 	ReservedSystemCPUs       cpuset.CPUSet
-	EnforceNodeAllocatable   sets.String
+	EnforceNodeAllocatable   sets.Set[string]
 	KubeReserved             v1.ResourceList
 	SystemReserved           v1.ResourceList
 	HardEvictionThresholds   []evictionapi.Threshold
@@ -189,7 +191,7 @@ func parsePercentage(v string) (int64, error) {
 	return percentage, nil
 }
 
-// ParseQOSReserved parses the --qos-reserve-requests option
+// ParseQOSReserved parses the --qos-reserved option
 func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 	reservations := make(map[v1.ResourceName]int64)
 	for k, v := range m {

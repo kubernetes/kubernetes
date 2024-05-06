@@ -32,6 +32,34 @@ import (
 	"k8s.io/klog/v2"
 )
 
+func TestReapply(t *testing.T) {
+	oldReapplyHandling := ReapplyHandling
+	defer func() {
+		ReapplyHandling = oldReapplyHandling
+		if err := ResetForTest(nil /* feature gates */); err != nil {
+			t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+		}
+	}()
+
+	newOptions := NewLoggingConfiguration()
+	if err := ValidateAndApply(newOptions, nil); err != nil {
+		t.Errorf("unexpected error for first ValidateAndApply: %v", err)
+	}
+	ReapplyHandling = ReapplyHandlingError
+	if err := ValidateAndApply(newOptions, nil); err == nil {
+		t.Error("did not get expected error for second ValidateAndApply")
+	}
+	ReapplyHandling = ReapplyHandlingIgnoreUnchanged
+	if err := ValidateAndApply(newOptions, nil); err != nil {
+		t.Errorf("unexpected error for third ValidateAndApply: %v", err)
+	}
+	modifiedOptions := newOptions.DeepCopy()
+	modifiedOptions.Verbosity = 100
+	if err := ValidateAndApply(modifiedOptions, nil); err == nil {
+		t.Errorf("unexpected success for forth ValidateAndApply, should have complained about modified config")
+	}
+}
+
 func TestOptions(t *testing.T) {
 	newOptions := NewLoggingConfiguration()
 	testcases := []struct {
@@ -75,6 +103,11 @@ func TestOptions(t *testing.T) {
 			if !assert.Equal(t, tc.want, c) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
 			}
+			defer func() {
+				if err := ResetForTest(nil /* feature gates */); err != nil {
+					t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+				}
+			}()
 			errs := ValidateAndApply(c, nil /* We don't care about feature gates here. */)
 			defer klog.StopFlushDaemon()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
@@ -97,10 +130,14 @@ func TestFlagSet(t *testing.T) {
 		//     --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
 		// -v, --v Level                        number for the log level verbosity
 		//     --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
+		//     --log-text-split-stream                [Alpha] In text format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.
+		//     --log-text-info-buffer-size quantity   [Alpha] In text format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.
 		assert.Regexp(t, `^.*--logging-format.*default.*text.*
 .*--log-flush-frequency.*default 5s.*
 .*-v.*--v.*
 .*--vmodule.*pattern=N.*
+.*--log-text-split-stream.*
+.*--log-text-info-buffer-size quantity.*
 $`, buffer.String())
 	})
 
@@ -118,6 +155,10 @@ $`, buffer.String())
 		// Expected (Go 1.19):
 		// -log-flush-frequency value
 		//   	Maximum number of seconds between log flushes (default 5s)
+		// -log-text-info-buffer-size value
+		//      [Alpha] In text format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.
+		// -log-text-split-stream
+		//      [Alpha] In text format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.
 		// -logging-format value
 		//   	Sets the log format. Permitted formats: "text". (default text)
 		// -v value
@@ -126,6 +167,10 @@ $`, buffer.String())
 		//   	comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
 		assert.Regexp(t, `^.*-log-flush-frequency.*
 .*default 5s.*
+.*-log-text-info-buffer-size.*
+.*
+.*-log-text-split-stream.*
+.*
 .*-logging-format.*
 .*default.*text.*
 .*-v.*
@@ -146,6 +191,10 @@ $`, buffer.String())
 		// known:
 		// -log-flush-frequency duration
 		//   	Maximum number of seconds between log flushes (default 5s)
+		// -log-text-info-buffer-size value
+		//      [Alpha] In text format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.
+		// -log-text-split-stream
+		//      [Alpha] In text format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.
 		// -logging-format string
 		//   	Sets the log format. Permitted formats: "text". (default "text")
 		// -v value
@@ -154,6 +203,10 @@ $`, buffer.String())
 		//   	comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
 		assert.Regexp(t, `^.*-log-flush-frequency.*duration.*
 .*default 5s.*
+.*-log-text-info-buffer-size.*
+.*
+.*-log-text-split-stream.*
+.*
 .*-logging-format.*string.*
 .*default.*text.*
 .*-v.*
@@ -182,6 +235,11 @@ func testContextualLogging(t *testing.T, enabled bool) {
 	AddFeatureGates(featureGate)
 	err = featureGate.SetFromMap(map[string]bool{string(ContextualLogging): enabled})
 	require.NoError(t, err)
+	defer func() {
+		if err := ResetForTest(nil /* feature gates */); err != nil {
+			t.Errorf("Unexpected error resetting the logging configuration: %v", err)
+		}
+	}()
 	err = ValidateAndApply(c, featureGate)
 	require.NoError(t, err)
 	defer klog.StopFlushDaemon()

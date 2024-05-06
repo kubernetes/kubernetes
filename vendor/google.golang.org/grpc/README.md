@@ -1,8 +1,8 @@
 # gRPC-Go
 
-[![Build Status](https://travis-ci.org/grpc/grpc-go.svg)](https://travis-ci.org/grpc/grpc-go)
 [![GoDoc](https://pkg.go.dev/badge/google.golang.org/grpc)][API]
 [![GoReportCard](https://goreportcard.com/badge/grpc/grpc-go)](https://goreportcard.com/report/github.com/grpc/grpc-go)
+[![codecov](https://codecov.io/gh/grpc/grpc-go/graph/badge.svg)](https://codecov.io/gh/grpc/grpc-go)
 
 The [Go][] implementation of [gRPC][]: A high performance, open source, general
 RPC framework that puts mobile and HTTP/2 first. For more information see the
@@ -14,19 +14,12 @@ RPC framework that puts mobile and HTTP/2 first. For more information see the
 
 ## Installation
 
-With [Go module][] support (Go 1.11+), simply add the following import
+Simply add the following import to your code, and then `go [build|run|test]`
+will automatically fetch the necessary dependencies:
+
 
 ```go
 import "google.golang.org/grpc"
-```
-
-to your code, and then `go [build|run|test]` will automatically fetch the
-necessary dependencies.
-
-Otherwise, to install the `grpc-go` package, run the following command:
-
-```console
-$ go get -u google.golang.org/grpc
 ```
 
 > **Note:** If you are trying to access `grpc-go` from **China**, see the
@@ -56,15 +49,6 @@ To build Go code, there are several options:
 
 - Set up a VPN and access google.golang.org through that.
 
-- Without Go module support: `git clone` the repo manually:
-
-  ```sh
-  git clone https://github.com/grpc/grpc-go.git $GOPATH/src/google.golang.org/grpc
-  ```
-
-  You will need to do the same for all of grpc's dependencies in `golang.org`,
-  e.g. `golang.org/x/net`.
-
 - With Go module support: it is possible to use the `replace` feature of `go
   mod` to create aliases for golang.org packages.  In your project's directory:
 
@@ -76,33 +60,13 @@ To build Go code, there are several options:
   ```
 
   Again, this will need to be done for all transitive dependencies hosted on
-  golang.org as well. For details, refer to [golang/go issue #28652](https://github.com/golang/go/issues/28652).
+  golang.org as well. For details, refer to [golang/go issue
+  #28652](https://github.com/golang/go/issues/28652).
 
 ### Compiling error, undefined: grpc.SupportPackageIsVersion
 
-#### If you are using Go modules:
-
-Ensure your gRPC-Go version is `require`d at the appropriate version in
-the same module containing the generated `.pb.go` files.  For example,
-`SupportPackageIsVersion6` needs `v1.27.0`, so in your `go.mod` file:
-
-```go
-module <your module name>
-
-require (
-    google.golang.org/grpc v1.27.0
-)
-```
-
-#### If you are *not* using Go modules:
-
-Update the `proto` package, gRPC package, and rebuild the `.proto` files:
-
-```sh
-go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
-go get -u google.golang.org/grpc
-protoc --go_out=plugins=grpc:. *.proto
-```
+Please update to the latest version of gRPC-Go using
+`go get google.golang.org/grpc`.
 
 ### How to turn on logging
 
@@ -121,9 +85,11 @@ possible reasons, including:
  1. mis-configured transport credentials, connection failed on handshaking
  1. bytes disrupted, possibly by a proxy in between
  1. server shutdown
- 1. Keepalive parameters caused connection shutdown, for example if you have configured
-    your server to terminate connections regularly to [trigger DNS lookups](https://github.com/grpc/grpc-go/issues/3170#issuecomment-552517779).
-    If this is the case, you may want to increase your [MaxConnectionAgeGrace](https://pkg.go.dev/google.golang.org/grpc/keepalive?tab=doc#ServerParameters),
+ 1. Keepalive parameters caused connection shutdown, for example if you have
+    configured your server to terminate connections regularly to [trigger DNS
+    lookups](https://github.com/grpc/grpc-go/issues/3170#issuecomment-552517779).
+    If this is the case, you may want to increase your
+    [MaxConnectionAgeGrace](https://pkg.go.dev/google.golang.org/grpc/keepalive?tab=doc#ServerParameters),
     to allow longer RPC calls to finish.
 
 It can be tricky to debug this because the error happens on the client side but

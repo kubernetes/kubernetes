@@ -16,9 +16,7 @@ limitations under the License.
 
 package network
 
-import "github.com/onsi/ginkgo/v2"
+import "k8s.io/kubernetes/test/e2e/framework"
 
 // SIGDescribe annotates the test with the SIG label.
-func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-network] "+text, body)
-}
+var SIGDescribe = framework.SIGDescribe("network")

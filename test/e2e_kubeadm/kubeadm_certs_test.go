@@ -56,7 +56,7 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("kubeadm-certs")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
@@ -68,11 +68,11 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 		// Checks the kubeadm-certs is ownen by a time lived token
 		gomega.Expect(s.OwnerReferences).To(gomega.HaveLen(1), "%s should have one owner reference", kubeadmCertsSecretName)
 		ownRef := s.OwnerReferences[0]
-		framework.ExpectEqual(ownRef.Kind, "Secret", "%s should be owned by a secret", kubeadmCertsSecretName)
+		gomega.Expect(ownRef.Kind).To(gomega.Equal("Secret"), "%s should be owned by a secret", kubeadmCertsSecretName)
 		gomega.Expect(*ownRef.BlockOwnerDeletion).To(gomega.BeTrue(), "%s should be deleted on owner deletion", kubeadmCertsSecretName)
 
 		o := GetSecret(f.ClientSet, kubeSystemNamespace, ownRef.Name)
-		framework.ExpectEqual(o.Type, corev1.SecretTypeBootstrapToken, "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
+		gomega.Expect(o.Type).To(gomega.Equal(corev1.SecretTypeBootstrapToken), "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
 		gomega.Expect(o.Data).To(gomega.HaveKey("expiration"), "%s should have an owner reference with an expiration", kubeadmCertsSecretName)
 
 		// gets the ClusterConfiguration from the kubeadm kubeadm-config ConfigMap as a untyped map

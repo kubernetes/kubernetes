@@ -45,11 +45,6 @@ func NewContainerScope(policy Policy) Scope {
 }
 
 func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
-	// Exception - Policy : none
-	if s.policy.Name() == PolicyNone {
-		return s.admitPolicyNone(pod)
-	}
-
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		bestHint, admit := s.calculateAffinity(pod, &container)
 		klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)

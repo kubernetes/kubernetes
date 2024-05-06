@@ -31,7 +31,7 @@ This is an example of how to build a kubectl plugin using the same set of tools 
 
 ```sh
 # assumes you have a working KUBECONFIG
-$ GO111MODULE="on" go build cmd/kubectl-ns.go
+$ go build cmd/kubectl-ns.go
 # place the built binary somewhere in your PATH
 $ cp ./kubectl-ns /usr/local/bin
 

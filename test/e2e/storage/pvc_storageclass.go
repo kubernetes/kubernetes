@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +39,7 @@ import (
 
 var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 	f := framework.NewDefaultFramework("pvc-retroactive-storageclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	var (
 		client    clientset.Interface
@@ -60,7 +62,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 		}
 	})
 
-	ginkgo.Describe("Retroactive StorageClass assignment [Serial][Disruptive]", func() {
+	f.Describe("Retroactive StorageClass assignment", framework.WithSerial(), framework.WithDisruptive(), func() {
 		ginkgo.It("should assign default SC to PVCs that have no SC set", func(ctx context.Context) {
 
 			// Temporarily set all default storage classes as non-default
@@ -109,7 +111,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 			framework.ExpectNoError(err)
 			updatedPVC, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(*updatedPVC.Spec.StorageClassName, storageClass.Name, "Expected PVC %v to have StorageClass %v, but it has StorageClass %v instead", updatedPVC.Name, prefixSC, updatedPVC.Spec.StorageClassName)
+			gomega.Expect(*updatedPVC.Spec.StorageClassName).To(gomega.Equal(storageClass.Name), "Expected PVC %v to have StorageClass %v, but it has StorageClass %v instead", updatedPVC.Name, prefixSC, updatedPVC.Spec.StorageClassName)
 			framework.Logf("Success - PersistentVolumeClaim %s got updated retroactively with StorageClass %v", updatedPVC.Name, storageClass.Name)
 		})
 	})
@@ -134,11 +136,11 @@ func temporarilyUnsetDefaultClasses(ctx context.Context, client clientset.Interf
 	classes, err := client.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 
-	var changedClasses []storagev1.StorageClass
+	changedClasses := make(map[string]bool)
 
 	for _, sc := range classes.Items {
 		if sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] == "true" {
-			changedClasses = append(changedClasses, sc)
+			changedClasses[sc.GetName()] = true
 			sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = "false"
 			_, err := client.StorageV1().StorageClasses().Update(ctx, &sc, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
@@ -146,10 +148,14 @@ func temporarilyUnsetDefaultClasses(ctx context.Context, client clientset.Interf
 	}
 
 	return func() {
-		for _, sc := range changedClasses {
-			sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = "true"
-			_, err := client.StorageV1().StorageClasses().Update(ctx, &sc, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+		classes, err = client.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, sc := range classes.Items {
+			if _, found := changedClasses[sc.GetName()]; found {
+				sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = "true"
+				_, err := client.StorageV1().StorageClasses().Update(ctx, &sc, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+			}
 		}
 	}
 

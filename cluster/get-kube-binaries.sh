@@ -46,7 +46,7 @@
 #
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
-#    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
+#    (Defaults to https://dl.k8s.io/release).
 #  Set KUBERNETES_DOWNLOAD_TESTS to additionally download and extract the test
 #    binaries tarball.
 

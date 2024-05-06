@@ -23,23 +23,17 @@ import (
 )
 
 func TestValidateConfiguration(t *testing.T) {
-	successCases := []resourcequotaapi.Configuration{
-		{
-			LimitedResources: []resourcequotaapi.LimitedResource{
-				{
-					Resource:      "pods",
-					MatchContains: []string{"requests.cpu"},
-				},
-			},
-		},
-		{
-			LimitedResources: []resourcequotaapi.LimitedResource{
-				{
-					Resource:      "persistentvolumeclaims",
-					MatchContains: []string{"requests.storage"},
-				},
-			},
-		},
+	successCases := []resourcequotaapi.Configuration{{
+		LimitedResources: []resourcequotaapi.LimitedResource{{
+			Resource:      "pods",
+			MatchContains: []string{"requests.cpu"},
+		}},
+	}, {
+		LimitedResources: []resourcequotaapi.LimitedResource{{
+			Resource:      "persistentvolumeclaims",
+			MatchContains: []string{"requests.storage"},
+		}},
+	},
 	}
 	for i := range successCases {
 		configuration := successCases[i]

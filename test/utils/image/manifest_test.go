@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 )
 
 func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
@@ -51,9 +51,6 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 			in:  "invalid.registry.k8s.io/invalid/test:latest",
 			out: "test.io/invalid/test:latest",
 		}, {
-			in:  "mcr.microsoft.com/test:latest",
-			out: "test.io/microsoft/test:latest",
-		}, {
 			in:  "registry.k8s.io/e2e-test-images/test:latest",
 			out: "test.io/promoter/test:latest",
 		}, {
@@ -70,7 +67,6 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 		PrivateRegistry:         "test.io/k8s-authenticated-test",
 		SigStorageRegistry:      "test.io/sig-storage",
 		InvalidRegistry:         "test.io/invalid",
-		MicrosoftRegistry:       "test.io/microsoft",
 		PromoterE2eRegistry:     "test.io/promoter",
 		BuildImageRegistry:      "test.io/build",
 		GcAuthenticatedRegistry: "test.io/gcAuth",
@@ -112,9 +108,6 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "invalid.registry.k8s.io/invalid/test:latest",
 			out: "test.io/invalid/test:latest",
 		}, {
-			in:  "mcr.microsoft.com/test:latest",
-			out: "test.io/microsoft/test:latest",
-		}, {
 			in:  "registry.k8s.io/e2e-test-images/test:latest",
 			out: "test.io/promoter/test:latest",
 		}, {
@@ -136,7 +129,6 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 		PrivateRegistry:         "test.io/k8s-authenticated-test",
 		SigStorageRegistry:      "test.io/sig-storage",
 		InvalidRegistry:         "test.io/invalid",
-		MicrosoftRegistry:       "test.io/microsoft",
 		PromoterE2eRegistry:     "test.io/promoter",
 		BuildImageRegistry:      "test.io/build",
 		GcAuthenticatedRegistry: "test.io/gcAuth",
@@ -177,6 +169,6 @@ func TestGetMappedImageConfigs(t *testing.T) {
 		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-10-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
 	}
 	if !reflect.DeepEqual(expected, actual) {
-		t.Fatal(diff.ObjectReflectDiff(expected, actual))
+		t.Fatal(cmp.Diff(expected, actual))
 	}
 }

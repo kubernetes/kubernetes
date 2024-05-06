@@ -131,8 +131,8 @@ type KubeControllerManagerConfiguration struct {
 	JobController JobControllerConfiguration
 	// CronJobControllerConfiguration holds configuration for CronJobController related features.
 	CronJobController CronJobControllerConfiguration
-	// NamespaceControllerConfiguration holds configuration for NamespaceController
-	// related features.
+	// LegacySATokenCleanerConfiguration holds configuration for LegacySATokenCleaner related features.
+	LegacySATokenCleaner LegacySATokenCleanerConfiguration
 	// NamespaceControllerConfiguration holds configuration for NamespaceController
 	// related features.
 	NamespaceController NamespaceControllerConfiguration
@@ -165,6 +165,9 @@ type KubeControllerManagerConfiguration struct {
 	// TTLAfterFinishedControllerConfiguration holds configuration for
 	// TTLAfterFinishedController related features.
 	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
+	// ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for
+	// ValidatingAdmissionPolicyStatusController related features.
+	ValidatingAdmissionPolicyStatusController ValidatingAdmissionPolicyStatusControllerConfiguration
 }
 
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
@@ -174,8 +177,12 @@ type AttachDetachControllerConfiguration struct {
 	// This flag enables or disables reconcile.  Is false by default, and thus enabled.
 	DisableAttachDetachReconcilerSync bool
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
-	// wait between successive executions. Is set to 5 sec by default.
+	// wait between successive executions. Is set to 60 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+	// DisableForceDetachOnTimeout disables force detach when the maximum unmount
+	// time is exceeded. Is false by default, and thus force detach on unmount is
+	// enabled.
+	DisableForceDetachOnTimeout bool `json:"disableForceDetachOnTimeout"`
 }
 
 // CSRSigningControllerConfiguration contains elements describing CSRSigningController.
@@ -357,6 +364,13 @@ type CronJobControllerConfiguration struct {
 	ConcurrentCronJobSyncs int32
 }
 
+// LegacySATokenCleanerConfiguration contains elements describing LegacySATokenCleaner
+type LegacySATokenCleanerConfiguration struct {
+	// CleanUpPeriod is the period of time since the last usage of an
+	// auto-generated service account token before it can be deleted.
+	CleanUpPeriod metav1.Duration
+}
+
 // NamespaceControllerConfiguration contains elements describing NamespaceController.
 type NamespaceControllerConfiguration struct {
 	// namespaceSyncPeriod is the period for syncing namespace life-cycle
@@ -383,9 +397,6 @@ type NodeIPAMControllerConfiguration struct {
 
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
-	// If set to true enables NoExecute Taints and will evict all not-tolerating
-	// Pod running on Nodes tainted with this kind of Taints.
-	EnableTaintManager *bool
 	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
 	NodeEvictionRate float32
 	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealthy
@@ -415,10 +426,10 @@ type PersistentVolumeBinderControllerConfiguration struct {
 	PVClaimBinderSyncPeriod metav1.Duration
 	// volumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration
-	// VolumeHostCIDRDenylist is a list of CIDRs that should not be reachable by the
+	// DEPRECATED: VolumeHostCIDRDenylist is a list of CIDRs that should not be reachable by the
 	// controller from plugins.
 	VolumeHostCIDRDenylist []string
-	// VolumeHostAllowLocalLoopback indicates if local loopback hosts (127.0.0.1, etc)
+	// DEPRECATED: VolumeHostAllowLocalLoopback indicates if local loopback hosts (127.0.0.1, etc)
 	// should be allowed from plugins.
 	VolumeHostAllowLocalLoopback *bool
 }
@@ -476,4 +487,13 @@ type TTLAfterFinishedControllerConfiguration struct {
 	// concurrentTTLSyncs is the number of TTL-after-finished collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentTTLSyncs int32
+}
+
+// ValidatingAdmissionPolicyStatusControllerConfiguration contains elements describing ValidatingAdmissionPolicyStatusController.
+type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
+	// ConcurrentPolicySyncs is the number of policy objects that are
+	// allowed to sync concurrently. Larger number = quicker type checking,
+	// but more CPU (and network) load.
+	// The default value is 5.
+	ConcurrentPolicySyncs int32
 }

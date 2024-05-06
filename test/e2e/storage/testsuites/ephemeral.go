@@ -117,7 +117,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", storageframework.GetDriverTimeouts(driver))
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	init := func(ctx context.Context) {
 		if pattern.VolType == storageframework.CSIInlineVolume {
@@ -274,7 +274,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := pvc.Status.Conditions
-			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 			return nil
 		}
 		l.testCase.TestEphemeral(ctx)
@@ -523,7 +523,7 @@ func GenericEphemeralVolumesEnabled(ctx context.Context, c clientset.Interface, 
 				Spec: v1.PersistentVolumeClaimSpec{
 					StorageClassName: &storageClassName,
 					AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},

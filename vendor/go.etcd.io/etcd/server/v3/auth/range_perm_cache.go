@@ -76,8 +76,10 @@ func checkKeyInterval(
 	cachedPerms *unifiedRangePermissions,
 	key, rangeEnd []byte,
 	permtyp authpb.Permission_Type) bool {
-	if len(rangeEnd) == 1 && rangeEnd[0] == 0 {
+	if isOpenEnded(rangeEnd) {
 		rangeEnd = nil
+		// nil rangeEnd will be converetd to []byte{}, the largest element of BytesAffineComparable,
+		// in NewBytesAffineInterval().
 	}
 
 	ivl := adt.NewBytesAffineInterval(key, rangeEnd)
@@ -152,4 +154,52 @@ func (as *authStore) refreshRangePermCache(tx backend.ReadTx) {
 type unifiedRangePermissions struct {
 	readPerms  adt.IntervalTree
 	writePerms adt.IntervalTree
+}
+
+// Constraints related to key range
+// Assumptions:
+// a1. key must be non-nil
+// a2. []byte{} (in the case of string, "") is not a valid key of etcd
+// For representing an open-ended range, BytesAffineComparable uses []byte{} as the largest element.
+// a3. []byte{0x00} is the minimum valid etcd key
+//
+// Based on the above assumptions, key and rangeEnd must follow below rules:
+// b1. for representing a single key point, rangeEnd should be nil or zero length byte array (in the case of string, "")
+// Rule a2 guarantees that (X, []byte{}) for any X is not a valid range. So such ranges can be used for representing
+// a single key permission.
+//
+// b2. key range with upper limit, like (X, Y), larger or equal to X and smaller than Y
+//
+// b3. key range with open-ended, like (X, <open ended>), is represented like (X, []byte{0x00})
+// Because of rule a3, if we have (X, []byte{0x00}), such a range represents an empty range and makes no sense to have
+// such a permission. So we use []byte{0x00} for representing an open-ended permission.
+// Note that rangeEnd with []byte{0x00} will be converted into []byte{} before inserted into the interval tree
+// (rule a2 ensures that this is the largest element).
+// Special range like key = []byte{0x00} and rangeEnd = []byte{0x00} is treated as a range which matches with all keys.
+//
+// Treating a range whose rangeEnd with []byte{0x00} as an open-ended comes from the rules of Range() and Watch() API.
+
+func isOpenEnded(rangeEnd []byte) bool { // check rule b3
+	return len(rangeEnd) == 1 && rangeEnd[0] == 0
+}
+
+func isValidPermissionRange(key, rangeEnd []byte) bool {
+	if len(key) == 0 {
+		return false
+	}
+	if rangeEnd == nil || len(rangeEnd) == 0 { // ensure rule b1
+		return true
+	}
+
+	begin := adt.BytesAffineComparable(key)
+	end := adt.BytesAffineComparable(rangeEnd)
+	if begin.Compare(end) == -1 { // rule b2
+		return true
+	}
+
+	if isOpenEnded(rangeEnd) {
+		return true
+	}
+
+	return false
 }

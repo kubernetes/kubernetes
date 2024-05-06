@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,10 +33,11 @@ import (
 	"time"
 
 	"github.com/moby/sys/mountinfo"
+	"golang.org/x/sys/unix"
 
+	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
-	utilio "k8s.io/utils/io"
 )
 
 const (
@@ -55,6 +55,11 @@ const (
 	errNoChildProcesses = "wait: no child processes"
 	// Error returned by some `umount` implementations when the specified path is not a mount point
 	errNotMounted = "not mounted"
+)
+
+var (
+	// Error statx support since Linux 4.11, https://man7.org/linux/man-pages/man2/statx.2.html
+	errStatxNotSupport = errors.New("the statx syscall is not supported. At least Linux kernel 4.11 is needed")
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -107,6 +112,59 @@ func (mounter *Mounter) hasSystemd() bool {
 	return *mounter.withSystemd
 }
 
+// Map unix.Statfs mount flags ro, nodev, noexec, nosuid, noatime, relatime,
+// nodiratime to mount option flag strings.
+func getUserNSBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_t) (err error)) ([]string, error) {
+	var s unix.Statfs_t
+	var mountOpts []string
+	if err := statfs(path, &s); err != nil {
+		return nil, &os.PathError{Op: "statfs", Path: path, Err: err}
+	}
+	flagMapping := map[int]string{
+		unix.MS_RDONLY:     "ro",
+		unix.MS_NODEV:      "nodev",
+		unix.MS_NOEXEC:     "noexec",
+		unix.MS_NOSUID:     "nosuid",
+		unix.MS_NOATIME:    "noatime",
+		unix.MS_RELATIME:   "relatime",
+		unix.MS_NODIRATIME: "nodiratime",
+	}
+	for k, v := range flagMapping {
+		if int(s.Flags)&k == k {
+			mountOpts = append(mountOpts, v)
+		}
+	}
+	return mountOpts, nil
+}
+
+// Do a bind mount including the needed remount for applying the bind opts.
+// If the remount fails and we are running in a user namespace
+// figure out if the source filesystem has the ro, nodev, noexec, nosuid,
+// noatime, relatime or nodiratime flag set and try another remount with the found flags.
+func (mounter *Mounter) bindMountSensitive(mounterPath string, mountCmd string, source string, target string, fstype string, bindOpts []string, bindRemountOpts []string, bindRemountOptsSensitive []string, mountFlags []string, systemdMountRequired bool) error {
+	err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
+	if err != nil {
+		return err
+	}
+	err = mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
+	if libcontaineruserns.RunningInUserNS() {
+		if err == nil {
+			return nil
+		}
+		// Check if the source has ro, nodev, noexec, nosuid, noatime, relatime,
+		// nodiratime flag...
+		fixMountOpts, err := getUserNSBindMountOptions(source, unix.Statfs)
+		if err != nil {
+			return &os.PathError{Op: "statfs", Path: source, Err: err}
+		}
+		// ... and retry the mount with flags found above.
+		bindRemountOpts = append(bindRemountOpts, fixMountOpts...)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
+	} else {
+		return err
+	}
+}
+
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
 // be an empty string in case it's not required, e.g. for remount, or for auto filesystem
 // type, where kernel handles fstype for you. The mount 'options' is a list of options,
@@ -127,11 +185,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
-		if err != nil {
-			return err
-		}
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
+		return mounter.bindMountSensitive(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{
@@ -156,11 +210,7 @@ func (mounter *Mounter) MountSensitiveWithoutSystemdWithMountFlags(source string
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, false)
-		if err != nil {
-			return err
-		}
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, false)
+		return mounter.bindMountSensitive(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOpts, bindRemountOptsSensitive, mountFlags, false)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{
@@ -271,7 +321,7 @@ func detectSafeNotMountedBehavior() bool {
 // detectSafeNotMountedBehaviorWithExec is for testing with FakeExec.
 func detectSafeNotMountedBehaviorWithExec(exec utilexec.Interface) bool {
 	// create a temp dir and try to umount it
-	path, err := ioutil.TempDir("", "kubelet-detect-safe-umount")
+	path, err := os.MkdirTemp("", "kubelet-detect-safe-umount")
 	if err != nil {
 		klog.V(4).Infof("Cannot create temp dir to detect safe 'not mounted' behavior: %v", err)
 		return false
@@ -387,14 +437,20 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return ListProcMounts(procMountsPath)
 }
 
-// IsLikelyNotMountPoint determines if a directory is not a mountpoint.
-// It is fast but not necessarily ALWAYS correct. If the path is in fact
-// a bind mount from one part of a mount to another it will not be detected.
-// It also can not distinguish between mountpoints and symbolic links.
-// mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
-// will return true. When in fact /tmp/b is a mount point. If this situation
-// is of interest to you, don't use this function...
-func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+func statx(file string) (unix.Statx_t, error) {
+	var stat unix.Statx_t
+	if err := unix.Statx(0, file, unix.AT_STATX_DONT_SYNC, 0, &stat); err != nil {
+		if err == unix.ENOSYS {
+			return stat, errStatxNotSupport
+		}
+
+		return stat, err
+	}
+
+	return stat, nil
+}
+
+func (mounter *Mounter) isLikelyNotMountPointStat(file string) (bool, error) {
 	stat, err := os.Stat(file)
 	if err != nil {
 		return true, err
@@ -409,6 +465,51 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (mounter *Mounter) isLikelyNotMountPointStatx(file string) (bool, error) {
+	var stat, rootStat unix.Statx_t
+	var err error
+
+	if stat, err = statx(file); err != nil {
+		return true, err
+	}
+
+	if stat.Attributes_mask != 0 {
+		if stat.Attributes_mask&unix.STATX_ATTR_MOUNT_ROOT != 0 {
+			if stat.Attributes&unix.STATX_ATTR_MOUNT_ROOT != 0 {
+				// file is a mountpoint
+				return false, nil
+			} else {
+				// no need to check rootStat if unix.STATX_ATTR_MOUNT_ROOT supported
+				return true, nil
+			}
+		}
+	}
+
+	root := filepath.Dir(strings.TrimSuffix(file, "/"))
+	if rootStat, err = statx(root); err != nil {
+		return true, err
+	}
+
+	return (stat.Dev_major == rootStat.Dev_major && stat.Dev_minor == rootStat.Dev_minor), nil
+}
+
+// IsLikelyNotMountPoint determines if a directory is not a mountpoint.
+// It is fast but not necessarily ALWAYS correct. If the path is in fact
+// a bind mount from one part of a mount to another it will not be detected.
+// It also can not distinguish between mountpoints and symbolic links.
+// mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
+// will return true. When in fact /tmp/b is a mount point. If this situation
+// is of interest to you, don't use this function...
+func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	notMountPoint, err := mounter.isLikelyNotMountPointStatx(file)
+	if errors.Is(err, errStatxNotSupport) {
+		// fall back to isLikelyNotMountPointStat
+		return mounter.isLikelyNotMountPointStat(file)
+	}
+
+	return notMountPoint, err
 }
 
 // CanSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
@@ -633,7 +734,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 
 // ListProcMounts is shared with NsEnterMounter
 func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
-	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
+	content, err := readMountInfo(mountFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -766,7 +867,7 @@ func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
 	resolvedFile, err := filepath.EvalSymlinks(file)
 	if err != nil {
-		if errors.Is(isMntErr, fs.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return false, fs.ErrNotExist
 		}
 		return false, err
@@ -810,7 +911,6 @@ func tryUnmount(target string, withSafeNotMountedBehavior bool, unmountTimeout t
 func forceUmount(target string, withSafeNotMountedBehavior bool) error {
 	command := exec.Command("umount", "-f", target)
 	output, err := command.CombinedOutput()
-
 	if err != nil {
 		return checkUmountError(target, command, output, err, withSafeNotMountedBehavior)
 	}

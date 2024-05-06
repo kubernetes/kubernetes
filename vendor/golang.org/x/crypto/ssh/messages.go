@@ -68,7 +68,7 @@ type kexInitMsg struct {
 
 // See RFC 4253, section 8.
 
-// Diffie-Helman
+// Diffie-Hellman
 const msgKexDHInit = 30
 
 type kexDHInitMsg struct {
@@ -347,6 +347,20 @@ type userAuthGSSAPIError struct {
 	MinorStatus uint32
 	Message     string
 	LanguageTag string
+}
+
+// Transport layer OpenSSH extension. See [PROTOCOL], section 1.9
+const msgPing = 192
+
+type pingMsg struct {
+	Data string `sshtype:"192"`
+}
+
+// Transport layer OpenSSH extension. See [PROTOCOL], section 1.9
+const msgPong = 193
+
+type pongMsg struct {
+	Data string `sshtype:"193"`
 }
 
 // typeTags returns the possible type bytes for the given reflect.Type, which

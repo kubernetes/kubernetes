@@ -73,26 +73,32 @@ type Cloud struct {
 	ErrShutdownByProviderID error
 	MetadataErr             error
 
-	Calls         []string
-	Addresses     []v1.NodeAddress
-	addressesMux  sync.Mutex
-	ExtID         map[types.NodeName]string
-	ExtIDErr      map[types.NodeName]error
-	InstanceTypes map[types.NodeName]string
-	Machines      []types.NodeName
-	NodeResources *v1.NodeResources
-	ClusterList   []string
-	MasterName    string
-	ExternalIP    net.IP
-	Balancers     map[string]Balancer
-	UpdateCalls   []UpdateBalancerCall
-	RouteMap      map[string]*Route
-	Lock          sync.Mutex
-	Provider      string
-	ProviderID    map[types.NodeName]string
-	addCallLock   sync.Mutex
+	Calls          []string
+	Addresses      []v1.NodeAddress
+	addressesMux   sync.Mutex
+	ExtID          map[types.NodeName]string
+	ExtIDErr       map[types.NodeName]error
+	InstanceTypes  map[types.NodeName]string
+	Machines       []types.NodeName
+	NodeResources  v1.ResourceList
+	ClusterList    []string
+	MasterName     string
+	ExternalIP     net.IP
+	Balancers      map[string]Balancer
+	updateCallLock sync.Mutex
+	UpdateCalls    []UpdateBalancerCall
+	ensureCallLock sync.Mutex
+	EnsureCalls    []UpdateBalancerCall
+	EnsureCallCb   func(UpdateBalancerCall)
+	UpdateCallCb   func(UpdateBalancerCall)
+	RouteMap       map[string]*Route
+	Lock           sync.Mutex
+	Provider       string
+	ProviderID     map[types.NodeName]string
+	addCallLock    sync.Mutex
 	cloudprovider.Zone
-	VolumeLabelMap map[string]map[string]string
+	VolumeLabelMap   map[string]map[string]string
+	AdditionalLabels map[string]string
 
 	OverrideInstanceMetadata func(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error)
 
@@ -201,6 +207,7 @@ func (f *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, ser
 // It adds an entry "create" into the internal method call record.
 func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	f.addCall("create")
+	f.markEnsureCall(service, nodes)
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]Balancer)
 	}
@@ -222,13 +229,31 @@ func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 	return status, f.Err
 }
 
+func (f *Cloud) markUpdateCall(service *v1.Service, nodes []*v1.Node) {
+	f.updateCallLock.Lock()
+	defer f.updateCallLock.Unlock()
+	update := UpdateBalancerCall{service, nodes}
+	f.UpdateCalls = append(f.UpdateCalls, update)
+	if f.UpdateCallCb != nil {
+		f.UpdateCallCb(update)
+	}
+}
+
+func (f *Cloud) markEnsureCall(service *v1.Service, nodes []*v1.Node) {
+	f.ensureCallLock.Lock()
+	defer f.ensureCallLock.Unlock()
+	update := UpdateBalancerCall{service, nodes}
+	f.EnsureCalls = append(f.EnsureCalls, update)
+	if f.EnsureCallCb != nil {
+		f.EnsureCallCb(update)
+	}
+}
+
 // UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
 func (f *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	f.addCall("update")
-	f.Lock.Lock()
-	defer f.Lock.Unlock()
-	f.UpdateCalls = append(f.UpdateCalls, UpdateBalancerCall{service, nodes})
+	f.markUpdateCall(service, nodes)
 	return f.Err
 }
 
@@ -312,6 +337,11 @@ func (f *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 // InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
 func (f *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-shutdown-by-provider-id")
+
+	if providerID == "" {
+		return false, fmt.Errorf("cannot shutdown instance with empty providerID")
+	}
+
 	return f.NodeShutdown, f.ErrShutdownByProviderID
 }
 
@@ -344,11 +374,12 @@ func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprov
 	}
 
 	return &cloudprovider.InstanceMetadata{
-		ProviderID:    providerID,
-		InstanceType:  f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
-		NodeAddresses: f.Addresses,
-		Zone:          f.Zone.FailureDomain,
-		Region:        f.Zone.Region,
+		ProviderID:       providerID,
+		InstanceType:     f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
+		NodeAddresses:    f.Addresses,
+		Zone:             f.Zone.FailureDomain,
+		Region:           f.Zone.Region,
+		AdditionalLabels: f.AdditionalLabels,
 	}, f.MetadataErr
 }
 

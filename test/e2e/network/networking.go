@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -82,15 +84,15 @@ func checkConnectivityToHost(ctx context.Context, f *framework.Framework, nodeNa
 var _ = common.SIGDescribe("Networking", func() {
 	var svcname = "nettest"
 	f := framework.NewDefaultFramework(svcname)
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func(ctx context.Context) {
+	f.It("should provide Internet connection for containers", feature.NetworkingIPv4, func(ctx context.Context) {
 		ginkgo.By("Running container which tries to connect to 8.8.8.8")
 		framework.ExpectNoError(
 			checkConnectivityToHost(ctx, f, "", "connectivity-test", "8.8.8.8", 53, 30))
 	})
 
-	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]", func(ctx context.Context) {
+	f.It("should provide Internet connection for containers", feature.NetworkingIPv6, "[Experimental][LinuxOnly]", func(ctx context.Context) {
 		// IPv6 is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
@@ -98,7 +100,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			checkConnectivityToHost(ctx, f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
 	})
 
-	ginkgo.It("should provider Internet connection for containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
+	f.It("should provider Internet connection for containers using DNS", feature.NetworkingDNS, func(ctx context.Context) {
 		ginkgo.By("Running container which tries to connect to google.com")
 		framework.ExpectNoError(
 			checkConnectivityToHost(ctx, f, "", "connectivity-test", "google.com", 80, 30))
@@ -176,7 +178,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
+		f.It("should function for pod-Service: sctp", feature.SCTPConnectivity, func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer(ctx, "sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -218,7 +220,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
+		f.It("should function for node-Service: sctp", feature.SCTPConnectivity, func(ctx context.Context) {
 			ginkgo.Skip("Skipping SCTP node to service test until DialFromNode supports SCTP #96482")
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, e2enetwork.ClusterSCTPPort))
@@ -262,7 +264,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
+		f.It("should function for endpoint-Service: sctp", feature.SCTPConnectivity, func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromEndpointContainer(ctx, "sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -326,6 +328,37 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		ginkgo.It("should update endpoints: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f)
+
+			// start of intermittent code snippet to understand the reason for flaky behaviour
+			// TODO @aroradaman @aojea remove this once issue #123760 is resolved
+			// streaming logs for netserver-0 which will be deleted during the test
+			// (ref: https://github.com/kubernetes/kubernetes/issues/123760)
+			pod0name := config.EndpointPods[0].Name
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				readCloser, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pod0name, &v1.PodLogOptions{
+					Follow: true,
+				}).Stream(ctx)
+
+				// silently ignoring error, we don't want to disturb the original test
+				if err != nil {
+					return
+				}
+				defer func() {
+					_ = readCloser.Close()
+				}()
+
+				scanner := bufio.NewScanner(readCloser)
+				var lines []string
+				for scanner.Scan() {
+					lines = append(lines, "\t\t"+scanner.Text())
+				}
+				framework.Logf("================ start of pod log for %s ================", pod0name)
+				framework.Logf("\n%s", strings.Join(lines, "\n"))
+				framework.Logf("================ end of pod log for %s ================", pod0name)
+			}()
+			// end of intermittent code snippet
+
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer(ctx, "http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
@@ -359,7 +392,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
-		ginkgo.It("should update nodePort: http [Slow]", func(ctx context.Context) {
+		f.It("should update nodePort: http", f.WithSlow(), func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (ctx, nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeHTTPPort))
 			err := config.DialFromNode(ctx, "http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -390,7 +423,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
-		ginkgo.It("should update nodePort: udp [Slow]", func(ctx context.Context) {
+		f.It("should update nodePort: udp", f.WithSlow(), func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeUDPPort))
 			err := config.DialFromNode(ctx, "udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -547,7 +580,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	})
 
-	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func(ctx context.Context) {
+	f.It("should recreate its iptables rules if they are deleted", f.WithDisruptive(), func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
@@ -634,7 +667,7 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	// This is [Serial] because it can't run at the same time as the
 	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
-	ginkgo.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly] [Serial]", func(ctx context.Context) {
+	f.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly]", f.WithSerial(), func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)

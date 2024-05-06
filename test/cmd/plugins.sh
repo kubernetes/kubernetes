@@ -57,6 +57,14 @@ run_plugins_tests() {
   kube::test::if_has_string "${output_message}" 'Client Version'
   kube::test::if_has_not_string "${output_message}" 'overshadows an existing plugin'
 
+  # attempt to run a plugin as a subcommand of kubectl create in the user's PATH
+  output_message=$(PATH=${TEMP_PATH}:"test/fixtures/pkg/kubectl/plugins/create" kubectl create foo)
+  kube::test::if_has_string "${output_message}" 'plugin foo as a subcommand of kubectl create command'
+
+  # ensure that a kubectl create cronjob builtin command supersedes a plugin that overshadows it
+  output_message=$(PATH=${TEMP_PATH}:"test/fixtures/pkg/kubectl/plugins/create" kubectl create cronjob --help)
+  kube::test::if_has_not_string "${output_message}" 'plugin cronjob as a subcommand of kubectl create command'
+
   rm -fr "${TEMP_PATH}"
 
   set +o nounset

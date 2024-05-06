@@ -39,7 +39,7 @@ import (
 
 var _ = SIGDescribe("Container Runtime", func() {
 	f := framework.NewDefaultFramework("container-runtime")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("blackbox test", func() {
 		ginkgo.Context("when starting a container that exits", func() {
@@ -49,11 +49,11 @@ var _ = SIGDescribe("Container Runtime", func() {
 				Testname: Container Runtime, Restart Policy, Pod Phases
 				Description: If the restart policy is set to 'Always', Pod MUST be restarted when terminated, If restart policy is 'OnFailure', Pod MUST be started only if it is terminated with non-zero exit code. If the restart policy is 'Never', Pod MUST never be restarted. All these three test cases MUST verify the restart counts accordingly.
 			*/
-			framework.ConformanceIt("should run with the expected status [NodeConformance]", func(ctx context.Context) {
+			framework.ConformanceIt("should run with the expected status", f.WithNodeConformance(), func(ctx context.Context) {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
 				testContainer := v1.Container{
-					Image: framework.BusyBoxImage,
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							MountPath: restartCountVolumePath,
@@ -118,16 +118,16 @@ while true; do sleep 1; done
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
 					isReady, err := terminateContainer.IsReady(ctx)
-					framework.ExpectEqual(isReady, testCase.Ready)
+					gomega.Expect(isReady).To(gomega.Equal(testCase.Ready))
 					framework.ExpectNoError(err)
 
 					status, err := terminateContainer.GetStatus(ctx)
 					framework.ExpectNoError(err)
 
 					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
-					framework.ExpectEqual(GetContainerState(status.State), testCase.State)
+					gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(testCase.State))
 
-					ginkgo.By(fmt.Sprintf("Container '%s': should be possible to delete [NodeConformance]", testContainer.Name))
+					ginkgo.By(fmt.Sprintf("Container '%s': should be possible to delete", testContainer.Name))
 					gomega.Expect(terminateContainer.Delete(ctx)).To(gomega.Succeed())
 					gomega.Eventually(ctx, terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.BeFalse())
 				}
@@ -161,7 +161,7 @@ while true; do sleep 1; done
 				framework.ExpectNoError(err)
 
 				ginkgo.By("the container should be terminated")
-				framework.ExpectEqual(GetContainerState(status.State), ContainerStateTerminated)
+				gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(ContainerStateTerminated))
 
 				ginkgo.By("the termination message should be set")
 				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
@@ -171,9 +171,9 @@ while true; do sleep 1; done
 				gomega.Expect(c.Delete(ctx)).To(gomega.Succeed())
 			}
 
-			ginkgo.It("should report termination message if TerminationMessagePath is set [NodeConformance]", func(ctx context.Context) {
+			f.It("should report termination message if TerminationMessagePath is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                  framework.BusyBoxImage,
+					Image:                  imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
 					TerminationMessagePath: "/dev/termination-log",
@@ -192,9 +192,9 @@ while true; do sleep 1; done
 				Testname: Container Runtime, TerminationMessagePath, non-root user and non-default path
 				Description: Create a pod with a container to run it as a non-root user with a custom TerminationMessagePath set. Pod redirects the output to the provided path successfully. When the container is terminated, the termination message MUST match the expected output logged in the provided custom path.
 			*/
-			framework.ConformanceIt("should report termination message if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func(ctx context.Context) {
+			framework.ConformanceIt("should report termination message if TerminationMessagePath is set as non-root user and at a non-default path", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                  framework.BusyBoxImage,
+					Image:                  imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 					TerminationMessagePath: "/dev/termination-custom-log",
@@ -213,9 +213,9 @@ while true; do sleep 1; done
 				Testname: Container Runtime, TerminationMessage, from container's log output of failing container
 				Description: Create a pod with an container. Container's output is recorded in log and container exits with an error. When container is terminated, termination message MUST match the expected output recorded from container's log.
 			*/
-			framework.ConformanceIt("should report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func(ctx context.Context) {
+			framework.ConformanceIt("should report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n DONE; /bin/false"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -229,9 +229,9 @@ while true; do sleep 1; done
 				Testname: Container Runtime, TerminationMessage, from log output of succeeding container
 				Description: Create a pod with an container. Container's output is recorded in log and container exits successfully without an error. When container is terminated, terminationMessage MUST have no content as container succeed.
 			*/
-			framework.ConformanceIt("should report termination message as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func(ctx context.Context) {
+			framework.ConformanceIt("should report termination message as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n DONE; /bin/true"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -245,9 +245,9 @@ while true; do sleep 1; done
 				Testname: Container Runtime, TerminationMessage, from file of succeeding container
 				Description: Create a pod with an container. Container's output is recorded in a file and the container exits successfully without an error. When container is terminated, terminationMessage MUST match with the content from file.
 			*/
-			framework.ConformanceIt("should report termination message from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance]", func(ctx context.Context) {
+			framework.ConformanceIt("should report termination message from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -368,23 +368,23 @@ while true; do sleep 1; done
 				}
 			}
 
-			ginkgo.It("should not be able to pull image from invalid registry [NodeConformance]", func(ctx context.Context) {
+			f.It("should not be able to pull image from invalid registry", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
 				imagePullTest(ctx, image, false, v1.PodPending, true, false)
 			})
 
-			ginkgo.It("should be able to pull image [NodeConformance]", func(ctx context.Context) {
+			f.It("should be able to pull image", f.WithNodeConformance(), func(ctx context.Context) {
 				// NOTE(claudiub): The agnhost image is supposed to work on both Linux and Windows.
 				image := imageutils.GetE2EImage(imageutils.Agnhost)
 				imagePullTest(ctx, image, false, v1.PodRunning, false, false)
 			})
 
-			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func(ctx context.Context) {
+			f.It("should not be able to pull from private registry without secret", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
 				imagePullTest(ctx, image, false, v1.PodPending, true, false)
 			})
 
-			ginkgo.It("should be able to pull from private registry with secret [NodeConformance]", func(ctx context.Context) {
+			f.It("should be able to pull from private registry with secret", f.WithNodeConformance(), func(ctx context.Context) {
 				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
 				isWindows := false
 				if framework.NodeOSDistroIs("windows") {

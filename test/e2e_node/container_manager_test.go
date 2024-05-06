@@ -36,6 +36,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -77,10 +78,10 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	return nil
 }
 
-var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
+var _ = SIGDescribe("Container Manager Misc", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	f.Describe("Validate OOM score adjustments", nodefeature.OOMScoreAdj, func() {
 		ginkgo.Context("once the node is setup", func() {
 			ginkgo.It("container runtime's oom-score-adj should be -999", func(ctx context.Context) {
 				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
@@ -94,7 +95,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 			ginkgo.It("Kubelet's oom-score-adj should be -999", func(ctx context.Context) {
 				kubeletPids, err := getPidsForProcess(kubeletProcessName, "")
 				framework.ExpectNoError(err, "failed to get list of kubelet pids")
-				framework.ExpectEqual(len(kubeletPids), 1, "expected only one kubelet process; found %d", len(kubeletPids))
+				gomega.Expect(kubeletPids).To(gomega.HaveLen(1), "expected only one kubelet process; found %d", len(kubeletPids))
 				gomega.Eventually(ctx, func() error {
 					return validateOOMScoreAdjSetting(kubeletPids[0], -999)
 				}, 5*time.Minute, 30*time.Second).Should(gomega.BeNil())
@@ -117,7 +118,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{
 								{
-									Image: framework.ServeHostnameImage,
+									Image: imageutils.GetE2EImage(imageutils.Agnhost),
 									Name:  podName,
 								},
 							},

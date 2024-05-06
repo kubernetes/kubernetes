@@ -47,12 +47,14 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -60,13 +62,16 @@ const (
 
 	apiServiceRetryPeriod  = 1 * time.Second
 	apiServiceRetryTimeout = 2 * time.Minute
+
+	defaultApiServiceGroupName = samplev1alpha1.GroupName
+	defaultApiServiceVersion   = "v1alpha1"
 )
 
 var _ = SIGDescribe("Aggregator", func() {
 	var aggrclient *aggregatorclient.Clientset
 
 	f := framework.NewDefaultFramework("aggregator")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
@@ -80,24 +85,25 @@ var _ = SIGDescribe("Aggregator", func() {
 		if err != nil {
 			framework.Failf("could not create aggregator client: %v", err)
 		}
-		ginkgo.DeferCleanup(cleanupSampleAPIServer, f.ClientSet, aggrclient, generateSampleAPIServerObjectNames(f.Namespace.Name))
+		apiServiceName := defaultApiServiceVersion + "." + defaultApiServiceGroupName
+		ginkgo.DeferCleanup(cleanupSampleAPIServer, f.ClientSet, aggrclient, generateSampleAPIServerObjectNames(f.Namespace.Name), apiServiceName)
 	})
 
 	/*
-		    Release: v1.17, v1.21, v1.27
-		    Testname: aggregator-supports-the-sample-apiserver
-		    Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
-			will work on the current Aggregator/API-Server.
+		Release: v1.17, v1.21, v1.27
+		Testname: aggregator-supports-the-sample-apiserver
+		Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
+		will work on the current Aggregator/API-Server.
 	*/
 	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func(ctx context.Context) {
 		// Testing a 1.17 version of the sample-apiserver
-		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
+		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), defaultApiServiceGroupName, defaultApiServiceVersion)
 	})
 })
 
-func cleanupSampleAPIServer(ctx context.Context, client clientset.Interface, aggrclient *aggregatorclient.Clientset, n sampleAPIServerObjectNames) {
+func cleanupSampleAPIServer(ctx context.Context, client clientset.Interface, aggrclient *aggregatorclient.Clientset, n sampleAPIServerObjectNames, apiServiceName string) {
 	// delete the APIService first to avoid causing discovery errors
-	_ = aggrclient.ApiregistrationV1().APIServices().Delete(ctx, "v1alpha1.wardle.example.com", metav1.DeleteOptions{})
+	_ = aggrclient.ApiregistrationV1().APIServices().Delete(ctx, apiServiceName, metav1.DeleteOptions{})
 
 	_ = client.AppsV1().Deployments(n.namespace).Delete(ctx, "sample-apiserver-deployment", metav1.DeleteOptions{})
 	_ = client.CoreV1().Secrets(n.namespace).Delete(ctx, "sample-apiserver-secret", metav1.DeleteOptions{})
@@ -124,11 +130,13 @@ func generateSampleAPIServerObjectNames(namespace string) sampleAPIServerObjectN
 		clusterRoleBinding: "wardler:" + namespace + "sample-apiserver-reader-" + namespace,
 	}
 }
-func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string, n sampleAPIServerObjectNames) {
+
+func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string, n sampleAPIServerObjectNames, apiServiceGroupName, apiServiceVersion string) {
 	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
 	certCtx := setupServerCert(n.namespace, "sample-api")
+	apiServiceName := apiServiceVersion + "." + apiServiceGroupName
 
 	// kubectl create -f namespace.yaml
 	// NOTE: aggregated apis should generally be set up in their own namespace. As the test framework is setting up a new namespace, we are just using that.
@@ -156,6 +164,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("namespaces").RuleOrDie(),
 				rbacv1helpers.NewRule("get", "list", "watch").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups("flowcontrol.apiserver.k8s.io").Resources("prioritylevelconfigurations", "flowschemas").RuleOrDie(),
 			},
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating cluster role %s", n.clusterRole)
@@ -245,7 +254,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
-						Port:   intstr.FromInt(443),
+						Port:   intstr.FromInt32(443),
 						Path:   "/readyz",
 					},
 				},
@@ -294,7 +303,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 				{
 					Protocol:   v1.ProtocolTCP,
 					Port:       aggregatorServicePort,
-					TargetPort: intstr.FromInt(443),
+					TargetPort: intstr.FromInt32(443),
 				},
 			},
 		},
@@ -341,21 +350,21 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 
 	// kubectl create -f apiservice.yaml
 	_, err = aggrclient.ApiregistrationV1().APIServices().Create(ctx, &apiregistrationv1.APIService{
-		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
+		ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
 		Spec: apiregistrationv1.APIServiceSpec{
 			Service: &apiregistrationv1.ServiceReference{
 				Namespace: n.namespace,
 				Name:      "sample-api",
 				Port:      pointer.Int32(aggregatorServicePort),
 			},
-			Group:                "wardle.example.com",
-			Version:              "v1alpha1",
+			Group:                apiServiceGroupName,
+			Version:              apiServiceVersion,
 			CABundle:             certCtx.signingCert,
 			GroupPriorityMinimum: 2000,
 			VersionPriority:      200,
 		},
 	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "creating apiservice %s", "v1alpha1.wardle.example.com")
+	framework.ExpectNoError(err, "creating apiservice %s", apiServiceName)
 
 	var (
 		currentAPIService *apiregistrationv1.APIService
@@ -364,10 +373,10 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 
 	err = pollTimed(ctx, 100*time.Millisecond, 60*time.Second, func(ctx context.Context) (bool, error) {
 
-		currentAPIService, _ = aggrclient.ApiregistrationV1().APIServices().Get(ctx, "v1alpha1.wardle.example.com", metav1.GetOptions{})
+		currentAPIService, _ = aggrclient.ApiregistrationV1().APIServices().Get(ctx, apiServiceName, metav1.GetOptions{})
 		currentPods, _ = client.CoreV1().Pods(n.namespace).List(ctx, metav1.ListOptions{})
 
-		request := restClient.Get().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders")
+		request := restClient.Get().AbsPath("/apis/" + apiServiceGroupName + "/" + apiServiceVersion + "/namespaces/default/flunders")
 		request.SetHeader("Accept", "application/json")
 		_, err := request.DoRaw(ctx)
 		if err != nil {
@@ -404,21 +413,22 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 	framework.ExpectNoError(err, "gave up waiting for apiservice wardle to come up successfully")
 }
 
-// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.29 and compiled against 1.29
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string) {
+func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image, apiServiceGroupName, apiServiceVersion string) {
 	n := generateSampleAPIServerObjectNames(f.Namespace.Name)
-	SetUpSampleAPIServer(ctx, f, aggrclient, image, n)
+	SetUpSampleAPIServer(ctx, f, aggrclient, image, n, apiServiceGroupName, apiServiceVersion)
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
 
 	flunderName := generateFlunderName("rest-flunder")
+	apiServiceName := apiServiceVersion + "." + apiServiceGroupName
 
 	// kubectl create -f flunders-1.yaml -v 9
 	// curl -k -v -XPOST https://localhost/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
 	// Request Body: {"apiVersion":"wardle.example.com/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
-	flunder := `{"apiVersion":"wardle.example.com/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"` + flunderName + `","namespace":"default"}}`
-	result := restClient.Post().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders").Body([]byte(flunder)).SetHeader("Accept", "application/json").Do(ctx)
+	flunder := `{"apiVersion":"` + apiServiceGroupName + `/` + apiServiceVersion + `","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"` + flunderName + `","namespace":"default"}}`
+	result := restClient.Post().AbsPath("/apis/"+apiServiceGroupName+"/"+apiServiceVersion+"/namespaces/default/flunders").Body([]byte(flunder)).SetHeader("Accept", "application/json").Do(ctx)
 	framework.ExpectNoError(result.Error(), "creating a new flunders resource")
 	var statusCode int
 	result.StatusCode(&statusCode)
@@ -429,35 +439,36 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	if err := result.Into(u); err != nil {
 		framework.ExpectNoError(err, "reading created response")
 	}
-	framework.ExpectEqual(u.GetAPIVersion(), "wardle.example.com/v1alpha1")
-	framework.ExpectEqual(u.GetKind(), "Flunder")
-	framework.ExpectEqual(u.GetName(), flunderName)
+
+	gomega.Expect(u.GetAPIVersion()).To(gomega.Equal(apiServiceGroupName + "/" + apiServiceVersion))
+	gomega.Expect(u.GetKind()).To(gomega.Equal("Flunder"))
+	gomega.Expect(u.GetName()).To(gomega.Equal(flunderName))
 
 	pods, err := client.CoreV1().Pods(n.namespace).List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting pods for flunders service")
 
 	// kubectl get flunders -v 9
 	// curl -k -v -XGET https://localhost/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
-	contents, err := restClient.Get().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw(ctx)
+	contents, err := restClient.Get().AbsPath("/apis/"+apiServiceGroupName+"/"+apiServiceVersion+"/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw(ctx)
 	framework.ExpectNoError(err, "attempting to get a newly created flunders resource")
 	var flundersList samplev1alpha1.FlunderList
 	err = json.Unmarshal(contents, &flundersList)
-	validateErrorWithDebugInfo(ctx, f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.example.com/v1alpha1")
+	validateErrorWithDebugInfo(ctx, f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/"+apiServiceGroupName+"/"+apiServiceVersion)
 	if len(flundersList.Items) != 1 {
 		framework.Failf("failed to get back the correct flunders list %v", flundersList)
 	}
 
 	// kubectl delete flunder test-flunder -v 9
 	// curl -k -v -XDELETE  https://35.193.112.40/apis/wardle.example.com/v1alpha1/namespaces/default/flunders/test-flunder
-	_, err = restClient.Delete().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders/" + flunderName).DoRaw(ctx)
+	_, err = restClient.Delete().AbsPath("/apis/" + apiServiceGroupName + "/" + apiServiceVersion + "/namespaces/default/flunders/" + flunderName).DoRaw(ctx)
 	validateErrorWithDebugInfo(ctx, f, err, pods, "attempting to delete a newly created flunders(%v) resource", flundersList.Items)
 
 	// kubectl get flunders -v 9
 	// curl -k -v -XGET https://localhost/apis/wardle.example.com/v1alpha1/namespaces/default/flunders
-	contents, err = restClient.Get().AbsPath("/apis/wardle.example.com/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw(ctx)
+	contents, err = restClient.Get().AbsPath("/apis/"+apiServiceGroupName+"/"+apiServiceVersion+"/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw(ctx)
 	framework.ExpectNoError(err, "confirming delete of a newly created flunders resource")
 	err = json.Unmarshal(contents, &flundersList)
-	validateErrorWithDebugInfo(ctx, f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.example.com/v1alpha1")
+	validateErrorWithDebugInfo(ctx, f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/"+apiServiceGroupName+"/"+apiServiceVersion)
 	if len(flundersList.Items) != 0 {
 		framework.Failf("failed to get back the correct deleted flunders list %v", flundersList)
 	}
@@ -468,7 +479,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	resources, discoveryErr := client.Discovery().ServerPreferredNamespacedResources()
 	groupVersionResources, err := discovery.GroupVersionResources(resources)
 	framework.ExpectNoError(err, "getting group version resources for dynamic client")
-	gvr := schema.GroupVersionResource{Group: "wardle.example.com", Version: "v1alpha1", Resource: "flunders"}
+	gvr := schema.GroupVersionResource{Group: apiServiceGroupName, Version: apiServiceVersion, Resource: "flunders"}
 	_, ok := groupVersionResources[gvr]
 	if !ok {
 		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
@@ -480,7 +491,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	testFlunder := samplev1alpha1.Flunder{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Flunder",
-			APIVersion: "wardle.example.com/v1alpha1",
+			APIVersion: apiServiceGroupName + "/" + apiServiceVersion,
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: flunderName},
 		Spec:       samplev1alpha1.FlunderSpec{},
@@ -500,27 +511,27 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
-	ginkgo.By("Read Status for v1alpha1.wardle.example.com")
+	ginkgo.By("Read Status for " + apiServiceName)
 	statusContent, err := restClient.Get().
-		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName+"/status").
 		SetHeader("Accept", "application/json").DoRaw(ctx)
-	framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+	framework.ExpectNoError(err, "No response for .../apiservices/"+apiServiceName+"/status. Error: %v", err)
 
 	var jr *apiregistrationv1.APIService
 	err = json.Unmarshal([]byte(statusContent), &jr)
 	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
-	framework.ExpectEqual(jr.Status.Conditions[0].Message, "all checks passed", "The Message returned was %v", jr.Status.Conditions[0].Message)
+	gomega.Expect(jr.Status.Conditions[0].Message).To(gomega.Equal("all checks passed"), "The Message returned was %v", jr.Status.Conditions[0].Message)
 
-	ginkgo.By("kubectl patch apiservice v1alpha1.wardle.example.com -p '{\"spec\":{\"versionPriority\": 400}}'")
+	ginkgo.By("kubectl patch apiservice " + apiServiceName + " -p '{\"spec\":{\"versionPriority\": 400}}'")
 	patchContent, err := restClient.Patch(types.MergePatchType).
-		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com").
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName).
 		SetHeader("Accept", "application/json").
 		Body([]byte(`{"spec":{"versionPriority": 400}}`)).DoRaw(ctx)
 
-	framework.ExpectNoError(err, "Patch failed for .../apiservices/v1alpha1.wardle.example.com. Error: %v", err)
+	framework.ExpectNoError(err, "Patch failed for .../apiservices/"+apiServiceName+". Error: %v", err)
 	err = json.Unmarshal([]byte(patchContent), &jr)
 	framework.ExpectNoError(err, "Failed to process patchContent: %v | err: %v ", string(patchContent), err)
-	framework.ExpectEqual(jr.Spec.VersionPriority, int32(400), "The VersionPriority returned was %d", jr.Spec.VersionPriority)
+	gomega.Expect(jr.Spec.VersionPriority).To(gomega.Equal(int32(400)), "The VersionPriority returned was %d", jr.Spec.VersionPriority)
 
 	ginkgo.By("List APIServices")
 	listApiservices, err := restClient.Get().
@@ -535,23 +546,21 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 
 	locatedWardle := false
 	for _, item := range list.Items {
-		if item.Name == "v1alpha1.wardle.example.com" {
-			framework.Logf("Found v1alpha1.wardle.example.com in APIServiceList")
+		if item.Name == apiServiceName {
+			framework.Logf("Found " + apiServiceName + " in APIServiceList")
 			locatedWardle = true
 			break
 		}
 	}
 	if !locatedWardle {
-		framework.Failf("Unable to find v1alpha1.wardle.example.com in APIServiceList")
+		framework.Failf("Unable to find " + apiServiceName + " in APIServiceList")
 	}
 
 	// As the APIService doesn't have any labels currently set we need to
 	// set one so that we can select it later when we call deleteCollection
 	ginkgo.By("Adding a label to the APIService")
-	apiServiceName := "v1alpha1.wardle.example.com"
 	apiServiceClient := aggrclient.ApiregistrationV1().APIServices()
 	apiServiceLabel := map[string]string{"e2e-apiservice": "patched"}
-	apiServiceLabelSelector := labels.SelectorFromSet(apiServiceLabel).String()
 	apiServicePatch, err := json.Marshal(map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"labels": apiServiceLabel,
@@ -571,9 +580,9 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var statusToUpdate *apiregistrationv1.APIService
 		statusContent, err = restClient.Get().
-			AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+			AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName+"/status").
 			SetHeader("Accept", "application/json").DoRaw(ctx)
-		framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+		framework.ExpectNoError(err, "No response for .../apiservices/"+apiServiceName+"/status. Error: %v", err)
 
 		err = json.Unmarshal([]byte(statusContent), &statusToUpdate)
 		framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
@@ -591,11 +600,11 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.ExpectNoError(err, "Failed to update status. %v", err)
 	framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
 
-	ginkgo.By("Confirm that v1alpha1.wardle.example.com /status was updated")
+	ginkgo.By("Confirm that " + apiServiceName + " /status was updated")
 	statusContent, err = restClient.Get().
-		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName+"/status").
 		SetHeader("Accept", "application/json").DoRaw(ctx)
-	framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+	framework.ExpectNoError(err, "No response for .../apiservices/"+apiServiceName+"/status. Error: %v", err)
 
 	err = json.Unmarshal([]byte(statusContent), &wardle)
 	framework.ExpectNoError(err, "Failed to process statusContent: %v | err: %v ", string(statusContent), err)
@@ -610,7 +619,9 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 			framework.Logf("Observed APIService %v with Labels: %v & Condition: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
 		}
 	}
-	framework.ExpectEqual(foundUpdatedStatusCondition, true, "The updated status condition was not found. %#v", wardle.Status.Conditions)
+	if !foundUpdatedStatusCondition {
+		framework.Failf("The updated status condition was not found in:\n%s", format.Object(wardle.Status.Conditions, 1))
+	}
 	framework.Logf("Found updated status condition for %s", wardle.ObjectMeta.Name)
 
 	ginkgo.By(fmt.Sprintf("Replace APIService %s", apiServiceName))
@@ -626,11 +637,11 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 		return err
 	})
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(updatedApiService.Labels[apiServiceName], "updated", "should have the updated label but have %q", updatedApiService.Labels[apiServiceName])
+	gomega.Expect(updatedApiService.Labels).To(gomega.HaveKeyWithValue(apiServiceName, "updated"), "should have the updated label but have %q", updatedApiService.Labels[apiServiceName])
 	framework.Logf("Found updated apiService label for %q", apiServiceName)
 
 	// kubectl delete flunder test-flunder
-	ginkgo.By(fmt.Sprintf("Delete APIService %q", flunderName))
+	ginkgo.By(fmt.Sprintf("Delete flunders resource %q", flunderName))
 	err = dynamicClient.Delete(ctx, flunderName, metav1.DeleteOptions{})
 	validateErrorWithDebugInfo(ctx, f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
@@ -657,11 +668,11 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
-	ginkgo.By("Read v1alpha1.wardle.example.com /status before patching it")
+	ginkgo.By("Read " + apiServiceName + " /status before patching it")
 	statusContent, err = restClient.Get().
-		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName+"/status").
 		SetHeader("Accept", "application/json").DoRaw(ctx)
-	framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+	framework.ExpectNoError(err, "No response for .../apiservices/"+apiServiceName+"/status. Error: %v", err)
 
 	wardle.Reset()
 	err = json.Unmarshal([]byte(statusContent), &wardle)
@@ -682,17 +693,17 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.ExpectNoError(err, "Failed to marshal JSON. %v", err)
 
 	_, err = restClient.Patch(types.MergePatchType).
-		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName+"/status").
 		SetHeader("Accept", "application/json").
 		Body([]byte(payload)).
 		DoRaw(ctx)
-	framework.ExpectNoError(err, "Patch failed for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+	framework.ExpectNoError(err, "Patch failed for .../apiservices/"+apiServiceName+"/status. Error: %v", err)
 
-	ginkgo.By("Confirm that v1alpha1.wardle.example.com /status was patched")
+	ginkgo.By("Confirm that " + apiServiceName + " /status was patched")
 	statusContent, err = restClient.Get().
-		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/v1alpha1.wardle.example.com/status").
+		AbsPath("/apis/apiregistration.k8s.io/v1/apiservices/"+apiServiceName+"/status").
 		SetHeader("Accept", "application/json").DoRaw(ctx)
-	framework.ExpectNoError(err, "No response for .../apiservices/v1alpha1.wardle.example.com/status. Error: %v", err)
+	framework.ExpectNoError(err, "No response for .../apiservices/"+apiServiceName+"/status. Error: %v", err)
 
 	wardle.Reset()
 	err = json.Unmarshal([]byte(statusContent), &wardle)
@@ -708,9 +719,12 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 			framework.Logf("Observed APIService %v with Labels: %v & Conditions: %v", wardle.ObjectMeta.Name, wardle.Labels, cond)
 		}
 	}
-	framework.ExpectEqual(foundPatchedStatusCondition, true, "The patched status condition was not found. %#v", wardle.Status.Conditions)
+	if !foundPatchedStatusCondition {
+		framework.Failf("The patched status condition was not found in:\n%s", format.Object(wardle.Status.Conditions, 1))
+	}
 	framework.Logf("Found patched status condition for %s", wardle.ObjectMeta.Name)
 
+	apiServiceLabelSelector := labels.SelectorFromSet(updatedApiService.Labels).String()
 	ginkgo.By(fmt.Sprintf("APIService deleteCollection with labelSelector: %q", apiServiceLabelSelector))
 
 	err = aggrclient.ApiregistrationV1().APIServices().DeleteCollection(ctx,
@@ -723,7 +737,7 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	framework.ExpectNoError(err, "failed to count the required APIServices")
 	framework.Logf("APIService %s has been deleted.", apiServiceName)
 
-	cleanupSampleAPIServer(ctx, client, aggrclient, n)
+	cleanupSampleAPIServer(ctx, client, aggrclient, n, apiServiceName)
 }
 
 // pollTimed will call Poll but time how long Poll actually took.

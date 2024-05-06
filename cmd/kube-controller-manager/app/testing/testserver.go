@@ -28,12 +28,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
-
-	"k8s.io/klog/v2"
 )
+
+func init() {
+	// If instantiated more than once or together with other servers, the
+	// servers would try to modify the global logging state. This must get
+	// ignored during testing.
+	logsapi.ReapplyHandling = logsapi.ReapplyHandlingIgnoreUnchanged
+}
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
@@ -55,17 +62,17 @@ type TestServer struct {
 // enough time to remove temporary files.
 func StartTestServer(ctx context.Context, customFlags []string) (result TestServer, err error) {
 	logger := klog.FromContext(ctx)
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(ctx)
 	var errCh chan error
 	tearDown := func() {
-		close(stopCh)
+		cancel()
 
 		// If the kube-controller-manager was started, let's wait for
-		// it to shutdown clearly.
+		// it to shutdown cleanly.
 		if errCh != nil {
 			err, ok := <-errCh
 			if ok && err != nil {
-				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+				logger.Error(err, "Failed to shutdown test server cleanly")
 			}
 		}
 		if len(result.TmpDir) != 0 {
@@ -89,8 +96,8 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	if err != nil {
 		return TestServer{}, err
 	}
-	all, disabled := app.KnownControllers(), app.ControllersDisabledByDefault.List()
-	namedFlagSets := s.Flags(all, disabled)
+	all, disabled, aliases := app.KnownControllers(), app.ControllersDisabledByDefault(), app.ControllerAliases()
+	namedFlagSets := s.Flags(all, disabled, aliases)
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -106,27 +113,29 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		logger.Info("kube-controller-manager will listen securely", "port", s.SecureServing.BindPort)
 	}
 
-	config, err := s.Config(all, disabled)
+	config, err := s.Config(all, disabled, aliases)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
 	errCh = make(chan error)
-	go func(stopCh <-chan struct{}) {
+	go func(ctx context.Context) {
 		defer close(errCh)
 
-		if err := app.Run(config.Complete(), stopCh); err != nil {
+		if err := app.Run(ctx, config.Complete()); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}(ctx)
 
 	logger.Info("Waiting for /healthz to be ok...")
 	client, err := kubernetes.NewForConfig(config.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+	err = wait.PollWithContext(ctx, 100*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
 		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
 		case err := <-errCh:
 			return false, err
 		default:

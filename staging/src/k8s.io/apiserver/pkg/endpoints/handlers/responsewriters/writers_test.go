@@ -35,11 +35,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -53,8 +53,6 @@ func TestSerializeObjectParallel(t *testing.T) {
 	type test struct {
 		name string
 
-		compressionEnabled bool
-
 		mediaType  string
 		out        []byte
 		outErrs    []error
@@ -67,10 +65,9 @@ func TestSerializeObjectParallel(t *testing.T) {
 	}
 	newTest := func() test {
 		return test{
-			name:               "compress on gzip",
-			compressionEnabled: true,
-			out:                largePayload,
-			mediaType:          "application/json",
+			name:      "compress on gzip",
+			out:       largePayload,
+			mediaType: "application/json",
 			req: &http.Request{
 				Header: http.Header{
 					"Accept-Encoding": []string{"gzip"},
@@ -85,6 +82,7 @@ func TestSerializeObjectParallel(t *testing.T) {
 			},
 		}
 	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)
 	for i := 0; i < 100; i++ {
 		ctt := newTest()
 		t.Run(ctt.name, func(t *testing.T) {
@@ -94,7 +92,6 @@ func TestSerializeObjectParallel(t *testing.T) {
 				}
 			}()
 			t.Parallel()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, ctt.compressionEnabled)()
 
 			encoder := &fakeEncoder{
 				buf:  ctt.out,
@@ -114,7 +111,7 @@ func TestSerializeObjectParallel(t *testing.T) {
 				t.Fatalf("unexpected code: %v", result.StatusCode)
 			}
 			if !reflect.DeepEqual(result.Header, ctt.wantHeaders) {
-				t.Fatal(diff.ObjectReflectDiff(ctt.wantHeaders, result.Header))
+				t.Fatal(cmp.Diff(ctt.wantHeaders, result.Header))
 			}
 		})
 	}
@@ -348,7 +345,7 @@ func TestSerializeObject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, tt.compressionEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, tt.compressionEnabled)
 
 			encoder := &fakeEncoder{
 				buf:  tt.out,
@@ -364,7 +361,7 @@ func TestSerializeObject(t *testing.T) {
 				t.Fatalf("unexpected code: %v", result.StatusCode)
 			}
 			if !reflect.DeepEqual(result.Header, tt.wantHeaders) {
-				t.Fatal(diff.ObjectReflectDiff(tt.wantHeaders, result.Header))
+				t.Fatal(cmp.Diff(tt.wantHeaders, result.Header))
 			}
 			body, _ := ioutil.ReadAll(result.Body)
 			if !bytes.Equal(tt.wantBody, body) {
@@ -462,7 +459,7 @@ func benchmarkSerializeObject(b *testing.B, payload []byte) {
 		},
 		URL: &url.URL{Path: "/path"},
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)()
+	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)
 
 	encoder := &fakeEncoder{
 		buf: payload,

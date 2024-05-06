@@ -29,13 +29,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/klog/v2"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -50,9 +55,10 @@ func (r *TokenREST) Destroy() {
 }
 
 type TokenREST struct {
-	svcaccts             getter
-	pods                 getter
-	secrets              getter
+	svcaccts             rest.Getter
+	pods                 rest.Getter
+	secrets              rest.Getter
+	nodes                rest.Getter
 	issuer               token.TokenGenerator
 	auds                 authenticator.Audiences
 	audsSet              sets.String
@@ -127,6 +133,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 
 	var (
 		pod    *api.Pod
+		node   *api.Node
 		secret *api.Secret
 	)
 
@@ -136,7 +143,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		gvk := schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
 		switch {
 		case gvk.Group == "" && gvk.Kind == "Pod":
-			newCtx := newContext(ctx, "pods", ref.Name, gvk)
+			newCtx := newContext(ctx, "pods", ref.Name, namespace, gvk)
 			podObj, err := r.pods.Get(newCtx, ref.Name, &metav1.GetOptions{})
 			if err != nil {
 				return nil, err
@@ -146,8 +153,41 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token for serviceaccount %q to pod running with different serviceaccount name.", name))
 			}
 			uid = pod.UID
+			if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenPodNodeInfo) {
+				if nodeName := pod.Spec.NodeName; nodeName != "" {
+					newCtx := newContext(ctx, "nodes", nodeName, "", api.SchemeGroupVersion.WithKind("Node"))
+					// set ResourceVersion=0 to allow this to be read/served from the apiservers watch cache
+					nodeObj, err := r.nodes.Get(newCtx, nodeName, &metav1.GetOptions{ResourceVersion: "0"})
+					if err != nil {
+						nodeObj, err = r.nodes.Get(newCtx, nodeName, &metav1.GetOptions{}) // fallback to a live lookup on any error
+					}
+					switch {
+					case errors.IsNotFound(err):
+						// if the referenced Node object does not exist, we still embed just the pod name into the
+						// claims so that clients still have some indication of what node a pod is assigned to when
+						// inspecting a token (even if the UID is not present).
+						klog.V(4).ErrorS(err, "failed fetching node for pod", "pod", klog.KObj(pod), "podUID", pod.UID, "nodeName", nodeName)
+						node = &api.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
+					case err != nil:
+						return nil, errors.NewInternalError(err)
+					default:
+						node = nodeObj.(*api.Node)
+					}
+				}
+			}
+		case gvk.Group == "" && gvk.Kind == "Node":
+			if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) {
+				return nil, errors.NewBadRequest(fmt.Sprintf("cannot bind token to a Node object as the %q feature-gate is disabled", features.ServiceAccountTokenNodeBinding))
+			}
+			newCtx := newContext(ctx, "nodes", ref.Name, "", gvk)
+			nodeObj, err := r.nodes.Get(newCtx, ref.Name, &metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			node = nodeObj.(*api.Node)
+			uid = node.UID
 		case gvk.Group == "" && gvk.Kind == "Secret":
-			newCtx := newContext(ctx, "secrets", ref.Name, gvk)
+			newCtx := newContext(ctx, "secrets", ref.Name, namespace, gvk)
 			secretObj, err := r.secrets.Get(newCtx, ref.Name, &metav1.GetOptions{})
 			if err != nil {
 				return nil, err
@@ -179,7 +219,10 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		exp = token.ExpirationExtensionSeconds
 	}
 
-	sc, pc := token.Claims(*svcacct, pod, secret, exp, warnAfter, req.Spec.Audiences)
+	sc, pc, err := token.Claims(*svcacct, pod, secret, node, exp, warnAfter, req.Spec.Audiences)
+	if err != nil {
+		return nil, err
+	}
 	tokdata, err := r.issuer.GenerateToken(sc, pc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %v", err)
@@ -191,6 +234,9 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		Token:               tokdata,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
+		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, serviceaccount.CredentialIDForJTI(sc.ID))
+	}
 	return out, nil
 }
 
@@ -198,20 +244,12 @@ func (r *TokenREST) GroupVersionKind(schema.GroupVersion) schema.GroupVersionKin
 	return gvk
 }
 
-type getter interface {
-	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
-}
-
 // newContext return a copy of ctx in which new RequestInfo is set
-func newContext(ctx context.Context, resource, name string, gvk schema.GroupVersionKind) context.Context {
-	oldInfo, found := genericapirequest.RequestInfoFrom(ctx)
-	if !found {
-		return ctx
-	}
+func newContext(ctx context.Context, resource, name, namespace string, gvk schema.GroupVersionKind) context.Context {
 	newInfo := genericapirequest.RequestInfo{
 		IsResourceRequest: true,
 		Verb:              "get",
-		Namespace:         oldInfo.Namespace,
+		Namespace:         namespace,
 		Resource:          resource,
 		Name:              name,
 		Parts:             []string{resource, name},

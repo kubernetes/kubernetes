@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // openapi generated definitions.
-package openapi
+package openapi // import "k8s.io/apiextensions-apiserver/pkg/generated/openapi"

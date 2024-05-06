@@ -272,6 +272,8 @@ func TestTimeoutRequestHeaders(t *testing.T) {
 		})
 	}
 
+	testDone := make(chan struct{})
+	defer close(testDone)
 	ts := httptest.NewServer(
 		withDeadline(
 			WithTimeoutForNonLongRunningRequests(
@@ -280,8 +282,13 @@ func TestTimeoutRequestHeaders(t *testing.T) {
 					cancel()
 					// mutate request Headers
 					// Authorization filter does it for example
-					for j := 0; j < 10000; j++ {
-						req.Header.Set("Test", "post")
+					for {
+						select {
+						case <-testDone:
+							return
+						default:
+							req.Header.Set("Test", "post")
+						}
 					}
 				}),
 				func(r *http.Request, requestInfo *request.RequestInfo) bool {
@@ -301,8 +308,8 @@ func TestTimeoutRequestHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.StatusCode != http.StatusGatewayTimeout {
-		t.Errorf("got res.StatusCde %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	if actual, expected := res.StatusCode, http.StatusGatewayTimeout; actual != expected {
+		t.Errorf("got status code %d; expected %d", actual, expected)
 	}
 	res.Body.Close()
 }
@@ -323,6 +330,8 @@ func TestTimeoutWithLogging(t *testing.T) {
 		})
 	}
 
+	testDone := make(chan struct{})
+	defer close(testDone)
 	ts := httptest.NewServer(
 		WithHTTPLogging(
 			withDeadline(
@@ -332,8 +341,13 @@ func TestTimeoutWithLogging(t *testing.T) {
 						cancel()
 						// mutate request Headers
 						// Authorization filter does it for example
-						for j := 0; j < 10000; j++ {
-							req.Header.Set("Test", "post")
+						for {
+							select {
+							case <-testDone:
+								return
+							default:
+								req.Header.Set("Test", "post")
+							}
 						}
 					}),
 					func(r *http.Request, requestInfo *request.RequestInfo) bool {
@@ -354,8 +368,8 @@ func TestTimeoutWithLogging(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.StatusCode != http.StatusGatewayTimeout {
-		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
+	if actual, expected := res.StatusCode, http.StatusGatewayTimeout; actual != expected {
+		t.Errorf("got status code %d; expected %d", actual, expected)
 	}
 	res.Body.Close()
 }
@@ -394,7 +408,9 @@ func TestErrConnKilled(t *testing.T) {
 	if isStackTraceLoggedByRuntime(capturedOutput) {
 		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
+	// For the sake of simplicity and clarity this matches the full log line.
+	// This is not part of the Kubernetes API and could change.
+	if !strings.Contains(capturedOutput, `"Timeout or abort while handling" logger="UnhandledError" method="GET" URI="/" auditID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 }
@@ -487,7 +503,9 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	if isStackTraceLoggedByRuntime(capturedOutput) {
 		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
+	// For the sake of simplicity and clarity this matches the full log line.
+	// This is not part of the Kubernetes API and could change.
+	if !strings.Contains(capturedOutput, `"Timeout or abort while handling" logger="UnhandledError" method="GET" URI="/" auditID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 

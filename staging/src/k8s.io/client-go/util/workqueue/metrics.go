@@ -244,13 +244,18 @@ func (f *queueMetricsFactory) newQueueMetrics(name string, clock clock.Clock) qu
 	}
 }
 
-func newRetryMetrics(name string) retryMetrics {
+func newRetryMetrics(name string, provider MetricsProvider) retryMetrics {
 	var ret *defaultRetryMetrics
 	if len(name) == 0 {
 		return ret
 	}
+
+	if provider == nil {
+		provider = globalMetricsFactory.metricsProvider
+	}
+
 	return &defaultRetryMetrics{
-		retries: globalMetricsFactory.metricsProvider.NewRetriesMetric(name),
+		retries: provider.NewRetriesMetric(name),
 	}
 }
 

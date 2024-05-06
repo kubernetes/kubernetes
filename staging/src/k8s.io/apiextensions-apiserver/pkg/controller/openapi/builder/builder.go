@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
+	"k8s.io/client-go/kubernetes/scheme"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/builder3"
 	"k8s.io/kube-openapi/pkg/common"
@@ -88,12 +89,6 @@ type Options struct {
 	// Convert to OpenAPI v2.
 	V2 bool
 
-	// Only takes effect if the flag and V2 and both set to true. If the condition is reached,
-	// publish OpenAPI V2 but skip running the spec through ToStructuralOpenAPIV2
-	// This prevents XPreserveUnknownFields:true fields from being cleared
-	// Used only by server side apply
-	SkipFilterSchemaForKubectlOpenAPIV2Validation bool
-
 	// Strip value validation.
 	StripValueValidation bool
 
@@ -102,6 +97,8 @@ type Options struct {
 
 	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
 	AllowNonStructural bool
+
+	IncludeSelectableFields bool
 }
 
 func generateBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, opts Options) (*builder, error) {
@@ -200,7 +197,7 @@ func BuildOpenAPIV3(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(false))
+	return builder3.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIV3Config())
 }
 
 // BuildOpenAPIV2 builds OpenAPI v2 for the given crd in the given version
@@ -210,7 +207,7 @@ func BuildOpenAPIV2(crd *apiextensionsv1.CustomResourceDefinition, version strin
 		return nil, err
 	}
 
-	return openapibuilder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig(true))
+	return openapibuilder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices([]*restful.WebService{b.ws}), b.getOpenAPIConfig())
 }
 
 // Implements CanonicalTypeNamer
@@ -316,14 +313,14 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		Path(root+path).
 		To(func(req *restful.Request, res *restful.Response) {}).
 		Doc(b.descriptionFor(path, operationVerb)).
-		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
+		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 		Operation(operationVerb+namespaced+b.kind+strings.Title(subresource(path))).
-		Metadata(endpoints.ROUTE_META_GVK, metav1.GroupVersionKind{
+		Metadata(endpoints.RouteMetaGVK, metav1.GroupVersionKind{
 			Group:   b.group,
 			Version: b.version,
 			Kind:    b.kind,
 		}).
-		Metadata(endpoints.ROUTE_META_ACTION, actionVerb).
+		Metadata(endpoints.RouteMetaAction, actionVerb).
 		Produces("application/json", "application/yaml").
 		Returns(http.StatusOK, "OK", sample).
 		Writes(sample)
@@ -379,19 +376,19 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 
 // buildKubeNative builds input schema with Kubernetes' native object meta, type meta and
 // extensions
-func (b *builder) buildKubeNative(schema *structuralschema.Structural, opts Options, crdPreserveUnknownFields bool) (ret *spec.Schema) {
+func (b *builder) buildKubeNative(crd *apiextensionsv1.CustomResourceDefinition, schema *structuralschema.Structural, opts Options, crdPreserveUnknownFields bool) (ret *spec.Schema) {
 	// only add properties if we have a schema. Otherwise, kubectl would (wrongly) assume additionalProperties=false
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
 	// TODO: fix kubectl to understand additionalProperties=true
-	if schema == nil || ((opts.V2 && !opts.SkipFilterSchemaForKubectlOpenAPIV2Validation) && (schema.XPreserveUnknownFields || crdPreserveUnknownFields)) {
+	if schema == nil || (opts.V2 && (schema.XPreserveUnknownFields || crdPreserveUnknownFields)) {
 		ret = &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
 		}
 		// no, we cannot add more properties here, not even TypeMeta/ObjectMeta because kubectl will complain about
 		// unknown fields for anything else.
 	} else {
-		if opts.V2 && !opts.SkipFilterSchemaForKubectlOpenAPIV2Validation {
+		if opts.V2 {
 			schema = openapiv2.ToStructuralOpenAPIV2(schema)
 		}
 
@@ -400,13 +397,19 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, opts Opti
 		addTypeMetaProperties(ret, opts.V2)
 		addEmbeddedProperties(ret, opts)
 	}
-	ret.AddExtension(endpoints.ROUTE_META_GVK, []interface{}{
+	ret.AddExtension(endpoints.RouteMetaGVK, []interface{}{
 		map[string]interface{}{
 			"group":   b.group,
 			"version": b.version,
 			"kind":    b.kind,
 		},
 	})
+
+	if opts.IncludeSelectableFields {
+		if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
+			ret.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
+		}
+	}
 
 	return ret
 }
@@ -428,7 +431,7 @@ func addEmbeddedProperties(s *spec.Schema, opts Options) {
 		addEmbeddedProperties(s.AdditionalProperties.Schema, opts)
 	}
 
-	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-preserve-unknown-fields"); ok && isTrue && opts.V2 && !opts.SkipFilterSchemaForKubectlOpenAPIV2Validation {
+	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-preserve-unknown-fields"); ok && isTrue && opts.V2 {
 		// don't add metadata properties if we're publishing to openapi v2 and are allowing unknown fields.
 		// adding these metadata properties makes kubectl refuse to validate unknown fields.
 		return
@@ -468,7 +471,7 @@ func withDescription(s spec.Schema, desc string) spec.Schema {
 }
 
 func generateBuildDefinitionsFunc() {
-	namer = openapi.NewDefinitionNamer(runtime.NewScheme())
+	namer = openapi.NewDefinitionNamer(scheme.Scheme)
 	definitionsV3 = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
 		defName, _ := namer.GetDefinitionName(name)
 		prefix := v3DefinitionPrefix
@@ -491,29 +494,34 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 }
 
 // buildListSchema builds the list kind schema for the CRD
-func (b *builder) buildListSchema(v2 bool) *spec.Schema {
+func (b *builder) buildListSchema(crd *apiextensionsv1.CustomResourceDefinition, opts Options) *spec.Schema {
 	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
 	s := new(spec.Schema).
 		Typed("object", "").
 		WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
-		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, v2))).WithDescription(doc)).
-		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, v2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))
+		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, opts.V2))).WithDescription(doc)).
+		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, opts.V2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))
 
-	addTypeMetaProperties(s, v2)
-	s.AddExtension(endpoints.ROUTE_META_GVK, []map[string]string{
+	addTypeMetaProperties(s, opts.V2)
+	s.AddExtension(endpoints.RouteMetaGVK, []map[string]string{
 		{
 			"group":   b.group,
 			"version": b.version,
 			"kind":    b.listKind,
 		},
 	})
+	if opts.IncludeSelectableFields {
+		if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
+			s.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
+		}
+	}
 	return s
 }
 
 // getOpenAPIConfig builds config which wires up generated definitions for kube-openapi to consume
-func (b *builder) getOpenAPIConfig(v2 bool) *common.Config {
+func (b *builder) getOpenAPIConfig() *common.Config {
 	return &common.Config{
 		ProtocolList: []string{"https"},
 		Info: &spec.Info{
@@ -525,6 +533,40 @@ func (b *builder) getOpenAPIConfig(v2 bool) *common.Config {
 		CommonResponses: map[int]spec.Response{
 			401: {
 				ResponseProps: spec.ResponseProps{
+					Description: "Unauthorized",
+				},
+			},
+		},
+		GetOperationIDAndTags: openapi.GetOperationIDAndTags,
+		GetDefinitionName: func(name string) (string, spec.Extensions) {
+			buildDefinitions.Do(generateBuildDefinitionsFunc)
+			return namer.GetDefinitionName(name)
+		},
+		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
+			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+				Schema:       *b.schema,
+				Dependencies: []string{objectMetaType},
+			}
+			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+				Schema: *b.listSchema,
+			}
+			return def
+		},
+	}
+}
+
+func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
+	return &common.OpenAPIV3Config{
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubernetes CRD Swagger",
+				Version: "v0.1.0",
+			},
+		},
+		CommonResponses: map[int]*spec3.Response{
+			401: {
+				ResponseProps: spec3.ResponseProps{
 					Description: "Unauthorized",
 				},
 			},
@@ -567,8 +609,29 @@ func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, s
 	}
 
 	// Pre-build schema with Kubernetes native properties
-	b.schema = b.buildKubeNative(schema, opts, crd.Spec.PreserveUnknownFields)
-	b.listSchema = b.buildListSchema(opts.V2)
+	b.schema = b.buildKubeNative(crd, schema, opts, crd.Spec.PreserveUnknownFields)
+	b.listSchema = b.buildListSchema(crd, opts)
 
 	return b
+}
+
+func buildSelectableFields(crd *apiextensionsv1.CustomResourceDefinition, version string) any {
+	var specVersion *apiextensionsv1.CustomResourceDefinitionVersion
+	for _, v := range crd.Spec.Versions {
+		if v.Name == version {
+			specVersion = &v
+			break
+		}
+	}
+	if specVersion == nil && len(specVersion.SelectableFields) == 0 {
+		return nil
+	}
+	selectableFields := make([]any, len(specVersion.SelectableFields))
+	for i, sf := range specVersion.SelectableFields {
+		props := map[string]any{
+			"fieldPath": strings.TrimPrefix(sf.JSONPath, "."),
+		}
+		selectableFields[i] = props
+	}
+	return selectableFields
 }

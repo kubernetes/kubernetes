@@ -1,0 +1,20 @@
+#$ Used in:
+#$ - geps/gep-1748.md
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: store
+spec:
+  parentRefs:
+  - name: external-http
+  rules:
+  - backendRefs:
+    - kind: Service
+      name: store
+      port: 8080
+      weight: 90
+    - group: multicluster.x-k8s.io
+      kind: ServiceImport
+      name: store-global
+      port: 8080
+      weight: 10

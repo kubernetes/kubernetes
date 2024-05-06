@@ -19,7 +19,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -59,10 +58,6 @@ const (
 	// objects that indicates attach/detach operations for the node should be
 	// managed by the attach/detach controller
 	ControllerManagedAttachAnnotation string = "volumes.kubernetes.io/controller-managed-attach-detach"
-
-	// KeepTerminatedPodVolumesAnnotation is the key of the annotation on Node
-	// that decides if pod volumes are unmounted when pod is terminated
-	KeepTerminatedPodVolumesAnnotation string = "volumes.kubernetes.io/keep-terminated-pod-volumes"
 
 	// MountsInGlobalPDPath is name of the directory appended to a volume plugin
 	// name to create the place for volume mounts in the global PD path.
@@ -173,7 +168,7 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path not specified")
 	}
-	podDef, err := ioutil.ReadFile(filePath)
+	podDef, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
 	}
@@ -654,8 +649,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String, se
 // attributes.
 func FsUserFrom(pod *v1.Pod) *int64 {
 	var fsUser *int64
-	// Exclude ephemeral containers because SecurityContext is not allowed.
-	podutil.VisitContainers(&pod.Spec, podutil.InitContainers|podutil.Containers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		runAsUser, ok := securitycontext.DetermineEffectiveRunAsUser(pod, container)
 		// One container doesn't specify user or there are more than one
 		// non-root UIDs.
@@ -688,9 +682,9 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	// Neither of the above should be counted as a mount ref as those are handled
 	// by the kubelet. What we're concerned about is a path like
 	//   /data/local/some/manual/mount
-	// As unmonting could interrupt usage from that mountpoint.
+	// As unmounting could interrupt usage from that mountpoint.
 	//
-	// So instead of looking for the entire /var/lib/... path, the plugins/kuberentes.io/
+	// So instead of looking for the entire /var/lib/... path, the plugins/kubernetes.io/
 	// suffix is trimmed off and searched for.
 	//
 	// If there isn't a /plugins/... path, the whole mountPath is used instead.
@@ -706,15 +700,19 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 	return false
 }
 
-// WriteVolumeCache flush disk data given the spcified mount path
+// WriteVolumeCache flush disk data given the specified mount path
 func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {
-		cmd := fmt.Sprintf("Get-Volume -FilePath %s | Write-Volumecache", deviceMountPath)
-		output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-		klog.Infof("command (%q) execeuted: %v, output: %q", cmd, err, string(output))
+		cmdString := "Get-Volume -FilePath $env:mountpath | Write-Volumecache"
+		cmd := exec.Command("powershell", "/c", cmdString)
+		env := append(os.Environ(), fmt.Sprintf("mountpath=%s", deviceMountPath))
+		cmd.SetEnv(env)
+		klog.V(8).Infof("Executing command: %q", cmdString)
+		output, err := cmd.CombinedOutput()
+		klog.Infof("command (%q) execeuted: %v, output: %q", cmdString, err, string(output))
 		if err != nil {
-			return fmt.Errorf("command (%q) failed: %v, output: %q", cmd, err, string(output))
+			return fmt.Errorf("command (%q) failed: %v, output: %q", cmdString, err, string(output))
 		}
 	}
 	// For linux runtime, it skips because unmount will automatically flush disk data

@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util"
@@ -41,7 +41,7 @@ type ViewLastAppliedOptions struct {
 	All                          bool
 	Factory                      cmdutil.Factory
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 var (
@@ -60,7 +60,7 @@ var (
 )
 
 // NewViewLastAppliedOptions takes option arguments from a CLI stream and returns it at ViewLastAppliedOptions type.
-func NewViewLastAppliedOptions(ioStreams genericclioptions.IOStreams) *ViewLastAppliedOptions {
+func NewViewLastAppliedOptions(ioStreams genericiooptions.IOStreams) *ViewLastAppliedOptions {
 	return &ViewLastAppliedOptions{
 		OutputFormat: "yaml",
 
@@ -69,7 +69,7 @@ func NewViewLastAppliedOptions(ioStreams genericclioptions.IOStreams) *ViewLastA
 }
 
 // NewCmdApplyViewLastApplied creates the cobra CLI `apply` subcommand `view-last-applied`.`
-func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	options := NewViewLastAppliedOptions(ioStreams)
 
 	cmd := &cobra.Command{

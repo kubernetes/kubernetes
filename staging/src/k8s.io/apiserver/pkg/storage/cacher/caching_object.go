@@ -148,6 +148,10 @@ func (o *cachingObject) CacheEncode(id runtime.Identifier, encode func(runtime.O
 	if result.err != nil {
 		return result.err
 	}
+	if b, support := w.(runtime.Splice); support {
+		b.Splice(result.raw)
+		return nil
+	}
 	_, err := w.Write(result.raw)
 	return err
 }

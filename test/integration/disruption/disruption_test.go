@@ -17,14 +17,17 @@ limitations under the License.
 package disruption
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"path"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/api/policy/v1beta1"
@@ -34,9 +37,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -46,17 +52,19 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const stalePodDisruptionTimeout = 3 * time.Second
 
-func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
+func setup(ctx context.Context, t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
 
 	clientSet, err := clientset.NewForConfig(server.ClientConfig)
@@ -88,6 +96,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 	}
 
 	pdbc := disruption.NewDisruptionControllerInternal(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
@@ -105,16 +114,16 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 }
 
 func TestPDBWithScaleSubresource(t *testing.T) {
-	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(t)
+	tCtx := ktesting.Init(t)
+	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(tCtx, t)
 	defer s.TearDownFn()
+	defer tCtx.Cancel("test has completed")
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	nsName := "pdb-scale-subresource"
-	createNs(ctx, t, nsName, clientSet)
+	createNs(tCtx, t, nsName, clientSet)
 
-	informers.Start(ctx.Done())
-	go pdbc.Run(ctx)
+	informers.Start(tCtx.Done())
+	go pdbc.Run(tCtx)
 
 	crdDefinition := newCustomResourceDefinition()
 	etcd.CreateTestCRDs(t, apiExtensionClient, true, crdDefinition)
@@ -137,7 +146,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			},
 		},
 	}
-	createdResource, err := resourceClient.Create(ctx, resource, metav1.CreateOptions{})
+	createdResource, err := resourceClient.Create(tCtx, resource, metav1.CreateOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -153,7 +162,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 		},
 	}
 	for i := 0; i < replicas; i++ {
-		createPod(ctx, t, fmt.Sprintf("pod-%d", i), nsName, map[string]string{"app": "test-crd"}, clientSet, ownerRefs)
+		createPod(tCtx, t, fmt.Sprintf("pod-%d", i), nsName, map[string]string{"app": "test-crd"}, clientSet, ownerRefs)
 	}
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
@@ -172,13 +181,13 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 			},
 		},
 	}
-	if _, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(ctx, pdb, metav1.CreateOptions{}); err != nil {
+	if _, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(tCtx, pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Error creating PodDisruptionBudget: %v", err)
 	}
 
-	waitPDBStable(ctx, t, clientSet, 4, nsName, pdb.Name)
+	waitPDBStable(tCtx, t, clientSet, 4, nsName, pdb.Name)
 
-	newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(ctx, pdb.Name, metav1.GetOptions{})
+	newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(tCtx, pdb.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Error getting PodDisruptionBudget: %v", err)
 	}
@@ -197,12 +206,12 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 func TestEmptySelector(t *testing.T) {
 	testcases := []struct {
 		name                   string
-		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error
 		expectedCurrentHealthy int32
 	}{
 		{
 			name: "v1beta1 should not target any pods",
-			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &v1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -212,14 +221,13 @@ func TestEmptySelector(t *testing.T) {
 						Selector:     &metav1.LabelSelector{},
 					},
 				}
-				_, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(ctx, pdb, metav1.CreateOptions{})
-				return err
+				return createPDBUsingRemovedAPI(ctx, etcdClient, etcdStoragePrefix, nsName, pdb)
 			},
 			expectedCurrentHealthy: 0,
 		},
 		{
 			name: "v1 should target all pods",
-			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -238,36 +246,35 @@ func TestEmptySelector(t *testing.T) {
 
 	for i, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			s, pdbc, informers, clientSet, _, _ := setup(t)
+			tCtx := ktesting.Init(t)
+			s, pdbc, informers, clientSet, _, _ := setup(tCtx, t)
 			defer s.TearDownFn()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			defer tCtx.Cancel("test has completed")
 
 			nsName := fmt.Sprintf("pdb-empty-selector-%d", i)
-			createNs(ctx, t, nsName, clientSet)
+			createNs(tCtx, t, nsName, clientSet)
 
-			informers.Start(ctx.Done())
-			go pdbc.Run(ctx)
+			informers.Start(tCtx.Done())
+			go pdbc.Run(tCtx)
 
 			replicas := 4
-			minAvailable := intstr.FromInt(2)
+			minAvailable := intstr.FromInt32(2)
 
 			for j := 0; j < replicas; j++ {
-				createPod(ctx, t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
+				createPod(tCtx, t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
 					clientSet, []metav1.OwnerReference{})
 			}
 
 			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
 
 			pdbName := "test-pdb"
-			if err := tc.createPDBFunc(ctx, clientSet, pdbName, nsName, minAvailable); err != nil {
+			if err := tc.createPDBFunc(tCtx, clientSet, s.EtcdClient, s.EtcdStoragePrefix, pdbName, nsName, minAvailable); err != nil {
 				t.Errorf("Error creating PodDisruptionBudget: %v", err)
 			}
 
-			waitPDBStable(ctx, t, clientSet, tc.expectedCurrentHealthy, nsName, pdbName)
+			waitPDBStable(tCtx, t, clientSet, tc.expectedCurrentHealthy, nsName, pdbName)
 
-			newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(ctx, pdbName, metav1.GetOptions{})
+			newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(tCtx, pdbName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("Error getting PodDisruptionBudget: %v", err)
 			}
@@ -282,12 +289,12 @@ func TestEmptySelector(t *testing.T) {
 func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 	testcases := []struct {
 		name                   string
-		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error
 		expectedCurrentHealthy int32
 	}{
 		{
 			name: "pods with no labels can be targeted by v1 PDBs with empty selector",
-			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -304,7 +311,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		},
 		{
 			name: "pods with no labels can be targeted by v1 PDBs with DoesNotExist selector",
-			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -328,7 +335,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		},
 		{
 			name: "pods with no labels can be targeted by v1beta1 PDBs with DoesNotExist selector",
-			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &v1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -345,8 +352,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 						},
 					},
 				}
-				_, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(nsName).Create(ctx, pdb, metav1.CreateOptions{})
-				return err
+				return createPDBUsingRemovedAPI(ctx, etcdClient, etcdStoragePrefix, nsName, pdb)
 			},
 			expectedCurrentHealthy: 1,
 		},
@@ -354,35 +360,34 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 
 	for i, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			s, pdbc, informers, clientSet, _, _ := setup(t)
+			tCtx := ktesting.Init(t)
+			s, pdbc, informers, clientSet, _, _ := setup(tCtx, t)
 			defer s.TearDownFn()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			defer tCtx.Cancel("test has completed")
 
 			nsName := fmt.Sprintf("pdb-selectors-%d", i)
-			createNs(ctx, t, nsName, clientSet)
+			createNs(tCtx, t, nsName, clientSet)
 
-			informers.Start(ctx.Done())
-			go pdbc.Run(ctx)
+			informers.Start(tCtx.Done())
+			go pdbc.Run(tCtx)
 
-			minAvailable := intstr.FromInt(1)
+			minAvailable := intstr.FromInt32(1)
 
 			// Create the PDB first and wait for it to settle.
 			pdbName := "test-pdb"
-			if err := tc.createPDBFunc(ctx, clientSet, pdbName, nsName, minAvailable); err != nil {
+			if err := tc.createPDBFunc(tCtx, clientSet, s.EtcdClient, s.EtcdStoragePrefix, pdbName, nsName, minAvailable); err != nil {
 				t.Errorf("Error creating PodDisruptionBudget: %v", err)
 			}
-			waitPDBStable(ctx, t, clientSet, 0, nsName, pdbName)
+			waitPDBStable(tCtx, t, clientSet, 0, nsName, pdbName)
 
 			// Create a pod and wait for it be reach the running phase.
-			createPod(ctx, t, "pod", nsName, map[string]string{}, clientSet, []metav1.OwnerReference{})
+			createPod(tCtx, t, "pod", nsName, map[string]string{}, clientSet, []metav1.OwnerReference{})
 			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodRunning)
 
 			// Then verify that the added pod are picked up by the disruption controller.
-			waitPDBStable(ctx, t, clientSet, 1, nsName, pdbName)
+			waitPDBStable(tCtx, t, clientSet, 1, nsName, pdbName)
 
-			newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(ctx, pdbName, metav1.GetOptions{})
+			newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(tCtx, pdbName, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("Error getting PodDisruptionBudget: %v", err)
 			}
@@ -507,15 +512,36 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 	}
 }
 
-func TestPatchCompatibility(t *testing.T) {
-	s, pdbc, _, clientSet, _, _ := setup(t)
-	defer s.TearDownFn()
+// createPDBUsingRemovedAPI creates a PDB directly using etcd.  This is must *ONLY* be used for checks of compatibility
+// with removed data. Do not use this just because you don't want to update your test to use v1.  Only use this
+// when it actually matters.
+func createPDBUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, etcdStoragePrefix, nsName string, betaPDB *v1beta1.PodDisruptionBudget) error {
+	betaPDB.APIVersion = v1beta1.SchemeGroupVersion.Group + "/" + v1beta1.SchemeGroupVersion.Version
+	betaPDB.Kind = "PodDisruptionBudget"
+	betaPDB.Namespace = nsName
+	betaPDB.Generation = 1
+	rest.FillObjectMetaSystemFields(betaPDB)
+	ctx = genericapirequest.WithNamespace(ctx, nsName)
+	key := path.Join("/", etcdStoragePrefix, "poddisruptionbudgets", nsName, betaPDB.Name)
+	protoSerializer := protobuf.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme)
+	buffer := bytes.NewBuffer(nil)
+	if err := protoSerializer.Encode(betaPDB, buffer); err != nil {
+		return err
+	}
+	_, err := etcdClient.Put(ctx, key, buffer.String())
+	return err
+}
 
+func TestPatchCompatibility(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	s, pdbc, _, clientSet, _, _ := setup(tCtx, t)
+	defer s.TearDownFn()
 	// Even though pdbc isn't used in this test, its creation is already
 	// spawning some goroutines. So we need to run it to ensure they won't leak.
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	pdbc.Run(ctx)
+	// We can't cancel immediately but later, because when the context is canceled,
+	// the event broadcaster will be shut down .
+	defer tCtx.Cancel("cleaning up")
+	go pdbc.Run(tCtx)
 
 	testcases := []struct {
 		name             string
@@ -528,17 +554,6 @@ func TestPatchCompatibility(t *testing.T) {
 		expectSelector   *metav1.LabelSelector
 	}{
 		{
-			name:      "v1beta1-smp",
-			version:   "v1beta1",
-			patchType: types.StrategicMergePatchType,
-			patch:     `{"spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
-			// matchLabels portion is merged, matchExpressions portion is replaced (because it's a list with no patchStrategy defined)
-			expectSelector: &metav1.LabelSelector{
-				MatchLabels:      map[string]string{"basematch": "true", "patchmatch": "true"},
-				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
-			},
-		},
-		{
 			name:      "v1-smp",
 			version:   "v1",
 			patchType: types.StrategicMergePatchType,
@@ -546,18 +561,6 @@ func TestPatchCompatibility(t *testing.T) {
 			// matchLabels and matchExpressions are both replaced (because selector patchStrategy=replace in v1)
 			expectSelector: &metav1.LabelSelector{
 				MatchLabels:      map[string]string{"patchmatch": "true"},
-				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
-			},
-		},
-
-		{
-			name:      "v1beta1-mergepatch",
-			version:   "v1beta1",
-			patchType: types.MergePatchType,
-			patch:     `{"spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
-			// matchLabels portion is merged, matchExpressions portion is replaced (because it's a list)
-			expectSelector: &metav1.LabelSelector{
-				MatchLabels:      map[string]string{"basematch": "true", "patchmatch": "true"},
 				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
 			},
 		},
@@ -572,26 +575,12 @@ func TestPatchCompatibility(t *testing.T) {
 				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
 			},
 		},
-
-		{
-			name:         "v1beta1-apply",
-			version:      "v1beta1",
-			patchType:    types.ApplyPatchType,
-			patch:        `{"apiVersion":"policy/v1beta1","kind":"PodDisruptionBudget","spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
-			force:        pointer.Bool(true),
-			fieldManager: "test",
-			// entire selector is replaced (because structType=atomic)
-			expectSelector: &metav1.LabelSelector{
-				MatchLabels:      map[string]string{"patchmatch": "true"},
-				MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "patchexpression", Operator: "In", Values: []string{"true"}}},
-			},
-		},
 		{
 			name:         "v1-apply",
 			version:      "v1",
 			patchType:    types.ApplyPatchType,
 			patch:        `{"apiVersion":"policy/v1","kind":"PodDisruptionBudget","spec":{"selector":{"matchLabels":{"patchmatch":"true"},"matchExpressions":[{"key":"patchexpression","operator":"In","values":["true"]}]}}}`,
-			force:        pointer.Bool(true),
+			force:        ptr.To(true),
 			fieldManager: "test",
 			// entire selector is replaced (because structType=atomic)
 			expectSelector: &metav1.LabelSelector{
@@ -635,12 +624,6 @@ func TestPatchCompatibility(t *testing.T) {
 					t.Fatal(err)
 				}
 				resultSelector = result.Spec.Selector
-			case "v1beta1":
-				result, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Patch(context.TODO(), pdb.Name, tc.patchType, []byte(tc.patch), metav1.PatchOptions{Force: tc.force, FieldManager: tc.fieldManager})
-				if err != nil {
-					t.Fatal(err)
-				}
-				resultSelector = result.Spec.Selector
 			default:
 				t.Error("unknown version")
 			}
@@ -653,18 +636,17 @@ func TestPatchCompatibility(t *testing.T) {
 }
 
 func TestStalePodDisruption(t *testing.T) {
-	s, pdbc, informers, clientSet, _, _ := setup(t)
+	tCtx := ktesting.Init(t)
+	s, pdbc, informers, clientSet, _, _ := setup(tCtx, t)
 	defer s.TearDownFn()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	defer tCtx.Cancel("test has completed")
 
 	nsName := "pdb-stale-pod-disruption"
-	createNs(ctx, t, nsName, clientSet)
+	createNs(tCtx, t, nsName, clientSet)
 
-	informers.Start(ctx.Done())
-	informers.WaitForCacheSync(ctx.Done())
-	go pdbc.Run(ctx)
+	informers.Start(tCtx.Done())
+	informers.WaitForCacheSync(tCtx.Done())
+	go pdbc.Run(tCtx)
 
 	cases := map[string]struct {
 		deletePod      bool
@@ -733,20 +715,20 @@ func TestStalePodDisruption(t *testing.T) {
 				Reason:             tc.reason,
 				LastTransitionTime: metav1.Now(),
 			})
-			pod, err = clientSet.CoreV1().Pods(nsName).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+			pod, err = clientSet.CoreV1().Pods(nsName).UpdateStatus(tCtx, pod, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Failed updating pod: %v", err)
 			}
 
 			if tc.deletePod {
-				if err := clientSet.CoreV1().Pods(nsName).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+				if err := clientSet.CoreV1().Pods(nsName).Delete(tCtx, name, metav1.DeleteOptions{}); err != nil {
 					t.Fatalf("Failed to delete pod: %v", err)
 				}
 			}
 			time.Sleep(stalePodDisruptionTimeout)
 			diff := ""
 			if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
-				pod, err = clientSet.CoreV1().Pods(nsName).Get(ctx, name, metav1.GetOptions{})
+				pod, err = clientSet.CoreV1().Pods(nsName).Get(tCtx, name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}

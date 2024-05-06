@@ -43,48 +43,44 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-func TestResolvePortInt(t *testing.T) {
-	expected := 80
-	port, err := resolvePort(intstr.FromInt(expected), &v1.Container{})
-	if port != expected {
-		t.Errorf("expected: %d, saw: %d", expected, port)
-	}
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestResolvePortString(t *testing.T) {
-	expected := 80
-	name := "foo"
-	container := &v1.Container{
-		Ports: []v1.ContainerPort{
-			{Name: name, ContainerPort: int32(expected)},
+func TestResolvePort(t *testing.T) {
+	for _, testCase := range []struct {
+		container  *v1.Container
+		stringPort string
+		expected   int
+	}{
+		{
+			stringPort: "foo",
+			container: &v1.Container{
+				Ports: []v1.ContainerPort{{Name: "foo", ContainerPort: int32(80)}},
+			},
+			expected: 80,
 		},
-	}
-	port, err := resolvePort(intstr.FromString(name), container)
-	if port != expected {
-		t.Errorf("expected: %d, saw: %d", expected, port)
-	}
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestResolvePortStringUnknown(t *testing.T) {
-	expected := int32(80)
-	name := "foo"
-	container := &v1.Container{
-		Ports: []v1.ContainerPort{
-			{Name: "bar", ContainerPort: expected},
+		{
+			container:  &v1.Container{},
+			stringPort: "80",
+			expected:   80,
 		},
-	}
-	port, err := resolvePort(intstr.FromString(name), container)
-	if port != -1 {
-		t.Errorf("expected: -1, saw: %d", port)
-	}
-	if err == nil {
-		t.Error("unexpected non-error")
+		{
+			container: &v1.Container{
+				Ports: []v1.ContainerPort{
+					{Name: "bar", ContainerPort: int32(80)},
+				},
+			},
+			stringPort: "foo",
+			expected:   -1,
+		},
+	} {
+		port, err := resolvePort(intstr.FromString(testCase.stringPort), testCase.container)
+		if testCase.expected != -1 && err != nil {
+			t.Fatalf("unexpected error while resolving port: %s", err)
+		}
+		if testCase.expected == -1 && err == nil {
+			t.Errorf("expected error when a port fails to resolve")
+		}
+		if testCase.expected != port {
+			t.Errorf("failed to resolve port, expected %d, got %d", testCase.expected, port)
+		}
 	}
 }
 
@@ -179,7 +175,7 @@ func TestRunHandlerHttp(t *testing.T) {
 			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 					Path: "bar",
 				},
 			},
@@ -216,7 +212,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 					Path: "/bar",
 					HTTPHeaders: []v1.HTTPHeader{
 						{Name: "Foo", Value: "bar"},
@@ -280,50 +276,23 @@ func TestRunHandlerHttps(t *testing.T) {
 			t.Errorf("unexpected url: %s", fakeHTTPDoer.url)
 		}
 	})
-
-	t.Run("inconsistent", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
-		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromString("70")
-		pod.Spec.Containers = []v1.Container{container}
-		_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
-
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if fakeHTTPDoer.url != "http://foo:70/bar" {
-			t.Errorf("unexpected url: %q", fakeHTTPDoer.url)
-		}
-	})
 }
 
 func TestRunHandlerHTTPPort(t *testing.T) {
 	tests := []struct {
-		Name               string
-		FeatureGateEnabled bool
-		Port               intstr.IntOrString
-		ExpectError        bool
-		Expected           string
+		Name        string
+		Port        intstr.IntOrString
+		ExpectError bool
+		Expected    string
 	}{
 		{
-			Name:               "consistent/with port",
-			FeatureGateEnabled: true,
-			Port:               intstr.FromString("70"),
-			Expected:           "https://foo:70/bar",
+			Name:     "consistent/with port",
+			Port:     intstr.FromString("70"),
+			Expected: "https://foo:70/bar",
 		}, {
-			Name:               "consistent/without port",
-			FeatureGateEnabled: true,
-			Port:               intstr.FromString(""),
-			ExpectError:        true,
-		}, {
-			Name:               "inconsistent/with port",
-			FeatureGateEnabled: false,
-			Port:               intstr.FromString("70"),
-			Expected:           "http://foo:70/bar",
-		}, {
-			Name:               "inconsistent/without port",
-			Port:               intstr.FromString(""),
-			FeatureGateEnabled: false,
-			Expected:           "http://foo:80/bar",
+			Name:        "consistent/without port",
+			Port:        intstr.FromString(""),
+			ExpectError: true,
 		},
 	}
 
@@ -353,7 +322,6 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			ctx := context.Background()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, tt.FeatureGateEnabled)()
 			fakeHTTPDoer := fakeHTTP{}
 			handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
@@ -648,13 +616,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			}
 
 			t.Run("consistent", func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 				verify(t, tt.Expected.NewHeader, tt.Expected.NewURL)
-			})
-
-			t.Run("inconsistent", func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
-				verify(t, tt.Expected.OldHeader, tt.Expected.OldURL)
 			})
 		})
 	}
@@ -739,7 +701,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 			PostStart: &v1.LifecycleHandler{
 				HTTPGet: &v1.HTTPGetAction{
 					Host: "foo",
-					Port: intstr.FromInt(8080),
+					Port: intstr.FromInt32(8080),
 					Path: "bar",
 				},
 			},
@@ -764,7 +726,6 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 
 func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	ctx := context.Background()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 
 	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
 	// we need to reset them prior running this test.
@@ -857,5 +818,61 @@ func TestIsHTTPResponseError(t *testing.T) {
 	_, err = http.DefaultClient.Do(req)
 	if !isHTTPResponseError(err) {
 		t.Errorf("unexpected http response error: %v", err)
+	}
+}
+
+func TestRunSleepHandler(t *testing.T) {
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	containerName := "containerFoo"
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+
+	tests := []struct {
+		name                          string
+		sleepSeconds                  int64
+		terminationGracePeriodSeconds int64
+		expectErr                     bool
+		expectedErr                   string
+	}{
+		{
+			name:                          "valid seconds",
+			sleepSeconds:                  5,
+			terminationGracePeriodSeconds: 30,
+		},
+		{
+			name:                          "longer than TerminationGracePeriodSeconds",
+			sleepSeconds:                  3,
+			terminationGracePeriodSeconds: 2,
+			expectErr:                     true,
+			expectedErr:                   "container terminated before sleep hook finished",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepAction, true)
+
+			pod.Spec.Containers[0].Lifecycle.PreStop.Sleep = &v1.SleepAction{Seconds: tt.sleepSeconds}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(tt.terminationGracePeriodSeconds)*time.Second)
+			defer cancel()
+
+			_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PreStop)
+
+			if !tt.expectErr && err != nil {
+				t.Errorf("unexpected success")
+			}
+			if tt.expectErr && err.Error() != tt.expectedErr {
+				t.Errorf("%s: expected error want %s, got %s", tt.name, tt.expectedErr, err.Error())
+			}
+		})
 	}
 }

@@ -83,8 +83,7 @@ if [[ "${generate_pot}" == "true" ]]; then
   # shellcheck disable=SC2046
   go-xgettext -k=i18n.T $(grep -lr "i18n.T" "${KUBECTL_FILES[@]}" | grep -vE "${KUBECTL_IGNORE_FILES_REGEX}") > tmp.pot
   perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
-  perl -pi -e 's/\\\(/\\\\\(/g' tmp.pot
-  perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
+  perl -pi -e 's/\\(?!n"\n|")/\\\\/g' tmp.pot
   kube::util::ensure-temp-dir
   if msgcat -s tmp.pot > "${KUBE_TEMP}/template.pot"; then
     mv "${KUBE_TEMP}/template.pot" "${TRANSLATIONS}/kubectl/template.pot"

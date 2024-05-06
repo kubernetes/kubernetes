@@ -44,6 +44,7 @@ import (
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	utiltesting "k8s.io/client-go/util/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
@@ -281,7 +282,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
+	defer utiltesting.CloseAndRemove(t, logFile)
 
 	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount",

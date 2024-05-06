@@ -639,21 +639,6 @@ items:
   - apiGroups:
     - ""
     resources:
-    - endpoints
-    verbs:
-    - create
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-controller-manager
-    resources:
-    - endpoints
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - ""
-    resources:
     - secrets
     - serviceaccounts
     verbs:
@@ -754,21 +739,6 @@ items:
     - kube-scheduler
     resources:
     - leases
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - ""
-    resources:
-    - endpoints
-    verbs:
-    - create
-  - apiGroups:
-    - ""
-    resourceNames:
-    - kube-scheduler
-    resources:
-    - endpoints
     verbs:
     - get
     - update
@@ -1295,7 +1265,9 @@ items:
   rules:
   - nonResourceURLs:
     - /.well-known/openid-configuration
+    - /.well-known/openid-configuration/
     - /openid/v1/jwks
+    - /openid/v1/jwks/
     verbs:
     - get
 - apiVersion: rbac.authorization.k8s.io/v1

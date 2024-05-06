@@ -284,7 +284,7 @@ type CSIDriverSpec struct {
 	// permission of the volume before being mounted.
 	// Refer to the specific FSGroupPolicy values for additional details.
 	//
-	// This field is immutable.
+	// This field was immutable in Kubernetes < 1.29 and now is mutable.
 	//
 	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
 	// to determine if Kubernetes should modify ownership and permissions of the volume.
@@ -303,7 +303,7 @@ type CSIDriverSpec struct {
 	// NodePublishVolume() calls.
 	// The CSI driver is responsible for parsing and validating the information
 	// passed in as VolumeContext.
-	// The following VolumeConext will be passed if podInfoOnMount is set to true.
+	// The following VolumeContext will be passed if podInfoOnMount is set to true.
 	// This list might grow, but the prefix will be used.
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
@@ -318,7 +318,7 @@ type CSIDriverSpec struct {
 	// deployed on such a cluster and the deployment determines which mode that is, for example
 	// via a command line parameter of the driver.
 	//
-	// This field is immutable.
+	// This field was immutable in Kubernetes < 1.29 and now is mutable.
 	//
 	// +optional
 	PodInfoOnMount *bool
@@ -409,6 +409,7 @@ type CSIDriverSpec struct {
 	//
 	// Default is "false".
 	//
+	// +featureGate=SELinuxMountReadWriteOncePod
 	// +optional
 	SELinuxMount *bool
 }
@@ -670,4 +671,54 @@ type CSIStorageCapacityList struct {
 
 	// Items is the list of CSIStorageCapacity objects.
 	Items []CSIStorageCapacity
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeAttributesClass represents a specification of mutable volume attributes
+// defined by the CSI driver. The class can be specified during dynamic provisioning
+// of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
+type VolumeAttributesClass struct {
+	metav1.TypeMeta
+
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Name of the CSI driver
+	// This field is immutable.
+	DriverName string
+
+	// parameters hold volume attributes defined by the CSI driver. These values
+	// are opaque to the Kubernetes and are passed directly to the CSI driver.
+	// The underlying storage provider supports changing these attributes on an
+	// existing volume, however the parameters field itself is immutable. To
+	// invoke a volume update, a new VolumeAttributesClass should be created with
+	// new parameters, and the PersistentVolumeClaim should be updated to reference
+	// the new VolumeAttributesClass.
+	//
+	// This field is required and must contain at least one key/value pair.
+	// The keys cannot be empty, and the maximum number of parameters is 512, with
+	// a cumulative max size of 256K. If the CSI driver rejects invalid parameters,
+	// the target PersistentVolumeClaim will be set to an "Infeasible" state in the
+	// modifyVolumeStatus field.
+	Parameters map[string]string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// VolumeAttributesClassList is a collection of VolumeAttributesClass objects.
+type VolumeAttributesClassList struct {
+	metav1.TypeMeta
+
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+
+	// items is the list of VolumeAttributesClass objects.
+	// +listType=map
+	// +listMapKey=name
+	Items []VolumeAttributesClass
 }

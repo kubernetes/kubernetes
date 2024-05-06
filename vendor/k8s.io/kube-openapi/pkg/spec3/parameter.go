@@ -36,6 +36,9 @@ type Parameter struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Parameter as JSON
 func (p *Parameter) MarshalJSON() ([]byte, error) {
+	if internal.UseOptimizedJSONMarshalingV3 {
+		return internal.DeterministicMarshal(p)
+	}
 	b1, err := json.Marshal(p.Refable)
 	if err != nil {
 		return nil, err
@@ -49,6 +52,18 @@ func (p *Parameter) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return swag.ConcatJSON(b1, b2, b3), nil
+}
+
+func (p *Parameter) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref            string                 `json:"$ref,omitempty"`
+		ParameterProps parameterPropsOmitZero `json:",inline"`
+		spec.Extensions
+	}
+	x.Ref = p.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(p.Extensions)
+	x.ParameterProps = parameterPropsOmitZero(p.ParameterProps)
+	return opts.MarshalNext(enc, x)
 }
 
 func (p *Parameter) UnmarshalJSON(data []byte) error {
@@ -113,4 +128,20 @@ type ParameterProps struct {
 	Example interface{} `json:"example,omitempty"`
 	// Examples of the parameter's potential value. Each example SHOULD contain a value in the correct format as specified in the parameter encoding
 	Examples map[string]*Example `json:"examples,omitempty"`
+}
+
+type parameterPropsOmitZero struct {
+	Name            string                `json:"name,omitempty"`
+	In              string                `json:"in,omitempty"`
+	Description     string                `json:"description,omitempty"`
+	Required        bool                  `json:"required,omitzero"`
+	Deprecated      bool                  `json:"deprecated,omitzero"`
+	AllowEmptyValue bool                  `json:"allowEmptyValue,omitzero"`
+	Style           string                `json:"style,omitempty"`
+	Explode         bool                  `json:"explode,omitzero"`
+	AllowReserved   bool                  `json:"allowReserved,omitzero"`
+	Schema          *spec.Schema          `json:"schema,omitzero"`
+	Content         map[string]*MediaType `json:"content,omitempty"`
+	Example         interface{}           `json:"example,omitempty"`
+	Examples        map[string]*Example   `json:"examples,omitempty"`
 }

@@ -62,6 +62,8 @@ const (
 	// DialFailureTunnelClosed indicates that the client connection was closed before the dial could
 	// complete.
 	DialFailureTunnelClosed DialFailureReason = "tunnelclosed"
+	// DialFailureAlreadyStarted indicates that a single-use tunnel dialer was already used once.
+	DialFailureAlreadyStarted DialFailureReason = "tunnelstarted"
 )
 
 type ClientConnectionStatus string

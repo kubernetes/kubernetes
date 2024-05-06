@@ -17,11 +17,6 @@ limitations under the License.
 package storage
 
 import (
-	"context"
-
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -39,30 +34,25 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against NetworkPolicies.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &networkingapi.NetworkPolicy{} },
 		NewListFunc:               func() runtime.Object { return &networkingapi.NetworkPolicyList{} },
 		DefaultQualifiedResource:  networkingapi.Resource("networkpolicies"),
 		SingularQualifiedResource: networkingapi.Resource("networkpolicy"),
 
-		CreateStrategy:      networkpolicy.Strategy,
-		UpdateStrategy:      networkpolicy.Strategy,
-		DeleteStrategy:      networkpolicy.Strategy,
-		ResetFieldsStrategy: networkpolicy.Strategy,
+		CreateStrategy: networkpolicy.Strategy,
+		UpdateStrategy: networkpolicy.Strategy,
+		DeleteStrategy: networkpolicy.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	statusStore := *store
-	statusStore.UpdateStrategy = networkpolicy.StatusStrategy
-	statusStore.ResetFieldsStrategy = networkpolicy.StatusStrategy
-	return &REST{store}, &StatusREST{store: &statusStore}, nil
-
+	return &REST{store}, nil
 }
 
 // Implement ShortNamesProvider
@@ -71,37 +61,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"netpol"}
-}
-
-// StatusREST implements the REST endpoint for changing the status of an ingress
-type StatusREST struct {
-	store *genericregistry.Store
-}
-
-// New creates an instance of the StatusREST object
-func (r *StatusREST) New() runtime.Object {
-	return &networkingapi.NetworkPolicy{}
-}
-
-// Destroy cleans up resources on shutdown.
-func (r *StatusREST) Destroy() {
-	// Given that underlying store is shared with REST,
-	// we don't destroy it here explicitly.
-}
-
-// Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	return r.store.Get(ctx, name, options)
-}
-
-// Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
-	// subresources should never allow create on update.
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
-}
-
-// GetResetFields implements rest.ResetFieldsStrategy
-func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
-	return r.store.GetResetFields()
 }

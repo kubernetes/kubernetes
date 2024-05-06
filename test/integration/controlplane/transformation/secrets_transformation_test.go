@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"testing"
 
-	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
+	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 )
@@ -85,17 +85,16 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 		// TODO: add secretbox
 	}
 	for _, tt := range testCases {
-		test, err := newTransformTest(t, tt.transformerConfigContent, false, "")
+		test, err := newTransformTest(t, tt.transformerConfigContent, false, "", nil)
 		if err != nil {
-			test.cleanUp()
-			t.Errorf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
+			t.Fatalf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
 			continue
 		}
 		test.secret, err = test.createSecret(testSecret, testNamespace)
 		if err != nil {
 			t.Fatalf("Failed to create test secret, error: %v", err)
 		}
-		test.runResource(test.logger, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
+		test.runResource(test.TContext, tt.unSealFunc, tt.transformerPrefix, "", "v1", "secrets", test.secret.Name, test.secret.Namespace)
 		test.cleanUp()
 	}
 }
@@ -120,11 +119,11 @@ func BenchmarkAESCBCEnvelopeWrite(b *testing.B) {
 
 func runBenchmark(b *testing.B, transformerConfig string) {
 	b.StopTimer()
-	test, err := newTransformTest(b, transformerConfig, false, "")
-	defer test.cleanUp()
+	test, err := newTransformTest(b, transformerConfig, false, "", nil)
 	if err != nil {
 		b.Fatalf("failed to setup benchmark for config %s, error was %v", transformerConfig, err)
 	}
+	defer test.cleanUp()
 
 	b.StartTimer()
 	test.benchmark(b)
@@ -133,14 +132,17 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 }
 
 func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
-	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
+	transformerConfig apiserverv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block cipher: %v", err)
 	}
 
-	gcmTransformer := aestransformer.NewGCMTransformer(block)
+	gcmTransformer, err := aestransformer.NewGCMTransformer(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transformer from block: %v", err)
+	}
 
 	clearText, _, err := gcmTransformer.TransformFromStorage(ctx, cipherText, dataCtx)
 	if err != nil {
@@ -151,7 +153,7 @@ func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx va
 }
 
 func unSealWithCBCTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
-	transformerConfig apiserverconfigv1.ProviderConfiguration) ([]byte, error) {
+	transformerConfig apiserverv1.ProviderConfiguration) ([]byte, error) {
 
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
 	if err != nil {

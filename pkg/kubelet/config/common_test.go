@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/utils/ptr"
 )
 
 func noDefault(*core.Pod) error { return nil }
@@ -104,6 +106,76 @@ func TestDecodeSinglePod(t *testing.T) {
 		if !reflect.DeepEqual(pod, podOut) {
 			t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, podOut, string(yaml))
 		}
+	}
+}
+
+func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
+	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			UID:       "12345",
+			Namespace: "mynamespace",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "ctb-volume",
+						MountPath: "/var/run/ctb-volume",
+					},
+				},
+			}},
+			Volumes: []v1.Volume{
+				{
+					Name: "ctb-volume",
+					VolumeSource: v1.VolumeSource{
+						Projected: &v1.ProjectedVolumeSource{
+							Sources: []v1.VolumeProjection{
+								{
+									ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+										Name: ptr.To("my-ctb"),
+										Path: "ctb-file",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      v1.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	_, _, err = tryDecodeSinglePod(json, noDefault)
+	if !errors.Is(err, ErrStaticPodTriedToUseClusterTrustBundle) {
+		t.Errorf("Got error %q, want %q", err, ErrStaticPodTriedToUseClusterTrustBundle)
 	}
 }
 

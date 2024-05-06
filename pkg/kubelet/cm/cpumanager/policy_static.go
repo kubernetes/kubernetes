@@ -27,10 +27,11 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/cpuset"
 )
 
 const (
@@ -277,6 +278,12 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	// If so, add its cpuset to the cpuset of reusable CPUs for any new allocations.
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
+			if types.IsRestartableInitContainer(&initContainer) {
+				// If the container is a restartable init container, we should not
+				// reuse its cpuset, as a restartable init container can run with
+				// regular containers.
+				break
+			}
 			p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Union(cset)
 			return
 		}
@@ -424,12 +431,12 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
 	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// ResourcesAllocated holds the value of Container.Resources.Requests when the pod was admitted.
+	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
 	// We should return this value because this is what kubelet agreed to allocate for the container
 	// and the value configured with runtime.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			cpuQuantity = cs.ResourcesAllocated[v1.ResourceCPU]
+			cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
 		}
 	}
 	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
@@ -444,15 +451,21 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 	// The maximum of requested CPUs by init containers.
 	requestedByInitContainers := 0
+	requestedByRestartableInitContainers := 0
 	for _, container := range pod.Spec.InitContainers {
 		if _, ok := container.Resources.Requests[v1.ResourceCPU]; !ok {
 			continue
 		}
 		requestedCPU := p.guaranteedCPUs(pod, &container)
-		if requestedCPU > requestedByInitContainers {
-			requestedByInitContainers = requestedCPU
+		// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+		// for the detail.
+		if types.IsRestartableInitContainer(&container) {
+			requestedByRestartableInitContainers += requestedCPU
+		} else if requestedByRestartableInitContainers+requestedCPU > requestedByInitContainers {
+			requestedByInitContainers = requestedByRestartableInitContainers + requestedCPU
 		}
 	}
+
 	// The sum of requested CPUs by app containers.
 	requestedByAppContainers := 0
 	for _, container := range pod.Spec.Containers {
@@ -462,10 +475,11 @@ func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 		requestedByAppContainers += p.guaranteedCPUs(pod, &container)
 	}
 
-	if requestedByInitContainers > requestedByAppContainers {
+	requestedByLongRunningContainers := requestedByAppContainers + requestedByRestartableInitContainers
+	if requestedByInitContainers > requestedByLongRunningContainers {
 		return requestedByInitContainers
 	}
-	return requestedByAppContainers
+	return requestedByLongRunningContainers
 }
 
 func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
@@ -584,7 +598,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 }
 
-// generateCPUtopologyHints generates a set of TopologyHints given the set of
+// generateCPUTopologyHints generates a set of TopologyHints given the set of
 // available CPUs and the number of CPUs being requested.
 //
 // It follows the convention of marking all hints that have the same number of

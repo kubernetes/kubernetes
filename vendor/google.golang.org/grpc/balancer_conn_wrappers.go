@@ -25,14 +25,20 @@ import (
 	"sync"
 
 	"google.golang.org/grpc/balancer"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/internal/balancer/gracefulswitch"
-	"google.golang.org/grpc/internal/buffer"
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcsync"
 	"google.golang.org/grpc/resolver"
-	"google.golang.org/grpc/status"
+)
+
+type ccbMode int
+
+const (
+	ccbModeActive = iota
+	ccbModeIdle
+	ccbModeClosed
+	ccbModeExitingIdle
 )
 
 // ccBalancerWrapper sits between the ClientConn and the Balancer.
@@ -49,192 +55,89 @@ import (
 // It uses the gracefulswitch.Balancer internally to ensure that balancer
 // switches happen in a graceful manner.
 type ccBalancerWrapper struct {
-	cc *ClientConn
+	// The following fields are initialized when the wrapper is created and are
+	// read-only afterwards, and therefore can be accessed without a mutex.
+	cc   *ClientConn
+	opts balancer.BuildOptions
 
-	// Since these fields are accessed only from handleXxx() methods which are
-	// synchronized by the watcher goroutine, we do not need a mutex to protect
-	// these fields.
+	// Outgoing (gRPC --> balancer) calls are guaranteed to execute in a
+	// mutually exclusive manner as they are scheduled in the serializer. Fields
+	// accessed *only* in these serializer callbacks, can therefore be accessed
+	// without a mutex.
 	balancer        *gracefulswitch.Balancer
 	curBalancerName string
 
-	updateCh *buffer.Unbounded // Updates written on this channel are processed by watcher().
-	resultCh *buffer.Unbounded // Results of calls to UpdateClientConnState() are pushed here.
-	closed   *grpcsync.Event   // Indicates if close has been called.
-	done     *grpcsync.Event   // Indicates if close has completed its work.
+	// mu guards access to the below fields. Access to the serializer and its
+	// cancel function needs to be mutex protected because they are overwritten
+	// when the wrapper exits idle mode.
+	mu               sync.Mutex
+	serializer       *grpcsync.CallbackSerializer // To serialize all outoing calls.
+	serializerCancel context.CancelFunc           // To close the seralizer at close/enterIdle time.
+	mode             ccbMode                      // Tracks the current mode of the wrapper.
 }
 
 // newCCBalancerWrapper creates a new balancer wrapper. The underlying balancer
 // is not created until the switchTo() method is invoked.
 func newCCBalancerWrapper(cc *ClientConn, bopts balancer.BuildOptions) *ccBalancerWrapper {
+	ctx, cancel := context.WithCancel(context.Background())
 	ccb := &ccBalancerWrapper{
-		cc:       cc,
-		updateCh: buffer.NewUnbounded(),
-		resultCh: buffer.NewUnbounded(),
-		closed:   grpcsync.NewEvent(),
-		done:     grpcsync.NewEvent(),
+		cc:               cc,
+		opts:             bopts,
+		serializer:       grpcsync.NewCallbackSerializer(ctx),
+		serializerCancel: cancel,
 	}
-	go ccb.watcher()
 	ccb.balancer = gracefulswitch.NewBalancer(ccb, bopts)
 	return ccb
 }
 
-// The following xxxUpdate structs wrap the arguments received as part of the
-// corresponding update. The watcher goroutine uses the 'type' of the update to
-// invoke the appropriate handler routine to handle the update.
-
-type ccStateUpdate struct {
-	ccs *balancer.ClientConnState
-}
-
-type scStateUpdate struct {
-	sc    balancer.SubConn
-	state connectivity.State
-	err   error
-}
-
-type exitIdleUpdate struct{}
-
-type resolverErrorUpdate struct {
-	err error
-}
-
-type switchToUpdate struct {
-	name string
-}
-
-type subConnUpdate struct {
-	acbw *acBalancerWrapper
-}
-
-// watcher is a long-running goroutine which reads updates from a channel and
-// invokes corresponding methods on the underlying balancer. It ensures that
-// these methods are invoked in a synchronous fashion. It also ensures that
-// these methods are invoked in the order in which the updates were received.
-func (ccb *ccBalancerWrapper) watcher() {
-	for {
-		select {
-		case u := <-ccb.updateCh.Get():
-			ccb.updateCh.Load()
-			if ccb.closed.HasFired() {
-				break
-			}
-			switch update := u.(type) {
-			case *ccStateUpdate:
-				ccb.handleClientConnStateChange(update.ccs)
-			case *scStateUpdate:
-				ccb.handleSubConnStateChange(update)
-			case *exitIdleUpdate:
-				ccb.handleExitIdle()
-			case *resolverErrorUpdate:
-				ccb.handleResolverError(update.err)
-			case *switchToUpdate:
-				ccb.handleSwitchTo(update.name)
-			case *subConnUpdate:
-				ccb.handleRemoveSubConn(update.acbw)
-			default:
-				logger.Errorf("ccBalancerWrapper.watcher: unknown update %+v, type %T", update, update)
-			}
-		case <-ccb.closed.Done():
-		}
-
-		if ccb.closed.HasFired() {
-			ccb.handleClose()
-			return
-		}
-	}
-}
-
 // updateClientConnState is invoked by grpc to push a ClientConnState update to
 // the underlying balancer.
-//
-// Unlike other methods invoked by grpc to push updates to the underlying
-// balancer, this method cannot simply push the update onto the update channel
-// and return. It needs to return the error returned by the underlying balancer
-// back to grpc which propagates that to the resolver.
 func (ccb *ccBalancerWrapper) updateClientConnState(ccs *balancer.ClientConnState) error {
-	ccb.updateCh.Put(&ccStateUpdate{ccs: ccs})
+	ccb.mu.Lock()
+	errCh := make(chan error, 1)
+	// Here and everywhere else where Schedule() is called, it is done with the
+	// lock held. But the lock guards only the scheduling part. The actual
+	// callback is called asynchronously without the lock being held.
+	ok := ccb.serializer.Schedule(func(_ context.Context) {
+		errCh <- ccb.balancer.UpdateClientConnState(*ccs)
+	})
+	if !ok {
+		// If we are unable to schedule a function with the serializer, it
+		// indicates that it has been closed. A serializer is only closed when
+		// the wrapper is closed or is in idle.
+		ccb.mu.Unlock()
+		return fmt.Errorf("grpc: cannot send state update to a closed or idle balancer")
+	}
+	ccb.mu.Unlock()
 
-	var res interface{}
-	select {
-	case res = <-ccb.resultCh.Get():
-		ccb.resultCh.Load()
-	case <-ccb.closed.Done():
-		// Return early if the balancer wrapper is closed while we are waiting for
-		// the underlying balancer to process a ClientConnState update.
-		return nil
+	// We get here only if the above call to Schedule succeeds, in which case it
+	// is guaranteed that the scheduled function will run. Therefore it is safe
+	// to block on this channel.
+	err := <-errCh
+	if logger.V(2) && err != nil {
+		logger.Infof("error from balancer.UpdateClientConnState: %v", err)
 	}
-	// If the returned error is nil, attempting to type assert to error leads to
-	// panic. So, this needs to handled separately.
-	if res == nil {
-		return nil
-	}
-	return res.(error)
-}
-
-// handleClientConnStateChange handles a ClientConnState update from the update
-// channel and invokes the appropriate method on the underlying balancer.
-//
-// If the addresses specified in the update contain addresses of type "grpclb"
-// and the selected LB policy is not "grpclb", these addresses will be filtered
-// out and ccs will be modified with the updated address list.
-func (ccb *ccBalancerWrapper) handleClientConnStateChange(ccs *balancer.ClientConnState) {
-	if ccb.curBalancerName != grpclbName {
-		// Filter any grpclb addresses since we don't have the grpclb balancer.
-		var addrs []resolver.Address
-		for _, addr := range ccs.ResolverState.Addresses {
-			if addr.Type == resolver.GRPCLB {
-				continue
-			}
-			addrs = append(addrs, addr)
-		}
-		ccs.ResolverState.Addresses = addrs
-	}
-	ccb.resultCh.Put(ccb.balancer.UpdateClientConnState(*ccs))
+	return err
 }
 
 // updateSubConnState is invoked by grpc to push a subConn state update to the
 // underlying balancer.
 func (ccb *ccBalancerWrapper) updateSubConnState(sc balancer.SubConn, s connectivity.State, err error) {
-	// When updating addresses for a SubConn, if the address in use is not in
-	// the new addresses, the old ac will be tearDown() and a new ac will be
-	// created. tearDown() generates a state change with Shutdown state, we
-	// don't want the balancer to receive this state change. So before
-	// tearDown() on the old ac, ac.acbw (acWrapper) will be set to nil, and
-	// this function will be called with (nil, Shutdown). We don't need to call
-	// balancer method in this case.
-	if sc == nil {
-		return
-	}
-	ccb.updateCh.Put(&scStateUpdate{
-		sc:    sc,
-		state: s,
-		err:   err,
+	ccb.mu.Lock()
+	ccb.serializer.Schedule(func(_ context.Context) {
+		// Even though it is optional for balancers, gracefulswitch ensures
+		// opts.StateListener is set, so this cannot ever be nil.
+		sc.(*acBalancerWrapper).stateListener(balancer.SubConnState{ConnectivityState: s, ConnectionError: err})
 	})
-}
-
-// handleSubConnStateChange handles a SubConnState update from the update
-// channel and invokes the appropriate method on the underlying balancer.
-func (ccb *ccBalancerWrapper) handleSubConnStateChange(update *scStateUpdate) {
-	ccb.balancer.UpdateSubConnState(update.sc, balancer.SubConnState{ConnectivityState: update.state, ConnectionError: update.err})
-}
-
-func (ccb *ccBalancerWrapper) exitIdle() {
-	ccb.updateCh.Put(&exitIdleUpdate{})
-}
-
-func (ccb *ccBalancerWrapper) handleExitIdle() {
-	if ccb.cc.GetState() != connectivity.Idle {
-		return
-	}
-	ccb.balancer.ExitIdle()
+	ccb.mu.Unlock()
 }
 
 func (ccb *ccBalancerWrapper) resolverError(err error) {
-	ccb.updateCh.Put(&resolverErrorUpdate{err: err})
-}
-
-func (ccb *ccBalancerWrapper) handleResolverError(err error) {
-	ccb.balancer.ResolverError(err)
+	ccb.mu.Lock()
+	ccb.serializer.Schedule(func(_ context.Context) {
+		ccb.balancer.ResolverError(err)
+	})
+	ccb.mu.Unlock()
 }
 
 // switchTo is invoked by grpc to instruct the balancer wrapper to switch to the
@@ -248,24 +151,27 @@ func (ccb *ccBalancerWrapper) handleResolverError(err error) {
 // the ccBalancerWrapper keeps track of the current LB policy name, and skips
 // the graceful balancer switching process if the name does not change.
 func (ccb *ccBalancerWrapper) switchTo(name string) {
-	ccb.updateCh.Put(&switchToUpdate{name: name})
+	ccb.mu.Lock()
+	ccb.serializer.Schedule(func(_ context.Context) {
+		// TODO: Other languages use case-sensitive balancer registries. We should
+		// switch as well. See: https://github.com/grpc/grpc-go/issues/5288.
+		if strings.EqualFold(ccb.curBalancerName, name) {
+			return
+		}
+		ccb.buildLoadBalancingPolicy(name)
+	})
+	ccb.mu.Unlock()
 }
 
-// handleSwitchTo handles a balancer switch update from the update channel. It
-// calls the SwitchTo() method on the gracefulswitch.Balancer with a
-// balancer.Builder corresponding to name. If no balancer.Builder is registered
-// for the given name, it uses the default LB policy which is "pick_first".
-func (ccb *ccBalancerWrapper) handleSwitchTo(name string) {
-	// TODO: Other languages use case-insensitive balancer registries. We should
-	// switch as well. See: https://github.com/grpc/grpc-go/issues/5288.
-	if strings.EqualFold(ccb.curBalancerName, name) {
-		return
-	}
-
-	// TODO: Ensure that name is a registered LB policy when we get here.
-	// We currently only validate the `loadBalancingConfig` field. We need to do
-	// the same for the `loadBalancingPolicy` field and reject the service config
-	// if the specified policy is not registered.
+// buildLoadBalancingPolicy performs the following:
+//   - retrieve a balancer builder for the given name. Use the default LB
+//     policy, pick_first, if no LB policy with name is found in the registry.
+//   - instruct the gracefulswitch balancer to switch to the above builder. This
+//     will actually build the new balancer.
+//   - update the `curBalancerName` field
+//
+// Must be called from a serializer callback.
+func (ccb *ccBalancerWrapper) buildLoadBalancingPolicy(name string) {
 	builder := balancer.Get(name)
 	if builder == nil {
 		channelz.Warningf(logger, ccb.cc.channelzID, "Channel switches to new LB policy %q, since the specified LB policy %q was not registered", PickFirstBalancerName, name)
@@ -281,26 +187,112 @@ func (ccb *ccBalancerWrapper) handleSwitchTo(name string) {
 	ccb.curBalancerName = builder.Name()
 }
 
-// handleRemoveSucConn handles a request from the underlying balancer to remove
-// a subConn.
-//
-// See comments in RemoveSubConn() for more details.
-func (ccb *ccBalancerWrapper) handleRemoveSubConn(acbw *acBalancerWrapper) {
-	ccb.cc.removeAddrConn(acbw.getAddrConn(), errConnDrain)
-}
-
 func (ccb *ccBalancerWrapper) close() {
-	ccb.closed.Fire()
-	<-ccb.done.Done()
+	channelz.Info(logger, ccb.cc.channelzID, "ccBalancerWrapper: closing")
+	ccb.closeBalancer(ccbModeClosed)
 }
 
-func (ccb *ccBalancerWrapper) handleClose() {
-	ccb.balancer.Close()
-	ccb.done.Fire()
+// enterIdleMode is invoked by grpc when the channel enters idle mode upon
+// expiry of idle_timeout. This call blocks until the balancer is closed.
+func (ccb *ccBalancerWrapper) enterIdleMode() {
+	channelz.Info(logger, ccb.cc.channelzID, "ccBalancerWrapper: entering idle mode")
+	ccb.closeBalancer(ccbModeIdle)
+}
+
+// closeBalancer is invoked when the channel is being closed or when it enters
+// idle mode upon expiry of idle_timeout.
+func (ccb *ccBalancerWrapper) closeBalancer(m ccbMode) {
+	ccb.mu.Lock()
+	if ccb.mode == ccbModeClosed || ccb.mode == ccbModeIdle {
+		ccb.mu.Unlock()
+		return
+	}
+
+	ccb.mode = m
+	done := ccb.serializer.Done()
+	b := ccb.balancer
+	ok := ccb.serializer.Schedule(func(_ context.Context) {
+		// Close the serializer to ensure that no more calls from gRPC are sent
+		// to the balancer.
+		ccb.serializerCancel()
+		// Empty the current balancer name because we don't have a balancer
+		// anymore and also so that we act on the next call to switchTo by
+		// creating a new balancer specified by the new resolver.
+		ccb.curBalancerName = ""
+	})
+	if !ok {
+		ccb.mu.Unlock()
+		return
+	}
+	ccb.mu.Unlock()
+
+	// Give enqueued callbacks a chance to finish before closing the balancer.
+	<-done
+	b.Close()
+}
+
+// exitIdleMode is invoked by grpc when the channel exits idle mode either
+// because of an RPC or because of an invocation of the Connect() API. This
+// recreates the balancer that was closed previously when entering idle mode.
+//
+// If the channel is not in idle mode, we know for a fact that we are here as a
+// result of the user calling the Connect() method on the ClientConn. In this
+// case, we can simply forward the call to the underlying balancer, instructing
+// it to reconnect to the backends.
+func (ccb *ccBalancerWrapper) exitIdleMode() {
+	ccb.mu.Lock()
+	if ccb.mode == ccbModeClosed {
+		// Request to exit idle is a no-op when wrapper is already closed.
+		ccb.mu.Unlock()
+		return
+	}
+
+	if ccb.mode == ccbModeIdle {
+		// Recreate the serializer which was closed when we entered idle.
+		ctx, cancel := context.WithCancel(context.Background())
+		ccb.serializer = grpcsync.NewCallbackSerializer(ctx)
+		ccb.serializerCancel = cancel
+	}
+
+	// The ClientConn guarantees that mutual exclusion between close() and
+	// exitIdleMode(), and since we just created a new serializer, we can be
+	// sure that the below function will be scheduled.
+	done := make(chan struct{})
+	ccb.serializer.Schedule(func(_ context.Context) {
+		defer close(done)
+
+		ccb.mu.Lock()
+		defer ccb.mu.Unlock()
+
+		if ccb.mode != ccbModeIdle {
+			ccb.balancer.ExitIdle()
+			return
+		}
+
+		// Gracefulswitch balancer does not support a switchTo operation after
+		// being closed. Hence we need to create a new one here.
+		ccb.balancer = gracefulswitch.NewBalancer(ccb, ccb.opts)
+		ccb.mode = ccbModeActive
+		channelz.Info(logger, ccb.cc.channelzID, "ccBalancerWrapper: exiting idle mode")
+
+	})
+	ccb.mu.Unlock()
+
+	<-done
+}
+
+func (ccb *ccBalancerWrapper) isIdleOrClosed() bool {
+	ccb.mu.Lock()
+	defer ccb.mu.Unlock()
+	return ccb.mode == ccbModeIdle || ccb.mode == ccbModeClosed
 }
 
 func (ccb *ccBalancerWrapper) NewSubConn(addrs []resolver.Address, opts balancer.NewSubConnOptions) (balancer.SubConn, error) {
-	if len(addrs) <= 0 {
+	if ccb.isIdleOrClosed() {
+		return nil, fmt.Errorf("grpc: cannot create SubConn when balancer is closed or idle")
+	}
+
+	if len(addrs) == 0 {
 		return nil, fmt.Errorf("grpc: cannot create SubConn with empty address list")
 	}
 	ac, err := ccb.cc.newAddrConn(addrs, opts)
@@ -308,32 +300,26 @@ func (ccb *ccBalancerWrapper) NewSubConn(addrs []resolver.Address, opts balancer
 		channelz.Warningf(logger, ccb.cc.channelzID, "acBalancerWrapper: NewSubConn: failed to newAddrConn: %v", err)
 		return nil, err
 	}
-	acbw := &acBalancerWrapper{ac: ac, producers: make(map[balancer.ProducerBuilder]*refCountedProducer)}
-	acbw.ac.mu.Lock()
+	acbw := &acBalancerWrapper{
+		ccb:           ccb,
+		ac:            ac,
+		producers:     make(map[balancer.ProducerBuilder]*refCountedProducer),
+		stateListener: opts.StateListener,
+	}
 	ac.acbw = acbw
-	acbw.ac.mu.Unlock()
 	return acbw, nil
 }
 
 func (ccb *ccBalancerWrapper) RemoveSubConn(sc balancer.SubConn) {
-	// Before we switched the ccBalancerWrapper to use gracefulswitch.Balancer, it
-	// was required to handle the RemoveSubConn() method asynchronously by pushing
-	// the update onto the update channel. This was done to avoid a deadlock as
-	// switchBalancer() was holding cc.mu when calling Close() on the old
-	// balancer, which would in turn call RemoveSubConn().
-	//
-	// With the use of gracefulswitch.Balancer in ccBalancerWrapper, handling this
-	// asynchronously is probably not required anymore since the switchTo() method
-	// handles the balancer switch by pushing the update onto the channel.
-	// TODO(easwars): Handle this inline.
-	acbw, ok := sc.(*acBalancerWrapper)
-	if !ok {
-		return
-	}
-	ccb.updateCh.Put(&subConnUpdate{acbw: acbw})
+	// The graceful switch balancer will never call this.
+	logger.Errorf("ccb RemoveSubConn(%v) called unexpectedly, sc")
 }
 
 func (ccb *ccBalancerWrapper) UpdateAddresses(sc balancer.SubConn, addrs []resolver.Address) {
+	if ccb.isIdleOrClosed() {
+		return
+	}
+
 	acbw, ok := sc.(*acBalancerWrapper)
 	if !ok {
 		return
@@ -342,6 +328,10 @@ func (ccb *ccBalancerWrapper) UpdateAddresses(sc balancer.SubConn, addrs []resol
 }
 
 func (ccb *ccBalancerWrapper) UpdateState(s balancer.State) {
+	if ccb.isIdleOrClosed() {
+		return
+	}
+
 	// Update picker before updating state.  Even though the ordering here does
 	// not matter, it can lead to multiple calls of Pick in the common start-up
 	// case where we wait for ready and then perform an RPC.  If the picker is
@@ -352,6 +342,10 @@ func (ccb *ccBalancerWrapper) UpdateState(s balancer.State) {
 }
 
 func (ccb *ccBalancerWrapper) ResolveNow(o resolver.ResolveNowOptions) {
+	if ccb.isIdleOrClosed() {
+		return
+	}
+
 	ccb.cc.resolveNow(o)
 }
 
@@ -362,78 +356,57 @@ func (ccb *ccBalancerWrapper) Target() string {
 // acBalancerWrapper is a wrapper on top of ac for balancers.
 // It implements balancer.SubConn interface.
 type acBalancerWrapper struct {
+	ac            *addrConn          // read-only
+	ccb           *ccBalancerWrapper // read-only
+	stateListener func(balancer.SubConnState)
+
 	mu        sync.Mutex
-	ac        *addrConn
 	producers map[balancer.ProducerBuilder]*refCountedProducer
 }
 
+func (acbw *acBalancerWrapper) String() string {
+	return fmt.Sprintf("SubConn(id:%d)", acbw.ac.channelzID.Int())
+}
+
 func (acbw *acBalancerWrapper) UpdateAddresses(addrs []resolver.Address) {
-	acbw.mu.Lock()
-	defer acbw.mu.Unlock()
-	if len(addrs) <= 0 {
-		acbw.ac.cc.removeAddrConn(acbw.ac, errConnDrain)
-		return
-	}
-	if !acbw.ac.tryUpdateAddrs(addrs) {
-		cc := acbw.ac.cc
-		opts := acbw.ac.scopts
-		acbw.ac.mu.Lock()
-		// Set old ac.acbw to nil so the Shutdown state update will be ignored
-		// by balancer.
-		//
-		// TODO(bar) the state transition could be wrong when tearDown() old ac
-		// and creating new ac, fix the transition.
-		acbw.ac.acbw = nil
-		acbw.ac.mu.Unlock()
-		acState := acbw.ac.getState()
-		acbw.ac.cc.removeAddrConn(acbw.ac, errConnDrain)
-
-		if acState == connectivity.Shutdown {
-			return
-		}
-
-		newAC, err := cc.newAddrConn(addrs, opts)
-		if err != nil {
-			channelz.Warningf(logger, acbw.ac.channelzID, "acBalancerWrapper: UpdateAddresses: failed to newAddrConn: %v", err)
-			return
-		}
-		acbw.ac = newAC
-		newAC.mu.Lock()
-		newAC.acbw = acbw
-		newAC.mu.Unlock()
-		if acState != connectivity.Idle {
-			go newAC.connect()
-		}
-	}
+	acbw.ac.updateAddrs(addrs)
 }
 
 func (acbw *acBalancerWrapper) Connect() {
-	acbw.mu.Lock()
-	defer acbw.mu.Unlock()
 	go acbw.ac.connect()
 }
 
-func (acbw *acBalancerWrapper) getAddrConn() *addrConn {
-	acbw.mu.Lock()
-	defer acbw.mu.Unlock()
-	return acbw.ac
+func (acbw *acBalancerWrapper) Shutdown() {
+	ccb := acbw.ccb
+	if ccb.isIdleOrClosed() {
+		// It it safe to ignore this call when the balancer is closed or in idle
+		// because the ClientConn takes care of closing the connections.
+		//
+		// Not returning early from here when the balancer is closed or in idle
+		// leads to a deadlock though, because of the following sequence of
+		// calls when holding cc.mu:
+		// cc.exitIdleMode --> ccb.enterIdleMode --> gsw.Close -->
+		// ccb.RemoveAddrConn --> cc.removeAddrConn
+		return
+	}
+
+	ccb.cc.removeAddrConn(acbw.ac, errConnDrain)
 }
 
-var errSubConnNotReady = status.Error(codes.Unavailable, "SubConn not currently connected")
-
 // NewStream begins a streaming RPC on the addrConn.  If the addrConn is not
-// ready, returns errSubConnNotReady.
+// ready, blocks until it is or ctx expires.  Returns an error when the context
+// expires or the addrConn is shut down.
 func (acbw *acBalancerWrapper) NewStream(ctx context.Context, desc *StreamDesc, method string, opts ...CallOption) (ClientStream, error) {
-	transport := acbw.ac.getReadyTransport()
-	if transport == nil {
-		return nil, errSubConnNotReady
+	transport, err := acbw.ac.getTransport(ctx)
+	if err != nil {
+		return nil, err
 	}
 	return newNonRetryClientStream(ctx, desc, method, transport, acbw.ac, opts...)
 }
 
 // Invoke performs a unary RPC.  If the addrConn is not ready, returns
 // errSubConnNotReady.
-func (acbw *acBalancerWrapper) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...CallOption) error {
+func (acbw *acBalancerWrapper) Invoke(ctx context.Context, method string, args any, reply any, opts ...CallOption) error {
 	cs, err := acbw.NewStream(ctx, unaryStreamDesc, method, opts...)
 	if err != nil {
 		return err

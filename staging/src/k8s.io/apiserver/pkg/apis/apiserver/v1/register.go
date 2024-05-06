@@ -40,13 +40,17 @@ func init() {
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
 	localSchemeBuilder.Register(addKnownTypes)
+	localSchemeBuilder.Register(addDefaultingFuncs)
 }
 
 // Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&AdmissionConfiguration{},
+		&EncryptionConfiguration{},
 	)
+	// also register into the v1 group as EncryptionConfig (due to a docs bug)
+	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "EncryptionConfig"}, &EncryptionConfiguration{})
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

@@ -140,15 +140,16 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascadingStrategy, p.gracePeriod, p.dryRunStrategy == cmdutil.DryRunServer)
+	ctx := context.TODO()
+	return runDelete(ctx, namespace, name, mapping, p.dynamicClient, p.cascadingStrategy, p.gracePeriod, p.dryRunStrategy == cmdutil.DryRunServer)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascadingStrategy metav1.DeletionPropagation, gracePeriod int, serverDryRun bool) error {
+func runDelete(ctx context.Context, namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascadingStrategy metav1.DeletionPropagation, gracePeriod int, serverDryRun bool) error {
 	options := asDeleteOptions(cascadingStrategy, gracePeriod)
 	if serverDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
-	return c.Resource(mapping.Resource).Namespace(namespace).Delete(context.TODO(), name, options)
+	return c.Resource(mapping.Resource).Namespace(namespace).Delete(ctx, name, options)
 }
 
 func asDeleteOptions(cascadingStrategy metav1.DeletionPropagation, gracePeriod int) metav1.DeleteOptions {

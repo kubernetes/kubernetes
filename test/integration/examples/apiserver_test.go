@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -48,6 +49,7 @@ import (
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
@@ -56,15 +58,179 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+func TestAPIServiceWaitOnStart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	t.Cleanup(cancel)
+
+	etcdConfig := framework.SharedEtcd()
+
+	etcd3Client, _, err := integration.GetEtcdClients(etcdConfig.Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { etcd3Client.Close() })
+
+	t.Log("Pollute CRD path in etcd so CRD lists cannot succeed and the informer cannot sync")
+	bogusCRDEtcdPath := path.Join("/", etcdConfig.Prefix, "apiextensions.k8s.io/customresourcedefinitions/bogus")
+	if _, err := etcd3Client.KV.Put(ctx, bogusCRDEtcdPath, `bogus data`); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Populate a valid CRD and managed APIService in etcd")
+	if _, err := etcd3Client.KV.Put(
+		ctx,
+		path.Join("/", etcdConfig.Prefix, "apiextensions.k8s.io/customresourcedefinitions/widgets.valid.example.com"),
+		`{
+			"apiVersion":"apiextensions.k8s.io/v1beta1",
+			"kind":"CustomResourceDefinition",
+			"metadata":{
+				"name":"widgets.valid.example.com",
+				"uid":"mycrd",
+				"creationTimestamp": "2022-06-08T23:46:32Z"
+			},
+			"spec":{
+				"scope": "Namespaced",
+				"group":"valid.example.com",
+				"version":"v1",
+				"names":{
+					"kind": "Widget",
+					"listKind": "WidgetList",
+					"plural": "widgets",
+					"singular": "widget"
+				}
+			},
+			"status": {
+				"acceptedNames": {
+					"kind": "Widget",
+					"listKind": "WidgetList",
+					"plural": "widgets",
+					"singular": "widget"
+				},
+				"conditions": [
+					{
+						"lastTransitionTime": "2023-05-18T15:03:57Z",
+						"message": "no conflicts found",
+						"reason": "NoConflicts",
+						"status": "True",
+						"type": "NamesAccepted"
+					},
+					{
+						"lastTransitionTime": "2023-05-18T15:03:57Z",
+						"message": "the initial names have been accepted",
+						"reason": "InitialNamesAccepted",
+						"status": "True",
+						"type": "Established"
+					}
+				],
+				"storedVersions": [
+					"v1"
+				]
+			}
+		}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := etcd3Client.KV.Put(
+		ctx,
+		path.Join("/", etcdConfig.Prefix, "apiregistration.k8s.io/apiservices/v1.valid.example.com"),
+		`{
+				"apiVersion":"apiregistration.k8s.io/v1",
+				"kind":"APIService",
+				"metadata": {
+					"name": "v1.valid.example.com",
+					"uid":"foo",
+					"creationTimestamp": "2022-06-08T23:46:32Z",
+					"labels":{"kube-aggregator.kubernetes.io/automanaged":"true"}
+				},
+				"spec": {
+					"group": "valid.example.com",
+					"version": "v1",
+					"groupPriorityMinimum":100,
+					"versionPriority":10
+				}
+			}`,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Populate a stale managed APIService in etcd")
+	if _, err := etcd3Client.KV.Put(
+		ctx,
+		path.Join("/", etcdConfig.Prefix, "apiregistration.k8s.io/apiservices/v1.stale.example.com"),
+		`{
+			"apiVersion":"apiregistration.k8s.io/v1",
+			"kind":"APIService",
+			"metadata": {
+				"name": "v1.stale.example.com",
+				"uid":"foo",
+				"creationTimestamp": "2022-06-08T23:46:32Z",
+				"labels":{"kube-aggregator.kubernetes.io/automanaged":"true"}
+			},
+			"spec": {
+				"group": "stale.example.com",
+				"version": "v1",
+				"groupPriorityMinimum":100,
+				"versionPriority":10
+			}
+		}`,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Starting server")
+	options := kastesting.NewDefaultTestServerOptions()
+	options.SkipHealthzCheck = true
+	testServer := kastesting.StartTestServerOrDie(t, options, nil, etcdConfig)
+	defer testServer.TearDownFn()
+
+	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
+	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeClientConfig)
+
+	t.Log("Ensure both APIService objects remain")
+	for i := 0; i < 10; i++ {
+		if _, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1.valid.example.com", metav1.GetOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1.stale.example.com", metav1.GetOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+	}
+
+	t.Log("Clear the bogus CRD data so the informer can sync")
+	if _, err := etcd3Client.KV.Delete(ctx, bogusCRDEtcdPath); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Ensure the stale APIService object is cleaned up")
+	if err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1.stale.example.com", metav1.GetOptions{})
+		if err == nil {
+			t.Log("stale APIService still exists, waiting...")
+			return false, nil
+		}
+		if !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("Ensure the valid APIService object remains")
+	for i := 0; i < 5; i++ {
+		time.Sleep(time.Second)
+		if _, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1.valid.example.com", metav1.GetOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestAggregatedAPIServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
 	// makes the kube-apiserver very responsive.  it's normally a minute
 	dynamiccertificates.FileRefreshDuration = 1 * time.Second
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 
 	// we need the wardle port information first to set up the service resolver
 	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
@@ -119,7 +285,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		}
 		o.RecommendedOptions.SecureServing.Listener = listener
 		o.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
-		wardleCmd := sampleserver.NewCommandStartWardleServer(o, stopCh)
+		wardleCmd := sampleserver.NewCommandStartWardleServer(ctx, o)
 		wardleCmd.SetArgs([]string{
 			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
 			"--authorization-kubeconfig", wardleToKASKubeConfigFile,
@@ -522,6 +688,7 @@ func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfi
 		t.Fatal(err)
 	}
 
+	defer wardleToKASKubeConfigFile.Close()
 	return wardleToKASKubeConfigFile.Name()
 }
 

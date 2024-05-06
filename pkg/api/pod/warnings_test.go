@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -143,9 +144,10 @@ func TestWarnings(t *testing.T) {
 		api.ResourceEphemeralStorage: resource.MustParse("4m"),
 	}
 	testcases := []struct {
-		name     string
-		template *api.PodTemplateSpec
-		expected []string
+		name        string
+		template    *api.PodTemplateSpec
+		oldTemplate *api.PodTemplateSpec
+		expected    []string
 	}{
 		{
 			name:     "null",
@@ -214,6 +216,24 @@ func TestWarnings(t *testing.T) {
 				}},
 			},
 			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, non-functional in v1.26+`},
+		}, {
+			name: "CephFS",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].cephfs: deprecated in v1.28, non-functional in v1.31+`},
+		},
+
+		{
+			name: "rbd",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].rbd: deprecated in v1.28, non-functional in v1.31+`},
 		},
 		{
 			name: "duplicate hostAlias",
@@ -255,38 +275,38 @@ func TestWarnings(t *testing.T) {
 			},
 		},
 		{
-			name: "duplicate volume",
-			template: &api.PodTemplateSpec{Spec: api.PodSpec{
-				Volumes: []api.Volume{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
-				}},
-			},
-			expected: []string{
-				`spec.volumes[1].name: duplicate name "a"`,
-				`spec.volumes[2].name: duplicate name "a"`,
-			},
-		},
-		{
 			name: "duplicate env",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				InitContainers: []api.Container{{Env: []api.EnvVar{
-					{Name: "a"},
-					{Name: "a"},
-					{Name: "a"},
+					{Name: "a", Value: "a"},
+					{Name: "a", Value: "a"},
+					{Name: "a", Value: "other"},
+					{Name: "a", Value: ""},
+					{Name: "a", Value: "$(a)"},
+					{Name: "a", ValueFrom: &api.EnvVarSource{}},
+					{Name: "a", Value: "$(a) $(a)"}, // no warning
 				}}},
 				Containers: []api.Container{{Env: []api.EnvVar{
-					{Name: "b"},
-					{Name: "b"},
-					{Name: "b"},
+					{Name: "b", Value: "b"},
+					{Name: "b", Value: "b"},
+					{Name: "b", Value: "other"},
+					{Name: "b", Value: ""},
+					{Name: "b", Value: "$(b)"},
+					{Name: "b", ValueFrom: &api.EnvVarSource{}},
+					{Name: "b", Value: "$(b) $(b)"}, // no warning
 				}}},
 			}},
 			expected: []string{
-				`spec.initContainers[0].env[1].name: duplicate name "a"`,
-				`spec.initContainers[0].env[2].name: duplicate name "a"`,
-				`spec.containers[0].env[1].name: duplicate name "b"`,
-				`spec.containers[0].env[2].name: duplicate name "b"`,
+				`spec.initContainers[0].env[1]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[2]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[3]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[4]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[5]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.containers[0].env[1]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[2]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[3]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[4]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[5]: hides previous definition of "b", which may be dropped when using apply`,
 			},
 		},
 		{
@@ -401,12 +421,30 @@ func TestWarnings(t *testing.T) {
 			template: &api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					TopologySpreadConstraints: []api.TopologySpreadConstraint{
-						{TopologyKey: `foo`},
-						{TopologyKey: `beta.kubernetes.io/arch`},
-						{TopologyKey: `beta.kubernetes.io/os`},
-						{TopologyKey: `failure-domain.beta.kubernetes.io/region`},
-						{TopologyKey: `failure-domain.beta.kubernetes.io/zone`},
-						{TopologyKey: `beta.kubernetes.io/instance-type`},
+						{
+							TopologyKey:   `foo`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `beta.kubernetes.io/arch`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `beta.kubernetes.io/os`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `failure-domain.beta.kubernetes.io/region`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `failure-domain.beta.kubernetes.io/zone`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							TopologyKey:   `beta.kubernetes.io/instance-type`,
+							LabelSelector: &metav1.LabelSelector{},
+						},
 					},
 				},
 			},
@@ -467,7 +505,7 @@ func TestWarnings(t *testing.T) {
 				Spec: api.PodSpec{Volumes: []api.Volume{
 					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
 						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
-							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.VolumeResourceRequirements{
 								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200Mi")}}},
 						},
 					}}}}},
@@ -481,7 +519,7 @@ func TestWarnings(t *testing.T) {
 				Spec: api.PodSpec{Volumes: []api.Volume{
 					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
 						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
-							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.VolumeResourceRequirements{
 								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200m")}}},
 						},
 					}}}}},
@@ -502,16 +540,539 @@ func TestWarnings(t *testing.T) {
 				`spec.terminationGracePeriodSeconds: must be >= 0; negative values are invalid and will be treated as 1`,
 			},
 		},
+		{
+			name: "null LabelSelector in topologySpreadConstraints",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							LabelSelector: &metav1.LabelSelector{},
+						},
+						{
+							LabelSelector: nil,
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.topologySpreadConstraints[1].labelSelector: a null labelSelector results in matching no pod`,
+			},
+		},
+		{
+			name: "null LabelSelector in PodAffinity",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{},
+								},
+								{
+									LabelSelector: nil,
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{},
+									},
+								},
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: nil,
+									},
+								},
+							},
+						},
+						PodAntiAffinity: &api.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{},
+								},
+								{
+									LabelSelector: nil,
+								},
+							},
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{},
+									},
+								},
+								{
+									PodAffinityTerm: api.PodAffinityTerm{
+										LabelSelector: nil,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: a null labelSelector results in matching no pod`,
+				`spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
+			},
+		},
+		{
+			name: "container no ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name:  "foo",
+					Ports: []api.ContainerPort{},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, one port",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, same protocol, different ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 81, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, different protocols, same port",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, Protocol: api.ProtocolTCP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, same protocol, same port, different hostport",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80},
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 81},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "one container, two ports, same protocol, port and hostPort, different hostIP",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.2"},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, same protocol, different ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 81, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, different protocols, same port",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, same protocol, same port, different hostport",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 81},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "two containers, one port each, same protocol, port and hostPort, different hostIP",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolTCP, HostPort: 80, HostIP: "10.0.0.2"},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "duplicate container ports with same port and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate container ports with same port, hostPort and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate container ports with same port, host port, host IP and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "one container port hostIP set without host port set",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[0]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
+			},
+		},
+		{
+			name: "duplicate container ports with one host port set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: overlapping port definition with spec.containers[0].ports[0]`,
+				`spec.containers[0].ports[1]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
+			},
+		},
+		{
+			name: "duplicate container ports without one host IP set and two with",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.2"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+				`spec.containers[0].ports[2]: dangerously ambiguous port definition with spec.containers[0].ports[1]`,
+			},
+		},
+		{
+			name: "duplicate container ports with one host IP set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with same port and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with same port, hostPort and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with same port, host port, host IP and protocol",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate containers with one host port set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: overlapping port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: hostIP set without hostPort: {Name: HostPort:0 ContainerPort:80 Protocol:UDP HostIP:10.0.0.1}`,
+			},
+		},
+		{
+			name: "duplicate container ports without one host IP set and one with",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "duplicate container ports with one host IP set and one without",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP, HostIP: "10.0.0.1"},
+					},
+				}, {
+					Name: "bar",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[1].ports[0]: dangerously ambiguous port definition with spec.containers[0].ports[0]`,
+			},
+		},
+		{
+			name: "create duplicate container ports in two containers",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+							{ContainerPort: 180, HostPort: 80, Protocol: api.ProtocolUDP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolUDP},
+						},
+					}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[2]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
+			},
+		},
+		{
+			name: "update duplicate container ports in two containers",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 180, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					}},
+			}},
+			oldTemplate: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 180, Protocol: api.ProtocolTCP},
+							{ContainerPort: 180, HostPort: 80, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 180, Protocol: api.ProtocolTCP},
+							{ContainerPort: 80, HostPort: 80, Protocol: api.ProtocolTCP},
+						},
+					}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[2]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[0]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[0]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[0].ports[2]`,
+				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForPodTemplate(context.TODO(), nil, tc.template, &api.PodTemplateSpec{})...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			var oldTemplate *api.PodTemplateSpec
+			if tc.oldTemplate != nil {
+				oldTemplate = tc.oldTemplate
+			}
+			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})
@@ -524,13 +1085,100 @@ func TestWarnings(t *testing.T) {
 					Spec:       tc.template.Spec,
 				}
 			}
-			actual := sets.NewString(GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
+			}
+		})
+	}
+}
+
+func TestTemplateOnlyWarnings(t *testing.T) {
+	testcases := []struct {
+		name        string
+		template    *api.PodTemplateSpec
+		oldTemplate *api.PodTemplateSpec
+		expected    []string
+	}{
+		{
+			name: "annotations",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
+				}},
+				Spec: api.PodSpec{Containers: []api.Container{{Name: "foo"}}},
+			},
+			expected: []string{
+				`template.metadata.annotations[container.apparmor.security.beta.kubernetes.io/foo]: deprecated since v1.30; use the "appArmorProfile" field instead`,
+			},
+		},
+		{
+			name: "AppArmor pod field",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
+				}},
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined},
+					},
+					Containers: []api.Container{{
+						Name: "foo",
+					}},
+				},
+			},
+			expected: []string{},
+		},
+		{
+			name: "AppArmor container field",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
+				}},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name: "foo",
+						SecurityContext: &api.SecurityContext{
+							AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined},
+						},
+					}},
+				},
+			},
+			expected: []string{},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run("podspec_"+tc.name, func(t *testing.T) {
+			var oldTemplate *api.PodTemplateSpec
+			if tc.oldTemplate != nil {
+				oldTemplate = tc.oldTemplate
+			}
+			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), field.NewPath("template"), tc.template, oldTemplate)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
+				t.Errorf("missing: %s", missing)
+			}
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
+				t.Errorf("extra: %s", extra)
+			}
+		})
+
+		t.Run("pod_"+tc.name, func(t *testing.T) {
+			var pod *api.Pod
+			if tc.template != nil {
+				pod = &api.Pod{
+					ObjectMeta: tc.template.ObjectMeta,
+					Spec:       tc.template.Spec,
+				}
+			}
+			actual := GetWarningsForPod(context.TODO(), pod, &api.Pod{})
+			if len(actual) > 0 {
+				t.Errorf("unexpected template-only warnings on pod: %v", actual)
 			}
 		})
 	}

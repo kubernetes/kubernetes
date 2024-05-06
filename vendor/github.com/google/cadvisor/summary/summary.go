@@ -78,7 +78,7 @@ func (s *StatsSummary) AddSample(stat v1.ContainerStats) error {
 	}
 	if elapsed > 60*time.Second {
 		// Make a minute sample. This works with dynamic housekeeping as long
-		// as we keep max dynamic houskeeping period close to a minute.
+		// as we keep max dynamic housekeeping period close to a minute.
 		minuteSample := GetMinutePercentiles(s.secondSamples)
 		// Clear seconds samples. Keep the latest sample for continuity.
 		// Copying and resizing helps avoid slice re-allocation.

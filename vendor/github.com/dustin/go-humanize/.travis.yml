@@ -1,12 +1,12 @@
 sudo: false
 language: go
+go_import_path: github.com/dustin/go-humanize
 go:
-  - 1.3.x
-  - 1.5.x
-  - 1.6.x
-  - 1.7.x
-  - 1.8.x
-  - 1.9.x
+  - 1.13.x
+  - 1.14.x
+  - 1.15.x
+  - 1.16.x
+  - stable
   - master
 matrix:
   allow_failures:
@@ -15,7 +15,7 @@ matrix:
 install:
   - # Do nothing. This is needed to prevent default install action "go get -t -v ./..." from happening here (we want it to happen inside script step).
 script:
-  - go get -t -v ./...
   - diff -u <(echo -n) <(gofmt -d -s .)
-  - go tool vet .
+  - go vet .
+  - go install -v -race ./...
   - go test -v -race ./...

@@ -87,13 +87,14 @@ type cloudCIDRAllocator struct {
 var _ CIDRAllocator = (*cloudCIDRAllocator)(nil)
 
 // NewCloudCIDRAllocator creates a new cloud CIDR allocator.
-func NewCloudCIDRAllocator(logger klog.Logger, client clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer) (CIDRAllocator, error) {
+func NewCloudCIDRAllocator(ctx context.Context, client clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer) (CIDRAllocator, error) {
+	logger := klog.FromContext(ctx)
 	if client == nil {
 		logger.Error(nil, "kubeClient is nil when starting cloud CIDR allocator")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
 
 	gceCloud, ok := cloud.(*gce.Cloud)
@@ -116,22 +117,22 @@ func NewCloudCIDRAllocator(logger klog.Logger, client clientset.Interface, cloud
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(
 			func(node *v1.Node) error {
-				return ca.AllocateOrOccupyCIDR(logger, node)
+				return ca.AllocateOrOccupyCIDR(ctx, node)
 			}),
 		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			if newNode.Spec.PodCIDR == "" {
-				return ca.AllocateOrOccupyCIDR(logger, newNode)
+				return ca.AllocateOrOccupyCIDR(ctx, newNode)
 			}
 			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
 			// set to true, we need to process the node to set the condition.
 			networkUnavailableTaint := &v1.Taint{Key: v1.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
 			_, cond := controllerutil.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
 			if cond == nil || cond.Status != v1.ConditionFalse || utiltaints.TaintExists(newNode.Spec.Taints, networkUnavailableTaint) {
-				return ca.AllocateOrOccupyCIDR(logger, newNode)
+				return ca.AllocateOrOccupyCIDR(ctx, newNode)
 			}
 			return nil
 		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(logger, func(node *v1.Node) error {
 			return ca.ReleaseCIDR(logger, node)
 		}),
 	})
@@ -143,7 +144,7 @@ func (ca *cloudCIDRAllocator) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
-	ca.broadcaster.StartStructuredLogging(0)
+	ca.broadcaster.StartStructuredLogging(3)
 	logger := klog.FromContext(ctx)
 	logger.Info("Sending events to api server")
 	ca.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ca.client.CoreV1().Events("")})
@@ -172,7 +173,7 @@ func (ca *cloudCIDRAllocator) worker(ctx context.Context) {
 				logger.Info("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			if err := ca.updateCIDRAllocation(logger, workItem); err == nil {
+			if err := ca.updateCIDRAllocation(ctx, workItem); err == nil {
 				logger.V(3).Info("Updated CIDR", "workItem", workItem)
 			} else {
 				logger.Error(err, "Error updating CIDR", "workItem", workItem)
@@ -242,10 +243,12 @@ func (ca *cloudCIDRAllocator) removeNodeFromProcessing(nodeName string) {
 // WARNING: If you're adding any return calls or defer any more work from this
 // function you have to make sure to update nodesInProcessing properly with the
 // disposition of the node when the work is done.
-func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(logger klog.Logger, node *v1.Node) error {
+func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node) error {
 	if node == nil {
 		return nil
 	}
+
+	logger := klog.FromContext(ctx)
 	if !ca.insertNodeToProcessing(node.Name) {
 		logger.V(2).Info("Node is already in a process of CIDR assignment", "node", klog.KObj(node))
 		return nil
@@ -257,7 +260,8 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(logger klog.Logger, node *v1.
 }
 
 // updateCIDRAllocation assigns CIDR to Node and sends an update to the API server.
-func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName string) error {
+func (ca *cloudCIDRAllocator) updateCIDRAllocation(ctx context.Context, nodeName string) error {
+	logger := klog.FromContext(ctx)
 	node, err := ca.nodeLister.Get(nodeName)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -272,11 +276,11 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 
 	cidrStrings, err := ca.cloud.AliasRangesByProviderID(node.Spec.ProviderID)
 	if err != nil {
-		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(logger, ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to get cidr(s) from provider: %v", err)
 	}
 	if len(cidrStrings) == 0 {
-		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRNotAvailable")
+		controllerutil.RecordNodeStatusChange(logger, ca.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to allocate cidr: Node %v has no CIDRs", node.Name)
 	}
 	//Can have at most 2 ips (one for v4 and one for v6)
@@ -304,14 +308,14 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(logger klog.Logger, nodeName 
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
 		for i := 0; i < cidrUpdateRetries; i++ {
-			if err = nodeutil.PatchNodeCIDRs(ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
+			if err = nodeutil.PatchNodeCIDRs(ctx, ca.client, types.NodeName(node.Name), cidrStrings); err == nil {
 				logger.Info("Set the node PodCIDRs", "node", klog.KObj(node), "cidrStrings", cidrStrings)
 				break
 			}
 		}
 	}
 	if err != nil {
-		controllerutil.RecordNodeStatusChange(ca.recorder, node, "CIDRAssignmentFailed")
+		controllerutil.RecordNodeStatusChange(logger, ca.recorder, node, "CIDRAssignmentFailed")
 		logger.Error(err, "Failed to update the node PodCIDR after multiple attempts", "node", klog.KObj(node), "cidrStrings", cidrStrings)
 		return err
 	}

@@ -43,10 +43,10 @@ import (
 
 var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f := framework.NewDefaultFramework("multi-az")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var zoneCount int
 	var err error
-	var zoneNames sets.String
+	var zoneNames sets.Set[string]
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs := f.ClientSet
 
@@ -68,18 +68,18 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 		err = createBalancedPodForNodes(ctx, f, cs, f.Namespace.Name, nodeList.Items, podRequestedResource, 0.0)
 		framework.ExpectNoError(err)
 	})
-	ginkgo.It("should spread the pods of a service across zones [Serial]", func(ctx context.Context) {
+	f.It("should spread the pods of a service across zones", f.WithSerial(), func(ctx context.Context) {
 		SpreadServiceOrFail(ctx, f, 5*zoneCount, zoneNames, imageutils.GetPauseImageName())
 	})
 
-	ginkgo.It("should spread the pods of a replication controller across zones [Serial]", func(ctx context.Context) {
-		SpreadRCOrFail(ctx, f, int32(5*zoneCount), zoneNames, framework.ServeHostnameImage, []string{"serve-hostname"})
+	f.It("should spread the pods of a replication controller across zones", f.WithSerial(), func(ctx context.Context) {
+		SpreadRCOrFail(ctx, f, int32(5*zoneCount), zoneNames, imageutils.GetE2EImage(imageutils.Agnhost), []string{"serve-hostname"})
 	})
 })
 
 // SpreadServiceOrFail check that the pods comprising a service
 // get spread evenly across available zones
-func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCount int, zoneNames sets.String, image string) {
+func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCount int, zoneNames sets.Set[string], image string) {
 	// First create the service
 	serviceName := "test-service"
 	serviceSpec := &v1.Service{
@@ -93,7 +93,7 @@ func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCou
 			},
 			Ports: []v1.ServicePort{{
 				Port:       80,
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt32(80),
 			}},
 		},
 	}
@@ -128,7 +128,7 @@ func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCou
 	framework.ExpectNoError(err)
 
 	// Now make sure they're spread across zones
-	checkZoneSpreading(ctx, f.ClientSet, pods, zoneNames.List())
+	checkZoneSpreading(ctx, f.ClientSet, pods, sets.List(zoneNames))
 }
 
 // Find the name of the zone in which a Node is running
@@ -182,7 +182,7 @@ func checkZoneSpreading(ctx context.Context, c clientset.Interface, pods *v1.Pod
 
 // SpreadRCOrFail Check that the pods comprising a replication
 // controller get spread evenly across available zones
-func SpreadRCOrFail(ctx context.Context, f *framework.Framework, replicaCount int32, zoneNames sets.String, image string, args []string) {
+func SpreadRCOrFail(ctx context.Context, f *framework.Framework, replicaCount int32, zoneNames sets.Set[string], image string, args []string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, &v1.ReplicationController{
@@ -231,5 +231,5 @@ func SpreadRCOrFail(ctx context.Context, f *framework.Framework, replicaCount in
 	framework.ExpectNoError(err)
 
 	// Now make sure they're spread across zones
-	checkZoneSpreading(ctx, f.ClientSet, pods, zoneNames.List())
+	checkZoneSpreading(ctx, f.ClientSet, pods, sets.List(zoneNames))
 }

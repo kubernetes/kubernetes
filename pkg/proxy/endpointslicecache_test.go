@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestEndpointsMapFromESC(t *testing.T) {
@@ -40,35 +40,35 @@ func TestEndpointsMapFromESC(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80), ptr.To[int32](443)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: true, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 				makeServicePortName("ns1", "svc1", "port-1", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 443, endpoint: "10.0.1.1:443", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 443, endpoint: "10.0.1.2:443", isLocal: true, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 443, endpoint: "10.0.1.3:443", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 			},
 		},
 		"2 slices, same port": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
-				generateEndpointSlice("svc1", "ns1", 2, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc1", "ns1", 2, 3, 999, 999, []string{}, []*int32{ptr.To[int32](80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.2.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.2.2:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.2.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.2.1", port: 80, endpoint: "10.0.2.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.2.2", port: 80, endpoint: "10.0.2.2:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.2.3", port: 80, endpoint: "10.0.2.3:80", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 			},
 		},
@@ -77,15 +77,15 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 overlapping slices, same port": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 4, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 4, 999, 999, []string{}, []*int32{ptr.To[int32](80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.4:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.4", port: 80, endpoint: "10.0.1.4:80", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 			},
 		},
@@ -96,21 +96,21 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 slices, overlapping endpoints, some endpoints unready in 1 or both": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 999, []string{}, []*int32{pointer.Int32(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 999, []string{}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 999, []string{}, []*int32{ptr.To[int32](80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.10:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.4:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.5:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.6:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.7:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.8:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.9:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.10", port: 80, endpoint: "10.0.1.10:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.4", port: 80, endpoint: "10.0.1.4:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.5", port: 80, endpoint: "10.0.1.5:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.6", port: 80, endpoint: "10.0.1.6:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.7", port: 80, endpoint: "10.0.1.7:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.8", port: 80, endpoint: "10.0.1.8:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.9", port: 80, endpoint: "10.0.1.9:80", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 			},
 		},
@@ -118,57 +118,57 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 slices, overlapping endpoints, some endpoints unready and some endpoints terminating": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 5, []string{}, []*int32{pointer.Int32(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 5, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 5, []string{}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 5, []string{}, []*int32{ptr.To[int32](80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.10:80", IsLocal: false, Ready: false, Serving: true, Terminating: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.4:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.5:80", IsLocal: false, Ready: false, Serving: true, Terminating: true},
-					&BaseEndpointInfo{Endpoint: "10.0.1.6:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.7:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.8:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.9:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.10", port: 80, endpoint: "10.0.1.10:80", isLocal: false, ready: false, serving: true, terminating: true},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.4", port: 80, endpoint: "10.0.1.4:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.5", port: 80, endpoint: "10.0.1.5:80", isLocal: false, ready: false, serving: true, terminating: true},
+					&BaseEndpointInfo{ip: "10.0.1.6", port: 80, endpoint: "10.0.1.6:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.7", port: 80, endpoint: "10.0.1.7:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.8", port: 80, endpoint: "10.0.1.8:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.9", port: 80, endpoint: "10.0.1.9:80", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 			},
 		},
 		"2 slices, overlapping endpoints, all unready": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{pointer.Int32(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{ptr.To[int32](80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.10:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.4:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.5:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.6:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.7:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.8:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.9:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.10", port: 80, endpoint: "10.0.1.10:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.4", port: 80, endpoint: "10.0.1.4:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.5", port: 80, endpoint: "10.0.1.5:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.6", port: 80, endpoint: "10.0.1.6:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.7", port: 80, endpoint: "10.0.1.7:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.8", port: 80, endpoint: "10.0.1.8:80", isLocal: false, ready: false, serving: false, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.9", port: 80, endpoint: "10.0.1.9:80", isLocal: false, ready: false, serving: false, terminating: false},
 				},
 			},
 		},
 		"3 slices with different services and namespaces": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
-				generateEndpointSlice("svc2", "ns1", 2, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
-				generateEndpointSlice("svc1", "ns2", 3, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc2", "ns1", 2, 3, 999, 999, []string{}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSlice("svc1", "ns2", 3, 3, 999, 999, []string{}, []*int32{ptr.To[int32](80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.3", port: 80, endpoint: "10.0.1.3:80", isLocal: false, ready: true, serving: true, terminating: false},
 				},
 			},
 		},
@@ -188,15 +188,15 @@ func TestEndpointsMapFromESC(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80)}),
-				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(8080)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](8080)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:8080", IsLocal: false, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true, Ready: true, Serving: true, Terminating: false},
-					&BaseEndpointInfo{Endpoint: "10.0.1.2:8080", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 80, endpoint: "10.0.1.1:80", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.1", port: 8080, endpoint: "10.0.1.1:8080", isLocal: false, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 80, endpoint: "10.0.1.2:80", isLocal: true, ready: true, serving: true, terminating: false},
+					&BaseEndpointInfo{ip: "10.0.1.2", port: 8080, endpoint: "10.0.1.2:8080", isLocal: true, ready: true, serving: true, terminating: false},
 				},
 			},
 		},
@@ -228,33 +228,36 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80)}),
 			},
 			expectedMap: spToEndpointMap{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					"10.0.1.1:80": &BaseEndpointInfo{
-						Endpoint:    "10.0.1.1:80",
-						IsLocal:     false,
-						NodeName:    "host2",
-						Ready:       true,
-						Serving:     true,
-						Terminating: false,
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
 					},
 					"10.0.1.2:80": &BaseEndpointInfo{
-						Endpoint:    "10.0.1.2:80",
-						IsLocal:     true,
-						NodeName:    "host1",
-						Ready:       true,
-						Serving:     true,
-						Terminating: false,
+						ip:          "10.0.1.2",
+						port:        80,
+						endpoint:    "10.0.1.2:80",
+						isLocal:     true,
+						ready:       true,
+						serving:     true,
+						terminating: false,
 					},
 					"10.0.1.3:80": &BaseEndpointInfo{
-						Endpoint:    "10.0.1.3:80",
-						IsLocal:     false,
-						NodeName:    "host2",
-						Ready:       true,
-						Serving:     true,
-						Terminating: false,
+						ip:          "10.0.1.3",
+						port:        80,
+						endpoint:    "10.0.1.3:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
 					},
 				},
 			},
@@ -263,42 +266,46 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80)}),
-				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(8080)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{ptr.To[int32](8080)}),
 			},
 			expectedMap: spToEndpointMap{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					"10.0.1.1:80": &BaseEndpointInfo{
-						Endpoint:    "10.0.1.1:80",
-						IsLocal:     false,
-						NodeName:    "host2",
-						Ready:       true,
-						Serving:     true,
-						Terminating: false,
+						ip:          "10.0.1.1",
+						port:        80,
+						endpoint:    "10.0.1.1:80",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
 					},
 					"10.0.1.2:80": &BaseEndpointInfo{
-						Endpoint:    "10.0.1.2:80",
-						IsLocal:     true,
-						NodeName:    "host1",
-						Ready:       true,
-						Serving:     true,
-						Terminating: false,
+						ip:          "10.0.1.2",
+						port:        80,
+						endpoint:    "10.0.1.2:80",
+						isLocal:     true,
+						ready:       true,
+						serving:     true,
+						terminating: false,
 					},
 					"10.0.1.1:8080": &BaseEndpointInfo{
-						Endpoint:    "10.0.1.1:8080",
-						IsLocal:     false,
-						NodeName:    "host2",
-						Ready:       true,
-						Serving:     true,
-						Terminating: false,
+						ip:          "10.0.1.1",
+						port:        8080,
+						endpoint:    "10.0.1.1:8080",
+						isLocal:     false,
+						ready:       true,
+						serving:     true,
+						terminating: false,
 					},
 					"10.0.1.2:8080": &BaseEndpointInfo{
-						Endpoint:    "10.0.1.2:8080",
-						IsLocal:     true,
-						NodeName:    "host1",
-						Ready:       true,
-						Serving:     true,
-						Terminating: false,
+						ip:          "10.0.1.2",
+						port:        8080,
+						endpoint:    "10.0.1.2:8080",
+						isLocal:     true,
+						ready:       true,
+						serving:     true,
+						terminating: false,
 					},
 				},
 			},
@@ -321,12 +328,11 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 	}
 }
 
-func TestEsInfoChanged(t *testing.T) {
+func TestEsDataChanged(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
-	tcpProto := v1.ProtocolTCP
-	port80 := discovery.EndpointPort{Port: &p80, Name: pointer.String("http"), Protocol: &tcpProto}
-	port443 := discovery.EndpointPort{Port: &p443, Name: pointer.String("https"), Protocol: &tcpProto}
+	port80 := discovery.EndpointPort{Port: &p80, Name: ptr.To("http"), Protocol: ptr.To(v1.ProtocolTCP)}
+	port443 := discovery.EndpointPort{Port: &p443, Name: ptr.To("https"), Protocol: ptr.To(v1.ProtocolTCP)}
 	endpoint1 := discovery.Endpoint{Addresses: []string{"10.0.1.0"}}
 	endpoint2 := discovery.Endpoint{Addresses: []string{"10.0.1.1"}}
 
@@ -448,11 +454,11 @@ func TestEsInfoChanged(t *testing.T) {
 				t.Fatalf("Expected no error calling endpointSliceCacheKeys(): %v", err)
 			}
 
-			esInfo := newEndpointSliceInfo(tc.updatedSlice, false)
-			changed := tc.cache.esInfoChanged(serviceKey, sliceKey, esInfo)
+			esData := newEndpointSliceData(tc.updatedSlice, false)
+			changed := tc.cache.esDataChanged(serviceKey, sliceKey, esData)
 
 			if tc.expectChanged != changed {
-				t.Errorf("Expected esInfoChanged() to return %t, got %t", tc.expectChanged, changed)
+				t.Errorf("Expected esDataChanged() to return %t, got %t", tc.expectChanged, changed)
 			}
 
 			cmc.Check(t)
@@ -461,8 +467,6 @@ func TestEsInfoChanged(t *testing.T) {
 }
 
 func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, offset, numEndpoints, unreadyMod int, terminatingMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
-	tcpProtocol := v1.ProtocolTCP
-
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%d", serviceName, sliceNum),
@@ -476,9 +480,9 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 
 	for i, portNum := range portNums {
 		endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-			Name:     pointer.String(fmt.Sprintf("port-%d", i)),
+			Name:     ptr.To(fmt.Sprintf("port-%d", i)),
 			Port:     portNum,
-			Protocol: &tcpProtocol,
+			Protocol: ptr.To(v1.ProtocolTCP),
 		})
 	}
 
@@ -486,9 +490,9 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 		readyCondition := i%unreadyMod != 0
 		terminatingCondition := i%terminatingMod == 0
 
-		ready := pointer.Bool(readyCondition && !terminatingCondition)
-		serving := pointer.Bool(readyCondition)
-		terminating := pointer.Bool(terminatingCondition)
+		ready := ptr.To(readyCondition && !terminatingCondition)
+		serving := ptr.To(readyCondition)
+		terminating := ptr.To(terminatingCondition)
 
 		endpoint := discovery.Endpoint{
 			Addresses: []string{fmt.Sprintf("10.0.%d.%d", offset, i)},

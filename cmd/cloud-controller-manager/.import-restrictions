@@ -3,9 +3,11 @@ rules:
     allowedPrefixes:
       - k8s.io/kubernetes/cmd/kube-controller-manager/app/options
       - k8s.io/kubernetes/cmd/kube-controller-manager/app/config
+      - k8s.io/kubernetes/cmd/kube-controller-manager/names
       - k8s.io/kubernetes/pkg/api/legacyscheme
       - k8s.io/kubernetes/pkg/api/service
       - k8s.io/kubernetes/pkg/api/v1/pod
+      - k8s.io/kubernetes/pkg/api/v1/service
       - k8s.io/kubernetes/pkg/apis/apps
       - k8s.io/kubernetes/pkg/apis/autoscaling
       - k8s.io/kubernetes/pkg/apis/core
@@ -41,3 +43,4 @@ rules:
       - k8s.io/kubernetes/pkg/proxy/util/testing
       - k8s.io/kubernetes/pkg/util/slice
       - k8s.io/kubernetes/pkg/util/sysctl
+      - k8s.io/kubernetes/test/utils/ktesting

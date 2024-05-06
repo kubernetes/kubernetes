@@ -29,12 +29,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// dialURL will dial the specified URL using the underlying dialer held by the passed
+// DialURL will dial the specified URL using the underlying dialer held by the passed
 // RoundTripper. The primary use of this method is to support proxying upgradable connections.
 // For this reason this method will prefer to negotiate http/1.1 if the URL scheme is https.
 // If you wish to ensure ALPN negotiates http2 then set NextProto=[]string{"http2"} in the
 // TLSConfig of the http.Transport
-func dialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (net.Conn, error) {
+func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
 	dialer, err := utilnet.DialerFor(transport)

@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
@@ -67,11 +68,17 @@ var (
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready"
 		kubectl wait --for=condition=Ready pod/busybox1
 
-		# The default value of status condition is true; you can wait for other targets after an equal delimiter (compared after Unicode simple case folding, which is a more general form of case-insensitivity):
+		# The default value of status condition is true; you can wait for other targets after an equal delimiter (compared after Unicode simple case folding, which is a more general form of case-insensitivity)
 		kubectl wait --for=condition=Ready=false pod/busybox1
 
-		# Wait for the pod "busybox1" to contain the status phase to be "Running".
+		# Wait for the pod "busybox1" to contain the status phase to be "Running"
 		kubectl wait --for=jsonpath='{.status.phase}'=Running pod/busybox1
+
+		# Wait for pod "busybox1" to be Ready
+		kubectl wait --for='jsonpath={.status.conditions[?(@.type=="Ready")].status}=True' pod/busybox1
+
+		# Wait for the service "loadbalancer" to have ingress.
+		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
@@ -92,11 +99,11 @@ type WaitFlags struct {
 	Timeout      time.Duration
 	ForCondition string
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewWaitFlags returns a default WaitFlags
-func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
+func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *WaitFlags {
 	return &WaitFlags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
@@ -115,11 +122,11 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 }
 
 // NewCmdWait returns a cobra command for waiting
-func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams genericiooptions.IOStreams) *cobra.Command {
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath='{}'=value]",
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
 		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
@@ -144,7 +151,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=JSONPath Condition]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -205,11 +212,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 		}.IsConditionMet, nil
 	}
 	if strings.HasPrefix(condition, "jsonpath=") {
-		splitStr := strings.Split(condition, "=")
-		if len(splitStr) != 3 {
-			return nil, fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3")
-		}
-		jsonPathExp, jsonPathCond, err := processJSONPathInput(splitStr[1], splitStr[2])
+		jsonPathInput := strings.TrimPrefix(condition, "jsonpath=")
+		jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
 		if err != nil {
 			return nil, err
 		}
@@ -218,9 +222,10 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			return nil, err
 		}
 		return JSONPathWait{
-			jsonPathCondition: jsonPathCond,
-			jsonPathParser:    j,
-			errOut:            errOut,
+			matchAnyValue:  jsonPathValue == "",
+			jsonPathValue:  jsonPathValue,
+			jsonPathParser: j,
+			errOut:         errOut,
 		}.IsJSONPathConditionMet, nil
 	}
 
@@ -239,18 +244,46 @@ func newJSONPathParser(jsonPathExpression string) (*jsonpath.JSONPath, error) {
 	return j, nil
 }
 
-// processJSONPathInput will parses the user's JSONPath input and process the string
-func processJSONPathInput(jsonPathExpression, jsonPathCond string) (string, string, error) {
-	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathExpression)
+// processJSONPathInput will parse and process the provided JSONPath input containing a JSON expression and optionally
+// a value for the matching condition.
+func processJSONPathInput(input string) (string, string, error) {
+	jsonPathInput := splitJSONPathInput(input)
+	if numOfArgs := len(jsonPathInput); numOfArgs < 1 || numOfArgs > 2 {
+		return "", "", fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3 or --for=jsonpath='{.status.readyReplicas}'")
+	}
+	relaxedJSONPathExp, err := cmdget.RelaxedJSONPathExpression(jsonPathInput[0])
 	if err != nil {
 		return "", "", err
 	}
-	if jsonPathCond == "" {
-		return "", "", errors.New("jsonpath wait condition cannot be empty")
+	if len(jsonPathInput) == 1 {
+		return relaxedJSONPathExp, "", nil
 	}
-	jsonPathCond = strings.Trim(jsonPathCond, `'"`)
+	jsonPathValue := strings.Trim(jsonPathInput[1], `'"`)
+	if jsonPathValue == "" {
+		return "", "", errors.New("jsonpath wait has to have a value after equal sign, like --for=jsonpath='{.status.readyReplicas}'=3")
+	}
+	return relaxedJSONPathExp, jsonPathValue, nil
+}
 
-	return relaxedJSONPathExp, jsonPathCond, nil
+// splitJSONPathInput splits the provided input string on single '='. Double '==' will not cause the string to be
+// split. E.g., "a.b.c====d.e.f===g.h.i===" will split to ["a.b.c====d.e.f==","g.h.i==",""].
+func splitJSONPathInput(input string) []string {
+	var output []string
+	var element strings.Builder
+	for i := 0; i < len(input); i++ {
+		if input[i] == '=' {
+			if i < len(input)-1 && input[i+1] == '=' {
+				element.WriteString("==")
+				i++
+				continue
+			}
+			output = append(output, element.String())
+			element.Reset()
+			continue
+		}
+		element.WriteByte(input[i])
+	}
+	return append(output, element.String())
 }
 
 // ResourceLocation holds the location of a resource
@@ -276,7 +309,7 @@ type WaitOptions struct {
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // ConditionFunc is the interface for providing condition checks
@@ -589,8 +622,9 @@ func getObservedGeneration(obj *unstructured.Unstructured, condition map[string]
 // JSONPathWait holds a JSONPath Parser which has the ability
 // to check for the JSONPath condition and compare with the API server provided JSON output.
 type JSONPathWait struct {
-	jsonPathCondition string
-	jsonPathParser    *jsonpath.JSONPath
+	matchAnyValue  bool
+	jsonPathValue  string
+	jsonPathParser *jsonpath.JSONPath
 	// errOut is written to if an error occurs
 	errOut io.Writer
 }
@@ -634,7 +668,10 @@ func (j JSONPathWait) checkCondition(obj *unstructured.Unstructured) (bool, erro
 	if err := verifyParsedJSONPath(parseResults); err != nil {
 		return false, err
 	}
-	isConditionMet, err := compareResults(parseResults[0][0], j.jsonPathCondition)
+	if j.matchAnyValue {
+		return true, nil
+	}
+	isConditionMet, err := compareResults(parseResults[0][0], j.jsonPathValue)
 	if err != nil {
 		return false, err
 	}

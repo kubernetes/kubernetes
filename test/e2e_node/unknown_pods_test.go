@@ -44,9 +44,9 @@ import (
 * runtime, but it will not be present in the config, thus making the pod a
 * "unknown pod". Kubelet should then proceed to terminate these unknown pods.
  */
-var _ = SIGDescribe("Unknown Pods [Serial] [Disruptive]", func() {
+var _ = SIGDescribe("Unknown Pods", framework.WithSerial(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("unknown-pods")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Context("when creating a mirror pod", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
@@ -55,7 +55,7 @@ var _ = SIGDescribe("Unknown Pods [Serial] [Disruptive]", func() {
 			staticPodName = "unknown-test-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
-			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			podPath = kubeletCfg.StaticPodPath
 
 			framework.Logf("create the static pod %v", staticPodName)
 			err := createStaticPodWithGracePeriod(podPath, staticPodName, ns)

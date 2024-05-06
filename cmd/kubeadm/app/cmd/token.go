@@ -43,7 +43,7 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
-	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -90,7 +90,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		options.DryRun, dryRun, "Whether to enable dry-run mode or not")
 
-	cfg := cmdutil.DefaultInitConfiguration()
+	cfg := &kubeadmapiv1.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -242,7 +242,9 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
 
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
+	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg, configutil.LoadOrDefaultConfigurationOptions{
+		SkipCRIDetect: true,
+	})
 	if err != nil {
 		return err
 	}
@@ -296,7 +298,7 @@ func RunGenerateToken(out io.Writer) error {
 	return nil
 }
 
-func formatBootstrapToken(obj *outputapiv1alpha2.BootstrapToken) string {
+func formatBootstrapToken(obj *outputapiv1alpha3.BootstrapToken) string {
 	ttl := "<forever>"
 	expires := "<never>"
 	if obj.Expires != nil {
@@ -343,7 +345,7 @@ func (ttp *tokenTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) erro
 	}
 
 	// Print token
-	fmt.Fprint(tabw, formatBootstrapToken(obj.(*outputapiv1alpha2.BootstrapToken)))
+	fmt.Fprint(tabw, formatBootstrapToken(obj.(*outputapiv1alpha3.BootstrapToken)))
 
 	return tabw.Flush()
 }
@@ -387,7 +389,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 		}
 
 		// Convert token into versioned output structure
-		outputToken := outputapiv1alpha2.BootstrapToken{
+		outputToken := outputapiv1alpha3.BootstrapToken{
 			BootstrapToken: bootstraptokenv1.BootstrapToken{
 				Token:       &bootstraptokenv1.BootstrapTokenString{ID: token.Token.ID, Secret: token.Token.Secret},
 				Description: token.Description,

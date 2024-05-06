@@ -63,7 +63,9 @@ var _ rangeallocation.RangeRegistry = &Etcd{}
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
 func NewEtcd(alloc allocator.Snapshottable, baseKey string, config *storagebackend.ConfigForResource) (*Etcd, error) {
-	storage, d, err := generic.NewRawStorage(config, nil)
+	// note that newFunc, newListFunc and resourcePrefix
+	// can be left blank unless the storage.Watch method is used
+	storage, d, err := generic.NewRawStorage(config, nil, nil, "")
 	if err != nil {
 		return nil, err
 	}

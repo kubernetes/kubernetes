@@ -29,9 +29,9 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/utils/cpuset"
 )
 
 type testCase struct {
@@ -65,11 +65,14 @@ func returnMachineInfo() cadvisorapi.MachineInfo {
 	}
 }
 
+type containerOptions struct {
+	request       string
+	limit         string
+	restartPolicy v1.ContainerRestartPolicy
+}
+
 func TestPodGuaranteedCPUs(t *testing.T) {
-	CPUs := [][]struct {
-		request string
-		limit   string
-	}{
+	options := [][]*containerOptions{
 		{
 			{request: "0", limit: "0"},
 		},
@@ -85,17 +88,46 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 		},
 	}
 	// tc for not guaranteed Pod
-	testPod1 := makeMultiContainerPod(CPUs[0], CPUs[0])
-	testPod2 := makeMultiContainerPod(CPUs[0], CPUs[1])
-	testPod3 := makeMultiContainerPod(CPUs[1], CPUs[0])
+	testPod1 := makeMultiContainerPodWithOptions(options[0], options[0])
+	testPod2 := makeMultiContainerPodWithOptions(options[0], options[1])
+	testPod3 := makeMultiContainerPodWithOptions(options[1], options[0])
 	// tc for guaranteed Pod
-	testPod4 := makeMultiContainerPod(CPUs[1], CPUs[1])
-	testPod5 := makeMultiContainerPod(CPUs[2], CPUs[2])
+	testPod4 := makeMultiContainerPodWithOptions(options[1], options[1])
+	testPod5 := makeMultiContainerPodWithOptions(options[2], options[2])
 	// tc for comparing init containers and user containers
-	testPod6 := makeMultiContainerPod(CPUs[1], CPUs[2])
-	testPod7 := makeMultiContainerPod(CPUs[2], CPUs[1])
+	testPod6 := makeMultiContainerPodWithOptions(options[1], options[2])
+	testPod7 := makeMultiContainerPodWithOptions(options[2], options[1])
 	// tc for multi containers
-	testPod8 := makeMultiContainerPod(CPUs[3], CPUs[3])
+	testPod8 := makeMultiContainerPodWithOptions(options[3], options[3])
+	// tc for restartable init containers
+	testPod9 := makeMultiContainerPodWithOptions([]*containerOptions{
+		{request: "1", limit: "1", restartPolicy: v1.ContainerRestartPolicyAlways},
+	}, []*containerOptions{
+		{request: "1", limit: "1"},
+	})
+	testPod10 := makeMultiContainerPodWithOptions([]*containerOptions{
+		{request: "5", limit: "5"},
+		{request: "1", limit: "1", restartPolicy: v1.ContainerRestartPolicyAlways},
+		{request: "2", limit: "2", restartPolicy: v1.ContainerRestartPolicyAlways},
+		{request: "3", limit: "3", restartPolicy: v1.ContainerRestartPolicyAlways},
+	}, []*containerOptions{
+		{request: "1", limit: "1"},
+	})
+	testPod11 := makeMultiContainerPodWithOptions([]*containerOptions{
+		{request: "5", limit: "5"},
+		{request: "1", limit: "1", restartPolicy: v1.ContainerRestartPolicyAlways},
+		{request: "2", limit: "2", restartPolicy: v1.ContainerRestartPolicyAlways},
+		{request: "5", limit: "5"},
+		{request: "3", limit: "3", restartPolicy: v1.ContainerRestartPolicyAlways},
+	}, []*containerOptions{
+		{request: "1", limit: "1"},
+	})
+	testPod12 := makeMultiContainerPodWithOptions([]*containerOptions{
+		{request: "10", limit: "10", restartPolicy: v1.ContainerRestartPolicyAlways},
+		{request: "200", limit: "200"},
+	}, []*containerOptions{
+		{request: "100", limit: "100"},
+	})
 
 	p := staticPolicy{}
 
@@ -144,13 +176,35 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 			pod:         testPod8,
 			expectedCPU: 6,
 		},
+		{
+			name:        "TestCase09: restartable init container + regular container",
+			pod:         testPod9,
+			expectedCPU: 2,
+		},
+		{
+			name:        "TestCase09: multiple restartable init containers",
+			pod:         testPod10,
+			expectedCPU: 7,
+		},
+		{
+			name:        "TestCase11: multiple restartable and regular init containers",
+			pod:         testPod11,
+			expectedCPU: 8,
+		},
+		{
+			name:        "TestCase12: restartable init, regular init and regular container",
+			pod:         testPod12,
+			expectedCPU: 210,
+		},
 	}
 	for _, tc := range tcases {
-		requestedCPU := p.podGuaranteedCPUs(tc.pod)
+		t.Run(tc.name, func(t *testing.T) {
+			requestedCPU := p.podGuaranteedCPUs(tc.pod)
 
-		if requestedCPU != tc.expectedCPU {
-			t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
-		}
+			if requestedCPU != tc.expectedCPU {
+				t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
+			}
+		})
 	}
 }
 
@@ -394,7 +448,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 
 			var activePods []*v1.Pod
 			for p := range testCase.assignments {

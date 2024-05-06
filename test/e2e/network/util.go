@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -158,7 +159,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	)
 
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/hostname`, targetAddr)
+	cmd := fmt.Sprintf(`curl -q -s --max-time 30 %s/hostname`, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		stdout, err = e2eoutput.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
@@ -178,7 +179,7 @@ func execHostnameTest(sourcePod v1.Pod, targetAddr, targetHostname string) {
 	hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
 
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(hostname, targetHostname)
+	gomega.Expect(hostname).To(gomega.Equal(targetHostname))
 }
 
 // createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
@@ -194,7 +195,7 @@ func createSecondNodePortService(ctx context.Context, f *framework.Framework, co
 					Port:       e2enetwork.ClusterHTTPPort,
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
-					TargetPort: intstr.FromInt(e2enetwork.EndpointHTTPPort),
+					TargetPort: intstr.FromInt32(e2enetwork.EndpointHTTPPort),
 				},
 			},
 			Selector: config.NodePortService.Spec.Selector,
@@ -232,7 +233,7 @@ func testEndpointReachability(ctx context.Context, endpoint string, port int32, 
 		return fmt.Errorf("service reachability check is not supported for %v", protocol)
 	}
 
-	err := wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)

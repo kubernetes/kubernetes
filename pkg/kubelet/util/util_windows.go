@@ -24,24 +24,17 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Microsoft/go-winio"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
 )
 
 const (
 	tcpProtocol   = "tcp"
 	npipeProtocol = "npipe"
-	// Amount of time to wait between attempting to use a Unix domain socket.
-	// As detailed in https://github.com/kubernetes/kubernetes/issues/104584
-	// the first attempt will most likely fail, hence the need to retry
-	socketDialRetryPeriod = 1 * time.Second
-	// Overall timeout value to dial a Unix domain socket, including retries
-	socketDialTimeout = 4 * time.Second
 )
 
 // CreateListener creates a listener on the specified endpoint.
@@ -117,9 +110,27 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	}
 }
 
-// LocalEndpoint empty implementation
+// LocalEndpoint returns the full path to a named pipe at the given endpoint - unlike on unix, we can't use sockets.
 func LocalEndpoint(path, file string) (string, error) {
-	return "", fmt.Errorf("LocalEndpoints are unsupported in this build")
+	// extract the podresources config name from the path. We only need this on windows because the preferred layout of pipes,
+	// this is why we have the extra logic in here instead of changing the function signature. Join the file to make sure the
+	// last path component is a file, so the operation chain works..
+	podResourcesDir := filepath.Base(filepath.Dir(filepath.Join(path, file)))
+	if podResourcesDir == "" {
+		// should not happen because the user can configure a root directory, and we expected a subdirectory inside
+		// the user supplied root directory named like "pod-resources" or so.
+		return "", fmt.Errorf("cannot infer the podresources directory from path %q", path)
+	}
+	// windows pipes are expected to use forward slashes: https://learn.microsoft.com/windows/win32/ipc/pipe-names
+	// so using `url` like we do on unix gives us unclear benefits - see https://github.com/kubernetes/kubernetes/issues/78628
+	// So we just construct the path from scratch.
+	// Format: \\ServerName\pipe\PipeName
+	// Where where ServerName is either the name of a remote computer or a period, to specify the local computer.
+	// We only consider PipeName as regular windows path, while the pipe path components are fixed, hence we use constants.
+	serverPart := `\\.`
+	pipePart := "pipe"
+	pipeName := "kubelet-" + podResourcesDir
+	return npipeProtocol + "://" + filepath.Join(serverPart, pipePart, pipeName), nil
 }
 
 var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
@@ -132,49 +143,6 @@ func GetBootTime() (time.Time, error) {
 		return time.Time{}, err
 	}
 	return currentTime.Add(-time.Duration(output) * time.Millisecond).Truncate(time.Second), nil
-}
-
-// IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
-// Note that due to the retry logic inside, it could take up to 4 seconds
-// to determine whether or not the file path supplied is a Unix domain socket
-func IsUnixDomainSocket(filePath string) (bool, error) {
-	// Due to the absence of golang support for os.ModeSocket in Windows (https://github.com/golang/go/issues/33357)
-	// we need to dial the file and check if we receive an error to determine if a file is Unix Domain Socket file.
-
-	// Note that querrying for the Reparse Points (https://docs.microsoft.com/en-us/windows/win32/fileio/reparse-points)
-	// for the file (using FSCTL_GET_REPARSE_POINT) and checking for reparse tag: reparseTagSocket
-	// does NOT work in 1809 if the socket file is created within a bind mounted directory by a container
-	// and the FSCTL is issued in the host by the kubelet.
-
-	klog.V(6).InfoS("Function IsUnixDomainSocket starts", "filePath", filePath)
-	// As detailed in https://github.com/kubernetes/kubernetes/issues/104584 we cannot rely
-	// on the Unix Domain socket working on the very first try, hence the potential need to
-	// dial multiple times
-	var lastSocketErr error
-	err := wait.PollImmediate(socketDialRetryPeriod, socketDialTimeout,
-		func() (bool, error) {
-			klog.V(6).InfoS("Dialing the socket", "filePath", filePath)
-			var c net.Conn
-			c, lastSocketErr = net.Dial("unix", filePath)
-			if lastSocketErr == nil {
-				c.Close()
-				klog.V(6).InfoS("Socket dialed successfully", "filePath", filePath)
-				return true, nil
-			}
-			klog.V(6).InfoS("Failed the current attempt to dial the socket, so pausing before retry",
-				"filePath", filePath, "err", lastSocketErr, "socketDialRetryPeriod",
-				socketDialRetryPeriod)
-			return false, nil
-		})
-
-	// PollImmediate will return "timed out waiting for the condition" if the function it
-	// invokes never returns true
-	if err != nil {
-		klog.V(2).InfoS("Failed all attempts to dial the socket so marking it as a non-Unix Domain socket. Last socket error along with the error from PollImmediate follow",
-			"filePath", filePath, "lastSocketErr", lastSocketErr, "err", err)
-		return false, nil
-	}
-	return true, nil
 }
 
 // NormalizePath converts FS paths returned by certain go frameworks (like fsnotify)

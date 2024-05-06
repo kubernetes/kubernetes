@@ -52,8 +52,7 @@ type ThreadSafeStore interface {
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	GetIndexers() Indexers
 
-	// AddIndexers adds more indexers to this store.  If you call this after you already have data
-	// in the store, the results are undefined.
+	// AddIndexers adds more indexers to this store. This supports adding indexes after the store already has items.
 	AddIndexers(newIndexers Indexers) error
 	// Resync is a no-op and is deprecated
 	Resync() error
@@ -135,50 +134,66 @@ func (i *storeIndex) addIndexers(newIndexers Indexers) error {
 	return nil
 }
 
+// updateSingleIndex modifies the objects location in the named index:
+// - for create you must provide only the newObj
+// - for update you must provide both the oldObj and the newObj
+// - for delete you must provide only the oldObj
+// updateSingleIndex must be called from a function that already has a lock on the cache
+func (i *storeIndex) updateSingleIndex(name string, oldObj interface{}, newObj interface{}, key string) {
+	var oldIndexValues, indexValues []string
+	indexFunc, ok := i.indexers[name]
+	if !ok {
+		// Should never happen. Caller is responsible for ensuring this exists, and should call with lock
+		// held to avoid any races.
+		panic(fmt.Errorf("indexer %q does not exist", name))
+	}
+	if oldObj != nil {
+		var err error
+		oldIndexValues, err = indexFunc(oldObj)
+		if err != nil {
+			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
+		}
+	} else {
+		oldIndexValues = oldIndexValues[:0]
+	}
+
+	if newObj != nil {
+		var err error
+		indexValues, err = indexFunc(newObj)
+		if err != nil {
+			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
+		}
+	} else {
+		indexValues = indexValues[:0]
+	}
+
+	index := i.indices[name]
+	if index == nil {
+		index = Index{}
+		i.indices[name] = index
+	}
+
+	if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
+		// We optimize for the most common case where indexFunc returns a single value which has not been changed
+		return
+	}
+
+	for _, value := range oldIndexValues {
+		i.deleteKeyFromIndex(key, value, index)
+	}
+	for _, value := range indexValues {
+		i.addKeyToIndex(key, value, index)
+	}
+}
+
 // updateIndices modifies the objects location in the managed indexes:
 // - for create you must provide only the newObj
 // - for update you must provide both the oldObj and the newObj
 // - for delete you must provide only the oldObj
 // updateIndices must be called from a function that already has a lock on the cache
 func (i *storeIndex) updateIndices(oldObj interface{}, newObj interface{}, key string) {
-	var oldIndexValues, indexValues []string
-	var err error
-	for name, indexFunc := range i.indexers {
-		if oldObj != nil {
-			oldIndexValues, err = indexFunc(oldObj)
-		} else {
-			oldIndexValues = oldIndexValues[:0]
-		}
-		if err != nil {
-			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
-		}
-
-		if newObj != nil {
-			indexValues, err = indexFunc(newObj)
-		} else {
-			indexValues = indexValues[:0]
-		}
-		if err != nil {
-			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
-		}
-
-		index := i.indices[name]
-		if index == nil {
-			index = Index{}
-			i.indices[name] = index
-		}
-
-		if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
-			// We optimize for the most common case where indexFunc returns a single value which has not been changed
-			continue
-		}
-
-		for _, value := range oldIndexValues {
-			i.deleteKeyFromIndex(key, value, index)
-		}
-		for _, value := range indexValues {
-			i.addKeyToIndex(key, value, index)
-		}
+	for name := range i.indexers {
+		i.updateSingleIndex(name, oldObj, newObj, key)
 	}
 }
 
@@ -339,11 +354,18 @@ func (c *threadSafeMap) AddIndexers(newIndexers Indexers) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if len(c.items) > 0 {
-		return fmt.Errorf("cannot add indexers to running index")
+	if err := c.index.addIndexers(newIndexers); err != nil {
+		return err
 	}
 
-	return c.index.addIndexers(newIndexers)
+	// If there are already items, index them
+	for key, item := range c.items {
+		for name := range newIndexers {
+			c.index.updateSingleIndex(name, nil, item, key)
+		}
+	}
+
+	return nil
 }
 
 func (c *threadSafeMap) Resync() error {

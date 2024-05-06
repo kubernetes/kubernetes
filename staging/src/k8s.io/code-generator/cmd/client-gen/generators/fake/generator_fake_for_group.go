@@ -19,21 +19,21 @@ package fake
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // genFakeForGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genFakeForGroup struct {
-	generator.DefaultGen
-	outputPackage     string
-	realClientPackage string
+	generator.GoGenerator
+	outputPackage     string // must be a Go import-path
+	realClientPackage string // must be a Go import-path
 	group             string
 	version           string
 	groupGoName       string
@@ -64,7 +64,7 @@ func (g *genFakeForGroup) Namers(c *generator.Context) namer.NameSystems {
 func (g *genFakeForGroup) Imports(c *generator.Context) (imports []string) {
 	imports = g.imports.ImportLines()
 	if len(g.types) != 0 {
-		imports = append(imports, fmt.Sprintf("%s \"%s\"", strings.ToLower(filepath.Base(g.realClientPackage)), g.realClientPackage))
+		imports = append(imports, fmt.Sprintf("%s \"%s\"", strings.ToLower(path.Base(g.realClientPackage)), g.realClientPackage))
 	}
 	return imports
 }
@@ -90,7 +90,7 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 			"type":              t,
 			"GroupGoName":       g.groupGoName,
 			"Version":           namer.IC(g.version),
-			"realClientPackage": strings.ToLower(filepath.Base(g.realClientPackage)),
+			"realClientPackage": strings.ToLower(path.Base(g.realClientPackage)),
 		}
 		if tags.NonNamespaced {
 			sw.Do(getterImplNonNamespaced, wrapper)

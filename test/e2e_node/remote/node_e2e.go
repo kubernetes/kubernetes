@@ -35,10 +35,9 @@ import (
 // NodeE2ERemote contains the specific functions in the node e2e test suite.
 type NodeE2ERemote struct{}
 
-// InitNodeE2ERemote initializes the node e2e test suite.
-func InitNodeE2ERemote() TestSuite {
-	// TODO: Register flags.
-	return &NodeE2ERemote{}
+// init initializes the node e2e test suite.
+func init() {
+	RegisterTestSuite("default", &NodeE2ERemote{})
 }
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
@@ -49,7 +48,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := utils.GetK8sBuildOutputDir()
+	buildOutputDir, err := utils.GetK8sBuildOutputDir(builder.IsDockerizedBuild(), builder.GetTargetBuildArch())
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes build output directory: %w", err)
 	}
@@ -63,6 +62,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter", "gcp-credential-provider"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
+		klog.V(2).Infof("Copying binaries from %s", source)
 		if _, err := os.Stat(source); err != nil {
 			return fmt.Errorf("failed to locate test binary %s: %w", bin, err)
 		}
@@ -93,11 +93,11 @@ func prependMemcgNotificationFlag(args string) string {
 	return "--kubelet-flags=--kernel-memcg-notification=true " + args
 }
 
-// prependGCPCredentialProviderFlag prepends the flags for enabling
+// prependCredentialProviderFlag prepends the flags for enabling
 // a credential provider plugin.
-func prependGCPCredentialProviderFlag(args, workspace string) string {
+func prependCredentialProviderFlag(args, workspace string) string {
 	credentialProviderConfig := filepath.Join(workspace, "credential-provider.yaml")
-	featureGateFlag := "--kubelet-flags=--feature-gates=DisableKubeletCloudCredentialProviders=true,KubeletCredentialProviders=true"
+	featureGateFlag := "--kubelet-flags=--feature-gates=DisableKubeletCloudCredentialProviders=true"
 	configFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-config=%s", credentialProviderConfig)
 	binFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-bin-dir=%s", workspace)
 	return fmt.Sprintf("%s %s %s %s", featureGateFlag, configFlag, binFlag, args)
@@ -115,9 +115,12 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 		return args, setKubeletSELinuxLabels(host, workspace)
 	case strings.Contains(output, "gci"), strings.Contains(output, "cos"):
 		args = prependMemcgNotificationFlag(args)
-		return prependGCPCredentialProviderFlag(args, workspace), nil
+		return prependCredentialProviderFlag(args, workspace), nil
 	case strings.Contains(output, "ubuntu"):
-		args = prependGCPCredentialProviderFlag(args, workspace)
+		args = prependCredentialProviderFlag(args, workspace)
+		return prependMemcgNotificationFlag(args), nil
+	case strings.Contains(output, "amzn"):
+		args = prependCredentialProviderFlag(args, workspace)
 		return prependMemcgNotificationFlag(args), nil
 	}
 	return args, nil
@@ -127,7 +130,7 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 // kubelet on Fedora CoreOS distribution
 func setKubeletSELinuxLabels(host, workspace string) error {
 	cmd := getSSHCommand(" && ",
-		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "kubelet")),
+		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t kubelet_exec_t %s", filepath.Join(workspace, "kubelet")),
 		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "e2e_node.test")),
 		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "ginkgo")),
 		fmt.Sprintf("/usr/bin/chcon -u system_u -r object_r -t bin_t %s", filepath.Join(workspace, "mounter")),

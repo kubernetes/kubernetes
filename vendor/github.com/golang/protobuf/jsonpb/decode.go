@@ -56,6 +56,7 @@ type Unmarshaler struct {
 // implement JSONPBMarshaler so that the custom format can be produced.
 //
 // The JSON unmarshaling must follow the JSON to proto specification:
+//
 //	https://developers.google.com/protocol-buffers/docs/proto3#json
 //
 // Deprecated: Custom types should implement protobuf reflection instead.
@@ -386,8 +387,14 @@ func (u *Unmarshaler) unmarshalMessage(m protoreflect.Message, in []byte) error 
 }
 
 func isSingularWellKnownValue(fd protoreflect.FieldDescriptor) bool {
+	if fd.Cardinality() == protoreflect.Repeated {
+		return false
+	}
 	if md := fd.Message(); md != nil {
-		return md.FullName() == "google.protobuf.Value" && fd.Cardinality() != protoreflect.Repeated
+		return md.FullName() == "google.protobuf.Value"
+	}
+	if ed := fd.Enum(); ed != nil {
+		return ed.FullName() == "google.protobuf.NullValue"
 	}
 	return false
 }

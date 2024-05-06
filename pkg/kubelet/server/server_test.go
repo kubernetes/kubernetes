@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -36,7 +37,6 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,13 +55,13 @@ import (
 	// Do some initialization to decode the query parameters correctly.
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubelet/pkg/cri/streaming"
+	"k8s.io/kubelet/pkg/cri/streaming/portforward"
+	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
-	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -74,8 +74,6 @@ const (
 
 type fakeKubelet struct {
 	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	containerInfoFunc   func(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	rawInfoFunc         func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
 	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
 	podsFunc            func() []*v1.Pod
 	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
@@ -107,14 +105,6 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 
 func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
-}
-
-func (fk *fakeKubelet) GetContainerInfo(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-	return fk.containerInfoFunc(ctx, podFullName, uid, containerName, req)
-}
-
-func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
-	return fk.rawInfoFunc(req)
 }
 
 func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
@@ -288,8 +278,10 @@ func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage(_ context.Context) ([]
 func (*fakeKubelet) ListPodCPUAndMemoryStats(_ context.Context) ([]statsapi.PodStats, error) {
 	return nil, nil
 }
-func (*fakeKubelet) ImageFsStats(_ context.Context) (*statsapi.FsStats, error) { return nil, nil }
-func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)               { return nil, nil }
+func (*fakeKubelet) ImageFsStats(_ context.Context) (*statsapi.FsStats, *statsapi.FsStats, error) {
+	return nil, nil, nil
+}
+func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error) { return nil, nil }
 func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
@@ -368,7 +360,6 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		fw.fakeAuth,
-		oteltrace.NewNoopTracerProvider(),
 		kubeCfg,
 	)
 	fw.serverUnderTest = &server
@@ -568,7 +559,7 @@ func TestAuthzCoverage(t *testing.T) {
 
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -865,18 +856,24 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 }
 
 func TestCheckpointContainer(t *testing.T) {
-	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
-
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
 	podNamespace := "other"
 	podName := "foo"
 	expectedContainerName := "baz"
-	// GetPodByName() should always fail
-	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
-		return nil, false
+
+	setupTest := func(featureGate bool) *serverTestFramework {
+		// Enable features.ContainerCheckpoint during test
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)
+
+		fw := newServerTest()
+		// GetPodByName() should always fail
+		fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+			return nil, false
+		}
+		return fw
 	}
+	fw := setupTest(true)
+	defer fw.testHTTPServer.Close()
+
 	t.Run("wrong pod namespace", func(t *testing.T) {
 		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
 		if err != nil {
@@ -934,6 +931,19 @@ func TestCheckpointContainer(t *testing.T) {
 		}
 		assert.Equal(t, resp.StatusCode, 200)
 	})
+
+	// Now test for 404 if checkpointing support is explicitly disabled.
+	fw.testHTTPServer.Close()
+	fw = setupTest(false)
+	defer fw.testHTTPServer.Close()
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	t.Run("checkpointing fails because disabled", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 404, resp.StatusCode)
+	})
 }
 
 func makeReq(t *testing.T, method, url, clientProtocol string) *http.Request {
@@ -959,7 +969,10 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil)
+	upgradeRoundTripper, err := spdy.NewRoundTripper(&tls.Config{})
+	if err != nil {
+		t.Fatalf("Error creating SpdyRoundTripper: %v", err)
+	}
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
@@ -1115,7 +1128,10 @@ func testExecAttach(t *testing.T, verb string) {
 				upgradeRoundTripper httpstream.UpgradeRoundTripper
 				c                   *http.Client
 			)
-			upgradeRoundTripper = spdy.NewRoundTripper(nil)
+			upgradeRoundTripper, err = spdy.NewRoundTripper(&tls.Config{})
+			if err != nil {
+				t.Fatalf("Error creating SpdyRoundTripper: %v", err)
+			}
 			c = &http.Client{Transport: upgradeRoundTripper}
 
 			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
@@ -1211,7 +1227,10 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil)
+	upgradeRoundTripper, err := spdy.NewRoundTripper(&tls.Config{})
+	if err != nil {
+		t.Fatalf("Error creating SpdyRoundTripper: %v", err)
+	}
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	req := makeReq(t, "POST", url, "portforward.k8s.io")
@@ -1310,7 +1329,10 @@ func TestServePortForward(t *testing.T) {
 				c                   *http.Client
 			)
 
-			upgradeRoundTripper = spdy.NewRoundTripper(nil)
+			upgradeRoundTripper, err = spdy.NewRoundTripper(&tls.Config{})
+			if err != nil {
+				t.Fatalf("Error creating SpdyRoundTripper: %v", err)
+			}
 			c = &http.Client{Transport: upgradeRoundTripper}
 
 			req := makeReq(t, "POST", url, "portforward.k8s.io")

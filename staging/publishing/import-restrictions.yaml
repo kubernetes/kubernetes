@@ -1,9 +1,10 @@
-- baseImportPath: "./pkg/apis/core/"
+- baseImportPath: "./pkg/apis/core"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/apiserver/pkg/util/feature
   - k8s.io/component-base/featuregate/testing
   - k8s.io/kubernetes/pkg/apis/core
+  - k8s.io/kubernetes/pkg/api/v1/service
   - k8s.io/kubernetes/pkg/features
   - k8s.io/kubernetes/pkg/fieldpath
   - k8s.io/kubernetes/pkg/util
@@ -20,18 +21,19 @@
   ignoredSubTrees:
   - "./pkg/apis/core/validation"
 
-- baseImportPath: "./vendor/k8s.io/cli-runtime/pkg/genericclioptions/"
+- baseImportPath: "./staging/src/k8s.io/cli-runtime/pkg/genericclioptions"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/client-go
   # TODO this one should be tightened.  We depend on it for testing, but we should instead create our own scheme
   - k8s.io/api/core/v1
+  - k8s.io/cli-runtime/pkg/genericiooptions
   - k8s.io/cli-runtime/pkg/printers
   - k8s.io/cli-runtime/pkg/resource
   - k8s.io/cli-runtime/pkg/kustomize
   - k8s.io/utils/pointer
 
-- baseImportPath: "./vendor/k8s.io/apimachinery/"
+- baseImportPath: "./staging/src/k8s.io/apimachinery"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
@@ -39,23 +41,25 @@
   - k8s.io/utils/net
   - k8s.io/utils/strings
   - k8s.io/klog
+  - k8s.io/utils/ptr
 
-- baseImportPath: "./vendor/k8s.io/api/"
+- baseImportPath: "./staging/src/k8s.io/api"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/klog
 
-- baseImportPath: "./vendor/k8s.io/code-generator/"
+- baseImportPath: "./staging/src/k8s.io/code-generator"
   ignoredSubTrees:
-  - "./vendor/k8s.io/code-generator/examples"
+  - "./staging/src/k8s.io/code-generator/examples"
+  - "./staging/src/k8s.io/code-generator/cmd/defaulter-gen/output_tests"
   allowedImports:
   - k8s.io/gengo
   - k8s.io/code-generator
   - k8s.io/kube-openapi
   - k8s.io/klog
 
-- baseImportPath: "./vendor/k8s.io/component-base/"
+- baseImportPath: "./staging/src/k8s.io/component-base"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/component-base
@@ -64,7 +68,7 @@
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/client-go/"
+- baseImportPath: "./staging/src/k8s.io/client-go"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -75,30 +79,30 @@
 
 # prevent core machinery from taking explicit v1 references unless
 # necessary
-- baseImportPath: "./vendor/k8s.io/client-go/rest/"
+- baseImportPath: "./staging/src/k8s.io/client-go/rest"
   excludeTests: true
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/klog
   - k8s.io/utils
-- baseImportPath: "./vendor/k8s.io/client-go/tools/"
+- baseImportPath: "./staging/src/k8s.io/client-go/tools"
   excludeTests: true
   ignoredSubTrees:
-  - "./vendor/k8s.io/client-go/tools/cache/testing"
-  - "./vendor/k8s.io/client-go/tools/leaderelection/resourcelock"
-  - "./vendor/k8s.io/client-go/tools/portforward"
-  - "./vendor/k8s.io/client-go/tools/record"
-  - "./vendor/k8s.io/client-go/tools/events"
-  - "./vendor/k8s.io/client-go/tools/reference"
-  - "./vendor/k8s.io/client-go/tools/remotecommand"
+  - "./staging/src/k8s.io/client-go/tools/cache/testing"
+  - "./staging/src/k8s.io/client-go/tools/leaderelection/resourcelock"
+  - "./staging/src/k8s.io/client-go/tools/portforward"
+  - "./staging/src/k8s.io/client-go/tools/record"
+  - "./staging/src/k8s.io/client-go/tools/events"
+  - "./staging/src/k8s.io/client-go/tools/reference"
+  - "./staging/src/k8s.io/client-go/tools/remotecommand"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/apiserver/"
+- baseImportPath: "./staging/src/k8s.io/apiserver"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -110,7 +114,7 @@
   - k8s.io/klog
   - k8s.io/kms
 
-- baseImportPath: "./vendor/k8s.io/metrics/"
+- baseImportPath: "./staging/src/k8s.io/metrics"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -119,7 +123,7 @@
   - k8s.io/metrics
   - k8s.io/klog
 
-- baseImportPath: "./vendor/k8s.io/kube-aggregator/"
+- baseImportPath: "./staging/src/k8s.io/kube-aggregator"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -132,7 +136,7 @@
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/kubectl/"
+- baseImportPath: "./staging/src/k8s.io/kubectl"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -146,7 +150,7 @@
   - k8s.io/utils
   - k8s.io/klog
 
-- baseImportPath: "./vendor/k8s.io/sample-apiserver/"
+- baseImportPath: "./staging/src/k8s.io/sample-apiserver"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -159,7 +163,7 @@
   - k8s.io/utils/net
   - k8s.io/klog
 
-- baseImportPath: "./vendor/k8s.io/apiextensions-apiserver/"
+- baseImportPath: "./staging/src/k8s.io/apiextensions-apiserver"
   allowedImports:
   - k8s.io/api
   - k8s.io/apiextensions-apiserver
@@ -172,21 +176,21 @@
   - k8s.io/kube-openapi
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/kube-openapi/"
+- baseImportPath: "./vendor/k8s.io/kube-openapi"
   allowedImports:
   - k8s.io/kube-openapi
   - k8s.io/gengo
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/sample-cli-plugin/"
+- baseImportPath: "./staging/src/k8s.io/sample-cli-plugin"
   allowedImports:
   - k8s.io/api
   - k8s.io/cli-runtime
   - k8s.io/client-go
   - k8s.io/sample-cli-plugin
 
-- baseImportPath: "./vendor/k8s.io/kube-controller-manager/"
+- baseImportPath: "./staging/src/k8s.io/kube-controller-manager"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/cloud-provider
@@ -195,14 +199,14 @@
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/kube-proxy/"
+- baseImportPath: "./staging/src/k8s.io/kube-proxy"
   allowedImports:
   - k8s.io/apimachinery
   - k8s.io/component-base
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/kube-scheduler/"
+- baseImportPath: "./staging/src/k8s.io/kube-scheduler"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -211,22 +215,27 @@
   - k8s.io/kube-scheduler
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/kubelet/"
+- baseImportPath: "./staging/src/k8s.io/kubelet"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/apiserver
+  - k8s.io/client-go
+  - k8s.io/cri-api
+  - k8s.io/cri-client
   - k8s.io/klog
   - k8s.io/component-base
   - k8s.io/kubelet
+  - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/cluster-bootstrap/"
+- baseImportPath: "./staging/src/k8s.io/cluster-bootstrap"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/cluster-bootstrap
   - k8s.io/klog
 
-- baseImportPath: "./vendor/k8s.io/cloud-provider/"
+- baseImportPath: "./staging/src/k8s.io/cloud-provider"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -239,17 +248,20 @@
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/dynamic-resource-allocation/"
+- baseImportPath: "./staging/src/k8s.io/dynamic-resource-allocation"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+  - k8s.io/apiserver/pkg/apis/cel
+  - k8s.io/apiserver/pkg/cel
+  - k8s.io/apiserver/pkg/cel/environment
   - k8s.io/client-go
   - k8s.io/dynamic-resource-allocation
   - k8s.io/klog
   - k8s.io/kubelet
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/legacy-cloud-providers/"
+- baseImportPath: "./staging/src/k8s.io/legacy-cloud-providers"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -265,14 +277,14 @@
   - k8s.io/component-base/metrics
   - k8s.io/component-base/metrics/legacyregistry
 
-- baseImportPath: "./vendor/k8s.io/csi-translation-lib/"
+- baseImportPath: "./staging/src/k8s.io/csi-translation-lib"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/klog
   - k8s.io/csi-translation-lib
 
-- baseImportPath: "./vendor/k8s.io/component-helpers/"
+- baseImportPath: "./staging/src/k8s.io/component-helpers"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -281,7 +293,7 @@
   - k8s.io/klog
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/pod-security-admission/"
+- baseImportPath: "./staging/src/k8s.io/pod-security-admission"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
@@ -293,12 +305,20 @@
   - k8s.io/pod-security-admission
   - k8s.io/utils
 
-- baseImportPath: "./vendor/k8s.io/kms/"
+- baseImportPath: "./staging/src/k8s.io/kms"
+  allowedImports:
+  - k8s.io/kms
+
+- baseImportPath: "./staging/src/k8s.io/endpointslice"
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/client-go
+  - k8s.io/component-base
+  - k8s.io/endpointslice
   - k8s.io/klog
-  - k8s.io/kms
   - k8s.io/utils
 
+# TODO: enable when source code got transferred
+# - baseImportPath: "./staging/src/k8s.io/cri-client"
+#   allowedImports: []

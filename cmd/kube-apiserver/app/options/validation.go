@@ -22,20 +22,21 @@ import (
 	"net"
 	"strings"
 
-	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
-	genericfeatures "k8s.io/apiserver/pkg/features"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	netutils "k8s.io/utils/net"
+
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
 // validateClusterIPFlags is expected to be called after Complete()
-func validateClusterIPFlags(options *ServerRunOptions) []error {
+func validateClusterIPFlags(options Extra) []error {
 	var errs []error
 	// maxCIDRBits is used to define the maximum CIDR size for the cluster ip(s)
-	const maxCIDRBits = 20
+	maxCIDRBits := 20
 
 	// validate that primary has been processed by user provided values or it has been defaulted
 	if options.PrimaryServiceClusterIPRange.IP == nil {
@@ -47,10 +48,12 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		errs = append(errs, errors.New("--service-cluster-ip-range must not contain more than two entries"))
 	}
 
-	// Complete() expected to have set Primary* and Secondary*
-	// primary CIDR validation
-	if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
-		errs = append(errs, err)
+	// Complete() expected to have set Primary* and Secondary
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		// primary CIDR validation
+		if err := validateMaxCIDRRange(options.PrimaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range"); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
@@ -68,9 +71,10 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		if !dualstack {
 			errs = append(errs, errors.New("--service-cluster-ip-range[0] and --service-cluster-ip-range[1] must be of different IP family"))
 		}
-
-		if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
-			errs = append(errs, err)
+		if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+			if err := validateMaxCIDRRange(options.SecondaryServiceClusterIPRange, maxCIDRBits, "--service-cluster-ip-range[1]"); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 
@@ -89,7 +93,7 @@ func validateMaxCIDRRange(cidr net.IPNet, maxCIDRBits int, cidrFlag string) erro
 	return nil
 }
 
-func validateServiceNodePort(options *ServerRunOptions) []error {
+func validateServiceNodePort(options Extra) []error {
 	var errs []error
 
 	if options.KubernetesServiceNodePort < 0 || options.KubernetesServiceNodePort > 65535 {
@@ -102,40 +106,19 @@ func validateServiceNodePort(options *ServerRunOptions) []error {
 	return errs
 }
 
-func validateTokenRequest(options *ServerRunOptions) []error {
-	var errs []error
-
-	enableAttempted := options.ServiceAccountSigningKeyFile != "" ||
-		(len(options.Authentication.ServiceAccounts.Issuers) != 0 && options.Authentication.ServiceAccounts.Issuers[0] != "") ||
-		len(options.Authentication.APIAudiences) != 0
-
-	enableSucceeded := options.ServiceAccountIssuer != nil
-
-	if !enableAttempted {
-		errs = append(errs, errors.New("--service-account-signing-key-file and --service-account-issuer are required flags"))
-	}
-
-	if enableAttempted && !enableSucceeded {
-		errs = append(errs, errors.New("--service-account-signing-key-file, --service-account-issuer, and --api-audiences should be specified together"))
-	}
-
-	return errs
-}
-
-func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
-		// If none of the following runtime config options are specified,
-		// APF is assumed to be turned on. The internal APF controller uses
-		// v1beta3 so it should be enabled.
-		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
-		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta3", "api/beta", "api/all"} // in the order of precedence
-		for _, testConfig := range testConfigs {
-			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
-				return []error{fmt.Errorf("--runtime-config=%s=false conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true", testConfig)}
-			}
-			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=true", testConfig)) {
-				return nil
-			}
+func validatePublicIPServiceClusterIPRangeIPFamilies(extra Extra, generic genericoptions.ServerRunOptions) []error {
+	// The "kubernetes.default" Service is SingleStack based on the configured ServiceIPRange.
+	// If the bootstrap controller reconcile the kubernetes.default Service and Endpoints, it must
+	// guarantee that the Service ClusterIPRepairConfig and the associated Endpoints have the same IP family, or
+	// it will not work for clients because of the IP family mismatch.
+	// TODO: revisit for dual-stack https://github.com/kubernetes/enhancements/issues/2438
+	if reconcilers.Type(extra.EndpointReconcilerType) != reconcilers.NoneEndpointReconcilerType {
+		serviceIPRange, _, err := controlplaneapiserver.ServiceIPRange(extra.PrimaryServiceClusterIPRange)
+		if err != nil {
+			return []error{fmt.Errorf("error determining service IP ranges: %w", err)}
+		}
+		if netutils.IsIPv4CIDR(&serviceIPRange) != netutils.IsIPv4(generic.AdvertiseAddress) {
+			return []error{fmt.Errorf("service IP family %q must match public address family %q", extra.PrimaryServiceClusterIPRange.String(), generic.AdvertiseAddress.String())}
 		}
 	}
 
@@ -143,23 +126,18 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 }
 
 // Validate checks ServerRunOptions and return a slice of found errs.
-func (s *ServerRunOptions) Validate() []error {
+func (s CompletedOptions) Validate() []error {
 	var errs []error
+
+	errs = append(errs, s.CompletedOptions.Validate()...)
+	errs = append(errs, s.CloudProvider.Validate()...)
+	errs = append(errs, validateClusterIPFlags(s.Extra)...)
+	errs = append(errs, validateServiceNodePort(s.Extra)...)
+	errs = append(errs, validatePublicIPServiceClusterIPRangeIPFamilies(s.Extra, *s.GenericServerRunOptions)...)
+
 	if s.MasterCount <= 0 {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
 	}
-	errs = append(errs, s.Etcd.Validate()...)
-	errs = append(errs, validateClusterIPFlags(s)...)
-	errs = append(errs, validateServiceNodePort(s)...)
-	errs = append(errs, validateAPIPriorityAndFairness(s)...)
-	errs = append(errs, s.SecureServing.Validate()...)
-	errs = append(errs, s.Authentication.Validate()...)
-	errs = append(errs, s.Authorization.Validate()...)
-	errs = append(errs, s.Audit.Validate()...)
-	errs = append(errs, s.Admission.Validate()...)
-	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
-	errs = append(errs, validateTokenRequest(s)...)
-	errs = append(errs, s.Metrics.Validate()...)
 
 	return errs
 }

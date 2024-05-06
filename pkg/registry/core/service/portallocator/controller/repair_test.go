@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
@@ -53,6 +54,7 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 }
 
 func TestRepair(t *testing.T) {
+	clearMetrics()
 	fakeClient := fake.NewSimpleClientset()
 	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "100-200"},
@@ -66,6 +68,13 @@ func TestRepair(t *testing.T) {
 	if !registry.updateCalled || registry.updated == nil || registry.updated.Range != pr.String() || registry.updated != registry.item {
 		t.Errorf("unexpected registry: %#v", registry)
 	}
+	repairErrors, err := testutil.GetCounterMetricValue(nodePortRepairReconcileErrors)
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairReconcileErrors.Name, err)
+	}
+	if repairErrors != 0 {
+		t.Fatalf("0 error expected, got %v", repairErrors)
+	}
 
 	registry = &mockRangeRegistry{
 		item:      &api.RangeAllocation{Range: "100-200"},
@@ -75,9 +84,18 @@ func TestRepair(t *testing.T) {
 	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
+	repairErrors, err = testutil.GetCounterMetricValue(nodePortRepairReconcileErrors)
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairReconcileErrors.Name, err)
+	}
+	if repairErrors != 1 {
+		t.Fatalf("1 error expected, got %v", repairErrors)
+	}
 }
 
 func TestRepairLeak(t *testing.T) {
+	clearMetrics()
+
 	pr, _ := net.ParsePortRange("100-200")
 	previous, err := portallocator.NewInMemory(*pr)
 	if err != nil {
@@ -127,9 +145,18 @@ func TestRepairLeak(t *testing.T) {
 	if after.Has(111) {
 		t.Errorf("expected portallocator to not have leaked port")
 	}
+	em := testMetrics{
+		leak:       1,
+		repair:     0,
+		outOfRange: 0,
+		duplicate:  0,
+		unknown:    0,
+	}
+	expectMetrics(t, em)
 }
 
 func TestRepairWithExisting(t *testing.T) {
+	clearMetrics()
 	pr, _ := net.ParsePortRange("100-200")
 	previous, err := portallocator.NewInMemory(*pr)
 	if err != nil {
@@ -204,6 +231,14 @@ func TestRepairWithExisting(t *testing.T) {
 	if free := after.Free(); free != 97 {
 		t.Errorf("unexpected portallocator state: %d free", free)
 	}
+	em := testMetrics{
+		leak:       0,
+		repair:     4,
+		outOfRange: 1,
+		duplicate:  1,
+		unknown:    0,
+	}
+	expectMetrics(t, em)
 }
 
 func TestCollectServiceNodePorts(t *testing.T) {
@@ -301,5 +336,53 @@ func TestCollectServiceNodePorts(t *testing.T) {
 				t.Fatalf("Invalid result\nexpected: %v\ngot: %v", tc.expected, ports)
 			}
 		})
+	}
+}
+
+// Metrics helpers
+func clearMetrics() {
+	nodePortRepairPortErrors.Reset()
+	nodePortRepairReconcileErrors.Reset()
+}
+
+type testMetrics struct {
+	leak       float64
+	repair     float64
+	outOfRange float64
+	duplicate  float64
+	unknown    float64
+	full       float64
+}
+
+func expectMetrics(t *testing.T, em testMetrics) {
+	var m testMetrics
+	var err error
+
+	m.leak, err = testutil.GetCounterMetricValue(nodePortRepairPortErrors.WithLabelValues("leak"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairPortErrors.Name, err)
+	}
+	m.repair, err = testutil.GetCounterMetricValue(nodePortRepairPortErrors.WithLabelValues("repair"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairPortErrors.Name, err)
+	}
+	m.outOfRange, err = testutil.GetCounterMetricValue(nodePortRepairPortErrors.WithLabelValues("outOfRange"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairPortErrors.Name, err)
+	}
+	m.duplicate, err = testutil.GetCounterMetricValue(nodePortRepairPortErrors.WithLabelValues("duplicate"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairPortErrors.Name, err)
+	}
+	m.unknown, err = testutil.GetCounterMetricValue(nodePortRepairPortErrors.WithLabelValues("unknown"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairPortErrors.Name, err)
+	}
+	m.full, err = testutil.GetCounterMetricValue(nodePortRepairPortErrors.WithLabelValues("full"))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", nodePortRepairPortErrors.Name, err)
+	}
+	if m != em {
+		t.Fatalf("metrics error: expected %v, received %v", em, m)
 	}
 }

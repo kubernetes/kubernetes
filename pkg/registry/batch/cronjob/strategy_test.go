@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -38,17 +38,20 @@ var (
 	validCronjobSpec = batch.CronJobSpec{
 		Schedule:          "5 5 * * ?",
 		ConcurrencyPolicy: batch.AllowConcurrent,
-		TimeZone:          pointer.String("Asia/Shanghai"),
+		TimeZone:          ptr.To("Asia/Shanghai"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
-				Template: validPodTemplateSpec,
+				Template:       validPodTemplateSpec,
+				CompletionMode: completionModePtr(batch.IndexedCompletion),
+				Completions:    ptr.To[int32](10),
+				Parallelism:    ptr.To[int32](10),
 			},
 		},
 	}
 	cronjobSpecWithTZinSchedule = batch.CronJobSpec{
 		Schedule:          "CRON_TZ=UTC 5 5 * * ?",
 		ConcurrencyPolicy: batch.AllowConcurrent,
-		TimeZone:          pointer.String("Asia/DoesNotExist"),
+		TimeZone:          ptr.To("Asia/DoesNotExist"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
 				Template: validPodTemplateSpec,
@@ -56,6 +59,10 @@ var (
 		},
 	}
 )
+
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
+}
 
 func TestCronJobStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
@@ -222,14 +229,14 @@ func TestStrategy_ResetFields(t *testing.T) {
 	}
 }
 
-func TestJobStatusStrategy_ResetFields(t *testing.T) {
+func TestCronJobStatusStrategy_ResetFields(t *testing.T) {
 	resetFields := StatusStrategy.GetResetFields()
 	if len(resetFields) != 2 {
 		t.Errorf("ResetFields should have 2 elements, but have %d", len(resetFields))
 	}
 }
 
-func TestJobStrategy_WarningsOnCreate(t *testing.T) {
+func TestCronJobStrategy_WarningsOnCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	now := metav1.Now()
@@ -266,20 +273,6 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 				},
 			},
 		},
-		"timezone invalid": {
-			wantWarningsCount: 1,
-			cronjob: &batch.CronJob{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "mycronjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "9",
-				},
-				Spec: cronjobSpecWithTZinSchedule,
-				Status: batch.CronJobStatus{
-					LastScheduleTime: &now,
-				},
-			},
-		},
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
@@ -291,7 +284,7 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 	}
 }
 
-func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
+func TestCronJobStrategy_WarningsOnUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	now := metav1.Now()
 
@@ -380,7 +373,7 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 					JobTemplate: batch.JobTemplateSpec{
 						Spec: batch.JobSpec{
 							Template: api.PodTemplateSpec{
-								Spec: api.PodSpec{Volumes: []api.Volume{{Name: "volume-name"}, {Name: "volume-name"}}},
+								Spec: api.PodSpec{ImagePullSecrets: []api.LocalObjectReference{{Name: ""}}},
 							},
 						},
 					},

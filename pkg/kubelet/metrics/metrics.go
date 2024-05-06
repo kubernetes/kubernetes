@@ -30,12 +30,19 @@ import (
 
 // This const block defines the metric names for the kubelet metrics.
 const (
+	FirstNetworkPodStartSLIDurationKey = "first_network_pod_start_sli_duration_seconds"
 	KubeletSubsystem                   = "kubelet"
 	NodeNameKey                        = "node_name"
 	NodeLabelKey                       = "node"
+	NodeStartupPreKubeletKey           = "node_startup_pre_kubelet_duration_seconds"
+	NodeStartupPreRegistrationKey      = "node_startup_pre_registration_duration_seconds"
+	NodeStartupRegistrationKey         = "node_startup_registration_duration_seconds"
+	NodeStartupPostRegistrationKey     = "node_startup_post_registration_duration_seconds"
+	NodeStartupKey                     = "node_startup_duration_seconds"
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
+	PodStartTotalDurationKey           = "pod_start_total_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
@@ -43,6 +50,9 @@ const (
 	PLEGDiscardEventsKey               = "pleg_discard_events"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
+	EventedPLEGConnErrKey              = "evented_pleg_connection_error_count"
+	EventedPLEGConnKey                 = "evented_pleg_connection_success_count"
+	EventedPLEGConnLatencyKey          = "evented_pleg_connection_latency_seconds"
 	EvictionsKey                       = "evictions"
 	EvictionStatsAgeKey                = "eviction_stats_age_seconds"
 	PreemptionsKey                     = "preemptions"
@@ -61,6 +71,7 @@ const (
 	WorkingPodCountKey                 = "working_pods"
 	OrphanedRuntimePodTotalKey         = "orphaned_runtime_pods_total"
 	RestartedPodTotalKey               = "restarted_pods_total"
+	ImagePullDurationKey               = "image_pull_duration_seconds"
 
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
@@ -75,6 +86,8 @@ const (
 	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable"
 	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list"
 	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable"
+	PodResourcesEndpointRequestsGetKey            = "pod_resources_endpoint_requests_get"
+	PodResourcesEndpointErrorsGetKey              = "pod_resources_endpoint_errors_get"
 
 	// Metrics keys for RuntimeClass
 	RunPodSandboxDurationKey = "run_podsandbox_duration_seconds"
@@ -97,6 +110,10 @@ const (
 	CPUManagerPinningRequestsTotalKey = "cpu_manager_pinning_requests_total"
 	CPUManagerPinningErrorsTotalKey   = "cpu_manager_pinning_errors_total"
 
+	// Metrics to track the Memory manager behavior
+	MemoryManagerPinningRequestsTotalKey = "memory_manager_pinning_requests_total"
+	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
+
 	// Metrics to track the Topology manager behavior
 	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
 	TopologyManagerAdmissionErrorsTotalKey   = "topology_manager_admission_errors_total"
@@ -106,10 +123,39 @@ const (
 	orphanPodCleanedVolumesKey       = "orphan_pod_cleaned_volumes"
 	orphanPodCleanedVolumesErrorsKey = "orphan_pod_cleaned_volumes_errors"
 
+	// Metric for tracking garbage collected images
+	ImageGarbageCollectedTotalKey = "image_garbage_collected_total"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
 	EphemeralContainer = "ephemeral_container"
+)
+
+type imageSizeBucket struct {
+	lowerBoundInBytes uint64
+	label             string
+}
+
+var (
+	podStartupDurationBuckets = []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600}
+	imagePullDurationBuckets  = []float64{1, 5, 10, 20, 30, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600}
+	// imageSizeBuckets has the labels to be associated with image_pull_duration_seconds metric. For example, if the size of
+	// an image pulled is between 1GB and 5GB, the label will be "1GB-5GB".
+	imageSizeBuckets = []imageSizeBucket{
+		{0, "0-10MB"},
+		{10 * 1024 * 1024, "10MB-100MB"},
+		{100 * 1024 * 1024, "100MB-500MB"},
+		{500 * 1024 * 1024, "500MB-1GB"},
+		{1 * 1024 * 1024 * 1024, "1GB-5GB"},
+		{5 * 1024 * 1024 * 1024, "5GB-10GB"},
+		{10 * 1024 * 1024 * 1024, "10GB-20GB"},
+		{20 * 1024 * 1024 * 1024, "20GB-30GB"},
+		{30 * 1024 * 1024 * 1024, "30GB-40GB"},
+		{40 * 1024 * 1024 * 1024, "40GB-60GB"},
+		{60 * 1024 * 1024 * 1024, "60GB-100GB"},
+		{100 * 1024 * 1024 * 1024, "GT100GB"},
+	}
 )
 
 var (
@@ -152,7 +198,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
 			Help:           "Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        podStartupDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -169,11 +215,44 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartSLIDurationKey,
 			Help:           "Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
-			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
+			Buckets:        podStartupDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{},
 	)
+
+	// PodStartTotalDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run
+	// since creation, including the time for image pulling.
+	//
+	// The histogram bucket boundaries for pod startup latency metrics, measured in seconds. These are hand-picked
+	// so as to be roughly exponential but still round numbers in everyday units. This is to minimise the number
+	// of buckets while allowing accurate measurement of thresholds which might be used in SLOs
+	// e.g. x% of pods start up within 30 seconds, or 15 minutes, etc.
+	PodStartTotalDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStartTotalDurationKey,
+			Help:           "Duration in seconds to start a pod since creation, including time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
+			Buckets:        podStartupDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{},
+	)
+
+	// FirstNetworkPodStartSLIDuration is a gauge that tracks the duration (in seconds) it takes for the first network pod to run,
+	// excluding the time for image pulling. This is an internal and temporary metric required because of the existing limitations of the
+	// existing networking subsystem and CRI/CNI implementations that will be solved by https://github.com/containernetworking/cni/issues/859
+	// The metric represents the latency observed by an user to run workloads in a new node.
+	// ref: https://github.com/kubernetes/community/blob/master/sig-scalability/slos/pod_startup_latency.md
+	FirstNetworkPodStartSLIDuration = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           FirstNetworkPodStartSLIDurationKey,
+			Help:           "Duration in seconds to start the first network pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
+			StabilityLevel: metrics.INTERNAL,
+		},
+	)
+
 	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
 	// Broken down by method.
 	CgroupManagerDuration = metrics.NewHistogramVec(
@@ -250,6 +329,41 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// EventedPLEGConnErr is a Counter that tracks the number of errors encountered during
+	// the establishment of streaming connection with the CRI runtime.
+	EventedPLEGConnErr = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EventedPLEGConnErrKey,
+			Help:           "The number of errors encountered during the establishment of streaming connection with the CRI runtime.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// EventedPLEGConn is a Counter that tracks the number of times a streaming client
+	// was obtained to receive CRI Events.
+	EventedPLEGConn = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EventedPLEGConnKey,
+			Help:           "The number of times a streaming client was obtained to receive CRI Events.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// EventedPLEGConnLatency is a Histogram that tracks the latency of streaming connection
+	// with the CRI runtime, measured in seconds.
+	EventedPLEGConnLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EventedPLEGConnLatencyKey,
+			Help:           "The latency of streaming connection with the CRI runtime, measured in seconds.",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// RuntimeOperations is a Counter that tracks the cumulative number of remote runtime operations.
 	// Broken down by operation type.
 	RuntimeOperations = metrics.NewCounterVec(
@@ -403,6 +517,30 @@ var (
 		[]string{"server_api_version"},
 	)
 
+	// PodResourcesEndpointRequestsGetCount is a Counter that tracks the number of requests to the PodResource Get() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsGetCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointRequestsGetKey,
+			Help:           "Number of requests to the PodResource Get endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
+	// PodResourcesEndpointErrorsGetCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
+	// Broken down by server API version.
+	PodResourcesEndpointErrorsGetCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointErrorsGetKey,
+			Help:           "Number of requests to the PodResource Get endpoint which returned error. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
+	)
+
 	// RunPodSandboxDuration is a Histogram that tracks the duration (in seconds) it takes to run Pod Sandbox operations.
 	// Broken down by RuntimeClass.Handler.
 	RunPodSandboxDuration = metrics.NewHistogramVec(
@@ -549,7 +687,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedHostProcessContainersTotalKey,
-			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type"},
@@ -559,7 +697,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedHostProcessContainersErrorsTotalKey,
-			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type", "code"},
@@ -623,6 +761,25 @@ var (
 		},
 	)
 
+	// MemoryManagerPinningRequestTotal tracks the number of times the pod spec required the memory manager to pin memory pages
+	MemoryManagerPinningRequestTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerPinningRequestsTotalKey,
+			Help:           "The number of memory pages allocations which required pinning.",
+			StabilityLevel: metrics.ALPHA,
+		})
+
+	// MemoryManagerPinningErrorsTotal tracks the number of times the pod spec required the memory manager to pin memory pages, but the allocation failed
+	MemoryManagerPinningErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerPinningErrorsTotalKey,
+			Help:           "The number of memory pages allocations which required pinning that failed.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// TopologyManagerAdmissionRequestsTotal tracks the number of times the pod spec will cause the topology manager to admit a pod
 	TopologyManagerAdmissionRequestsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -672,6 +829,84 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	NodeStartupPreKubeletDuration = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           NodeStartupPreKubeletKey,
+			Help:           "Duration in seconds of node startup before kubelet starts.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	NodeStartupPreRegistrationDuration = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           NodeStartupPreRegistrationKey,
+			Help:           "Duration in seconds of node startup before registration.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	NodeStartupRegistrationDuration = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           NodeStartupRegistrationKey,
+			Help:           "Duration in seconds of node startup during registration.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	NodeStartupPostRegistrationDuration = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           NodeStartupPostRegistrationKey,
+			Help:           "Duration in seconds of node startup after registration.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	NodeStartupDuration = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           NodeStartupKey,
+			Help:           "Duration in seconds of node startup in total.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	ImageGarbageCollectedTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageGarbageCollectedTotalKey,
+			Help:           "Total number of images garbage collected by the kubelet, whether through disk usage or image age.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason"},
+	)
+
+	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
+	// including the time spent in the waiting queue of image puller.
+	// The metric is broken down by bucketed image size.
+	ImagePullDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImagePullDurationKey,
+			Help:           "Duration in seconds to pull an image.",
+			Buckets:        imagePullDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"image_size_in_bytes"},
+	)
+
+	LifecycleHandlerSleepTerminated = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "sleep_action_terminated_early_total",
+			Help:           "The number of times lifecycle sleep handler got terminated before it finishes",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -680,10 +915,18 @@ var registerMetrics sync.Once
 func Register(collectors ...metrics.StableCollector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(FirstNetworkPodStartSLIDuration)
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(PodStartSLIDuration)
+		legacyregistry.MustRegister(PodStartTotalDuration)
+		legacyregistry.MustRegister(ImagePullDuration)
+		legacyregistry.MustRegister(NodeStartupPreKubeletDuration)
+		legacyregistry.MustRegister(NodeStartupPreRegistrationDuration)
+		legacyregistry.MustRegister(NodeStartupRegistrationDuration)
+		legacyregistry.MustRegister(NodeStartupPostRegistrationDuration)
+		legacyregistry.MustRegister(NodeStartupDuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(PodStatusSyncDuration)
@@ -692,6 +935,9 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PLEGDiscardEvents)
 		legacyregistry.MustRegister(PLEGRelistInterval)
 		legacyregistry.MustRegister(PLEGLastSeen)
+		legacyregistry.MustRegister(EventedPLEGConnErr)
+		legacyregistry.MustRegister(EventedPLEGConn)
+		legacyregistry.MustRegister(EventedPLEGConnLatency)
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
 		legacyregistry.MustRegister(RuntimeOperationsErrors)
@@ -709,15 +955,14 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(OrphanedRuntimePodTotal)
 		legacyregistry.MustRegister(RestartedPodTotal)
 		legacyregistry.MustRegister(ManagedEphemeralContainers)
-		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
-			legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
-
-			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGetAllocatable) {
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
-				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
-				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
-			}
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
+		legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
+		legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
+			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
 		}
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
@@ -729,6 +974,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 		legacyregistry.MustRegister(CPUManagerPinningRequestsTotal)
 		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
+			legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
+			legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
+		}
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
@@ -745,9 +994,8 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
-			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
-		}
+		legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
+		legacyregistry.MustRegister(LifecycleHandlerSleepTerminated)
 	})
 }
 
@@ -764,4 +1012,19 @@ func SinceInSeconds(start time.Time) float64 {
 // SetNodeName sets the NodeName Gauge to 1.
 func SetNodeName(name types.NodeName) {
 	NodeName.WithLabelValues(string(name)).Set(1)
+}
+
+func GetImageSizeBucket(sizeInBytes uint64) string {
+	if sizeInBytes == 0 {
+		return "N/A"
+	}
+
+	for i := len(imageSizeBuckets) - 1; i >= 0; i-- {
+		if sizeInBytes > imageSizeBuckets[i].lowerBoundInBytes {
+			return imageSizeBuckets[i].label
+		}
+	}
+
+	// return empty string when sizeInBytes is 0 (error getting image size)
+	return ""
 }

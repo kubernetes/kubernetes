@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -41,10 +42,18 @@ import (
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/trace"
 )
 
 const defaultExpectedTypeName = "<unspecified>"
+
+var (
+	// We try to spread the load on apiserver by setting timeouts for
+	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+	defaultMinWatchTimeout = 5 * time.Minute
+)
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
@@ -68,9 +77,9 @@ type Reflector struct {
 	listerWatcher ListerWatcher
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
-	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
-	initConnBackoffManager wait.BackoffManager
-	resyncPeriod           time.Duration
+	resyncPeriod   time.Duration
+	// minWatchTimeout defines the minimum timeout for watch requests.
+	minWatchTimeout time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
@@ -99,6 +108,17 @@ type Reflector struct {
 	ShouldResync func() bool
 	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
 	MaxInternalErrorRetryDuration time.Duration
+	// UseWatchList if turned on instructs the reflector to open a stream to bring data from the API server.
+	// Streaming has the primary advantage of using fewer server's resources to fetch data.
+	//
+	// The old behaviour establishes a LIST request which gets data in chunks.
+	// Paginated list is less efficient and depending on the actual size of objects
+	// might result in an increased memory consumption of the APIServer.
+	//
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
+	//
+	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
+	UseWatchList *bool
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to
@@ -139,12 +159,6 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 	}
 }
 
-var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	minWatchTimeout = 5 * time.Minute
-)
-
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
 // The indexer is configured to key on namespace
 func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
@@ -182,6 +196,10 @@ type ReflectorOptions struct {
 	// (do not resync).
 	ResyncPeriod time.Duration
 
+	// MinWatchTimeout, if non-zero, defines the minimum timeout for watch requests send to kube-apiserver.
+	// However, values lower than 5m will not be honored to avoid negative performance impact on controlplane.
+	MinWatchTimeout time.Duration
+
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
 }
@@ -201,20 +219,24 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	if reflectorClock == nil {
 		reflectorClock = clock.RealClock{}
 	}
+	minWatchTimeout := defaultMinWatchTimeout
+	if options.MinWatchTimeout > defaultMinWatchTimeout {
+		minWatchTimeout = options.MinWatchTimeout
+	}
 	r := &Reflector{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
+		minWatchTimeout: minWatchTimeout,
 		typeDescription: options.TypeDescription,
 		listerWatcher:   lw,
 		store:           store,
 		// We used to make the call every 1sec (1 QPS), the goal here is to achieve ~98% traffic reduction when
 		// API server is not healthy. With these parameters, backoff will stop at [30,60) sec interval which is
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
-		backoffManager:         wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
-		initConnBackoffManager: wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
-		clock:                  reflectorClock,
-		watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
-		expectedType:           reflect.TypeOf(expectedType),
+		backoffManager:    wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
+		clock:             reflectorClock,
+		watchErrorHandler: WatchErrorHandler(DefaultWatchErrorHandler),
+		expectedType:      reflect.TypeOf(expectedType),
 	}
 
 	if r.name == "" {
@@ -227,6 +249,14 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 
 	if r.expectedGVK == nil {
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
+	}
+
+	// don't overwrite UseWatchList if already set
+	// because the higher layers (e.g. storage/cacher) disabled it on purpose
+	if r.UseWatchList == nil {
+		if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
+			r.UseWatchList = ptr.To(true)
+		}
 	}
 
 	return r
@@ -311,17 +341,39 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	klog.V(3).Infof("Listing and watching %v from %s", r.typeDescription, r.name)
+	var err error
+	var w watch.Interface
+	useWatchList := ptr.Deref(r.UseWatchList, false)
+	fallbackToList := !useWatchList
 
-	err := r.list(stopCh)
-	if err != nil {
-		return err
+	if useWatchList {
+		w, err = r.watchList(stopCh)
+		if w == nil && err == nil {
+			// stopCh was closed
+			return nil
+		}
+		if err != nil {
+			klog.Warningf("The watchlist request ended with an error, falling back to the standard LIST/WATCH semantics because making progress is better than deadlocking, err = %v", err)
+			fallbackToList = true
+			// ensure that we won't accidentally pass some garbage down the watch.
+			w = nil
+		}
 	}
+
+	if fallbackToList {
+		err = r.list(stopCh)
+		if err != nil {
+			return err
+		}
+	}
+
+	klog.V(2).Infof("Caches populated for %v from %s", r.typeDescription, r.name)
 
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
 	defer close(cancelCh)
 	go r.startResync(stopCh, cancelCh, resyncerrc)
-	return r.watch(nil, stopCh, resyncerrc)
+	return r.watch(w, stopCh, resyncerrc)
 }
 
 // startResync periodically calls r.store.Resync() method.
@@ -361,6 +413,11 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
 		select {
 		case <-stopCh:
+			// we can only end up here when the stopCh
+			// was closed after a successful watchlist or list request
+			if w != nil {
+				w.Stop()
+			}
 			return nil
 		default:
 		}
@@ -369,7 +426,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		start := r.clock.Now()
 
 		if w == nil {
-			timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+			timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 			options := metav1.ListOptions{
 				ResourceVersion: r.LastSyncResourceVersion(),
 				// We want to avoid situations of hanging watchers. Stop any watchers that do not
@@ -385,15 +442,20 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
 					klog.V(4).Infof("%s: watch of %v returned %v - backing off", r.name, r.typeDescription, err)
-					<-r.initConnBackoffManager.Backoff().C()
-					continue
+					select {
+					case <-stopCh:
+						return nil
+					case <-r.backoffManager.Backoff().C():
+						continue
+					}
 				}
 				return err
 			}
 		}
 
-		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, r.clock, resyncerrc, stopCh)
+		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
+		w.Stop()
 		w = nil
 		retry.After(err)
 		if err != nil {
@@ -406,8 +468,12 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.typeDescription, err)
 				case apierrors.IsTooManyRequests(err):
 					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.typeDescription)
-					<-r.initConnBackoffManager.Backoff().C()
-					continue
+					select {
+					case <-stopCh:
+						return nil
+					case <-r.backoffManager.Backoff().C():
+						continue
+					}
 				case apierrors.IsInternalError(err) && retry.ShouldRetry():
 					klog.V(2).Infof("%s: retrying watch of %v internal error: %v", r.name, r.typeDescription, err)
 					continue
@@ -467,7 +533,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 			pager.PageSize = 0
 		}
 
-		list, paginatedResult, err = pager.List(context.Background(), options)
+		list, paginatedResult, err = pager.ListWithAlloc(context.Background(), options)
 		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
 			r.setIsLastSyncResourceVersionUnavailable(true)
 			// Retry immediately if the resource version used to list is unavailable.
@@ -476,7 +542,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 			// resource version it is listing at is expired or the cache may not yet be synced to the provided
 			// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
 			// the reflector makes forward progress.
-			list, paginatedResult, err = pager.List(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
+			list, paginatedResult, err = pager.ListWithAlloc(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 		}
 		close(listCh)
 	}()
@@ -514,7 +580,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	}
 	resourceVersion = listMetaInterface.GetResourceVersion()
 	initTrace.Step("Resource version extracted")
-	items, err := meta.ExtractList(list)
+	items, err := meta.ExtractListWithAlloc(list)
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
@@ -526,6 +592,120 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	r.setLastSyncResourceVersion(resourceVersion)
 	initTrace.Step("Resource version updated")
 	return nil
+}
+
+// watchList establishes a stream to get a consistent snapshot of data
+// from the server as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#proposal
+//
+// case 1: start at Most Recent (RV="", ResourceVersionMatch=ResourceVersionMatchNotOlderThan)
+// Establishes a consistent stream with the server.
+// That means the returned data is consistent, as if, served directly from etcd via a quorum read.
+// It begins with synthetic "Added" events of all resources up to the most recent ResourceVersion.
+// It ends with a synthetic "Bookmark" event containing the most recent ResourceVersion.
+// After receiving a "Bookmark" event the reflector is considered to be synchronized.
+// It replaces its internal store with the collected items and
+// reuses the current watch requests for getting further events.
+//
+// case 2: start at Exact (RV>"0", ResourceVersionMatch=ResourceVersionMatchNotOlderThan)
+// Establishes a stream with the server at the provided resource version.
+// To establish the initial state the server begins with synthetic "Added" events.
+// It ends with a synthetic "Bookmark" event containing the provided or newer resource version.
+// After receiving a "Bookmark" event the reflector is considered to be synchronized.
+// It replaces its internal store with the collected items and
+// reuses the current watch requests for getting further events.
+func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
+	var w watch.Interface
+	var err error
+	var temporaryStore Store
+	var resourceVersion string
+	// TODO(#115478): see if this function could be turned
+	//  into a method and see if error handling
+	//  could be unified with the r.watch method
+	isErrorRetriableWithSideEffectsFn := func(err error) bool {
+		if canRetry := isWatchErrorRetriable(err); canRetry {
+			klog.V(2).Infof("%s: watch-list of %v returned %v - backing off", r.name, r.typeDescription, err)
+			<-r.backoffManager.Backoff().C()
+			return true
+		}
+		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
+			// we tried to re-establish a watch request but the provided RV
+			// has either expired or it is greater than the server knows about.
+			// In that case we reset the RV and
+			// try to get a consistent snapshot from the watch cache (case 1)
+			r.setIsLastSyncResourceVersionUnavailable(true)
+			return true
+		}
+		return false
+	}
+
+	initTrace := trace.New("Reflector WatchList", trace.Field{Key: "name", Value: r.name})
+	defer initTrace.LogIfLong(10 * time.Second)
+	for {
+		select {
+		case <-stopCh:
+			return nil, nil
+		default:
+		}
+
+		resourceVersion = ""
+		lastKnownRV := r.rewatchResourceVersion()
+		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		// TODO(#115478): large "list", slow clients, slow network, p&f
+		//  might slow down streaming and eventually fail.
+		//  maybe in such a case we should retry with an increased timeout?
+		timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+		options := metav1.ListOptions{
+			ResourceVersion:      lastKnownRV,
+			AllowWatchBookmarks:  true,
+			SendInitialEvents:    pointer.Bool(true),
+			ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+			TimeoutSeconds:       &timeoutSeconds,
+		}
+		start := r.clock.Now()
+
+		w, err = r.listerWatcher.Watch(options)
+		if err != nil {
+			if isErrorRetriableWithSideEffectsFn(err) {
+				continue
+			}
+			return nil, err
+		}
+		bookmarkReceived := pointer.Bool(false)
+		err = watchHandler(start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+			func(rv string) { resourceVersion = rv },
+			bookmarkReceived,
+			r.clock, make(chan error), stopCh)
+		if err != nil {
+			w.Stop() // stop and retry with clean state
+			if err == errorStopRequested {
+				return nil, nil
+			}
+			if isErrorRetriableWithSideEffectsFn(err) {
+				continue
+			}
+			return nil, err
+		}
+		if *bookmarkReceived {
+			break
+		}
+	}
+	// We successfully got initial state from watch-list confirmed by the
+	// "k8s.io/initial-events-end" bookmark.
+	initTrace.Step("Objects streamed", trace.Field{Key: "count", Value: len(temporaryStore.List())})
+	r.setIsLastSyncResourceVersionUnavailable(false)
+
+	// we utilize the temporaryStore to ensure independence from the current store implementation.
+	// as of today, the store is implemented as a queue and will be drained by the higher-level
+	// component as soon as it finishes replacing the content.
+	checkWatchListConsistencyIfRequested(stopCh, r.name, resourceVersion, r.listerWatcher, temporaryStore)
+
+	if err = r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
+		return nil, fmt.Errorf("unable to sync watch-list result: %v", err)
+	}
+	initTrace.Step("SyncWith done")
+	r.setLastSyncResourceVersion(resourceVersion)
+
+	return w, nil
 }
 
 // syncWith replaces the store's items with the given list.
@@ -546,15 +726,17 @@ func watchHandler(start time.Time,
 	name string,
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
+	exitOnInitialEventsEndBookmark *bool,
 	clock clock.Clock,
 	errc chan error,
 	stopCh <-chan struct{},
 ) error {
 	eventCount := 0
-
-	// Stopping the watcher should be idempotent and if we return from this function there's no way
-	// we're coming back in with the same watch interface.
-	defer w.Stop()
+	if exitOnInitialEventsEndBookmark != nil {
+		// set it to false just in case somebody
+		// made it positive
+		*exitOnInitialEventsEndBookmark = false
+	}
 
 loop:
 	for {
@@ -609,6 +791,11 @@ loop:
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
+				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+					if exitOnInitialEventsEndBookmark != nil {
+						*exitOnInitialEventsEndBookmark = true
+					}
+				}
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", name, event))
 			}
@@ -617,6 +804,11 @@ loop:
 				rvu.UpdateResourceVersion(resourceVersion)
 			}
 			eventCount++
+			if exitOnInitialEventsEndBookmark != nil && *exitOnInitialEventsEndBookmark {
+				watchDuration := clock.Since(start)
+				klog.V(4).Infof("exiting %v Watch because received the bookmark that marks the end of initial events stream, total %v items received in %v", name, eventCount, watchDuration)
+				return nil
+			}
 		}
 	}
 
@@ -661,6 +853,18 @@ func (r *Reflector) relistResourceVersion() string {
 		// For performance reasons, initial list performed by reflector uses "0" as resource version to allow it to
 		// be served from the watch cache if it is enabled.
 		return "0"
+	}
+	return r.lastSyncResourceVersion
+}
+
+// rewatchResourceVersion determines the resource version the reflector should start streaming from.
+func (r *Reflector) rewatchResourceVersion() string {
+	r.lastSyncResourceVersionMutex.RLock()
+	defer r.lastSyncResourceVersionMutex.RUnlock()
+	if r.isLastSyncResourceVersionUnavailable {
+		// initial stream should return data at the most recent resource version.
+		// the returned data must be consistent i.e. as if served from etcd via a quorum read
+		return ""
 	}
 	return r.lastSyncResourceVersion
 }

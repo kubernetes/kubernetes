@@ -52,14 +52,6 @@ import (
 	// ensure auth plugins are loaded
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	// ensure that cloud providers are loaded
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/aws"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
-	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
-
 	// Ensure that logging flags are part of the command line.
 	_ "k8s.io/component-base/logs/testinit"
 )
@@ -150,7 +142,7 @@ func waitForDaemonSets(ctx context.Context, c clientset.Interface, ns string, al
 	framework.Logf("Waiting up to %v for all daemonsets in namespace '%s' to start",
 		timeout, ns)
 
-	return wait.PollImmediateWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		dsList, err := c.AppsV1().DaemonSets(ns).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
@@ -191,9 +183,7 @@ func setupSuite(ctx context.Context) {
 	}
 
 	c, err := framework.LoadClientset()
-	if err != nil {
-		klog.Fatal("Error loading client: ", err)
-	}
+	framework.ExpectNoError(err, "Error loading client")
 
 	// Delete any namespaces except those created by the system. This ensures no
 	// lingering resources are left over from a previous test run.
@@ -236,7 +226,7 @@ func setupSuite(ctx context.Context) {
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), timeouts.SystemPodsStartup); err != nil {
+	if err := e2epod.WaitForAlmostAllPodsReady(ctx, c, metav1.NamespaceSystem, framework.TestContext.MinStartupPods, framework.TestContext.AllowedNotReadyNodes, timeouts.SystemPodsStartup); err != nil {
 		e2edebug.DumpAllNamespaceInfo(ctx, c, metav1.NamespaceSystem)
 		e2ekubectl.LogFailedContainers(ctx, c, metav1.NamespaceSystem, framework.Logf)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
@@ -388,9 +378,7 @@ func setupSuitePerGinkgoNode(ctx context.Context) {
 	// the dual stack clusters can be ipv4-ipv6 or ipv6-ipv4, order matters,
 	// and services use the primary IP family by default
 	c, err := framework.LoadClientset()
-	if err != nil {
-		klog.Fatal("Error loading client: ", err)
-	}
+	framework.ExpectNoError(err, "Error loading client")
 	framework.TestContext.IPFamily = getDefaultClusterIPFamily(ctx, c)
 	framework.Logf("Cluster IP family: %s", framework.TestContext.IPFamily)
 }
@@ -429,7 +417,7 @@ func prepullImages(ctx context.Context, c clientset.Interface) {
 			return daemonset.CheckPresentOnNodes(ctx, c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
 		}
 		framework.Logf("Waiting for %s", imgPuller.Name)
-		err := wait.PollImmediateWithContext(ctx, dsRetryPeriod, dsRetryTimeout, checkDaemonset)
+		err := wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkDaemonset)
 		framework.ExpectNoError(err, "error waiting for image to be pulled")
 	}
 }

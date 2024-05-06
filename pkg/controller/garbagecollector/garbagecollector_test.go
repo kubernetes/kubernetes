@@ -29,6 +29,8 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"k8s.io/klog/v2"
+
 	"github.com/golang/groupcache/lru"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -61,6 +63,7 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type testRESTMapper struct {
@@ -95,7 +98,8 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{},
+	logger, tCtx := ktesting.NewTestContext(t)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
@@ -104,30 +108,27 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 
 	// Make sure resource monitor syncing creates and stops resource monitors.
 	tweakableRM.Add(schema.GroupVersionKind{Group: "tpr.io", Version: "v1", Kind: "unknown"}, nil)
-	err = gc.resyncMonitors(twoResources)
+	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
 	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
 
-	err = gc.resyncMonitors(podResource)
+	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
 	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 
-	// Make sure the syncing mechanism also works after Run() has been called
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go gc.Run(ctx, 1)
+	go gc.Run(tCtx, 1)
 
-	err = gc.resyncMonitors(twoResources)
+	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
 		t.Errorf("Failed adding a monitor: %v", err)
 	}
 	assert.Equal(t, 2, len(gc.dependencyGraphBuilder.monitors))
 
-	err = gc.resyncMonitors(podResource)
+	err = gc.resyncMonitors(logger, podResource)
 	if err != nil {
 		t.Errorf("Failed removing a monitor: %v", err)
 	}
@@ -207,6 +208,7 @@ type garbageCollector struct {
 }
 
 func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
+	_, ctx := ktesting.NewTestContext(t)
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -216,7 +218,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,6 +410,8 @@ func TestProcessEvent(t *testing.T) {
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	for _, scenario := range testScenarios {
+		logger, _ := ktesting.NewTestContext(t)
+
 		dependencyGraphBuilder := &GraphBuilder{
 			informersStarted: alwaysStarted,
 			graphChanges:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
@@ -420,7 +424,7 @@ func TestProcessEvent(t *testing.T) {
 		}
 		for i := 0; i < len(scenario.events); i++ {
 			dependencyGraphBuilder.graphChanges.Add(&scenario.events[i])
-			dependencyGraphBuilder.processGraphChanges()
+			dependencyGraphBuilder.processGraphChanges(logger)
 			verifyGraphInvariants(scenario.name, dependencyGraphBuilder.uidToNode.uidToNode, t)
 		}
 	}
@@ -439,6 +443,8 @@ func BenchmarkReferencesDiffs(t *testing.B) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	gc := setupGC(t, &restclient.Config{})
 	defer close(gc.stop)
 
@@ -452,7 +458,7 @@ func TestDependentsRace(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < updates; i++ {
 			dependent := &node{}
-			gc.dependencyGraphBuilder.addDependentToOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
+			gc.dependencyGraphBuilder.addDependentToOwners(logger, dependent, []metav1.OwnerReference{{UID: ownerUID}})
 			gc.dependencyGraphBuilder.removeDependentFromOwners(dependent, []metav1.OwnerReference{{UID: ownerUID}})
 		}
 	}()
@@ -460,7 +466,7 @@ func TestDependentsRace(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < updates; i++ {
 			gc.attemptToOrphan.Add(owner)
-			gc.processAttemptToOrphanWorker()
+			gc.processAttemptToOrphanWorker(logger)
 		}
 	}()
 	wg.Wait()
@@ -672,6 +678,8 @@ func TestUnblockOwnerReference(t *testing.T) {
 }
 
 func TestOrphanDependentsFailure(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
 	testHandler := &fakeActionHandler{
 		response: map[string]FakeResponse{
 			"PATCH" + "/api/v1/namespaces/ns1/pods/pod": {
@@ -698,7 +706,7 @@ func TestOrphanDependentsFailure(t *testing.T) {
 			},
 		},
 	}
-	err := gc.orphanDependents(objectReference{}, dependents)
+	err := gc.orphanDependents(logger, objectReference{}, dependents)
 	expected := `the server reported a conflict`
 	if err == nil || !strings.Contains(err.Error(), expected) {
 		if err != nil {
@@ -788,15 +796,19 @@ func TestGetDeletableResources(t *testing.T) {
 		},
 	}
 
+	logger, _ := ktesting.NewTestContext(t)
 	for name, test := range tests {
 		t.Logf("testing %q", name)
 		client := &fakeServerResources{
 			PreferredResources: test.serverResources,
 			Error:              test.err,
 		}
-		actual := GetDeletableResources(client)
+		actual, actualErr := GetDeletableResources(logger, client)
 		if !reflect.DeepEqual(test.deletableResources, actual) {
 			t.Errorf("expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
+		}
+		if !reflect.DeepEqual(test.err, actualErr) {
+			t.Errorf("expected error:\n%v\ngot:\n%v", test.err, actualErr)
 		}
 	}
 }
@@ -811,7 +823,15 @@ func TestGarbageCollectorSync(t *testing.T) {
 				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete", "list", "watch"}},
 			},
 		},
+		{
+			GroupVersion: "apps/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "deployments", Namespaced: true, Kind: "Deployment", Verbs: metav1.Verbs{"delete", "list", "watch"}},
+			},
+		},
 	}
+	appsV1Error := &discovery.ErrGroupDiscoveryFailed{Groups: map[schema.GroupVersion]error{{Group: "apps", Version: "v1"}: fmt.Errorf(":-/")}}
+
 	unsyncableServerResources := []*metav1.APIResourceList{
 		{
 			GroupVersion: "v1",
@@ -834,6 +854,10 @@ func TestGarbageCollectorSync(t *testing.T) {
 				200,
 				[]byte("{}"),
 			},
+			"GET" + "/apis/apps/v1/deployments": {
+				200,
+				[]byte("{}"),
+			},
 			"GET" + "/api/v1/secrets": {
 				404,
 				[]byte("{}"),
@@ -848,23 +872,28 @@ func TestGarbageCollectorSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rm := &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}
+	tweakableRM := meta.NewDefaultRESTMapper(nil)
+	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Pod"}, schema.GroupVersionResource{Version: "v1", Resource: "pods"}, schema.GroupVersionResource{Version: "v1", Resource: "pod"}, meta.RESTScopeNamespace)
+	tweakableRM.AddSpecific(schema.GroupVersionKind{Version: "v1", Kind: "Secret"}, schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, schema.GroupVersionResource{Version: "v1", Resource: "secret"}, meta.RESTScopeNamespace)
+	tweakableRM.AddSpecific(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}, schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployment"}, meta.RESTScopeNamespace)
+	rm := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
 	metadataClient, err := metadata.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go gc.Run(ctx, 1)
+	go gc.Run(tCtx, 1)
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -879,7 +908,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(fakeDiscoveryClient, 200*time.Millisecond, ctx.Done())
+	go gc.Sync(tCtx, fakeDiscoveryClient, 200*time.Millisecond)
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
@@ -888,37 +917,69 @@ func TestGarbageCollectorSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to be running but it is blocked: %v", err)
 	}
+	assertMonitors(t, gc, "pods", "deployments")
 
 	// Simulate the discovery client returning an error
-	fakeDiscoveryClient.setPreferredResources(nil)
-	fakeDiscoveryClient.setError(fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
+	fakeDiscoveryClient.setPreferredResources(nil, fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
 
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
+	// No monitor changes
+	assertMonitors(t, gc, "pods", "deployments")
 
 	// Remove the error from being returned and see if the garbage collector sync is still working
-	fakeDiscoveryClient.setPreferredResources(serverResources)
-	fakeDiscoveryClient.setError(nil)
+	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
 	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
+	assertMonitors(t, gc, "pods", "deployments")
 
 	// Simulate the discovery client returning a resource the restmapper can resolve, but will not sync caches
-	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources)
-	fakeDiscoveryClient.setError(nil)
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, nil)
 
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)
+	assertMonitors(t, gc, "pods", "secrets")
 
 	// Put the resources back to normal and ensure garbage collector sync recovers
-	fakeDiscoveryClient.setPreferredResources(serverResources)
-	fakeDiscoveryClient.setError(nil)
+	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
 
 	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
+	assertMonitors(t, gc, "pods", "deployments")
+
+	// Partial discovery failure
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources, appsV1Error)
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+	// Deployments monitor kept
+	assertMonitors(t, gc, "pods", "deployments", "secrets")
+
+	// Put the resources back to normal and ensure garbage collector sync recovers
+	fakeDiscoveryClient.setPreferredResources(serverResources, nil)
+	// Wait until sync discovers the change
+	time.Sleep(1 * time.Second)
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
+	// Unsyncable monitor removed
+	assertMonitors(t, gc, "pods", "deployments")
+}
+
+func assertMonitors(t *testing.T, gc *GarbageCollector, resources ...string) {
+	t.Helper()
+	expected := sets.NewString(resources...)
+	actual := sets.NewString()
+	for m := range gc.dependencyGraphBuilder.monitors {
+		actual.Insert(m.Resource)
+	}
+	if !actual.Equal(expected) {
+		t.Fatalf("expected monitors %v, got %v", expected.List(), actual.List())
 	}
 }
 
@@ -967,15 +1028,10 @@ func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceL
 	return f.PreferredResources, f.Error
 }
 
-func (f *fakeServerResources) setPreferredResources(resources []*metav1.APIResourceList) {
+func (f *fakeServerResources) setPreferredResources(resources []*metav1.APIResourceList, err error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.PreferredResources = resources
-}
-
-func (f *fakeServerResources) setError(err error) {
-	f.Lock.Lock()
-	defer f.Lock.Unlock()
 	f.Error = err
 }
 
@@ -2286,8 +2342,11 @@ func TestConflictingData(t *testing.T) {
 				},
 			}
 
+			logger, _ := ktesting.NewTestContext(t)
+
 			ctx := stepContext{
 				t:               t,
+				logger:          logger,
 				gc:              gc,
 				eventRecorder:   eventRecorder,
 				metadataClient:  metadataClient,
@@ -2396,6 +2455,7 @@ func makeMetadataObj(identity objectReference, owners ...objectReference) *metav
 
 type stepContext struct {
 	t               *testing.T
+	logger          klog.Logger
 	gc              *GarbageCollector
 	eventRecorder   *record.FakeRecorder
 	metadataClient  *fakemetadata.FakeMetadataClient
@@ -2417,7 +2477,7 @@ func processPendingGraphChanges(count int) step {
 			if count <= 0 {
 				// process all
 				for ctx.gc.dependencyGraphBuilder.graphChanges.Len() != 0 {
-					ctx.gc.dependencyGraphBuilder.processGraphChanges()
+					ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 				}
 			} else {
 				for i := 0; i < count; i++ {
@@ -2425,7 +2485,7 @@ func processPendingGraphChanges(count int) step {
 						ctx.t.Errorf("expected at least %d pending changes, got %d", count, i+1)
 						return
 					}
-					ctx.gc.dependencyGraphBuilder.processGraphChanges()
+					ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 				}
 			}
 		},
@@ -2488,7 +2548,7 @@ func processEvent(e *event) step {
 				ctx.t.Fatalf("events present in graphChanges, must process pending graphChanges before calling processEvent")
 			}
 			ctx.gc.dependencyGraphBuilder.graphChanges.Add(e)
-			ctx.gc.dependencyGraphBuilder.processGraphChanges()
+			ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 		},
 	}
 }

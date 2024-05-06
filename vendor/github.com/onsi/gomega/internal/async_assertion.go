@@ -412,7 +412,7 @@ func (assertion *AsyncAssertion) match(matcher types.GomegaMatcher, desiredMatch
 				message += format.Object(attachment.Object, 1)
 			}
 		} else {
-			message = preamble + "\n" + err.Error() + "\n" + format.Object(err, 1)
+			message = preamble + "\n" + format.Object(err, 1)
 		}
 		return message
 	}
@@ -425,10 +425,18 @@ func (assertion *AsyncAssertion) match(matcher types.GomegaMatcher, desiredMatch
 
 		if actualErr == nil {
 			if matcherErr == nil {
-				if desiredMatch {
-					message += matcher.FailureMessage(actual)
+				if desiredMatch != matches {
+					if desiredMatch {
+						message += matcher.FailureMessage(actual)
+					} else {
+						message += matcher.NegatedFailureMessage(actual)
+					}
 				} else {
-					message += matcher.NegatedFailureMessage(actual)
+					if assertion.asyncType == AsyncAssertionTypeConsistently {
+						message += "There is no failure as the matcher passed to Consistently has not yet failed"
+					} else {
+						message += "There is no failure as the matcher passed to Eventually succeeded on its most recent iteration"
+					}
 				}
 			} else {
 				var fgErr formattedGomegaError
@@ -545,7 +553,12 @@ func (assertion *AsyncAssertion) match(matcher types.GomegaMatcher, desiredMatch
 				lock.Unlock()
 			}
 		case <-contextDone:
-			fail("Context was cancelled")
+			err := context.Cause(assertion.ctx)
+			if err != nil && err != context.Canceled {
+				fail(fmt.Sprintf("Context was cancelled (cause: %s)", err))
+			} else {
+				fail("Context was cancelled")
+			}
 			return false
 		case <-timeout:
 			if assertion.asyncType == AsyncAssertionTypeEventually {

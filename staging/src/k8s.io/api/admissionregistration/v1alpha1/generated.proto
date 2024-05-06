@@ -66,6 +66,47 @@ message AuditAnnotation {
   optional string valueExpression = 2;
 }
 
+// ExpressionWarning is a warning information that targets a specific expression.
+message ExpressionWarning {
+  // The path to the field that refers the expression.
+  // For example, the reference to the expression of the first item of
+  // validations is "spec.validations[0].expression"
+  optional string fieldRef = 2;
+
+  // The content of type checking information in a human-readable form.
+  // Each line of the warning contains the type that the expression is checked
+  // against, followed by the type check error from the compiler.
+  optional string warning = 3;
+}
+
+message MatchCondition {
+  // Name is an identifier for this match condition, used for strategic merging of MatchConditions,
+  // as well as providing an identifier for logging purposes. A good name should be descriptive of
+  // the associated expression.
+  // Name must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and
+  // must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or
+  // '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an
+  // optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')
+  //
+  // Required.
+  optional string name = 1;
+
+  // Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.
+  // CEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:
+  //
+  // 'object' - The object from the incoming request. The value is null for DELETE requests.
+  // 'oldObject' - The existing object. The value is null for CREATE requests.
+  // 'request' - Attributes of the admission request(/pkg/apis/admission/types.go#AdmissionRequest).
+  // 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
+  //   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
+  // 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
+  //   request resource.
+  // Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
+  //
+  // Required.
+  optional string expression = 2;
+}
+
 // MatchResources decides whether to run the admission control policy on an object based
 // on whether it meets the match criteria.
 // The exclude rules take precedence over include rules (if a resource matches both, it is excluded)
@@ -115,7 +156,7 @@ message MatchResources {
   //
   // Default to the empty LabelSelector, which matches everything.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 1;
 
   // ObjectSelector decides whether to run the validation based on if the
   // object has matching labels. objectSelector is evaluated against both
@@ -129,7 +170,7 @@ message MatchResources {
   // users may skip the admission webhook by setting the labels.
   // Default to the empty LabelSelector, which matches everything.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 2;
 
   // ResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy matches.
   // The policy cares about an operation if it matches _any_ Rule.
@@ -170,7 +211,7 @@ message NamedRuleWithOperations {
   repeated string resourceNames = 1;
 
   // RuleWithOperations is a tuple of Operations and Resources.
-  optional k8s.io.api.admissionregistration.v1.RuleWithOperations ruleWithOperations = 2;
+  optional .k8s.io.api.admissionregistration.v1.RuleWithOperations ruleWithOperations = 2;
 }
 
 // ParamKind is a tuple of Group Kind and Version.
@@ -186,34 +227,102 @@ message ParamKind {
   optional string kind = 2;
 }
 
-// ParamRef references a parameter resource
+// ParamRef describes how to locate the params to be used as input to
+// expressions of rules applied by a policy binding.
 // +structType=atomic
 message ParamRef {
-  // Name of the resource being referenced.
+  // `name` is the name of the resource being referenced.
+  //
+  // `name` and `selector` are mutually exclusive properties. If one is set,
+  // the other must be unset.
+  //
+  // +optional
   optional string name = 1;
 
-  // Namespace of the referenced resource.
-  // Should be empty for the cluster-scoped resources
+  // namespace is the namespace of the referenced resource. Allows limiting
+  // the search for params to a specific namespace. Applies to both `name` and
+  // `selector` fields.
+  //
+  // A per-namespace parameter may be used by specifying a namespace-scoped
+  // `paramKind` in the policy and leaving this field empty.
+  //
+  // - If `paramKind` is cluster-scoped, this field MUST be unset. Setting this
+  // field results in a configuration error.
+  //
+  // - If `paramKind` is namespace-scoped, the namespace of the object being
+  // evaluated for admission will be used when this field is left unset. Take
+  // care that if this is left empty the binding must not match any cluster-scoped
+  // resources, which will result in an error.
+  //
   // +optional
   optional string namespace = 2;
+
+  // selector can be used to match multiple param objects based on their labels.
+  // Supply selector: {} to match all resources of the ParamKind.
+  //
+  // If multiple params are found, they are all evaluated with the policy expressions
+  // and the results are ANDed together.
+  //
+  // One of `name` or `selector` must be set, but `name` and `selector` are
+  // mutually exclusive properties. If one is set, the other must be unset.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 3;
+
+  // `parameterNotFoundAction` controls the behavior of the binding when the resource
+  // exists, and name or selector is valid, but there are no parameters
+  // matched by the binding. If the value is set to `Allow`, then no
+  // matched parameters will be treated as successful validation by the binding.
+  // If set to `Deny`, then no matched parameters will be subject to the
+  // `failurePolicy` of the policy.
+  //
+  // Allowed values are `Allow` or `Deny`
+  // Default to `Deny`
+  // +optional
+  optional string parameterNotFoundAction = 4;
+}
+
+// TypeChecking contains results of type checking the expressions in the
+// ValidatingAdmissionPolicy
+message TypeChecking {
+  // The type checking warnings for each expression.
+  // +optional
+  // +listType=atomic
+  repeated ExpressionWarning expressionWarnings = 1;
 }
 
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 message ValidatingAdmissionPolicy {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the ValidatingAdmissionPolicy.
   optional ValidatingAdmissionPolicySpec spec = 2;
+
+  // The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+  // behaves in the expected way.
+  // Populated by the system.
+  // Read-only.
+  // +optional
+  optional ValidatingAdmissionPolicyStatus status = 3;
 }
 
 // ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
 // ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
+//
+// For a given admission request, each binding will cause its policy to be
+// evaluated N times, where N is 1 for policies/bindings that don't use
+// params, otherwise N is the number of parameters selected by the binding.
+//
+// The CEL expressions of a policy must have a computed CEL cost below the maximum
+// CEL budget. Each evaluation of the policy is given an independent CEL cost budget.
+// Adding/removing policies, bindings, or params can not affect whether a
+// given (policy, binding, param) combination is within its own CEL budget.
 message ValidatingAdmissionPolicyBinding {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
   optional ValidatingAdmissionPolicyBindingSpec spec = 2;
@@ -224,7 +333,7 @@ message ValidatingAdmissionPolicyBindingList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of PolicyBinding.
   repeated ValidatingAdmissionPolicyBinding items = 2;
@@ -237,9 +346,10 @@ message ValidatingAdmissionPolicyBindingSpec {
   // Required.
   optional string policyName = 1;
 
-  // ParamRef specifies the parameter resource used to configure the admission control policy.
+  // paramRef specifies the parameter resource used to configure the admission control policy.
   // It should point to a resource of the type specified in ParamKind of the bound ValidatingAdmissionPolicy.
   // If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the ValidatingAdmissionPolicy applied.
+  // If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param.
   // +optional
   optional ParamRef paramRef = 2;
 
@@ -299,7 +409,7 @@ message ValidatingAdmissionPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ValidatingAdmissionPolicy.
   repeated ValidatingAdmissionPolicy items = 2;
@@ -351,6 +461,60 @@ message ValidatingAdmissionPolicySpec {
   // +listType=atomic
   // +optional
   repeated AuditAnnotation auditAnnotations = 5;
+
+  // MatchConditions is a list of conditions that must be met for a request to be validated.
+  // Match conditions filter requests that have already been matched by the rules,
+  // namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.
+  // There are a maximum of 64 match conditions allowed.
+  //
+  // If a parameter object is provided, it can be accessed via the `params` handle in the same
+  // manner as validation expressions.
+  //
+  // The exact matching logic is (in order):
+  //   1. If ANY matchCondition evaluates to FALSE, the policy is skipped.
+  //   2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.
+  //   3. If any matchCondition evaluates to an error (but none are FALSE):
+  //      - If failurePolicy=Fail, reject the request
+  //      - If failurePolicy=Ignore, the policy is skipped
+  //
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  // +optional
+  repeated MatchCondition matchConditions = 6;
+
+  // Variables contain definitions of variables that can be used in composition of other expressions.
+  // Each variable is defined as a named CEL expression.
+  // The variables defined here will be available under `variables` in other expressions of the policy
+  // except MatchConditions because MatchConditions are evaluated before the rest of the policy.
+  //
+  // The expression of a variable can refer to other variables defined earlier in the list but not those after.
+  // Thus, Variables must be sorted by the order of first appearance and acyclic.
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  // +optional
+  repeated Variable variables = 7;
+}
+
+// ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.
+message ValidatingAdmissionPolicyStatus {
+  // The generation observed by the controller.
+  // +optional
+  optional int64 observedGeneration = 1;
+
+  // The results of type checking for each expression.
+  // Presence of this field indicates the completion of the type checking.
+  // +optional
+  optional TypeChecking typeChecking = 2;
+
+  // The conditions represent the latest available observations of a policy's current state.
+  // +optional
+  // +listType=map
+  // +listMapKey=type
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
 }
 
 // Validation specifies the CEL expression which is used to apply the validation.
@@ -363,6 +527,9 @@ message Validation {
   // - 'oldObject' - The existing object. The value is null for CREATE requests.
   // - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)).
   // - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind.
+  // - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources.
+  // - 'variables' - Map of composited variables, from its name to its lazily evaluated value.
+  //   For example, a variable named 'foo' can be accessed as 'variables.foo'.
   // - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.
   //   See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz
   // - 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the
@@ -413,5 +580,30 @@ message Validation {
   // If not set, StatusReasonInvalid is used in the response to the client.
   // +optional
   optional string reason = 3;
+
+  // messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.
+  // Since messageExpression is used as a failure message, it must evaluate to a string.
+  // If both message and messageExpression are present on a validation, then messageExpression will be used if validation fails.
+  // If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced
+  // as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string
+  // that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and
+  // the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged.
+  // messageExpression has access to all the same variables as the `expression` except for 'authorizer' and 'authorizer.requestResource'.
+  // Example:
+  // "object.x must be less than max ("+string(params.max)+")"
+  // +optional
+  optional string messageExpression = 4;
+}
+
+// Variable is the definition of a variable that is used for composition.
+message Variable {
+  // Name is the name of the variable. The name must be a valid CEL identifier and unique among all variables.
+  // The variable can be accessed in other expressions through `variables`
+  // For example, if name is "foo", the variable will be available as `variables.foo`
+  optional string Name = 1;
+
+  // Expression is the expression that will be evaluated as the value of the variable.
+  // The CEL expression has access to the same identifiers as the CEL expressions in Validation.
+  optional string Expression = 2;
 }
 

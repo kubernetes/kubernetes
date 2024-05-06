@@ -30,10 +30,12 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
-	utilpointer "k8s.io/utils/pointer"
+	klogtesting "k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	service1v1 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
 		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}}}
@@ -56,7 +58,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	serviceConfig := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
+	serviceConfig := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	serviceConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go serviceConfig.Run(stopCh)
@@ -83,7 +85,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
-	tcp := v1.ProtocolTCP
+	_, ctx := klogtesting.NewTestContext(t)
 	endpoints1v1 := &discoveryv1.EndpointSlice{
 		ObjectMeta:  metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
 		AddressType: discoveryv1.AddressTypeIPv4,
@@ -93,8 +95,8 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 			},
 		}},
 		Ports: []discoveryv1.EndpointPort{{
-			Port:     utilpointer.Int32(8080),
-			Protocol: &tcp,
+			Port:     ptr.To[int32](8080),
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 	}
 	endpoints1v2 := &discoveryv1.EndpointSlice{
@@ -107,8 +109,8 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 			},
 		}},
 		Ports: []discoveryv1.EndpointPort{{
-			Port:     utilpointer.Int32(8080),
-			Protocol: &tcp,
+			Port:     ptr.To[int32](8080),
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 	}
 	endpoints2 := &discoveryv1.EndpointSlice{
@@ -120,8 +122,8 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 			},
 		}},
 		Ports: []discoveryv1.EndpointPort{{
-			Port:     utilpointer.Int32(8080),
-			Protocol: &tcp,
+			Port:     ptr.To[int32](8080),
+			Protocol: ptr.To(v1.ProtocolTCP),
 		}},
 	}
 
@@ -137,7 +139,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	endpointsliceConfig := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	endpointsliceConfig := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
 	endpointsliceConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go endpointsliceConfig.Run(stopCh)
@@ -164,6 +166,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 }
 
 func TestInitialSync(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
 	svc1 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}},
@@ -192,11 +195,11 @@ func TestInitialSync(t *testing.T) {
 	client := fake.NewSimpleClientset(svc1, svc2, eps2, eps1)
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
-	svcConfig := NewServiceConfig(sharedInformers.Core().V1().Services(), 0)
+	svcConfig := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), 0)
 	svcHandler := NewServiceHandlerMock()
 	svcConfig.RegisterEventHandler(svcHandler)
 
-	epsConfig := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), 0)
+	epsConfig := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), 0)
 	epsHandler := NewEndpointSliceHandlerMock()
 	epsConfig.RegisterEventHandler(epsHandler)
 

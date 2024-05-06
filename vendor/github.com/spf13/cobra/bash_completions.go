@@ -1,4 +1,4 @@
-// Copyright 2013-2022 The Cobra Authors
+// Copyright 2013-2023 The Cobra Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -532,7 +532,7 @@ func writeLocalNonPersistentFlag(buf io.StringWriter, flag *pflag.Flag) {
 	}
 }
 
-// Setup annotations for go completions for registered flags
+// prepareCustomAnnotationsForFlags setup annotations for go completions for registered flags
 func prepareCustomAnnotationsForFlags(cmd *Command) {
 	flagCompletionMutex.RLock()
 	defer flagCompletionMutex.RUnlock()

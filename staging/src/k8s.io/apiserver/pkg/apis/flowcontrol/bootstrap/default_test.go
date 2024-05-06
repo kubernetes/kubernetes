@@ -19,7 +19,7 @@ package bootstrap
 import (
 	"testing"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 )
 
 func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
@@ -89,7 +89,7 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 			t.Errorf("bootstrap PriorityLevelConfiguration %q is not %q", test.name, flowcontrol.PriorityLevelEnablementLimited)
 			continue
 		}
-		if test.nominalSharesExpected != bootstrapPL.Spec.Limited.NominalConcurrencyShares {
+		if test.nominalSharesExpected != *bootstrapPL.Spec.Limited.NominalConcurrencyShares {
 			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected NominalConcurrencyShares: %d, but got: %d", test.name, test.nominalSharesExpected, bootstrapPL.Spec.Limited.NominalConcurrencyShares)
 		}
 		if test.lendablePercentexpected != *bootstrapPL.Spec.Limited.LendablePercent {
@@ -113,5 +113,12 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 		if len(names) != 0 {
 			t.Errorf("bootstrap PriorityLevelConfiguration objects not accounted by this test: %v", names)
 		}
+	}
+	exemptPL := MandatoryPriorityLevelConfigurationExempt
+	if exemptPL.Spec.Exempt.NominalConcurrencyShares != nil && *exemptPL.Spec.Exempt.NominalConcurrencyShares != 0 {
+		t.Errorf("Expected exempt priority level to have NominalConcurrencyShares==0 but got %d instead", *exemptPL.Spec.Exempt.NominalConcurrencyShares)
+	}
+	if exemptPL.Spec.Exempt.LendablePercent != nil && *exemptPL.Spec.Exempt.LendablePercent != 0 {
+		t.Errorf("Expected exempt priority level to have LendablePercent==0 but got %d instead", *exemptPL.Spec.Exempt.LendablePercent)
 	}
 }

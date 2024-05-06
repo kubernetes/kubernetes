@@ -56,6 +56,7 @@ type fakePodWorkers struct {
 	terminating           map[types.UID]bool
 	terminated            map[types.UID]bool
 	terminationRequested  map[types.UID]bool
+	finished              map[types.UID]bool
 	removeRuntime         map[types.UID]bool
 	removeContent         map[types.UID]bool
 	terminatingStaticPods map[string]bool
@@ -104,6 +105,11 @@ func (f *fakePodWorkers) CouldHaveRunningContainers(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.running[uid]
+}
+func (f *fakePodWorkers) ShouldPodBeFinished(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.finished[uid]
 }
 func (f *fakePodWorkers) IsPodTerminationRequested(uid types.UID) bool {
 	f.statusLock.Lock()
@@ -748,23 +754,41 @@ func TestUpdatePod(t *testing.T) {
 			expectKnownTerminated: true,
 		},
 		{
-			name: "a pod that is terminal and has never started is finished immediately if the runtime has a cached terminal state",
+			name: "a pod that is terminal and has never started advances to finished if the runtime has a cached terminal state",
 			update: UpdatePodOptions{
 				UpdateType: kubetypes.SyncPodCreate,
 				Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
 			},
 			runtimeStatus: &kubecontainer.PodStatus{ /* we know about this pod */ },
-			expect: &podSyncStatus{
+			expectBeforeWorker: &podSyncStatus{
+				fullname:      "done-pod_ns",
+				syncedAt:      time.Unix(1, 0),
+				terminatingAt: time.Unix(1, 0),
+				terminatedAt:  time.Unix(1, 0),
+				pendingUpdate: &UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
+				},
+				finished:           false, // Should be marked as not finished initially (to ensure `SyncTerminatedPod` will run) and status will progress to terminated.
+				startedTerminating: true,
+				working:            true,
+			},
+			expect: hasContext(&podSyncStatus{
 				fullname:           "done-pod_ns",
 				syncedAt:           time.Unix(1, 0),
 				terminatingAt:      time.Unix(1, 0),
 				terminatedAt:       time.Unix(1, 0),
+				startedAt:          time.Unix(3, 0),
 				startedTerminating: true,
 				finished:           true,
+				activeUpdate: &UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodSync,
+					Pod:        newPodWithPhase("1", "done-pod", v1.PodSucceeded),
+				},
 
 				// if we have never seen the pod before, a restart makes no sense
 				restartRequested: false,
-			},
+			}),
 			expectKnownTerminated: true,
 		},
 		{
@@ -1637,7 +1661,8 @@ func TestSyncKnownPods(t *testing.T) {
 	// verify workers that are not terminated stay open even if config no longer
 	// sees them
 	podWorkers.SyncKnownPods(nil)
-	if len(podWorkers.podUpdates) != 2 {
+	drainAllWorkers(podWorkers)
+	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
 	if len(podWorkers.podSyncStatuses) != 2 {

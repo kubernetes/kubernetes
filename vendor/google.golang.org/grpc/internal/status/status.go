@@ -43,13 +43,41 @@ type Status struct {
 	s *spb.Status
 }
 
+// NewWithProto returns a new status including details from statusProto.  This
+// is meant to be used by the gRPC library only.
+func NewWithProto(code codes.Code, message string, statusProto []string) *Status {
+	if len(statusProto) != 1 {
+		// No grpc-status-details bin header, or multiple; just ignore.
+		return &Status{s: &spb.Status{Code: int32(code), Message: message}}
+	}
+	st := &spb.Status{}
+	if err := proto.Unmarshal([]byte(statusProto[0]), st); err != nil {
+		// Probably not a google.rpc.Status proto; do not provide details.
+		return &Status{s: &spb.Status{Code: int32(code), Message: message}}
+	}
+	if st.Code == int32(code) {
+		// The codes match between the grpc-status header and the
+		// grpc-status-details-bin header; use the full details proto.
+		return &Status{s: st}
+	}
+	return &Status{
+		s: &spb.Status{
+			Code: int32(codes.Internal),
+			Message: fmt.Sprintf(
+				"grpc-status-details-bin mismatch: grpc-status=%v, grpc-message=%q, grpc-status-details-bin=%+v",
+				code, message, st,
+			),
+		},
+	}
+}
+
 // New returns a Status representing c and msg.
 func New(c codes.Code, msg string) *Status {
 	return &Status{s: &spb.Status{Code: int32(c), Message: msg}}
 }
 
 // Newf returns New(c, fmt.Sprintf(format, a...)).
-func Newf(c codes.Code, format string, a ...interface{}) *Status {
+func Newf(c codes.Code, format string, a ...any) *Status {
 	return New(c, fmt.Sprintf(format, a...))
 }
 
@@ -64,7 +92,7 @@ func Err(c codes.Code, msg string) error {
 }
 
 // Errorf returns Error(c, fmt.Sprintf(format, a...)).
-func Errorf(c codes.Code, format string, a ...interface{}) error {
+func Errorf(c codes.Code, format string, a ...any) error {
 	return Err(c, fmt.Sprintf(format, a...))
 }
 
@@ -120,11 +148,11 @@ func (s *Status) WithDetails(details ...proto.Message) (*Status, error) {
 
 // Details returns a slice of details messages attached to the status.
 // If a detail cannot be decoded, the error is returned in place of the detail.
-func (s *Status) Details() []interface{} {
+func (s *Status) Details() []any {
 	if s == nil || s.s == nil {
 		return nil
 	}
-	details := make([]interface{}, 0, len(s.s.Details))
+	details := make([]any, 0, len(s.s.Details))
 	for _, any := range s.s.Details {
 		detail := &ptypes.DynamicAny{}
 		if err := ptypes.UnmarshalAny(any, detail); err != nil {

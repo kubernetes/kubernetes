@@ -352,9 +352,9 @@ func compare(obj1, obj2 interface{}, kind reflect.Kind) (CompareType, bool) {
 
 // Greater asserts that the first element is greater than the second
 //
-//    assert.Greater(t, 2, 1)
-//    assert.Greater(t, float64(2), float64(1))
-//    assert.Greater(t, "b", "a")
+//	assert.Greater(t, 2, 1)
+//	assert.Greater(t, float64(2), float64(1))
+//	assert.Greater(t, "b", "a")
 func Greater(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -364,10 +364,10 @@ func Greater(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface
 
 // GreaterOrEqual asserts that the first element is greater than or equal to the second
 //
-//    assert.GreaterOrEqual(t, 2, 1)
-//    assert.GreaterOrEqual(t, 2, 2)
-//    assert.GreaterOrEqual(t, "b", "a")
-//    assert.GreaterOrEqual(t, "b", "b")
+//	assert.GreaterOrEqual(t, 2, 1)
+//	assert.GreaterOrEqual(t, 2, 2)
+//	assert.GreaterOrEqual(t, "b", "a")
+//	assert.GreaterOrEqual(t, "b", "b")
 func GreaterOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -377,9 +377,9 @@ func GreaterOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...in
 
 // Less asserts that the first element is less than the second
 //
-//    assert.Less(t, 1, 2)
-//    assert.Less(t, float64(1), float64(2))
-//    assert.Less(t, "a", "b")
+//	assert.Less(t, 1, 2)
+//	assert.Less(t, float64(1), float64(2))
+//	assert.Less(t, "a", "b")
 func Less(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -389,10 +389,10 @@ func Less(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{})
 
 // LessOrEqual asserts that the first element is less than or equal to the second
 //
-//    assert.LessOrEqual(t, 1, 2)
-//    assert.LessOrEqual(t, 2, 2)
-//    assert.LessOrEqual(t, "a", "b")
-//    assert.LessOrEqual(t, "b", "b")
+//	assert.LessOrEqual(t, 1, 2)
+//	assert.LessOrEqual(t, 2, 2)
+//	assert.LessOrEqual(t, "a", "b")
+//	assert.LessOrEqual(t, "b", "b")
 func LessOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -402,8 +402,8 @@ func LessOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...inter
 
 // Positive asserts that the specified element is positive
 //
-//    assert.Positive(t, 1)
-//    assert.Positive(t, 1.23)
+//	assert.Positive(t, 1)
+//	assert.Positive(t, 1.23)
 func Positive(t TestingT, e interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -414,8 +414,8 @@ func Positive(t TestingT, e interface{}, msgAndArgs ...interface{}) bool {
 
 // Negative asserts that the specified element is negative
 //
-//    assert.Negative(t, -1)
-//    assert.Negative(t, -1.23)
+//	assert.Negative(t, -1)
+//	assert.Negative(t, -1.23)
 func Negative(t TestingT, e interface{}, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()

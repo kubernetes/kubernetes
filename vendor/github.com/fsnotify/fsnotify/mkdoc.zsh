@@ -2,8 +2,8 @@
 [ "${ZSH_VERSION:-}" = "" ] && echo >&2 "Only works with zsh" && exit 1
 setopt err_exit no_unset pipefail extended_glob
 
-# Simple script to update the godoc comments on all watchers. Probably took me
-# more time to write this than doing it manually, but ah well 🙃
+# Simple script to update the godoc comments on all watchers so you don't need
+# to update the same comment 5 times.
 
 watcher=$(<<EOF
 // Watcher watches a set of paths, delivering events on a channel.
@@ -16,9 +16,9 @@ watcher=$(<<EOF
 // When a file is removed a Remove event won't be emitted until all file
 // descriptors are closed, and deletes will always emit a Chmod. For example:
 //
-//     fp := os.Open("file")
-//     os.Remove("file")        // Triggers Chmod
-//     fp.Close()               // Triggers Remove
+//	fp := os.Open("file")
+//	os.Remove("file")        // Triggers Chmod
+//	fp.Close()               // Triggers Remove
 //
 // This is the event that inotify sends, so not much can be changed about this.
 //
@@ -32,16 +32,16 @@ watcher=$(<<EOF
 //
 // To increase them you can use sysctl or write the value to the /proc file:
 //
-//     # Default values on Linux 5.18
-//     sysctl fs.inotify.max_user_watches=124983
-//     sysctl fs.inotify.max_user_instances=128
+//	# Default values on Linux 5.18
+//	sysctl fs.inotify.max_user_watches=124983
+//	sysctl fs.inotify.max_user_instances=128
 //
 // To make the changes persist on reboot edit /etc/sysctl.conf or
 // /usr/lib/sysctl.d/50-default.conf (details differ per Linux distro; check
 // your distro's documentation):
 //
-//     fs.inotify.max_user_watches=124983
-//     fs.inotify.max_user_instances=128
+//	fs.inotify.max_user_watches=124983
+//	fs.inotify.max_user_instances=128
 //
 // Reaching the limit will result in a "no space left on device" or "too many open
 // files" error.
@@ -57,14 +57,20 @@ watcher=$(<<EOF
 // control the maximum number of open files, as well as /etc/login.conf on BSD
 // systems.
 //
-// # macOS notes
+// # Windows notes
 //
-// Spotlight indexing on macOS can result in multiple events (see [#15]). A
-// temporary workaround is to add your folder(s) to the "Spotlight Privacy
-// Settings" until we have a native FSEvents implementation (see [#11]).
+// Paths can be added as "C:\\path\\to\\dir", but forward slashes
+// ("C:/path/to/dir") will also work.
 //
-// [#11]: https://github.com/fsnotify/fsnotify/issues/11
-// [#15]: https://github.com/fsnotify/fsnotify/issues/15
+// When a watched directory is removed it will always send an event for the
+// directory itself, but may not send events for all files in that directory.
+// Sometimes it will send events for all times, sometimes it will send no
+// events, and often only for some files.
+//
+// The default ReadDirectoryChangesW() buffer size is 64K, which is the largest
+// value that is guaranteed to work with SMB filesystems. If you have many
+// events in quick succession this may not be enough, and you will have to use
+// [WithBufferSize] to increase the value.
 EOF
 )
 
@@ -73,19 +79,35 @@ new=$(<<EOF
 EOF
 )
 
+newbuffered=$(<<EOF
+// NewBufferedWatcher creates a new Watcher with a buffered Watcher.Events
+// channel.
+//
+// The main use case for this is situations with a very large number of events
+// where the kernel buffer size can't be increased (e.g. due to lack of
+// permissions). An unbuffered Watcher will perform better for almost all use
+// cases, and whenever possible you will be better off increasing the kernel
+// buffers instead of adding a large userspace buffer.
+EOF
+)
+
 add=$(<<EOF
 // Add starts monitoring the path for changes.
 //
-// A path can only be watched once; attempting to watch it more than once will
-// return an error. Paths that do not yet exist on the filesystem cannot be
-// added. A watch will be automatically removed if the path is deleted.
+// A path can only be watched once; watching it more than once is a no-op and will
+// not return an error. Paths that do not yet exist on the filesystem cannot be
+// watched.
 //
-// A path will remain watched if it gets renamed to somewhere else on the same
-// filesystem, but the monitor will get removed if the path gets deleted and
-// re-created, or if it's moved to a different filesystem.
+// A watch will be automatically removed if the watched path is deleted or
+// renamed. The exception is the Windows backend, which doesn't remove the
+// watcher on renames.
 //
 // Notifications on network filesystems (NFS, SMB, FUSE, etc.) or special
 // filesystems (/proc, /sys, etc.) generally don't work.
+//
+// Returns [ErrClosed] if [Watcher.Close] was called.
+//
+// See [Watcher.AddWith] for a version that allows adding options.
 //
 // # Watching directories
 //
@@ -96,14 +118,27 @@ add=$(<<EOF
 // # Watching files
 //
 // Watching individual files (rather than directories) is generally not
-// recommended as many tools update files atomically. Instead of "just" writing
-// to the file a temporary file will be written to first, and if successful the
-// temporary file is moved to to destination removing the original, or some
-// variant thereof. The watcher on the original file is now lost, as it no
-// longer exists.
+// recommended as many programs (especially editors) update files atomically: it
+// will write to a temporary file which is then moved to to destination,
+// overwriting the original (or some variant thereof). The watcher on the
+// original file is now lost, as that no longer exists.
 //
-// Instead, watch the parent directory and use Event.Name to filter out files
-// you're not interested in. There is an example of this in [cmd/fsnotify/file.go].
+// The upshot of this is that a power failure or crash won't leave a
+// half-written file.
+//
+// Watch the parent directory and use Event.Name to filter out files you're not
+// interested in. There is an example of this in cmd/fsnotify/file.go.
+EOF
+)
+
+addwith=$(<<EOF
+// AddWith is like [Watcher.Add], but allows adding options. When using Add()
+// the defaults described below are used.
+//
+// Possible options are:
+//
+//   - [WithBufferSize] sets the buffer size for the Windows backend; no-op on
+//     other platforms. The default is 64K (65536 bytes).
 EOF
 )
 
@@ -114,16 +149,21 @@ remove=$(<<EOF
 // /tmp/dir and /tmp/dir/subdir then you will need to remove both.
 //
 // Removing a path that has not yet been added returns [ErrNonExistentWatch].
+//
+// Returns nil if [Watcher.Close] was called.
 EOF
 )
 
 close=$(<<EOF
-// Close removes all watches and closes the events channel.
+// Close removes all watches and closes the Events channel.
 EOF
 )
 
 watchlist=$(<<EOF
-// WatchList returns all paths added with [Add] (and are not yet removed).
+// WatchList returns all paths explicitly added with [Watcher.Add] (and are not
+// yet removed).
+//
+// Returns nil if [Watcher.Close] was called.
 EOF
 )
 
@@ -153,20 +193,29 @@ events=$(<<EOF
 	//                      initiated by the user may show up as one or multiple
 	//                      writes, depending on when the system syncs things to
 	//                      disk. For example when compiling a large Go program
-	//                      you may get hundreds of Write events, so you
-	//                      probably want to wait until you've stopped receiving
-	//                      them (see the dedup example in cmd/fsnotify).
+	//                      you may get hundreds of Write events, and you may
+	//                      want to wait until you've stopped receiving them
+	//                      (see the dedup example in cmd/fsnotify).
+	//
+	//                      Some systems may send Write event for directories
+	//                      when the directory content changes.
 	//
 	//   fsnotify.Chmod     Attributes were changed. On Linux this is also sent
 	//                      when a file is removed (or more accurately, when a
 	//                      link to an inode is removed). On kqueue it's sent
-	//                      and on kqueue when a file is truncated. On Windows
-	//                      it's never sent.
+	//                      when a file is truncated. On Windows it's never
+	//                      sent.
 EOF
 )
 
 errors=$(<<EOF
 	// Errors sends any errors.
+	//
+	// ErrEventOverflow is used to indicate there are too many events:
+	//
+	//  - inotify:      There are too many queued events (fs.inotify.max_queued_events sysctl)
+	//  - windows:      The buffer size is too small; WithBufferSize() can be used to increase it.
+	//  - kqueue, fen:  Not used.
 EOF
 )
 
@@ -200,7 +249,9 @@ set-cmt() {
 
 set-cmt '^type Watcher struct '             $watcher
 set-cmt '^func NewWatcher('                 $new
+set-cmt '^func NewBufferedWatcher('         $newbuffered
 set-cmt '^func (w \*Watcher) Add('          $add
+set-cmt '^func (w \*Watcher) AddWith('      $addwith
 set-cmt '^func (w \*Watcher) Remove('       $remove
 set-cmt '^func (w \*Watcher) Close('        $close
 set-cmt '^func (w \*Watcher) WatchList('    $watchlist

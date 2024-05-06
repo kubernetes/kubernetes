@@ -38,7 +38,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.UpdateAllocatedDevices()
 
-	// Loop through all device resources and generate TopologyHints for them..
+	// Loop through all device resources and generate TopologyHints for them.
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	accumulatedResourceRequests := m.getContainerDeviceRequest(container)
 
@@ -63,7 +63,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 				continue
 			}
 			klog.InfoS("Regenerating TopologyHints for resource already allocated to pod", "resource", resource, "pod", klog.KObj(pod), "containerName", container.Name)
-			deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.String{}, requested)
+			deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.Set[string]{}, requested)
 			continue
 		}
 
@@ -118,7 +118,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 				continue
 			}
 			klog.InfoS("Regenerating TopologyHints for resource already allocated to pod", "resource", resource, "pod", klog.KObj(pod))
-			deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.String{}, requested)
+			deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.Set[string]{}, requested)
 			continue
 		}
 
@@ -132,7 +132,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 
 		// Generate TopologyHints for this resource given the current
 		// request size and the list of available devices.
-		deviceHints[resource] = m.generateDeviceTopologyHints(resource, available, sets.String{}, requested)
+		deviceHints[resource] = m.generateDeviceTopologyHints(resource, available, sets.Set[string]{}, requested)
 	}
 
 	return deviceHints
@@ -148,12 +148,12 @@ func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
 	return false
 }
 
-func (m *ManagerImpl) getAvailableDevices(resource string) sets.String {
+func (m *ManagerImpl) getAvailableDevices(resource string) sets.Set[string] {
 	// Strip all devices in use from the list of healthy ones.
 	return m.healthyDevices[resource].Difference(m.allocatedDevices[resource])
 }
 
-func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available sets.String, reusable sets.String, request int) []topologymanager.TopologyHint {
+func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available sets.Set[string], reusable sets.Set[string], request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes
 	minAffinitySize := len(m.numaNodes)
 
@@ -171,7 +171,7 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available set
 			minAffinitySize = mask.Count()
 		}
 
-		// Then check to see if all of the reusable devices are part of the bitmask.
+		// Then check to see if all the reusable devices are part of the bitmask.
 		numMatching := 0
 		for d := range reusable {
 			// Skip the device if it doesn't specify any topology info.
