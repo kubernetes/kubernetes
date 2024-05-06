@@ -18,6 +18,7 @@ package portforward
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -629,5 +631,88 @@ func TestForwardPortsReturnsNilWhenStopChanIsClosed(t *testing.T) {
 	err = <-errChan
 	if err != nil {
 		t.Fatalf("unexpected error from pf.ForwardPorts(): %s", err)
+	}
+}
+
+func TestHandleRemoteSendError(t *testing.T) {
+	type portForwardErrResponse struct {
+		// server side's suggestions
+		// guide us whether to close the connection
+		CloseConnection bool `json:"closeConnection,omitempty"`
+		// error detail
+		Message string `json:"message,omitempty"`
+	}
+
+	testCases := []struct {
+		resp portForwardErrResponse
+	}{
+		{
+			resp: portForwardErrResponse{
+				CloseConnection: false,
+			},
+		},
+		{
+			resp: portForwardErrResponse{
+				CloseConnection: true,
+			},
+		},
+		{
+			resp: portForwardErrResponse{
+				CloseConnection: false,
+				Message:         syscall.EPIPE.Error(),
+			},
+		},
+		{
+			resp: portForwardErrResponse{
+				CloseConnection: false,
+				Message:         syscall.ECONNRESET.Error(),
+			},
+		},
+		{
+			resp: portForwardErrResponse{
+				CloseConnection: true,
+				Message:         "got unexpect err",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run("", func(t *testing.T) {
+			out := bytes.NewBufferString("")
+			errOut := bytes.NewBufferString("")
+
+			errStream := &bytes.Buffer{}
+			if err := json.NewEncoder(errStream).Encode(testCase.resp); err != nil {
+				t.Fatalf("encode the err response: %v", err)
+			}
+
+			pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, errOut)
+			if err != nil {
+				t.Fatalf("error while calling New: %s", err)
+			}
+
+			// Setup fake local connection
+			localConnection := &fakeConn{
+				sendBuffer:    bytes.NewBufferString(""),
+				receiveBuffer: bytes.NewBufferString(""),
+			}
+
+			// Setup fake remote connection to return an error message on the error stream
+			remoteDataToSend := bytes.NewBufferString("")
+			remoteDataReceived := bytes.NewBufferString("")
+			remoteConnection := newFakeConnection()
+			remoteConnection.dataStream.readFunc = remoteDataToSend.Read
+			remoteConnection.dataStream.writeFunc = remoteDataReceived.Write
+			remoteConnection.errorStream.readFunc = errStream.Read
+			pf.streamConn = remoteConnection
+
+			// Test handleConnection, using go-routine because it needs to be able to write to unbuffered pf.errorChan
+			pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
+
+			underlayConn := pf.streamConn.(*fakeConnection)
+			if testCase.resp.CloseConnection != underlayConn.closed {
+				t.Fatalf("want %v but got %v", testCase.resp.CloseConnection, underlayConn.closed)
+			}
+		})
 	}
 }

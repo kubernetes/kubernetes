@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -357,13 +358,42 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	errorChan := make(chan error)
 	go func() {
-		message, err := io.ReadAll(errorStream)
-		switch {
-		case err != nil:
-			errorChan <- fmt.Errorf("error reading from error stream for port %d -> %d: %v", port.Local, port.Remote, err)
-		case len(message) > 0:
-			errorChan <- fmt.Errorf("an error occurred forwarding %d -> %d: %v", port.Local, port.Remote, string(message))
+		type portForwardErrResponse struct {
+			// server side's suggestions
+			// guide us whether to close the connection
+			CloseConnection bool `json:"closeConnection,omitempty"`
+			// error detail
+			Message string `json:"message,omitempty"`
 		}
+		message, err := io.ReadAll(errorStream)
+		if err != nil {
+			errorChan <- fmt.Errorf("error reading from error stream for port %d -> %d: %v", port.Local, port.Remote, err)
+			close(errorChan)
+			return
+		}
+
+		// happy path, we have successfully completed forwarding task
+		if len(message) == 0 {
+			close(errorChan)
+			return
+		}
+
+		resp := portForwardErrResponse{}
+		if err := json.Unmarshal(message, &resp); err != nil {
+			errorChan <- fmt.Errorf("decode portforward error response for port %d -> %d: %w", port.Local, port.Remote, err)
+			close(errorChan)
+			return
+		}
+
+		err = fmt.Errorf("an error occurred forwarding %d -> %d: %v", port.Local, port.Remote, resp.Message)
+		if !resp.CloseConnection {
+			// logging it for debug
+			runtime.HandleError(err)
+			close(errorChan)
+			return
+		}
+		// We got an unexpected error and the server instructed us to close the connection.
+		errorChan <- err
 		close(errorChan)
 	}()
 
