@@ -392,8 +392,8 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer ec.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting ephemeral volume controller")
-	defer logger.Info("Shutting down ephemeral volume controller")
+	logger.Info("Starting resource claim controller")
+	defer logger.Info("Shutting down resource claim controller")
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -401,7 +401,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.claimsSynced) {
+	if !cache.WaitForNamedCacheSync("resource_claim", ctx.Done(), ec.podSynced, ec.podSchedulingSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 
