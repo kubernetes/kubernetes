@@ -1006,7 +1006,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		})
 
 		ginkgo.It("should run both restartable init containers and third init container together", func() {
-			framework.ExpectNoError(results.RunTogether(restartableInit2, restartableInit1))
+			framework.ExpectNoError(results.RunTogether(restartableInit1, restartableInit2))
 			framework.ExpectNoError(results.RunTogether(restartableInit1, init3))
 			framework.ExpectNoError(results.RunTogether(restartableInit2, init3))
 		})
