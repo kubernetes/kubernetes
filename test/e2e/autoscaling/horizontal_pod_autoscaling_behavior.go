@@ -208,7 +208,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			waitStart := time.Now()
 
 			rc.EnsureDesiredReplicasInRange(ctx, initPods, initPods, waitDeadline, hpa.Name)
-			timeWaited := time.Now().Sub(waitStart)
+			timeWaited := time.Since(waitStart)
 
 			ginkgo.By("verifying time waited for a scale down")
 			framework.Logf("time waited for scale down: %s", timeWaited)
@@ -248,11 +248,11 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 2, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor2 := time.Now().Sub(waitStart)
+			timeWaitedFor2 := time.Since(waitStart)
 
 			waitStart = time.Now()
 			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor3 := time.Now().Sub(waitStart)
+			timeWaitedFor3 := time.Since(waitStart)
 
 			ginkgo.By("verifying time waited for a scale up to 2 replicas")
 			deadline := limitWindowLength + maxHPAReactionTime + maxResourceConsumerDelay
@@ -290,11 +290,11 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 2, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor2 := time.Now().Sub(waitStart)
+			timeWaitedFor2 := time.Since(waitStart)
 
 			waitStart = time.Now()
 			rc.WaitForReplicas(ctx, 1, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor1 := time.Now().Sub(waitStart)
+			timeWaitedFor1 := time.Since(waitStart)
 
 			ginkgo.By("verifying time waited for a scale down to 2 replicas")
 			deadline := limitWindowLength + maxHPAReactionTime + maxResourceConsumerDelay
@@ -334,12 +334,12 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor3 := time.Now().Sub(waitStart)
+			timeWaitedFor3 := time.Since(waitStart)
 
 			waitStart = time.Now()
 			// Scale up limited by percentage takes ceiling, so new replicas number is ceil(3 * 1.5) = ceil(4.5) = 5
 			rc.WaitForReplicas(ctx, 5, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor5 := time.Now().Sub(waitStart)
+			timeWaitedFor5 := time.Since(waitStart)
 
 			ginkgo.By("verifying time waited for a scale up to 3 replicas")
 			deadline := limitWindowLength + maxHPAReactionTime + maxResourceConsumerDelay
@@ -377,12 +377,12 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 5, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor5 := time.Now().Sub(waitStart)
+			timeWaitedFor5 := time.Since(waitStart)
 
 			waitStart = time.Now()
 			// Scale down limited by percentage takes floor, so new replicas number is floor(5 * 0.75) = floor(3.75) = 3
 			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+limitWindowLength)
-			timeWaitedFor3 := time.Now().Sub(waitStart)
+			timeWaitedFor3 := time.Since(waitStart)
 
 			ginkgo.By("verifying time waited for a scale down to 5 replicas")
 			deadline := limitWindowLength + maxHPAReactionTime + maxResourceConsumerDelay
@@ -430,7 +430,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			waitStart := time.Now()
 			waitDeadline = maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 			rc.WaitForReplicas(ctx, 3, waitDeadline)
-			timeWaited := time.Now().Sub(waitStart)
+			timeWaited := time.Since(waitStart)
 			framework.Logf("time waited for scale up: %s", timeWaited)
 			gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 
@@ -445,7 +445,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			waitStart = time.Now()
 			waitDeadline = maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 			rc.WaitForReplicas(ctx, 2, waitDeadline)
-			timeWaited = time.Now().Sub(waitStart)
+			timeWaited = time.Since(waitStart)
 			framework.Logf("time waited for scale down: %s", timeWaited)
 			gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 		})
@@ -484,7 +484,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			waitStart := time.Now()
 			waitDeadline = limitWindowLength + maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 			rc.WaitForReplicas(ctx, 4, waitDeadline)
-			timeWaited := time.Now().Sub(waitStart)
+			timeWaited := time.Since(waitStart)
 			framework.Logf("time waited for scale up: %s", timeWaited)
 			gomega.Default.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 
@@ -499,7 +499,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			waitStart = time.Now()
 			waitDeadline = maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 			rc.WaitForReplicas(ctx, 2, waitDeadline)
-			timeWaited = time.Now().Sub(waitStart)
+			timeWaited = time.Since(waitStart)
 			framework.Logf("time waited for scale down: %s", timeWaited)
 			gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
 		})
