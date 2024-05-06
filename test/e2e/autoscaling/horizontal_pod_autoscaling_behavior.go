@@ -95,7 +95,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			rc.ConsumeCPU(usageForReplicas(2))
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 2, downScaleStabilization+maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
-			timeWaited := time.Now().Sub(waitStart)
+			timeWaited := time.Since(waitStart)
 
 			ginkgo.By("verifying time waited for a scale down")
 			framework.Logf("time waited for scale down: %s", timeWaited)
@@ -136,7 +136,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 			rc.ConsumeCPU(usageForReplicas(3))
 			waitStart := time.Now()
 			rc.WaitForReplicas(ctx, 3, upScaleStabilization+maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
-			timeWaited := time.Now().Sub(waitStart)
+			timeWaited := time.Since(waitStart)
 
 			ginkgo.By("verifying time waited for a scale up")
 			framework.Logf("time waited for scale up: %s", timeWaited)
