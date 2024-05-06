@@ -35,6 +35,7 @@ import (
 
 // portForwardErrResponse
 // It will be sent to the client to instruct the client whether to close the Connection.
+// it should be kept in sync with those defined in staging/src/k8s.io/client-go/tools/portforward/portforward.go:361
 type portForwardErrResponse struct {
 	// unexpected error was encountered and the connection needs to be closed.
 	CloseConnection bool `json:"closeConnection,omitempty"`
