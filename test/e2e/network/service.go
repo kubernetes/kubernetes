@@ -430,8 +430,8 @@ func verifyServeHostnameServiceDown(ctx context.Context, c clientset.Interface, 
 }
 
 // testNotReachableHTTP tests that a HTTP request doesn't connect to the given host and port.
-func testNotReachableHTTP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testNotReachableHTTP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := e2enetwork.PokeHTTP(host, port, "/", nil)
 		if result.Code == 0 {
 			return true, nil
@@ -439,7 +439,7 @@ func testNotReachableHTTP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
@@ -519,8 +519,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
 	if err != nil {
 		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
+		var neterr net.Error
+		if errors.As(err, &neterr) && neterr.Timeout() {
 			ret.Status = UDPTimeout
 		} else if strings.Contains(err.Error(), "connection refused") {
 			ret.Status = UDPRefused
@@ -549,8 +549,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	n, err := con.Read(buf)
 	if err != nil {
 		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
+		var neterr net.Error
+		if errors.As(err, &neterr) && neterr.Timeout() {
 			ret.Status = UDPTimeout
 		} else if strings.Contains(err.Error(), "connection refused") {
 			ret.Status = UDPRefused
@@ -575,8 +575,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 }
 
 // testReachableUDP tests that the given host serves UDP on the given port.
-func testReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{
 			Timeout:  3 * time.Second,
 			Response: "hello",
@@ -587,43 +587,43 @@ func testReachableUDP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 // testNotReachableUDP tests that the given host doesn't serve UDP on the given port.
-func testNotReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testNotReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
 		if result.Status != UDPSuccess && result.Status != UDPError {
 			return true, nil
 		}
 		return false, nil // caller can retry
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
 
 // testRejectedUDP tests that the given host rejects a UDP request on the given port.
-func testRejectedUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testRejectedUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
 		if result.Status == UDPRefused {
 			return true, nil
 		}
 		return false, nil // caller can retry
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("UDP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
 // TestHTTPHealthCheckNodePort tests a HTTP connection by the given request to the given host and port.
-func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
+func TestHTTPHealthCheckNodePort(ctx context.Context, host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		success, _ := testHTTPHealthCheckNodePort(host, port, request)
 		if success && expectSucceed ||
 			!success && !expectSucceed {
@@ -635,7 +635,7 @@ func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout 
 		return false, nil
 	}
 
-	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v%v, got %d", threshold, expectSucceed, host, port, count)
 	}
 	return nil
@@ -654,7 +654,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 		framework.Logf("Got error testing for reachability of %s: %v", url, err)
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		framework.Logf("Got error reading response from %s: %v", url, err)
 		return false, err
@@ -672,7 +672,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 
 func testHTTPHealthCheckNodePortFromTestContainer(ctx context.Context, config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0
-	pollFn := func() (bool, error) {
+	pollFn := func(ctx context.Context) (bool, error) {
 		statusCode, err := config.GetHTTPCodeFromTestContainer(ctx,
 			"/healthz",
 			host,
@@ -689,7 +689,7 @@ func testHTTPHealthCheckNodePortFromTestContainer(ctx context.Context, config *e
 		}
 		return count >= threshold, nil
 	}
-	err := wait.PollImmediate(time.Second, timeout, pollFn)
+	err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, pollFn)
 	if err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v:%v/healthz, got %d", threshold, expectSucceed, host, port, count)
 	}
@@ -4134,9 +4134,9 @@ func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name
 }
 
 // checkReachabilityFromPod checks reachability from the specified pod.
-func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
+func checkReachabilityFromPod(ctx context.Context, expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
-	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := e2eoutput.RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)

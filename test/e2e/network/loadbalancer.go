@@ -55,7 +55,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -248,7 +248,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer with no backends, no answer expected")
-		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
+		testNotReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
 		err = tcpJig.Scale(ctx, 1)
@@ -272,7 +272,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the TCP LoadBalancer is closed")
-		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
+		testNotReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
 	f.It("should be able to change the type and ports of a UDP service", f.WithSlow(), func(ctx context.Context) {
@@ -340,7 +340,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		// Change the services' node ports.
 
@@ -361,7 +361,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		// Change the services' main ports.
 
@@ -389,14 +389,14 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 0")
 		err = udpJig.Scale(ctx, 0)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("looking for ICMP REJECT on the UDP service's LoadBalancer")
-		testRejectedUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		testRejectedUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
 		err = udpJig.Scale(ctx, 1)
@@ -407,7 +407,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		// Change the services back to ClusterIP.
 
@@ -424,7 +424,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the UDP LoadBalancer is closed")
-		testNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
+		testNotReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
 	f.It("should only allow access from service loadbalancer source ranges", f.WithSlow(), func(ctx context.Context) {
@@ -475,8 +475,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// as this may take significant amount of time, especially in large clusters.
 		// However, the information whether it was already programmed isn't achievable.
 		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
-		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(false, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
+		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(ctx, false, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 
 		// Make sure dropPod is running. There are certain chances that the pod might be terminated due to unexpected reasons.
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(ctx, dropPod.Name, metav1.GetOptions{})
@@ -495,8 +495,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// significant amount of time, especially in large clusters.
 		// However, the information whether it was already programmed isn't achievable.
 		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
-		checkReachabilityFromPod(false, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
+		checkReachabilityFromPod(ctx, false, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 
 		ginkgo.By("Delete LoadBalancerSourceRange field and check reachability")
 		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
@@ -507,8 +507,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// significant amount of time, especially in large clusters.
 		// However, the information whether it was already programmed isn't achievable.
 		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
-		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
+		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
@@ -626,7 +626,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		ginkgo.By("changing the TCP service to type=LoadBalancer")
 		_, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 		})
 		framework.ExpectNoError(err)
 
@@ -647,7 +647,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		ginkgo.By("adding a TCP service's NodePort")
 		tcpService, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		})
 		framework.ExpectNoError(err)
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
@@ -728,9 +728,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 					framework.Logf("Failed to connect to: %s %d", udpIngressIP, port)
 					continue
 				}
-				conn.SetDeadline(time.Now().Add(3 * time.Second))
+				_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 				framework.Logf("Connected successfully to: %s", raddr.String())
-				conn.Write([]byte("hostname\n"))
+				_, _ = conn.Write([]byte("hostname\n"))
 				buff := make([]byte, 1024)
 				n, _, err := conn.ReadFrom(buff)
 				if err == nil {
@@ -739,7 +739,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 					mu.Unlock()
 					framework.Logf("Connected successfully to hostname: %s", string(buff[:n]))
 				}
-				conn.Close()
+				_ = conn.Close()
 			}
 		}()
 
@@ -760,7 +760,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node " + nodes.Items[0].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true, func(ctx context.Context) (bool, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			return hostnames.Has(serverPod1.Spec.Hostname), nil
@@ -786,7 +786,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
 		ginkgo.By("checking client pod connected to the backend 2 on Node " + nodes.Items[1].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true, func(ctx context.Context) (bool, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			return hostnames.Has(serverPod2.Spec.Hostname), nil
@@ -860,9 +860,9 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 					framework.Logf("Failed to connect to: %s %d", udpIngressIP, port)
 					continue
 				}
-				conn.SetDeadline(time.Now().Add(3 * time.Second))
+				_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 				framework.Logf("Connected successfully to: %s", raddr.String())
-				conn.Write([]byte("hostname\n"))
+				_, _ = conn.Write([]byte("hostname\n"))
 				buff := make([]byte, 1024)
 				n, _, err := conn.ReadFrom(buff)
 				if err == nil {
@@ -871,7 +871,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 					mu.Unlock()
 					framework.Logf("Connected successfully to hostname: %s", string(buff[:n]))
 				}
-				conn.Close()
+				_ = conn.Close()
 			}
 		}()
 
@@ -892,7 +892,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node " + nodes.Items[0].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true, func(ctx context.Context) (bool, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			return hostnames.Has(serverPod1.Spec.Hostname), nil
@@ -918,7 +918,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
 		ginkgo.By("checking client pod connected to the backend 2 on Node " + nodes.Items[0].Name)
-		if err := wait.PollImmediate(1*time.Second, loadBalancerLagTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 1*time.Second, loadBalancerLagTimeout, true, func(ctx context.Context) (bool, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			return hostnames.Has(serverPod2.Spec.Hostname), nil
@@ -1181,7 +1181,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		var srcIP string
 		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs)
 		ginkgo.By(fmt.Sprintf("Hitting external lb %v from pod %v on node %v", ingressIP, pausePod.Name, pausePod.Spec.NodeName))
-		if pollErr := wait.PollImmediate(framework.Poll, loadBalancerPropagationTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, loadBalancerPropagationTimeout, true, func(ctx context.Context) (bool, error) {
 			stdout, err := e2eoutput.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
 			if err != nil {
 				framework.Logf("got err: %v, retry until timeout", err)
@@ -1270,7 +1270,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		for nodeName, nodeIP := range endpointNodeMap {
 			ginkgo.By(fmt.Sprintf("checking kube-proxy health check fails on node with endpoint (%s), public IP %s", nodeName, nodeIP))
 			var body string
-			pollFn := func() (bool, error) {
+			pollFn := func(ctx context.Context) (bool, error) {
 				// we expect connection failure here, but not other errors
 				resp, err := config.GetResponseFromTestContainer(ctx,
 					"http",
@@ -1288,7 +1288,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 				}
 				return false, nil
 			}
-			if pollErr := wait.PollImmediate(framework.Poll, e2eservice.TestTimeout, pollFn); pollErr != nil {
+			if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.TestTimeout, true, pollFn); pollErr != nil {
 				framework.Failf("Kube-proxy still exposing health check on node %v:%v, after ESIPP was turned off. body %s",
 					nodeName, healthCheckNodePort, body)
 			}
@@ -1297,7 +1297,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		// Poll till kube-proxy re-adds the MASQUERADE rule on the node.
 		ginkgo.By(fmt.Sprintf("checking source ip is NOT preserved through loadbalancer %v", ingressIP))
 		var clientIP string
-		pollErr := wait.PollImmediate(framework.Poll, 3*e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, 3*e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
 			if err != nil {
 				return false, nil
@@ -1336,7 +1336,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 		})
 		framework.ExpectNoError(err)
 		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs)
-		pollErr = wait.PollImmediate(framework.PollShortTimeout, loadBalancerPropagationTimeout, func() (bool, error) {
+		pollErr = wait.PollUntilContextTimeout(ctx, framework.PollShortTimeout, loadBalancerPropagationTimeout, true, func(ctx context.Context) (bool, error) {
 			clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
 			if err != nil {
 				return false, nil
@@ -1384,7 +1384,7 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 		},
 	}
 	ds.Spec.Template.Labels = labels
-	ds.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(gracePeriod)
+	ds.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(gracePeriod)
 
 	nodeNames := e2edaemonset.SchedulableNodes(ctx, cs, ds)
 	e2eskipper.SkipUnlessAtLeast(len(nodeNames), 2, "load-balancer rolling update test requires at least 2 schedulable nodes for the DaemonSet")
@@ -1447,7 +1447,7 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 				atomic.AddUint64(&networkErrors, 1)
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != http.StatusOK {
 				framework.Logf("Got bad status code: %d", resp.StatusCode)
 				atomic.AddUint64(&httpErrors, 1)
@@ -1470,7 +1470,7 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 	ginkgo.By("Triggering DaemonSet rolling update several times")
 	var previousTotalRequests uint64 = 0
 	var previousNetworkErrors uint64 = 0
-	var previousHttpErrors uint64 = 0
+	var previousHTTPErrors uint64 = 0
 	for i := 1; i <= 5; i++ {
 		framework.Logf("Update daemon pods environment: [{\"name\":\"VERSION\",\"value\":\"%d\"}]", i)
 		patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"containers":[{"name":"%s","env":[{"name":"VERSION","value":"%d"}]}]}}}}`, ds.Spec.Template.Spec.Containers[0].Name, i)
@@ -1478,8 +1478,8 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 		framework.ExpectNoError(err)
 
 		framework.Logf("Check that daemon pods are available on every node of the cluster with the updated environment.")
-		err = wait.PollImmediate(framework.Poll, creationTimeout, func() (bool, error) {
-			podList, err := cs.CoreV1().Pods(ds.Namespace).List(context.TODO(), metav1.ListOptions{})
+		err = wait.PollUntilContextTimeout(ctx, framework.Poll, creationTimeout, true, func(ctx context.Context) (bool, error) {
+			podList, err := cs.CoreV1().Pods(ds.Namespace).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -1517,16 +1517,16 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 		// assert that the HTTP requests success rate is above the acceptable threshold after this rolling update
 		currentTotalRequests := atomic.LoadUint64(&totalRequests)
 		currentNetworkErrors := atomic.LoadUint64(&networkErrors)
-		currentHttpErrors := atomic.LoadUint64(&httpErrors)
+		currentHTTPErrors := atomic.LoadUint64(&httpErrors)
 
 		partialTotalRequests := currentTotalRequests - previousTotalRequests
 		partialNetworkErrors := currentNetworkErrors - previousNetworkErrors
-		partialHttpErrors := currentHttpErrors - previousHttpErrors
-		partialSuccessRate := (float64(partialTotalRequests) - float64(partialNetworkErrors+partialHttpErrors)) / float64(partialTotalRequests)
+		partialHTTPErrors := currentHTTPErrors - previousHTTPErrors
+		partialSuccessRate := (float64(partialTotalRequests) - float64(partialNetworkErrors+partialHTTPErrors)) / float64(partialTotalRequests)
 
 		framework.Logf("Load Balancer total HTTP requests: %d", partialTotalRequests)
 		framework.Logf("Network errors: %d", partialNetworkErrors)
-		framework.Logf("HTTP errors: %d", partialHttpErrors)
+		framework.Logf("HTTP errors: %d", partialHTTPErrors)
 		framework.Logf("Success rate: %.2f%%", partialSuccessRate*100)
 		if partialSuccessRate < minSuccessRate {
 			framework.Failf("Encountered too many errors when doing HTTP requests to the load balancer address. Success rate is %.2f%%, and the minimum allowed threshold is %.2f%%.", partialSuccessRate*100, minSuccessRate*100)
@@ -1534,7 +1534,7 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 
 		previousTotalRequests = currentTotalRequests
 		previousNetworkErrors = currentNetworkErrors
-		previousHttpErrors = currentHttpErrors
+		previousHTTPErrors = currentHTTPErrors
 	}
 
 	// assert that the load balancer address is still reachable after the rolling updates are finished
