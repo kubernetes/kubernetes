@@ -156,6 +156,10 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		return tlsCacheKey{}, false, nil
 	}
 
+	if c.DialHolder != nil && c.DialHolder.DisableCache {
+		return tlsCacheKey{}, false, nil
+	}
+
 	k := tlsCacheKey{
 		insecure:           c.TLS.Insecure,
 		caData:             string(c.TLS.CAData),

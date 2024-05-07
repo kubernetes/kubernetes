@@ -82,6 +82,9 @@ type Config struct {
 // DialHolder is used to make the wrapped function comparable so that it can be used as a map key.
 type DialHolder struct {
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// DisableCache disables TLS config caching for this DialHolder.
+	DisableCache bool
 }
 
 // ImpersonationConfig has all the available impersonation options
