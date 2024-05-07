@@ -77,9 +77,11 @@ func GetPodList(client coreclient.PodsGetter, namespace string, selector string,
 		return nil, err
 	}
 
-	_, ok := event.Object.(*corev1.Pod)
+	po, ok := event.Object.(*corev1.Pod)
 	if !ok {
 		return nil, fmt.Errorf("%#v is not a pod event", event)
+	} else {
+		podList.Items = append(podList.Items, *po)
 	}
 	return podList, nil
 }
