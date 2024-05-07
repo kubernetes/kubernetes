@@ -52,7 +52,8 @@ type server struct {
 	grpc       *grpc.Server
 	rhandler   RegistrationHandler
 	chandler   ClientHandler
-	clients    map[string]Client
+	// clients is a map of plugin name to connected client
+	clients map[string]Client
 }
 
 // NewServer returns an initialized device plugin registration server.
