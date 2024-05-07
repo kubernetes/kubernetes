@@ -53,9 +53,7 @@ func GetPodList(client coreclient.PodsGetter, namespace string, selector string,
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
 		for i, pod := range pods {
-			if pod != nil { // Check if the pod is not nil to avoid dereferencing nil pointers
-				podList.Items[i] = *pod
-			}
+			podList.Items[i] = *pod
 		}
 		return podList, nil
 	}
