@@ -50,6 +50,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
+	"k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -426,7 +427,7 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 		return
 	}
 	job := jm.resolveControllerRef(pod.Namespace, controllerRef)
-	if job == nil || IsJobFinished(job) {
+	if job == nil || util.IsJobFinished(job) {
 		// syncJob will not remove this finalizer.
 		if hasFinalizer {
 			jm.enqueueOrphanPod(pod)
@@ -480,7 +481,7 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 
 	// The job shouldn't be marked as finished until all pod finalizers are removed.
 	// This is a backup operation in this case.
-	if IsJobFinished(curJob) {
+	if util.IsJobFinished(curJob) {
 		jm.cleanupPodFinalizers(curJob)
 	}
 
@@ -655,7 +656,7 @@ func (jm *Controller) syncOrphanPod(ctx context.Context, key string) error {
 				return nil
 			}
 		}
-		if job != nil && !IsJobFinished(job) {
+		if job != nil && !util.IsJobFinished(job) {
 			// The pod was adopted. Do not remove finalizer.
 			return nil
 		}
@@ -766,7 +767,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	job := *sharedJob.DeepCopy()
 
 	// if job was finished previously, we don't want to redo the termination
-	if IsJobFinished(&job) {
+	if util.IsJobFinished(&job) {
 		err := jm.podBackoffStore.removeBackoffRecord(key)
 		if err != nil {
 			// re-syncing here as the record has to be removed for finished/deleted jobs
