@@ -11,13 +11,16 @@ It provides a set of APIs to directly measure performance and behavior of your s
 
 ## Project Status
 
-| Signal  | Status     |
-|---------|------------|
-| Traces  | Stable     |
-| Metrics | Stable     |
-| Logs    | Design [1] |
+| Signal  | Status     | Project               |
+|---------|------------|-----------------------|
+| Traces  | Stable     | N/A                   |
+| Metrics | Mixed [1]  | [Go: Metric SDK (GA)] |
+| Logs    | Frozen [2] | N/A                   |
 
-- [1]: Currently the logs signal development is in a design phase ([#4696](https://github.com/open-telemetry/opentelemetry-go/issues/4696)).
+[Go: Metric SDK (GA)]: https://github.com/orgs/open-telemetry/projects/34
+
+- [1]: [Metrics API](https://pkg.go.dev/go.opentelemetry.io/otel/metric) is Stable. [Metrics SDK](https://pkg.go.dev/go.opentelemetry.io/otel/sdk/metric) is Beta.
+- [2]: The Logs signal development is halted for this project while we stabilize the Metrics SDK.
    No Logs Pull Requests are currently being accepted.
 
 Progress and status specific to this repository is tracked in our

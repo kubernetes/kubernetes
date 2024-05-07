@@ -176,7 +176,7 @@ func (d decoder) unmarshalAny(m protoreflect.Message) error {
 	// Use another decoder to parse the unread bytes for @type field. This
 	// avoids advancing a read from current decoder because the current JSON
 	// object may contain the fields of the embedded type.
-	dec := decoder{d.Clone(), UnmarshalOptions{RecursionLimit: d.opts.RecursionLimit}}
+	dec := decoder{d.Clone(), UnmarshalOptions{}}
 	tok, err := findTypeURL(dec)
 	switch err {
 	case errEmptyObject:
@@ -308,29 +308,48 @@ Loop:
 // array) in order to advance the read to the next JSON value. It relies on
 // the decoder returning an error if the types are not in valid sequence.
 func (d decoder) skipJSONValue() error {
-	var open int
-	for {
-		tok, err := d.Read()
-		if err != nil {
-			return err
-		}
-		switch tok.Kind() {
-		case json.ObjectClose, json.ArrayClose:
-			open--
-		case json.ObjectOpen, json.ArrayOpen:
-			open++
-			if open > d.opts.RecursionLimit {
-				return errors.New("exceeded max recursion depth")
+	tok, err := d.Read()
+	if err != nil {
+		return err
+	}
+	// Only need to continue reading for objects and arrays.
+	switch tok.Kind() {
+	case json.ObjectOpen:
+		for {
+			tok, err := d.Read()
+			if err != nil {
+				return err
 			}
-		case json.EOF:
-			// This can only happen if there's a bug in Decoder.Read.
-			// Avoid an infinite loop if this does happen.
-			return errors.New("unexpected EOF")
+			switch tok.Kind() {
+			case json.ObjectClose:
+				return nil
+			case json.Name:
+				// Skip object field value.
+				if err := d.skipJSONValue(); err != nil {
+					return err
+				}
+			}
 		}
-		if open == 0 {
-			return nil
+
+	case json.ArrayOpen:
+		for {
+			tok, err := d.Peek()
+			if err != nil {
+				return err
+			}
+			switch tok.Kind() {
+			case json.ArrayClose:
+				d.Read()
+				return nil
+			default:
+				// Skip array item.
+				if err := d.skipJSONValue(); err != nil {
+					return err
+				}
+			}
 		}
 	}
+	return nil
 }
 
 // unmarshalAnyValue unmarshals the given custom-type message from the JSON

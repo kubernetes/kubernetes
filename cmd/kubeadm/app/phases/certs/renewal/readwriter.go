@@ -36,7 +36,7 @@ import (
 // read or write a certificate stored/embedded in a file
 type certificateReadWriter interface {
 	//Exists return true if the certificate exists
-	Exists() (bool, error)
+	Exists() bool
 
 	// Read a certificate stored/embedded in a file
 	Read() (*x509.Certificate, error)
@@ -61,20 +61,17 @@ func newPKICertificateReadWriter(certificateDir string, baseName string) *pkiCer
 }
 
 // Exists checks if a certificate exist
-func (rw *pkiCertificateReadWriter) Exists() (bool, error) {
+func (rw *pkiCertificateReadWriter) Exists() bool {
 	certificatePath, _ := pkiutil.PathsForCertAndKey(rw.certificateDir, rw.baseName)
 	return fileExists(certificatePath)
 }
 
-func fileExists(filename string) (bool, error) {
+func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
+	if os.IsNotExist(err) {
+		return false
 	}
-	return !info.IsDir(), nil
+	return !info.IsDir()
 }
 
 // Read a certificate from a file the K8s pki managed by kubeadm
@@ -123,7 +120,7 @@ func newKubeconfigReadWriter(kubernetesDir string, kubeConfigFileName string, ce
 }
 
 // Exists checks if a certificate embedded in kubeConfig file exists
-func (rw *kubeConfigReadWriter) Exists() (bool, error) {
+func (rw *kubeConfigReadWriter) Exists() bool {
 	return fileExists(rw.kubeConfigFilePath)
 }
 

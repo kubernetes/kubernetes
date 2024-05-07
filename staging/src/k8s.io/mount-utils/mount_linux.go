@@ -35,7 +35,6 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"golang.org/x/sys/unix"
 
-	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -112,59 +111,6 @@ func (mounter *Mounter) hasSystemd() bool {
 	return *mounter.withSystemd
 }
 
-// Map unix.Statfs mount flags ro, nodev, noexec, nosuid, noatime, relatime,
-// nodiratime to mount option flag strings.
-func getUserNSBindMountOptions(path string, statfs func(path string, buf *unix.Statfs_t) (err error)) ([]string, error) {
-	var s unix.Statfs_t
-	var mountOpts []string
-	if err := statfs(path, &s); err != nil {
-		return nil, &os.PathError{Op: "statfs", Path: path, Err: err}
-	}
-	flagMapping := map[int]string{
-		unix.MS_RDONLY:     "ro",
-		unix.MS_NODEV:      "nodev",
-		unix.MS_NOEXEC:     "noexec",
-		unix.MS_NOSUID:     "nosuid",
-		unix.MS_NOATIME:    "noatime",
-		unix.MS_RELATIME:   "relatime",
-		unix.MS_NODIRATIME: "nodiratime",
-	}
-	for k, v := range flagMapping {
-		if int(s.Flags)&k == k {
-			mountOpts = append(mountOpts, v)
-		}
-	}
-	return mountOpts, nil
-}
-
-// Do a bind mount including the needed remount for applying the bind opts.
-// If the remount fails and we are running in a user namespace
-// figure out if the source filesystem has the ro, nodev, noexec, nosuid,
-// noatime, relatime or nodiratime flag set and try another remount with the found flags.
-func (mounter *Mounter) bindMountSensitive(mounterPath string, mountCmd string, source string, target string, fstype string, bindOpts []string, bindRemountOpts []string, bindRemountOptsSensitive []string, mountFlags []string, systemdMountRequired bool) error {
-	err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
-	if err != nil {
-		return err
-	}
-	err = mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
-	if libcontaineruserns.RunningInUserNS() {
-		if err == nil {
-			return nil
-		}
-		// Check if the source has ro, nodev, noexec, nosuid, noatime, relatime,
-		// nodiratime flag...
-		fixMountOpts, err := getUserNSBindMountOptions(source, unix.Statfs)
-		if err != nil {
-			return &os.PathError{Op: "statfs", Path: source, Err: err}
-		}
-		// ... and retry the mount with flags found above.
-		bindRemountOpts = append(bindRemountOpts, fixMountOpts...)
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, systemdMountRequired)
-	} else {
-		return err
-	}
-}
-
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
 // be an empty string in case it's not required, e.g. for remount, or for auto filesystem
 // type, where kernel handles fstype for you. The mount 'options' is a list of options,
@@ -185,7 +131,11 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		return mounter.bindMountSensitive(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
+		if err != nil {
+			return err
+		}
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{
@@ -210,7 +160,11 @@ func (mounter *Mounter) MountSensitiveWithoutSystemdWithMountFlags(source string
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		return mounter.bindMountSensitive(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOpts, bindRemountOptsSensitive, mountFlags, false)
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, mountFlags, false)
+		if err != nil {
+			return err
+		}
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, mountFlags, false)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{

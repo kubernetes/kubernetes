@@ -320,7 +320,7 @@ const (
 	MinExternalEtcdVersion = "3.4.13-4"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.13-0"
+	DefaultEtcdVersion = "3.5.12-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -479,25 +479,24 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		22: "3.5.13-0",
-		23: "3.5.13-0",
-		24: "3.5.13-0",
-		25: "3.5.13-0",
-		26: "3.5.13-0",
-		27: "3.5.13-0",
-		28: "3.5.13-0",
-		29: "3.5.13-0",
-		30: "3.5.13-0",
-		31: "3.5.13-0",
+		22: "3.5.12-0",
+		23: "3.5.12-0",
+		24: "3.5.12-0",
+		25: "3.5.12-0",
+		26: "3.5.12-0",
+		27: "3.5.12-0",
+		28: "3.5.12-0",
+		29: "3.5.12-0",
+		30: "3.5.12-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
 	// the bootstrap tokens to access the kubeadm-certs Secret during the join of a new control-plane
 	KubeadmCertsClusterRoleName = fmt.Sprintf("kubeadm:%s", KubeadmCertsSecret)
 
-	// DefaultKubernetesPlaceholderVersion is a placeholder version in case the component-base
+	// defaultKubernetesPlaceholderVersion is a placeholder version in case the component-base
 	// version was not populated during build.
-	DefaultKubernetesPlaceholderVersion = version.MustParseSemantic("v1.0.0-placeholder-version")
+	defaultKubernetesPlaceholderVersion = version.MustParseSemantic("v1.0.0-placeholder-version")
 )
 
 // getSkewedKubernetesVersion returns the current MAJOR.(MINOR+n).0 Kubernetes version with a skew of 'n'
@@ -515,7 +514,7 @@ func getSkewedKubernetesVersionImpl(versionInfo *apimachineryversion.Info, n int
 	// More changes would be required if the kubelet version one day decouples from that of Kubernetes.
 	var ver *version.Version
 	if len(versionInfo.Major) == 0 {
-		return DefaultKubernetesPlaceholderVersion
+		return defaultKubernetesPlaceholderVersion
 	}
 	ver = version.MustParseSemantic(versionInfo.GitVersion)
 	// Append the MINOR version skew.

@@ -21,7 +21,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -59,7 +58,7 @@ var (
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
 
 		  # Create a new secret named my-secret from ~/.docker/config.json
-		  kubectl create secret docker-registry my-secret --from-file=path/to/.docker/config.json`))
+		  kubectl create secret docker-registry my-secret --from-file=.dockerconfigjson=path/to/.docker/config.json`))
 )
 
 // DockerConfigJSON represents a local docker auth config file
@@ -153,11 +152,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericioopti
 	cmd.Flags().StringVar(&o.Email, "docker-email", o.Email, i18n.T("Email for Docker registry"))
 	cmd.Flags().StringVar(&o.Server, "docker-server", o.Server, i18n.T("Server location for Docker registry"))
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
-	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, "+
-		"in which case a default name of "+corev1.DockerConfigJsonKey+" will be given to them, "+
-		"or optionally with a name and file path, in which case the given name will be used. "+
-		"Specifying a directory will iterate each named file in the directory that is a valid secret key. "+
-		"For this command, the key should always be "+corev1.DockerConfigJsonKey+".")
+	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
@@ -209,11 +204,6 @@ func (o *CreateSecretDockerRegistryOptions) Complete(f cmdutil.Factory, cmd *cob
 		return err
 	}
 
-	for i := range o.FileSources {
-		if !strings.Contains(o.FileSources[i], "=") {
-			o.FileSources[i] = corev1.DockerConfigJsonKey + "=" + o.FileSources[i]
-		}
-	}
 	return nil
 }
 

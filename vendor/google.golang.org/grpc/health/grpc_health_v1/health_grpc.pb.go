@@ -44,15 +44,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type HealthClient interface {
-	// Check gets the health of the specified service. If the requested service
-	// is unknown, the call will fail with status NOT_FOUND. If the caller does
-	// not specify a service name, the server should respond with its overall
-	// health status.
-	//
-	// Clients should set a deadline when calling Check, and can declare the
-	// server unhealthy if they do not receive a timely response.
-	//
-	// Check implementations should be idempotent and side effect free.
+	// If the requested service is unknown, the call will fail with status
+	// NOT_FOUND.
 	Check(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 	// Performs a watch for the serving status of the requested service.
 	// The server will immediately send back a message indicating the current
@@ -125,15 +118,8 @@ func (x *healthWatchClient) Recv() (*HealthCheckResponse, error) {
 // All implementations should embed UnimplementedHealthServer
 // for forward compatibility
 type HealthServer interface {
-	// Check gets the health of the specified service. If the requested service
-	// is unknown, the call will fail with status NOT_FOUND. If the caller does
-	// not specify a service name, the server should respond with its overall
-	// health status.
-	//
-	// Clients should set a deadline when calling Check, and can declare the
-	// server unhealthy if they do not receive a timely response.
-	//
-	// Check implementations should be idempotent and side effect free.
+	// If the requested service is unknown, the call will fail with status
+	// NOT_FOUND.
 	Check(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	// Performs a watch for the serving status of the requested service.
 	// The server will immediately send back a message indicating the current

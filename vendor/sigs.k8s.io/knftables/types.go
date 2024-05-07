@@ -38,12 +38,6 @@ type Object interface {
 	// writeOperation writes out an "nft" operation involving the object. It assumes
 	// that the object has been validated.
 	writeOperation(verb verb, ctx *nftContext, writer io.Writer)
-
-	// parse is the opposite of writeOperation; it fills Object fields based on an "nft add"
-	// command. line is the part of the line after "nft add <type> <family> <tablename>"
-	// (so for most types it starts with the object name).
-	// If error is returned, Object's fields may be partially filled, therefore Object should not be used.
-	parse(line string) error
 }
 
 // Family is an nftables family

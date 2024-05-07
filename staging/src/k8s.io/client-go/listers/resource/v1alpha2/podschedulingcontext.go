@@ -20,8 +20,8 @@ package v1alpha2
 
 import (
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type PodSchedulingContextLister interface {
 
 // podSchedulingContextLister implements the PodSchedulingContextLister interface.
 type podSchedulingContextLister struct {
-	listers.ResourceIndexer[*v1alpha2.PodSchedulingContext]
+	indexer cache.Indexer
 }
 
 // NewPodSchedulingContextLister returns a new PodSchedulingContextLister.
 func NewPodSchedulingContextLister(indexer cache.Indexer) PodSchedulingContextLister {
-	return &podSchedulingContextLister{listers.New[*v1alpha2.PodSchedulingContext](indexer, v1alpha2.Resource("podschedulingcontext"))}
+	return &podSchedulingContextLister{indexer: indexer}
+}
+
+// List lists all PodSchedulingContexts in the indexer.
+func (s *podSchedulingContextLister) List(selector labels.Selector) (ret []*v1alpha2.PodSchedulingContext, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha2.PodSchedulingContext))
+	})
+	return ret, err
 }
 
 // PodSchedulingContexts returns an object that can list and get PodSchedulingContexts.
 func (s *podSchedulingContextLister) PodSchedulingContexts(namespace string) PodSchedulingContextNamespaceLister {
-	return podSchedulingContextNamespaceLister{listers.NewNamespaced[*v1alpha2.PodSchedulingContext](s.ResourceIndexer, namespace)}
+	return podSchedulingContextNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // PodSchedulingContextNamespaceLister helps list and get PodSchedulingContexts.
@@ -66,5 +74,26 @@ type PodSchedulingContextNamespaceLister interface {
 // podSchedulingContextNamespaceLister implements the PodSchedulingContextNamespaceLister
 // interface.
 type podSchedulingContextNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha2.PodSchedulingContext]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all PodSchedulingContexts in the indexer for a given namespace.
+func (s podSchedulingContextNamespaceLister) List(selector labels.Selector) (ret []*v1alpha2.PodSchedulingContext, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha2.PodSchedulingContext))
+	})
+	return ret, err
+}
+
+// Get retrieves the PodSchedulingContext from the indexer for a given namespace and name.
+func (s podSchedulingContextNamespaceLister) Get(name string) (*v1alpha2.PodSchedulingContext, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1alpha2.Resource("podschedulingcontext"), name)
+	}
+	return obj.(*v1alpha2.PodSchedulingContext), nil
 }

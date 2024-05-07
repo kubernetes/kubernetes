@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -129,7 +130,7 @@ func TestDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := os.ReadFile(filepath.Join(diff.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +201,7 @@ func TestDiffer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := os.ReadFile(filepath.Join(diff.From.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +210,7 @@ func TestDiffer(t *testing.T) {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}
 
-	fcontent, err = os.ReadFile(filepath.Join(diff.To.Dir.Name, obj.Name()))
+	fcontent, err = os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,12 +286,12 @@ metadata:
 				t.Fatal(err)
 			}
 
-			actualFromContent, _ := os.ReadFile(filepath.Join(diff.From.Dir.Name, obj.Name()))
+			actualFromContent, _ := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
 			if string(actualFromContent) != tc.expectedFromContent {
 				t.Fatalf("File has %q, expected %q", string(actualFromContent), tc.expectedFromContent)
 			}
 
-			actualToContent, _ := os.ReadFile(filepath.Join(diff.To.Dir.Name, obj.Name()))
+			actualToContent, _ := os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
 			if string(actualToContent) != tc.expectedToContent {
 				t.Fatalf("File has %q, expected %q", string(actualToContent), tc.expectedToContent)
 			}

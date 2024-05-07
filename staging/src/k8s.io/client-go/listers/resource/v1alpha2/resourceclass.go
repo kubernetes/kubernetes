@@ -20,8 +20,8 @@ package v1alpha2
 
 import (
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,10 +39,30 @@ type ResourceClassLister interface {
 
 // resourceClassLister implements the ResourceClassLister interface.
 type resourceClassLister struct {
-	listers.ResourceIndexer[*v1alpha2.ResourceClass]
+	indexer cache.Indexer
 }
 
 // NewResourceClassLister returns a new ResourceClassLister.
 func NewResourceClassLister(indexer cache.Indexer) ResourceClassLister {
-	return &resourceClassLister{listers.New[*v1alpha2.ResourceClass](indexer, v1alpha2.Resource("resourceclass"))}
+	return &resourceClassLister{indexer: indexer}
+}
+
+// List lists all ResourceClasses in the indexer.
+func (s *resourceClassLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceClass, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha2.ResourceClass))
+	})
+	return ret, err
+}
+
+// Get retrieves the ResourceClass from the index for a given name.
+func (s *resourceClassLister) Get(name string) (*v1alpha2.ResourceClass, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1alpha2.Resource("resourceclass"), name)
+	}
+	return obj.(*v1alpha2.ResourceClass), nil
 }

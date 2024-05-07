@@ -186,6 +186,22 @@ var (
 		clusterName: foo
 	`, kubeadmapiv1.GroupName, oldClusterConfigVersion)
 
+	// currentBarClusterConfig is a minimal currently supported ClusterConfiguration
+	// with a well known value of clusterName (in this case `bar`)
+	currentBarClusterConfig = fmt.Sprintf(`
+		apiVersion: %s
+		kind: ClusterConfiguration
+		clusterName: bar
+	`, kubeadmapiv1.SchemeGroupVersion)
+
+	// oldBarClusterConfig is a minimal unsupported ClusterConfiguration
+	// with a well known value of clusterName (in this case `bar`)
+	oldBarClusterConfig = fmt.Sprintf(`
+		apiVersion: %s/%s
+		kind: ClusterConfiguration
+		clusterName: bar
+	`, kubeadmapiv1.GroupName, oldClusterConfigVersion)
+
 	// This is the "minimal" valid config that can be unmarshalled to and from YAML.
 	// Due to same static defaulting it's not exactly small in size.
 	validUnmarshallableClusterConfig = struct {
@@ -471,6 +487,126 @@ func TestLoadingFromCluster(t *testing.T) {
 		)
 
 		return clusterConfigHandler.FromCluster(client, testClusterCfg())
+	})
+}
+
+func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
+	fakeKnownContext(func() {
+		cases := []struct {
+			desc          string
+			obj           runtime.Object
+			config        string
+			expectedValue string
+			isNotLoaded   bool
+			expectedErr   bool
+		}{
+			{
+				desc:          "appropriate cluster object without overwrite is used",
+				obj:           testClusterConfigMap(currentFooClusterConfig, false),
+				expectedValue: "foo",
+			},
+			{
+				desc:          "appropriate cluster object with appropriate overwrite is overwritten",
+				obj:           testClusterConfigMap(currentFooClusterConfig, false),
+				config:        dedent.Dedent(currentBarClusterConfig),
+				expectedValue: "bar",
+			},
+			{
+				desc:        "appropriate cluster object with old overwrite returns an error",
+				obj:         testClusterConfigMap(currentFooClusterConfig, false),
+				config:      dedent.Dedent(oldBarClusterConfig),
+				expectedErr: true,
+			},
+			{
+				desc:        "old config without overwrite returns an error",
+				obj:         testClusterConfigMap(oldFooClusterConfig, false),
+				expectedErr: true,
+			},
+			{
+				desc:          "old config with appropriate overwrite returns the substitute",
+				obj:           testClusterConfigMap(oldFooClusterConfig, false),
+				config:        dedent.Dedent(currentBarClusterConfig),
+				expectedValue: "bar",
+			},
+			{
+				desc:        "old config with old overwrite returns an error",
+				obj:         testClusterConfigMap(oldFooClusterConfig, false),
+				config:      dedent.Dedent(oldBarClusterConfig),
+				expectedErr: true,
+			},
+			{
+				desc:          "appropriate signed cluster object without overwrite is used",
+				obj:           testClusterConfigMap(currentFooClusterConfig, true),
+				expectedValue: "foo",
+			},
+			{
+				desc:          "appropriate signed cluster object with appropriate overwrite is overwritten",
+				obj:           testClusterConfigMap(currentFooClusterConfig, true),
+				config:        dedent.Dedent(currentBarClusterConfig),
+				expectedValue: "bar",
+			},
+			{
+				desc:        "appropriate signed cluster object with old overwrite returns an error",
+				obj:         testClusterConfigMap(currentFooClusterConfig, true),
+				config:      dedent.Dedent(oldBarClusterConfig),
+				expectedErr: true,
+			},
+			{
+				desc:        "old signed config without an overwrite is not loaded",
+				obj:         testClusterConfigMap(oldFooClusterConfig, true),
+				isNotLoaded: true,
+			},
+			{
+				desc:          "old signed config with appropriate overwrite returns the substitute",
+				obj:           testClusterConfigMap(oldFooClusterConfig, true),
+				config:        dedent.Dedent(currentBarClusterConfig),
+				expectedValue: "bar",
+			},
+			{
+				desc:        "old signed config with old overwrite returns an error",
+				obj:         testClusterConfigMap(oldFooClusterConfig, true),
+				config:      dedent.Dedent(oldBarClusterConfig),
+				expectedErr: true,
+			},
+		}
+
+		for _, test := range cases {
+			t.Run(test.desc, func(t *testing.T) {
+				client := clientsetfake.NewSimpleClientset(test.obj)
+
+				docmap, err := kubeadmutil.SplitYAMLDocuments([]byte(test.config))
+				if err != nil {
+					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+				}
+
+				clusterCfg := testClusterCfg()
+
+				err = FetchFromClusterWithLocalOverwrites(clusterCfg, client, docmap)
+				if err != nil {
+					if !test.expectedErr {
+						t.Errorf("unexpected failure: %v", err)
+					}
+				} else {
+					if test.expectedErr {
+						t.Error("unexpected success")
+					} else {
+						clusterCfg, ok := clusterCfg.ComponentConfigs[kubeadmapiv1.GroupName]
+						if !ok {
+							if !test.isNotLoaded {
+								t.Error("no config was loaded when it should have been")
+							}
+						} else {
+							actualConfig, ok := clusterCfg.(*clusterConfig)
+							if !ok {
+								t.Error("the config is not of the expected type")
+							} else if actualConfig.config.ClusterName != test.expectedValue {
+								t.Errorf("unexpected value:\n\tgot: %q\n\texpected: %q", actualConfig.config.ClusterName, test.expectedValue)
+							}
+						}
+					}
+				}
+			})
+		}
 	})
 }
 

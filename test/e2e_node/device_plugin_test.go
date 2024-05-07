@@ -844,7 +844,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 		// simulate node reboot scenario by removing pods using CRI before kubelet is started. In addition to that,
 		// intentionally a scenario is created where after node reboot, application pods requesting devices appear before the device plugin pod
 		// exposing those devices as resource has restarted. The expected behavior is that the application pod fails at admission time.
-		framework.It("Keeps device plugin assignments across node reboots (no pod restart, no device plugin re-registration)", framework.WithFlaky(), func(ctx context.Context) {
+		ginkgo.It("Keeps device plugin assignments across node reboots (no pod restart, no device plugin re-registration)", func(ctx context.Context) {
 			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
 			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"

@@ -42,7 +42,7 @@ largefiles () {
         case "$tree" in
             w/-text)
                 # Only binary files have a size limit.
-                size="$(wc -c < "$file")"
+                size="$(stat --printf=%s "$file")"
                 if [ "${size}" -gt "$maxsize" ] &&
                        ! kube::util::array_contains "$file" "${allowlist[@]}"; then
                     echo    "$file is too large ($size bytes)"

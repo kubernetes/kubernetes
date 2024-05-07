@@ -19,8 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 	v1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 )
@@ -39,10 +39,30 @@ type ClusterTestTypeLister interface {
 
 // clusterTestTypeLister implements the ClusterTestTypeLister interface.
 type clusterTestTypeLister struct {
-	listers.ResourceIndexer[*v1.ClusterTestType]
+	indexer cache.Indexer
 }
 
 // NewClusterTestTypeLister returns a new ClusterTestTypeLister.
 func NewClusterTestTypeLister(indexer cache.Indexer) ClusterTestTypeLister {
-	return &clusterTestTypeLister{listers.New[*v1.ClusterTestType](indexer, v1.Resource("clustertesttype"))}
+	return &clusterTestTypeLister{indexer: indexer}
+}
+
+// List lists all ClusterTestTypes in the indexer.
+func (s *clusterTestTypeLister) List(selector labels.Selector) (ret []*v1.ClusterTestType, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ClusterTestType))
+	})
+	return ret, err
+}
+
+// Get retrieves the ClusterTestType from the index for a given name.
+func (s *clusterTestTypeLister) Get(name string) (*v1.ClusterTestType, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("clustertesttype"), name)
+	}
+	return obj.(*v1.ClusterTestType), nil
 }

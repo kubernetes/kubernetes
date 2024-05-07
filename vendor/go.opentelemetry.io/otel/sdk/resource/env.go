@@ -28,14 +28,16 @@ import (
 
 const (
 	// resourceAttrKey is the environment variable name OpenTelemetry Resource information will be read from.
-	resourceAttrKey = "OTEL_RESOURCE_ATTRIBUTES" //nolint:gosec // False positive G101: Potential hardcoded credentials
+	resourceAttrKey = "OTEL_RESOURCE_ATTRIBUTES"
 
 	// svcNameKey is the environment variable name that Service Name information will be read from.
 	svcNameKey = "OTEL_SERVICE_NAME"
 )
 
-// errMissingValue is returned when a resource value is missing.
-var errMissingValue = fmt.Errorf("%w: missing value", ErrPartialResource)
+var (
+	// errMissingValue is returned when a resource value is missing.
+	errMissingValue = fmt.Errorf("%w: missing value", ErrPartialResource)
+)
 
 // fromEnv is a Detector that implements the Detector and collects
 // resources from environment.  This Detector is included as a
@@ -89,7 +91,7 @@ func constructOTResources(s string) (*Resource, error) {
 			continue
 		}
 		key := strings.TrimSpace(k)
-		val, err := url.PathUnescape(strings.TrimSpace(v))
+		val, err := url.QueryUnescape(strings.TrimSpace(v))
 		if err != nil {
 			// Retain original value if decoding fails, otherwise it will be
 			// an empty string.

@@ -154,7 +154,7 @@ func TestHasInitialEventsEndBookmarkAnnotation(t *testing.T) {
 	createAnnotatedPod := func(name, value string) *example.Pod {
 		p := createPod(name)
 		p.Annotations = map[string]string{}
-		p.Annotations[metav1.InitialEventsAnnotationKey] = value
+		p.Annotations["k8s.io/initial-events-end"] = value
 		return p
 	}
 	scenarios := []struct {

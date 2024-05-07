@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type ConfigMapLister interface {
 
 // configMapLister implements the ConfigMapLister interface.
 type configMapLister struct {
-	listers.ResourceIndexer[*v1.ConfigMap]
+	indexer cache.Indexer
 }
 
 // NewConfigMapLister returns a new ConfigMapLister.
 func NewConfigMapLister(indexer cache.Indexer) ConfigMapLister {
-	return &configMapLister{listers.New[*v1.ConfigMap](indexer, v1.Resource("configmap"))}
+	return &configMapLister{indexer: indexer}
+}
+
+// List lists all ConfigMaps in the indexer.
+func (s *configMapLister) List(selector labels.Selector) (ret []*v1.ConfigMap, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ConfigMap))
+	})
+	return ret, err
 }
 
 // ConfigMaps returns an object that can list and get ConfigMaps.
 func (s *configMapLister) ConfigMaps(namespace string) ConfigMapNamespaceLister {
-	return configMapNamespaceLister{listers.NewNamespaced[*v1.ConfigMap](s.ResourceIndexer, namespace)}
+	return configMapNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // ConfigMapNamespaceLister helps list and get ConfigMaps.
@@ -66,5 +74,26 @@ type ConfigMapNamespaceLister interface {
 // configMapNamespaceLister implements the ConfigMapNamespaceLister
 // interface.
 type configMapNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ConfigMap]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all ConfigMaps in the indexer for a given namespace.
+func (s configMapNamespaceLister) List(selector labels.Selector) (ret []*v1.ConfigMap, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ConfigMap))
+	})
+	return ret, err
+}
+
+// Get retrieves the ConfigMap from the indexer for a given namespace and name.
+func (s configMapNamespaceLister) Get(name string) (*v1.ConfigMap, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("configmap"), name)
+	}
+	return obj.(*v1.ConfigMap), nil
 }

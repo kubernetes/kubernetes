@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 //go:build appengine
+// +build appengine
 
 // This file applies to App Engine first generation runtimes (<= Go 1.9).
 

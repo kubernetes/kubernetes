@@ -17,40 +17,40 @@ package checker
 import (
 	"sort"
 
-	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/debug"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 type semanticAdorner struct {
-	checked *ast.AST
+	checks *exprpb.CheckedExpr
 }
 
 var _ debug.Adorner = &semanticAdorner{}
 
 func (a *semanticAdorner) GetMetadata(elem any) string {
 	result := ""
-	e, isExpr := elem.(ast.Expr)
+	e, isExpr := elem.(*exprpb.Expr)
 	if !isExpr {
 		return result
 	}
-	t := a.checked.TypeMap()[e.ID()]
+	t := a.checks.TypeMap[e.GetId()]
 	if t != nil {
 		result += "~"
-		result += FormatCELType(t)
+		result += FormatCheckedType(t)
 	}
 
-	switch e.Kind() {
-	case ast.IdentKind,
-		ast.CallKind,
-		ast.ListKind,
-		ast.StructKind,
-		ast.SelectKind:
-		if ref, found := a.checked.ReferenceMap()[e.ID()]; found {
-			if len(ref.OverloadIDs) == 0 {
+	switch e.GetExprKind().(type) {
+	case *exprpb.Expr_IdentExpr,
+		*exprpb.Expr_CallExpr,
+		*exprpb.Expr_StructExpr,
+		*exprpb.Expr_SelectExpr:
+		if ref, found := a.checks.ReferenceMap[e.GetId()]; found {
+			if len(ref.GetOverloadId()) == 0 {
 				result += "^" + ref.Name
 			} else {
-				sort.Strings(ref.OverloadIDs)
-				for i, overload := range ref.OverloadIDs {
+				sort.Strings(ref.GetOverloadId())
+				for i, overload := range ref.GetOverloadId() {
 					if i == 0 {
 						result += "^"
 					} else {
@@ -68,7 +68,7 @@ func (a *semanticAdorner) GetMetadata(elem any) string {
 // Print returns a string representation of the Expr message,
 // annotated with types from the CheckedExpr.  The Expr must
 // be a sub-expression embedded in the CheckedExpr.
-func Print(e ast.Expr, checked *ast.AST) string {
-	a := &semanticAdorner{checked: checked}
+func Print(e *exprpb.Expr, checks *exprpb.CheckedExpr) string {
+	a := &semanticAdorner{checks: checks}
 	return debug.ToAdornedDebugString(e, a)
 }

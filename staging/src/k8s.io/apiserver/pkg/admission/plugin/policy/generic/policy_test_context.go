@@ -216,7 +216,6 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 		fakeAuthorizer{},
 		featureGate,
 		testContext.Done(),
-		fakeRestMapper,
 	)
 	genericInitializer.Initialize(plugin)
 	plugin.SetRESTMapper(fakeRestMapper)

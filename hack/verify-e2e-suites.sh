@@ -31,7 +31,6 @@ cd "${KUBE_ROOT}"
 
 kube::util::ensure-temp-dir
 
-res=0
 for suite in $(git grep -l framework.AfterReadingAllFlags | grep -v -e ^test/e2e/framework -e ^hack | xargs -n 1 dirname | sort -u); do
     # Build a binary and run it in the root directory to get paths that are
     # relative to that instead of the package directory.
@@ -42,7 +41,5 @@ for suite in $(git grep -l framework.AfterReadingAllFlags | grep -v -e ^test/e2e
         echo >&2 "ERROR: E2E test suite invocation failed for $suite."
         # shellcheck disable=SC2001
         echo "$out" | sed -e 's/^/   /'
-        res=1
     fi
 done
-exit "$res"

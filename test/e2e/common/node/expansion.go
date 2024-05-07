@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -372,42 +371,6 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
-
-	/*
-		Release: v1.30
-		Testname: Environment variables, expansion
-		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
-		Allow almost all printable ASCII characters in environment variables.
-	*/
-	framework.It("allow almost all printable ASCII characters as environment variable names", feature.RelaxedEnvironmentVariableValidation, func(ctx context.Context) {
-		envVars := []v1.EnvVar{
-			{
-				Name:  "!\"#$%&'()",
-				Value: "value-1",
-			},
-			{
-				Name:  "* +,-./0123456789",
-				Value: "value-2",
-			},
-			{
-				Name:  ":;<>?@",
-				Value: "value-3",
-			},
-			{
-				Name:  "[\\]^_`{}|~",
-				Value: "value-4",
-			},
-		}
-		pod := newPod([]string{"sh", "-c", "env"}, envVars, nil, nil)
-
-		e2epodoutput.TestContainerOutput(ctx, f, "env composition", pod, 0, []string{
-			"!\"#$%&'()=value-1",
-			"* +,-./0123456789=value-2",
-			":;<>?@=value-3",
-			"[\\]^_`{}|~=value-4",
-		})
-	})
-
 })
 
 func testPodFailSubpath(ctx context.Context, f *framework.Framework, pod *v1.Pod) {

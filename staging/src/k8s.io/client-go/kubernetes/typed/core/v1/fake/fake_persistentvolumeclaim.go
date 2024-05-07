@@ -44,24 +44,22 @@ var persistentvolumeclaimsKind = v1.SchemeGroupVersion.WithKind("PersistentVolum
 
 // Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
 func (c *FakePersistentVolumeClaims) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PersistentVolumeClaim, err error) {
-	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(persistentvolumeclaimsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(persistentvolumeclaimsResource, c.ns, name), &v1.PersistentVolumeClaim{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PersistentVolumeClaim), err
 }
 
 // List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
 func (c *FakePersistentVolumeClaims) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PersistentVolumeClaimList, err error) {
-	emptyResult := &v1.PersistentVolumeClaimList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(persistentvolumeclaimsResource, persistentvolumeclaimsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(persistentvolumeclaimsResource, persistentvolumeclaimsKind, c.ns, opts), &v1.PersistentVolumeClaimList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,37 +84,34 @@ func (c *FakePersistentVolumeClaims) Watch(ctx context.Context, opts metav1.List
 
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
 func (c *FakePersistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.CreateOptions) (result *v1.PersistentVolumeClaim, err error) {
-	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), emptyResult)
+		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &v1.PersistentVolumeClaim{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PersistentVolumeClaim), err
 }
 
 // Update takes the representation of a persistentVolumeClaim and updates it. Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
 func (c *FakePersistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
-	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), emptyResult)
+		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), &v1.PersistentVolumeClaim{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PersistentVolumeClaim), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePersistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
-	emptyResult := &v1.PersistentVolumeClaim{}
+func (c *FakePersistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (*v1.PersistentVolumeClaim, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), &v1.PersistentVolumeClaim{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PersistentVolumeClaim), err
 }
@@ -139,12 +134,11 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(ctx context.Context, opts 
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
 func (c *FakePersistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
-	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, pt, data, subresources...), &v1.PersistentVolumeClaim{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PersistentVolumeClaim), err
 }
@@ -162,12 +156,11 @@ func (c *FakePersistentVolumeClaims) Apply(ctx context.Context, persistentVolume
 	if name == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim.Name must be provided to Apply")
 	}
-	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data), &v1.PersistentVolumeClaim{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PersistentVolumeClaim), err
 }
@@ -186,12 +179,11 @@ func (c *FakePersistentVolumeClaims) ApplyStatus(ctx context.Context, persistent
 	if name == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim.Name must be provided to Apply")
 	}
-	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.PersistentVolumeClaim{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PersistentVolumeClaim), err
 }

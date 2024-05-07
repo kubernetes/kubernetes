@@ -20,8 +20,8 @@ package v1alpha1
 
 import (
 	v1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,10 +39,30 @@ type ImageReviewLister interface {
 
 // imageReviewLister implements the ImageReviewLister interface.
 type imageReviewLister struct {
-	listers.ResourceIndexer[*v1alpha1.ImageReview]
+	indexer cache.Indexer
 }
 
 // NewImageReviewLister returns a new ImageReviewLister.
 func NewImageReviewLister(indexer cache.Indexer) ImageReviewLister {
-	return &imageReviewLister{listers.New[*v1alpha1.ImageReview](indexer, v1alpha1.Resource("imagereview"))}
+	return &imageReviewLister{indexer: indexer}
+}
+
+// List lists all ImageReviews in the indexer.
+func (s *imageReviewLister) List(selector labels.Selector) (ret []*v1alpha1.ImageReview, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.ImageReview))
+	})
+	return ret, err
+}
+
+// Get retrieves the ImageReview from the index for a given name.
+func (s *imageReviewLister) Get(name string) (*v1alpha1.ImageReview, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1alpha1.Resource("imagereview"), name)
+	}
+	return obj.(*v1alpha1.ImageReview), nil
 }

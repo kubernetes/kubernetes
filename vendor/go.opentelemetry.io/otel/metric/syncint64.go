@@ -147,9 +147,8 @@ type Int64Histogram interface {
 // Int64HistogramConfig contains options for synchronous counter instruments
 // that record int64 values.
 type Int64HistogramConfig struct {
-	description              string
-	unit                     string
-	explicitBucketBoundaries []float64
+	description string
+	unit        string
 }
 
 // NewInt64HistogramConfig returns a new [Int64HistogramConfig] with all opts
@@ -170,11 +169,6 @@ func (c Int64HistogramConfig) Description() string {
 // Unit returns the configured unit.
 func (c Int64HistogramConfig) Unit() string {
 	return c.unit
-}
-
-// ExplicitBucketBoundaries returns the configured explicit bucket boundaries.
-func (c Int64HistogramConfig) ExplicitBucketBoundaries() []float64 {
-	return c.explicitBucketBoundaries
 }
 
 // Int64HistogramOption applies options to a [Int64HistogramConfig]. See

@@ -15,9 +15,13 @@
 package checker
 
 import (
+	"reflect"
+
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // typeErrors is a specialization of Errors.
@@ -30,9 +34,9 @@ func (e *typeErrors) fieldTypeMismatch(id int64, l common.Location, name string,
 		name, FormatCELType(field), FormatCELType(value))
 }
 
-func (e *typeErrors) incompatibleType(id int64, l common.Location, ex ast.Expr, prev, next *types.Type) {
+func (e *typeErrors) incompatibleType(id int64, l common.Location, ex *exprpb.Expr, prev, next *types.Type) {
 	e.errs.ReportErrorAtID(id, l,
-		"incompatible type already exists for expression: %v(%d) old:%v, new:%v", ex, ex.ID(), prev, next)
+		"incompatible type already exists for expression: %v(%d) old:%v, new:%v", ex, ex.GetId(), prev, next)
 }
 
 func (e *typeErrors) noMatchingOverload(id int64, l common.Location, name string, args []*types.Type, isInstance bool) {
@@ -45,7 +49,7 @@ func (e *typeErrors) notAComprehensionRange(id int64, l common.Location, t *type
 		FormatCELType(t))
 }
 
-func (e *typeErrors) notAnOptionalFieldSelection(id int64, l common.Location, field ast.Expr) {
+func (e *typeErrors) notAnOptionalFieldSelection(id int64, l common.Location, field *exprpb.Expr) {
 	e.errs.ReportErrorAtID(id, l, "unsupported optional field selection: %v", field)
 }
 
@@ -57,9 +61,9 @@ func (e *typeErrors) notAMessageType(id int64, l common.Location, typeName strin
 	e.errs.ReportErrorAtID(id, l, "'%s' is not a message type", typeName)
 }
 
-func (e *typeErrors) referenceRedefinition(id int64, l common.Location, ex ast.Expr, prev, next *ast.ReferenceInfo) {
+func (e *typeErrors) referenceRedefinition(id int64, l common.Location, ex *exprpb.Expr, prev, next *ast.ReferenceInfo) {
 	e.errs.ReportErrorAtID(id, l,
-		"reference already exists for expression: %v(%d) old:%v, new:%v", ex, ex.ID(), prev, next)
+		"reference already exists for expression: %v(%d) old:%v, new:%v", ex, ex.GetId(), prev, next)
 }
 
 func (e *typeErrors) typeDoesNotSupportFieldSelection(id int64, l common.Location, t *types.Type) {
@@ -83,6 +87,6 @@ func (e *typeErrors) unexpectedFailedResolution(id int64, l common.Location, typ
 	e.errs.ReportErrorAtID(id, l, "unexpected failed resolution of '%s'", typeName)
 }
 
-func (e *typeErrors) unexpectedASTType(id int64, l common.Location, kind, typeName string) {
-	e.errs.ReportErrorAtID(id, l, "unexpected %s type: %v", kind, typeName)
+func (e *typeErrors) unexpectedASTType(id int64, l common.Location, ex *exprpb.Expr) {
+	e.errs.ReportErrorAtID(id, l, "unrecognized ast type: %v", reflect.TypeOf(ex))
 }

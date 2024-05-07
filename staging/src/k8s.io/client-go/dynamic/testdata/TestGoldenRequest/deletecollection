@@ -1,9 +1,0 @@
-DELETE /apis/flops/v1alpha1/namespaces/mops/flips?resourceVersion=42 HTTP/1.1
-Host: example.com
-Accept: application/json
-Accept-Encoding: gzip
-Content-Length: 60
-Content-Type: application/json
-User-Agent: TestGoldenRequest
-
-{"kind":"DeleteOptions","apiVersion":"v1","dryRun":["All"]}

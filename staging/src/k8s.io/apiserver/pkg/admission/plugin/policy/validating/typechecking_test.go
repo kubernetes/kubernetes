@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,7 +36,7 @@ import (
 var (
 	scheme *runtime.Scheme = func() *runtime.Scheme {
 		res := runtime.NewScheme()
-		if err := v1.AddToScheme(res); err != nil {
+		if err := v1beta1.AddToScheme(res); err != nil {
 			panic(err)
 		}
 
@@ -58,21 +58,21 @@ func must3[T any, I any](val T, _ I, err error) T {
 func TestExtractTypeNames(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
-		policy   *v1.ValidatingAdmissionPolicy
+		policy   *v1beta1.ValidatingAdmissionPolicy
 		expected []schema.GroupVersionKind // must be sorted
 	}{
 		{
 			name:     "empty",
-			policy:   &v1.ValidatingAdmissionPolicy{},
+			policy:   &v1beta1.ValidatingAdmissionPolicy{},
 			expected: nil,
 		},
 		{
 			name: "specific",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 					{
-						RuleWithOperations: v1.RuleWithOperations{
-							Rule: v1.Rule{
+						RuleWithOperations: v1beta1.RuleWithOperations{
+							Rule: v1beta1.Rule{
 								APIGroups:   []string{"apps"},
 								APIVersions: []string{"v1"},
 								Resources:   []string{"deployments"},
@@ -89,19 +89,19 @@ func TestExtractTypeNames(t *testing.T) {
 		},
 		{
 			name: "multiple",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 					{
-						RuleWithOperations: v1.RuleWithOperations{
-							Rule: v1.Rule{
+						RuleWithOperations: v1beta1.RuleWithOperations{
+							Rule: v1beta1.Rule{
 								APIGroups:   []string{"apps"},
 								APIVersions: []string{"v1"},
 								Resources:   []string{"deployments"},
 							},
 						},
 					}, {
-						RuleWithOperations: v1.RuleWithOperations{
-							Rule: v1.Rule{
+						RuleWithOperations: v1beta1.RuleWithOperations{
+							Rule: v1beta1.Rule{
 								APIGroups:   []string{""},
 								APIVersions: []string{"v1"},
 								Resources:   []string{"pods"},
@@ -122,11 +122,11 @@ func TestExtractTypeNames(t *testing.T) {
 		},
 		{
 			name: "all resources",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 					{
-						RuleWithOperations: v1.RuleWithOperations{
-							Rule: v1.Rule{
+						RuleWithOperations: v1beta1.RuleWithOperations{
+							Rule: v1beta1.Rule{
 								APIGroups:   []string{"apps"},
 								APIVersions: []string{"v1"},
 								Resources:   []string{"*"},
@@ -139,11 +139,11 @@ func TestExtractTypeNames(t *testing.T) {
 		},
 		{
 			name: "sub resources",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 					{
-						RuleWithOperations: v1.RuleWithOperations{
-							Rule: v1.Rule{
+						RuleWithOperations: v1beta1.RuleWithOperations{
+							Rule: v1beta1.Rule{
 								APIGroups:   []string{"apps"},
 								APIVersions: []string{"v1"},
 								Resources:   []string{"pods/*"},
@@ -156,11 +156,11 @@ func TestExtractTypeNames(t *testing.T) {
 		},
 		{
 			name: "mixtures",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 					{
-						RuleWithOperations: v1.RuleWithOperations{
-							Rule: v1.Rule{
+						RuleWithOperations: v1beta1.RuleWithOperations{
+							Rule: v1beta1.Rule{
 								APIGroups:   []string{"apps"},
 								APIVersions: []string{"v1"},
 								Resources:   []string{"deployments"},
@@ -168,8 +168,8 @@ func TestExtractTypeNames(t *testing.T) {
 						},
 					},
 					{
-						RuleWithOperations: v1.RuleWithOperations{
-							Rule: v1.Rule{
+						RuleWithOperations: v1beta1.RuleWithOperations{
+							Rule: v1beta1.Rule{
 								APIGroups:   []string{"apps"},
 								APIVersions: []string{"*"},
 								Resources:   []string{"deployments"},
@@ -196,16 +196,16 @@ func TestExtractTypeNames(t *testing.T) {
 }
 
 func TestTypeCheck(t *testing.T) {
-	deploymentPolicy := &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-		Validations: []v1.Validation{
+	deploymentPolicy := &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+		Validations: []v1beta1.Validation{
 			{
 				Expression: "object.foo == 'bar'",
 			},
 		},
-		MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+		MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1.RuleWithOperations{
-					Rule: v1.Rule{
+				RuleWithOperations: v1beta1.RuleWithOperations{
+					Rule: v1beta1.Rule{
 						APIGroups:   []string{"apps"},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"deployments"},
@@ -218,8 +218,8 @@ func TestTypeCheck(t *testing.T) {
 	deploymentPolicyWithBadMessageExpression := deploymentPolicy.DeepCopy()
 	deploymentPolicyWithBadMessageExpression.Spec.Validations[0].MessageExpression = "object.foo + 114514" // confusion
 
-	multiExpressionPolicy := &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-		Validations: []v1.Validation{
+	multiExpressionPolicy := &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+		Validations: []v1beta1.Validation{
 			{
 				Expression: "object.foo == 'bar'",
 			},
@@ -227,10 +227,10 @@ func TestTypeCheck(t *testing.T) {
 				Expression: "object.bar == 'foo'",
 			},
 		},
-		MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+		MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1.RuleWithOperations{
-					Rule: v1.Rule{
+				RuleWithOperations: v1beta1.RuleWithOperations{
+					Rule: v1beta1.Rule{
 						APIGroups:   []string{"apps"},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"deployments"},
@@ -239,20 +239,20 @@ func TestTypeCheck(t *testing.T) {
 			},
 		}},
 	}}
-	paramsRefPolicy := &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-		ParamKind: &v1.ParamKind{
+	paramsRefPolicy := &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+		ParamKind: &v1beta1.ParamKind{
 			APIVersion: "v1",
 			Kind:       "DoesNotMatter",
 		},
-		Validations: []v1.Validation{
+		Validations: []v1beta1.Validation{
 			{
 				Expression: "object.foo == params.bar",
 			},
 		},
-		MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+		MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1.RuleWithOperations{
-					Rule: v1.Rule{
+				RuleWithOperations: v1beta1.RuleWithOperations{
+					Rule: v1beta1.Rule{
 						APIGroups:   []string{"apps"},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"deployments"},
@@ -261,16 +261,16 @@ func TestTypeCheck(t *testing.T) {
 			},
 		}},
 	}}
-	authorizerPolicy := &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-		Validations: []v1.Validation{
+	authorizerPolicy := &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+		Validations: []v1beta1.Validation{
 			{
 				Expression: "authorizer.group('').resource('endpoints').check('create').allowed()",
 			},
 		},
-		MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+		MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1.RuleWithOperations{
-					Rule: v1.Rule{
+				RuleWithOperations: v1beta1.RuleWithOperations{
+					Rule: v1beta1.Rule{
 						APIGroups:   []string{"apps"},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"deployments"},
@@ -279,16 +279,16 @@ func TestTypeCheck(t *testing.T) {
 			},
 		}},
 	}}
-	authorizerInvalidPolicy := &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-		Validations: []v1.Validation{
+	authorizerInvalidPolicy := &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+		Validations: []v1beta1.Validation{
 			{
 				Expression: "authorizer.allowed()",
 			},
 		},
-		MatchConstraints: &v1.MatchResources{ResourceRules: []v1.NamedRuleWithOperations{
+		MatchConstraints: &v1beta1.MatchResources{ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1.RuleWithOperations{
-					Rule: v1.Rule{
+				RuleWithOperations: v1beta1.RuleWithOperations{
+					Rule: v1beta1.Rule{
 						APIGroups:   []string{"apps"},
 						APIVersions: []string{"v1"},
 						Resources:   []string{"deployments"},
@@ -300,12 +300,12 @@ func TestTypeCheck(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		schemaToReturn *spec.Schema
-		policy         *v1.ValidatingAdmissionPolicy
+		policy         *v1beta1.ValidatingAdmissionPolicy
 		assertions     []assertionFunc
 	}{
 		{
 			name:       "empty",
-			policy:     &v1.ValidatingAdmissionPolicy{},
+			policy:     &v1beta1.ValidatingAdmissionPolicy{},
 			assertions: []assertionFunc{toBeEmpty},
 		},
 		{
@@ -439,14 +439,14 @@ func TestTypeCheck(t *testing.T) {
 		},
 		{
 			name: "variables valid",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				Variables: []v1.Variable{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
 					{
 						Name:       "works",
 						Expression: "true",
 					},
 				},
-				Validations: []v1.Validation{
+				Validations: []v1beta1.Validation{
 					{
 						Expression: "variables.works",
 					},
@@ -466,14 +466,14 @@ func TestTypeCheck(t *testing.T) {
 		},
 		{
 			name: "variables missing field",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				Variables: []v1.Variable{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
 					{
 						Name:       "works",
 						Expression: "true",
 					},
 				},
-				Validations: []v1.Validation{
+				Validations: []v1beta1.Validation{
 					{
 						Expression: "variables.nonExisting",
 					},
@@ -497,14 +497,14 @@ func TestTypeCheck(t *testing.T) {
 		},
 		{
 			name: "variables field wrong type",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				Variables: []v1.Variable{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
 					{
 						Name:       "name",
 						Expression: "'something'",
 					},
 				},
-				Validations: []v1.Validation{
+				Validations: []v1beta1.Validation{
 					{
 						Expression: "variables.name == object.foo", // foo is int64
 					},
@@ -528,14 +528,14 @@ func TestTypeCheck(t *testing.T) {
 		},
 		{
 			name: "error in variables, not reported during type checking.",
-			policy: &v1.ValidatingAdmissionPolicy{Spec: v1.ValidatingAdmissionPolicySpec{
-				Variables: []v1.Variable{
+			policy: &v1beta1.ValidatingAdmissionPolicy{Spec: v1beta1.ValidatingAdmissionPolicySpec{
+				Variables: []v1beta1.Variable{
 					{
 						Name:       "name",
 						Expression: "object.foo == 'str'",
 					},
 				},
-				Validations: []v1.Validation{
+				Validations: []v1beta1.Validation{
 					{
 						Expression: "variables.name == object.foo", // foo is int64
 					},
@@ -593,14 +593,14 @@ func (r *fakeSchemaResolver) ResolveSchema(gvk schema.GroupVersionKind) (*spec.S
 	return r.schemaToReturn, nil
 }
 
-func toBeEmpty(warnings []v1.ExpressionWarning, t *testing.T) {
+func toBeEmpty(warnings []v1beta1.ExpressionWarning, t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("expected empty but got %v", warnings)
 	}
 }
 
-func toContain(substring string) func(warnings []v1.ExpressionWarning, t *testing.T) {
-	return func(warnings []v1.ExpressionWarning, t *testing.T) {
+func toContain(substring string) func(warnings []v1beta1.ExpressionWarning, t *testing.T) {
+	return func(warnings []v1beta1.ExpressionWarning, t *testing.T) {
 		if len(warnings) == 0 {
 			t.Errorf("expected containing %q but got empty", substring)
 		}
@@ -612,8 +612,8 @@ func toContain(substring string) func(warnings []v1.ExpressionWarning, t *testin
 	}
 }
 
-func toHaveLengthOf(expected int) func(warnings []v1.ExpressionWarning, t *testing.T) {
-	return func(warnings []v1.ExpressionWarning, t *testing.T) {
+func toHaveLengthOf(expected int) func(warnings []v1beta1.ExpressionWarning, t *testing.T) {
+	return func(warnings []v1beta1.ExpressionWarning, t *testing.T) {
 		got := len(warnings)
 		if expected != got {
 			t.Errorf("expect warnings to have length of %d, but got %d", expected, got)
@@ -621,8 +621,8 @@ func toHaveLengthOf(expected int) func(warnings []v1.ExpressionWarning, t *testi
 	}
 }
 
-func toHaveFieldRef(paths ...string) func(warnings []v1.ExpressionWarning, t *testing.T) {
-	return func(warnings []v1.ExpressionWarning, t *testing.T) {
+func toHaveFieldRef(paths ...string) func(warnings []v1beta1.ExpressionWarning, t *testing.T) {
+	return func(warnings []v1beta1.ExpressionWarning, t *testing.T) {
 		if len(paths) != len(warnings) {
 			t.Errorf("expect warnings to have length of %d, but got %d", len(paths), len(warnings))
 		}
@@ -634,4 +634,4 @@ func toHaveFieldRef(paths ...string) func(warnings []v1.ExpressionWarning, t *te
 	}
 }
 
-type assertionFunc func(warnings []v1.ExpressionWarning, t *testing.T)
+type assertionFunc func(warnings []v1beta1.ExpressionWarning, t *testing.T)

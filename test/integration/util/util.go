@@ -1159,8 +1159,6 @@ func NextPodOrDie(t *testing.T, testCtx *TestContext) *schedulerframework.Queued
 }
 
 // NextPod returns the next Pod in the scheduler queue, with a 5 seconds timeout.
-// Note that this function leaks goroutines in the case of timeout; even after this function returns after timeout,
-// the goroutine made by this function keep waiting to pop a pod from the queue.
 func NextPod(t *testing.T, testCtx *TestContext) *schedulerframework.QueuedPodInfo {
 	t.Helper()
 

@@ -90,7 +90,7 @@ users:
 		"--kubeconfig", fakeKubeConfig.Name(),
 		// disable admission and filters that require talking to kube-apiserver
 		"--enable-priority-and-fairness=false",
-		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ValidatingAdmissionPolicy"},
+		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"},
 		flags...,
 	), nil)
 	if err != nil {

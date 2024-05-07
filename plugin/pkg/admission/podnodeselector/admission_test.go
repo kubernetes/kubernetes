@@ -198,7 +198,7 @@ func TestHandles(t *testing.T) {
 func newHandlerForTest(c kubernetes.Interface) (*Plugin, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	handler := NewPodNodeSelector(nil)
-	pluginInitializer := genericadmissioninitializer.New(c, nil, f, nil, nil, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, nil, f, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err := admission.ValidateInitialization(handler)
 	return handler, f, err

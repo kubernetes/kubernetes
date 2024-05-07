@@ -66,7 +66,10 @@ func (s String) Compare(other ref.Val) ref.Val {
 func (s String) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
 	case reflect.String:
-		return reflect.ValueOf(s).Convert(typeDesc).Interface(), nil
+		if reflect.TypeOf(s).AssignableTo(typeDesc) {
+			return s, nil
+		}
+		return s.Value(), nil
 	case reflect.Ptr:
 		switch typeDesc {
 		case anyValueType:
@@ -155,7 +158,7 @@ func (s String) Match(pattern ref.Val) ref.Val {
 	}
 	matched, err := regexp.MatchString(pat.Value().(string), s.Value().(string))
 	if err != nil {
-		return &Err{error: err}
+		return &Err{err}
 	}
 	return Bool(matched)
 }

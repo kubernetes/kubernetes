@@ -20,8 +20,8 @@ package v1beta2
 
 import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type StatefulSetLister interface {
 
 // statefulSetLister implements the StatefulSetLister interface.
 type statefulSetLister struct {
-	listers.ResourceIndexer[*v1beta2.StatefulSet]
+	indexer cache.Indexer
 }
 
 // NewStatefulSetLister returns a new StatefulSetLister.
 func NewStatefulSetLister(indexer cache.Indexer) StatefulSetLister {
-	return &statefulSetLister{listers.New[*v1beta2.StatefulSet](indexer, v1beta2.Resource("statefulset"))}
+	return &statefulSetLister{indexer: indexer}
+}
+
+// List lists all StatefulSets in the indexer.
+func (s *statefulSetLister) List(selector labels.Selector) (ret []*v1beta2.StatefulSet, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta2.StatefulSet))
+	})
+	return ret, err
 }
 
 // StatefulSets returns an object that can list and get StatefulSets.
 func (s *statefulSetLister) StatefulSets(namespace string) StatefulSetNamespaceLister {
-	return statefulSetNamespaceLister{listers.NewNamespaced[*v1beta2.StatefulSet](s.ResourceIndexer, namespace)}
+	return statefulSetNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // StatefulSetNamespaceLister helps list and get StatefulSets.
@@ -66,5 +74,26 @@ type StatefulSetNamespaceLister interface {
 // statefulSetNamespaceLister implements the StatefulSetNamespaceLister
 // interface.
 type statefulSetNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta2.StatefulSet]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all StatefulSets in the indexer for a given namespace.
+func (s statefulSetNamespaceLister) List(selector labels.Selector) (ret []*v1beta2.StatefulSet, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta2.StatefulSet))
+	})
+	return ret, err
+}
+
+// Get retrieves the StatefulSet from the indexer for a given namespace and name.
+func (s statefulSetNamespaceLister) Get(name string) (*v1beta2.StatefulSet, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1beta2.Resource("statefulset"), name)
+	}
+	return obj.(*v1beta2.StatefulSet), nil
 }

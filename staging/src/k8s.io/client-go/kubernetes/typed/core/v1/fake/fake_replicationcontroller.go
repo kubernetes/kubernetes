@@ -45,24 +45,22 @@ var replicationcontrollersKind = v1.SchemeGroupVersion.WithKind("ReplicationCont
 
 // Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
 func (c *FakeReplicationControllers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ReplicationController, err error) {
-	emptyResult := &v1.ReplicationController{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(replicationcontrollersResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(replicationcontrollersResource, c.ns, name), &v1.ReplicationController{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.ReplicationController), err
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
 func (c *FakeReplicationControllers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ReplicationControllerList, err error) {
-	emptyResult := &v1.ReplicationControllerList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(replicationcontrollersResource, replicationcontrollersKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(replicationcontrollersResource, replicationcontrollersKind, c.ns, opts), &v1.ReplicationControllerList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -87,37 +85,34 @@ func (c *FakeReplicationControllers) Watch(ctx context.Context, opts metav1.List
 
 // Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *FakeReplicationControllers) Create(ctx context.Context, replicationController *v1.ReplicationController, opts metav1.CreateOptions) (result *v1.ReplicationController, err error) {
-	emptyResult := &v1.ReplicationController{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), emptyResult)
+		Invokes(testing.NewCreateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.ReplicationController), err
 }
 
 // Update takes the representation of a replicationController and updates it. Returns the server's representation of the replicationController, and an error, if there is any.
 func (c *FakeReplicationControllers) Update(ctx context.Context, replicationController *v1.ReplicationController, opts metav1.UpdateOptions) (result *v1.ReplicationController, err error) {
-	emptyResult := &v1.ReplicationController{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), emptyResult)
+		Invokes(testing.NewUpdateAction(replicationcontrollersResource, c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.ReplicationController), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeReplicationControllers) UpdateStatus(ctx context.Context, replicationController *v1.ReplicationController, opts metav1.UpdateOptions) (result *v1.ReplicationController, err error) {
-	emptyResult := &v1.ReplicationController{}
+func (c *FakeReplicationControllers) UpdateStatus(ctx context.Context, replicationController *v1.ReplicationController, opts metav1.UpdateOptions) (*v1.ReplicationController, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "status", c.ns, replicationController), &v1.ReplicationController{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.ReplicationController), err
 }
@@ -140,12 +135,11 @@ func (c *FakeReplicationControllers) DeleteCollection(ctx context.Context, opts 
 
 // Patch applies the patch and returns the patched replicationController.
 func (c *FakeReplicationControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ReplicationController, err error) {
-	emptyResult := &v1.ReplicationController{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, name, pt, data, subresources...), &v1.ReplicationController{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.ReplicationController), err
 }
@@ -163,12 +157,11 @@ func (c *FakeReplicationControllers) Apply(ctx context.Context, replicationContr
 	if name == nil {
 		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
 	}
-	emptyResult := &v1.ReplicationController{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data), &v1.ReplicationController{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.ReplicationController), err
 }
@@ -187,36 +180,33 @@ func (c *FakeReplicationControllers) ApplyStatus(ctx context.Context, replicatio
 	if name == nil {
 		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
 	}
-	emptyResult := &v1.ReplicationController{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(replicationcontrollersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ReplicationController{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.ReplicationController), err
 }
 
 // GetScale takes name of the replicationController, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeReplicationControllers) GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
-	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), emptyResult)
+		Invokes(testing.NewGetSubresourceAction(replicationcontrollersResource, c.ns, "scale", replicationControllerName), &autoscalingv1.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
 func (c *FakeReplicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
-	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(replicationcontrollersResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }

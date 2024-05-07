@@ -20,8 +20,8 @@ package v2beta1
 
 import (
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type HorizontalPodAutoscalerLister interface {
 
 // horizontalPodAutoscalerLister implements the HorizontalPodAutoscalerLister interface.
 type horizontalPodAutoscalerLister struct {
-	listers.ResourceIndexer[*v2beta1.HorizontalPodAutoscaler]
+	indexer cache.Indexer
 }
 
 // NewHorizontalPodAutoscalerLister returns a new HorizontalPodAutoscalerLister.
 func NewHorizontalPodAutoscalerLister(indexer cache.Indexer) HorizontalPodAutoscalerLister {
-	return &horizontalPodAutoscalerLister{listers.New[*v2beta1.HorizontalPodAutoscaler](indexer, v2beta1.Resource("horizontalpodautoscaler"))}
+	return &horizontalPodAutoscalerLister{indexer: indexer}
+}
+
+// List lists all HorizontalPodAutoscalers in the indexer.
+func (s *horizontalPodAutoscalerLister) List(selector labels.Selector) (ret []*v2beta1.HorizontalPodAutoscaler, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v2beta1.HorizontalPodAutoscaler))
+	})
+	return ret, err
 }
 
 // HorizontalPodAutoscalers returns an object that can list and get HorizontalPodAutoscalers.
 func (s *horizontalPodAutoscalerLister) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerNamespaceLister {
-	return horizontalPodAutoscalerNamespaceLister{listers.NewNamespaced[*v2beta1.HorizontalPodAutoscaler](s.ResourceIndexer, namespace)}
+	return horizontalPodAutoscalerNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // HorizontalPodAutoscalerNamespaceLister helps list and get HorizontalPodAutoscalers.
@@ -66,5 +74,26 @@ type HorizontalPodAutoscalerNamespaceLister interface {
 // horizontalPodAutoscalerNamespaceLister implements the HorizontalPodAutoscalerNamespaceLister
 // interface.
 type horizontalPodAutoscalerNamespaceLister struct {
-	listers.ResourceIndexer[*v2beta1.HorizontalPodAutoscaler]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all HorizontalPodAutoscalers in the indexer for a given namespace.
+func (s horizontalPodAutoscalerNamespaceLister) List(selector labels.Selector) (ret []*v2beta1.HorizontalPodAutoscaler, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v2beta1.HorizontalPodAutoscaler))
+	})
+	return ret, err
+}
+
+// Get retrieves the HorizontalPodAutoscaler from the indexer for a given namespace and name.
+func (s horizontalPodAutoscalerNamespaceLister) Get(name string) (*v2beta1.HorizontalPodAutoscaler, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v2beta1.Resource("horizontalpodautoscaler"), name)
+	}
+	return obj.(*v2beta1.HorizontalPodAutoscaler), nil
 }

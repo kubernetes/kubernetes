@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/apis/storagemigration"
 	"k8s.io/kubernetes/pkg/printers"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -6840,94 +6839,5 @@ func TestPrintServiceCIDRList(t *testing.T) {
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
 		}
-	}
-}
-
-func TestPrintStorageVersionMigration(t *testing.T) {
-	storageVersionMigration := storagemigration.StorageVersionMigration{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "StorageVersionMigration",
-			APIVersion: "storagemigration.k8s.io/v1alpha1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "print-test",
-		},
-		Spec: storagemigration.StorageVersionMigrationSpec{
-			Resource: storagemigration.GroupVersionResource{
-				Group:    "test-group",
-				Version:  "test-version",
-				Resource: "test-resource",
-			},
-		},
-	}
-
-	// Columns: Name, GVRTOMIGRATE
-	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}}}
-
-	rows, err := printStorageVersionMigration(&storageVersionMigration, printers.GenerateOptions{})
-	if err != nil {
-		t.Fatalf("Error generating table rows for StorageVersionMigration: %#v", err)
-	}
-	rows[0].Object.Object = nil
-	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
-	}
-}
-
-func TestPrintStorageVersionMigrationList(t *testing.T) {
-	storageVersionMigrationList := storagemigration.StorageVersionMigrationList{
-		Items: []storagemigration.StorageVersionMigration{
-			{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "StorageVersionMigration",
-					APIVersion: "storagemigration.k8s.io/v1alpha1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "print-test",
-				},
-				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
-						Group:    "test-group",
-						Version:  "test-version",
-						Resource: "test-resource",
-					},
-				},
-			},
-			{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "StorageVersionMigration",
-					APIVersion: "storagemigration.k8s.io/v1alpha1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "print-test2",
-				},
-				Spec: storagemigration.StorageVersionMigrationSpec{
-					Resource: storagemigration.GroupVersionResource{
-						Group:    "test-group2",
-						Version:  "test-version2",
-						Resource: "test-resource2",
-					},
-				},
-			},
-		},
-	}
-
-	// Columns: Name, GVRTOMIGRATE
-	expected := []metav1.TableRow{
-		{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}},
-		{Cells: []interface{}{"print-test2", "test-resource2.test-version2.test-group2"}},
-	}
-
-	rows, err := printStorageVersionMigrationList(&storageVersionMigrationList, printers.GenerateOptions{})
-	if err != nil {
-		t.Fatalf("Error generating table rows for StorageVersionMigration: %#v", err)
-	}
-
-	for i := range rows {
-		rows[i].Object.Object = nil
-	}
-
-	if !reflect.DeepEqual(expected, rows) {
-		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 }

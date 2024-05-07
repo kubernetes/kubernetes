@@ -239,7 +239,7 @@ func TestFileExists(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got, _ := fileExists(tt.filename); got != tt.want {
+			if got := fileExists(tt.filename); got != tt.want {
 				t.Errorf("fileExists() = %v, want %v", got, tt.want)
 			}
 		})
@@ -295,7 +295,7 @@ func TestPKICertificateReadWriterExists(t *testing.T) {
 				baseName:       tt.fields.baseName,
 				certificateDir: tt.fields.certificateDir,
 			}
-			if got, _ := rw.Exists(); got != tt.want {
+			if got := rw.Exists(); got != tt.want {
 				t.Errorf("pkiCertificateReadWriter.Exists() = %v, want %v", got, tt.want)
 			}
 		})
@@ -338,7 +338,7 @@ func TestKubeConfigReadWriterExists(t *testing.T) {
 			rw := &kubeConfigReadWriter{
 				kubeConfigFilePath: tt.kubeConfigFilePath,
 			}
-			if got, _ := rw.Exists(); got != tt.want {
+			if got := rw.Exists(); got != tt.want {
 				t.Errorf("kubeConfigReadWriter.Exists() = %v, want %v", got, tt.want)
 			}
 		})

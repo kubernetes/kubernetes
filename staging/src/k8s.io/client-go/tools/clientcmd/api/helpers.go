@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -114,7 +115,7 @@ func ShortenConfig(config *Config) {
 // FlattenConfig changes the config object into a self-contained config (useful for making secrets)
 func FlattenConfig(config *Config) error {
 	for key, authInfo := range config.AuthInfos {
-		baseDir, err := MakeAbs(filepath.Dir(authInfo.LocationOfOrigin), "")
+		baseDir, err := MakeAbs(path.Dir(authInfo.LocationOfOrigin), "")
 		if err != nil {
 			return err
 		}
@@ -129,7 +130,7 @@ func FlattenConfig(config *Config) error {
 		config.AuthInfos[key] = authInfo
 	}
 	for key, cluster := range config.Clusters {
-		baseDir, err := MakeAbs(filepath.Dir(cluster.LocationOfOrigin), "")
+		baseDir, err := MakeAbs(path.Dir(cluster.LocationOfOrigin), "")
 		if err != nil {
 			return err
 		}

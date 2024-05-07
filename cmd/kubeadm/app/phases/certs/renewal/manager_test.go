@@ -54,8 +54,8 @@ type fakecertificateReadWriter struct {
 	cert  *x509.Certificate
 }
 
-func (cr fakecertificateReadWriter) Exists() (bool, error) {
-	return cr.exist, nil
+func (cr fakecertificateReadWriter) Exists() bool {
+	return cr.exist
 }
 
 func (cr fakecertificateReadWriter) Read() (*x509.Certificate, error) {

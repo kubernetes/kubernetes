@@ -44,24 +44,22 @@ var ingressesKind = v1beta1.SchemeGroupVersion.WithKind("Ingress")
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
 func (c *FakeIngresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
-	emptyResult := &v1beta1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(ingressesResource, c.ns, name), &v1beta1.Ingress{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Ingress), err
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
 func (c *FakeIngresses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
-	emptyResult := &v1beta1.IngressList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(ingressesResource, ingressesKind, c.ns, opts), &v1beta1.IngressList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,37 +84,34 @@ func (c *FakeIngresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.I
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
 func (c *FakeIngresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (result *v1beta1.Ingress, err error) {
-	emptyResult := &v1beta1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), emptyResult)
+		Invokes(testing.NewCreateAction(ingressesResource, c.ns, ingress), &v1beta1.Ingress{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Ingress), err
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
 func (c *FakeIngresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
-	emptyResult := &v1beta1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(ingressesResource, c.ns, ingress), emptyResult)
+		Invokes(testing.NewUpdateAction(ingressesResource, c.ns, ingress), &v1beta1.Ingress{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Ingress), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
-	emptyResult := &v1beta1.Ingress{}
+func (c *FakeIngresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(ingressesResource, "status", c.ns, ingress), &v1beta1.Ingress{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Ingress), err
 }
@@ -139,12 +134,11 @@ func (c *FakeIngresses) DeleteCollection(ctx context.Context, opts v1.DeleteOpti
 
 // Patch applies the patch and returns the patched ingress.
 func (c *FakeIngresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error) {
-	emptyResult := &v1beta1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, name, pt, data, subresources...), &v1beta1.Ingress{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Ingress), err
 }
@@ -162,12 +156,11 @@ func (c *FakeIngresses) Apply(ctx context.Context, ingress *networkingv1beta1.In
 	if name == nil {
 		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Ingress{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Ingress), err
 }
@@ -186,12 +179,11 @@ func (c *FakeIngresses) ApplyStatus(ctx context.Context, ingress *networkingv1be
 	if name == nil {
 		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta1.Ingress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(ingressesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta1.Ingress{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Ingress), err
 }

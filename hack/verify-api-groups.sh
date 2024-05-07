@@ -65,6 +65,7 @@ done
 # them.  This happens for types that aren't served from the API server
 groups_without_codegen=(
 	"abac"
+	"componentconfig"
 	"imagepolicy"
 	"admission"
 )
@@ -92,6 +93,7 @@ packages_without_install=(
 	"k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/admission"
 	"k8s.io/kubernetes/pkg/apis/apidiscovery"
+	"k8s.io/kubernetes/pkg/apis/componentconfig" # TODO: Remove this package completely and from this list
 )
 known_version_files=(
 	"pkg/controlplane/import_known_versions.go"

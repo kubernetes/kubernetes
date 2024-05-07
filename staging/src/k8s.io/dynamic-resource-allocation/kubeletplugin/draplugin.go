@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
+	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -139,21 +140,21 @@ func KubeletPluginSocketPath(path string) Option {
 // may be used more than once and each interceptor will get called.
 func GRPCInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
 	return func(o *options) error {
-		o.unaryInterceptors = append(o.unaryInterceptors, interceptor)
+		o.interceptors = append(o.interceptors, interceptor)
 		return nil
 	}
 }
 
-// GRPCStreamInterceptor is called for each gRPC streaming method call. This option
-// may be used more than once and each interceptor will get called.
-func GRPCStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
+// NodeV1alpha2 explicitly chooses whether the DRA gRPC API v1alpha2
+// gets enabled.
+func NodeV1alpha2(enabled bool) Option {
 	return func(o *options) error {
-		o.streamInterceptors = append(o.streamInterceptors, interceptor)
+		o.nodeV1alpha2 = enabled
 		return nil
 	}
 }
 
-// NodeV1alpha3 explicitly chooses whether the DRA gRPC API v1alpha3
+// NodeV1alpha2 explicitly chooses whether the DRA gRPC API v1alpha3
 // gets enabled.
 func NodeV1alpha3(enabled bool) Option {
 	return func(o *options) error {
@@ -169,10 +170,9 @@ type options struct {
 	draEndpoint                endpoint
 	draAddress                 string
 	pluginRegistrationEndpoint endpoint
-	unaryInterceptors          []grpc.UnaryServerInterceptor
-	streamInterceptors         []grpc.StreamServerInterceptor
+	interceptors               []grpc.UnaryServerInterceptor
 
-	nodeV1alpha3 bool
+	nodeV1alpha2, nodeV1alpha3 bool
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -190,6 +190,7 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 	o := options{
 		logger:        klog.Background(),
 		grpcVerbosity: 4,
+		nodeV1alpha2:  true,
 		nodeV1alpha3:  true,
 	}
 	for _, option := range opts {
@@ -214,10 +215,15 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	implemented := false
-	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.interceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		if nodeServer, ok := nodeServer.(drapbv1alpha3.NodeServer); ok && o.nodeV1alpha3 {
 			o.logger.V(5).Info("registering drapbv1alpha3.NodeServer")
 			drapbv1alpha3.RegisterNodeServer(grpcServer, nodeServer)
+			implemented = true
+		}
+		if nodeServer, ok := nodeServer.(drapbv1alpha2.NodeServer); ok && o.nodeV1alpha2 {
+			o.logger.V(5).Info("registering drapbv1alpha2.NodeServer")
+			drapbv1alpha2.RegisterNodeServer(grpcServer, nodeServer)
 			implemented = true
 		}
 	})
@@ -240,7 +246,7 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 	}
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.interceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}

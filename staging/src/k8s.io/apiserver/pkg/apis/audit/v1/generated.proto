@@ -48,11 +48,11 @@ message Event {
   optional string verb = 5;
 
   // Authenticated user information.
-  optional .k8s.io.api.authentication.v1.UserInfo user = 6;
+  optional k8s.io.api.authentication.v1.UserInfo user = 6;
 
   // Impersonated user information.
   // +optional
-  optional .k8s.io.api.authentication.v1.UserInfo impersonatedUser = 7;
+  optional k8s.io.api.authentication.v1.UserInfo impersonatedUser = 7;
 
   // Source IPs, from where the request originated and intermediate proxies.
   // The source IPs are listed from (in order):
@@ -79,28 +79,28 @@ message Event {
   // For successful responses, this will only include the Code and StatusSuccess.
   // For non-status type error responses, this will be auto-populated with the error Message.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Status responseStatus = 10;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Status responseStatus = 10;
 
   // API object from the request, in JSON format. The RequestObject is recorded as-is in the request
   // (possibly re-encoded as JSON), prior to version conversion, defaulting, admission or
   // merging. It is an external versioned object type, and may not be a valid object on its own.
   // Omitted for non-resource requests.  Only logged at Request Level and higher.
   // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.Unknown requestObject = 11;
+  optional k8s.io.apimachinery.pkg.runtime.Unknown requestObject = 11;
 
   // API object returned in the response, in JSON. The ResponseObject is recorded after conversion
   // to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged
   // at Response Level.
   // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.Unknown responseObject = 12;
+  optional k8s.io.apimachinery.pkg.runtime.Unknown responseObject = 12;
 
   // Time the request reached the apiserver.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime requestReceivedTimestamp = 13;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime requestReceivedTimestamp = 13;
 
   // Time the request reached current audit stage.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime stageTimestamp = 14;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime stageTimestamp = 14;
 
   // Annotations is an unstructured key value map stored with an audit event that may be set by
   // plugins invoked in the request serving chain, including authentication, authorization and
@@ -115,7 +115,7 @@ message Event {
 // EventList is a list of audit Events.
 message EventList {
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated Event items = 2;
 }
@@ -187,7 +187,7 @@ message ObjectReference {
 message Policy {
   // ObjectMeta is included for interoperability with API infrastructure.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules specify the audit Level a request should be recorded at.
   // A request may match multiple rules, in which case the FIRST matching rule is used.
@@ -215,7 +215,7 @@ message Policy {
 // PolicyList is a list of audit Policies.
 message PolicyList {
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   repeated Policy items = 2;
 }

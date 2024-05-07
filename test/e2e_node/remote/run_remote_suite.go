@@ -20,11 +20,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 )
@@ -75,6 +77,7 @@ func RunRemoteTestSuite(testSuite TestSuite) {
 		os.Exit(1)
 	}()
 
+	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
 		CreateTestArchive(testSuite,

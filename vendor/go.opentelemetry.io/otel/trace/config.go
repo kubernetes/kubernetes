@@ -268,7 +268,6 @@ func (o stackTraceOption) applyEvent(c EventConfig) EventConfig {
 	c.stackTrace = bool(o)
 	return c
 }
-
 func (o stackTraceOption) applySpan(c SpanConfig) SpanConfig {
 	c.stackTrace = bool(o)
 	return c

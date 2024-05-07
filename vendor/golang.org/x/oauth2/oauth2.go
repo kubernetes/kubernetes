@@ -58,10 +58,6 @@ type Config struct {
 
 	// Scope specifies optional requested permissions.
 	Scopes []string
-
-	// authStyleCache caches which auth style to use when Endpoint.AuthStyle is
-	// the zero value (AuthStyleAutoDetect).
-	authStyleCache internal.LazyAuthStyleCache
 }
 
 // A TokenSource is anything that can return a token.
@@ -75,9 +71,8 @@ type TokenSource interface {
 // Endpoint represents an OAuth 2.0 provider's authorization and token
 // endpoint URLs.
 type Endpoint struct {
-	AuthURL       string
-	DeviceAuthURL string
-	TokenURL      string
+	AuthURL  string
+	TokenURL string
 
 	// AuthStyle optionally specifies how the endpoint wants the
 	// client ID & client secret sent. The zero value means to
@@ -144,19 +139,15 @@ func SetAuthURLParam(key, value string) AuthCodeOption {
 // AuthCodeURL returns a URL to OAuth 2.0 provider's consent page
 // that asks for permissions for the required scopes explicitly.
 //
-// State is an opaque value used by the client to maintain state between the
-// request and callback. The authorization server includes this value when
-// redirecting the user agent back to the client.
+// State is a token to protect the user from CSRF attacks. You must
+// always provide a non-empty string and validate that it matches the
+// state query parameter on your redirect callback.
+// See http://tools.ietf.org/html/rfc6749#section-10.12 for more info.
 //
 // Opts may include AccessTypeOnline or AccessTypeOffline, as well
 // as ApprovalForce.
-//
-// To protect against CSRF attacks, opts should include a PKCE challenge
-// (S256ChallengeOption). Not all servers support PKCE. An alternative is to
-// generate a random state parameter and verify it after exchange.
-// See https://datatracker.ietf.org/doc/html/rfc6749#section-10.12 (predating
-// PKCE), https://www.oauth.com/oauth2-servers/pkce/ and
-// https://www.ietf.org/archive/id/draft-ietf-oauth-v2-1-09.html#name-cross-site-request-forgery (describing both approaches)
+// It can also be used to pass the PKCE challenge.
+// See https://www.oauth.com/oauth2-servers/pkce/ for more info.
 func (c *Config) AuthCodeURL(state string, opts ...AuthCodeOption) string {
 	var buf bytes.Buffer
 	buf.WriteString(c.Endpoint.AuthURL)
@@ -171,6 +162,7 @@ func (c *Config) AuthCodeURL(state string, opts ...AuthCodeOption) string {
 		v.Set("scope", strings.Join(c.Scopes, " "))
 	}
 	if state != "" {
+		// TODO(light): Docs say never to omit state; don't allow empty.
 		v.Set("state", state)
 	}
 	for _, opt := range opts {
@@ -215,11 +207,10 @@ func (c *Config) PasswordCredentialsToken(ctx context.Context, username, passwor
 // The provided context optionally controls which HTTP client is used. See the HTTPClient variable.
 //
 // The code will be in the *http.Request.FormValue("code"). Before
-// calling Exchange, be sure to validate FormValue("state") if you are
-// using it to protect against CSRF attacks.
+// calling Exchange, be sure to validate FormValue("state").
 //
-// If using PKCE to protect against CSRF attacks, opts should include a
-// VerifierOption.
+// Opts may include the PKCE verifier code if previously used in AuthCodeURL.
+// See https://www.oauth.com/oauth2-servers/pkce/ for more info.
 func (c *Config) Exchange(ctx context.Context, code string, opts ...AuthCodeOption) (*Token, error) {
 	v := url.Values{
 		"grant_type": {"authorization_code"},

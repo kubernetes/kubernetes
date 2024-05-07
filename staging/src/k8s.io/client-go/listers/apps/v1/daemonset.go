@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type DaemonSetLister interface {
 
 // daemonSetLister implements the DaemonSetLister interface.
 type daemonSetLister struct {
-	listers.ResourceIndexer[*v1.DaemonSet]
+	indexer cache.Indexer
 }
 
 // NewDaemonSetLister returns a new DaemonSetLister.
 func NewDaemonSetLister(indexer cache.Indexer) DaemonSetLister {
-	return &daemonSetLister{listers.New[*v1.DaemonSet](indexer, v1.Resource("daemonset"))}
+	return &daemonSetLister{indexer: indexer}
+}
+
+// List lists all DaemonSets in the indexer.
+func (s *daemonSetLister) List(selector labels.Selector) (ret []*v1.DaemonSet, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.DaemonSet))
+	})
+	return ret, err
 }
 
 // DaemonSets returns an object that can list and get DaemonSets.
 func (s *daemonSetLister) DaemonSets(namespace string) DaemonSetNamespaceLister {
-	return daemonSetNamespaceLister{listers.NewNamespaced[*v1.DaemonSet](s.ResourceIndexer, namespace)}
+	return daemonSetNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // DaemonSetNamespaceLister helps list and get DaemonSets.
@@ -66,5 +74,26 @@ type DaemonSetNamespaceLister interface {
 // daemonSetNamespaceLister implements the DaemonSetNamespaceLister
 // interface.
 type daemonSetNamespaceLister struct {
-	listers.ResourceIndexer[*v1.DaemonSet]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all DaemonSets in the indexer for a given namespace.
+func (s daemonSetNamespaceLister) List(selector labels.Selector) (ret []*v1.DaemonSet, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.DaemonSet))
+	})
+	return ret, err
+}
+
+// Get retrieves the DaemonSet from the indexer for a given namespace and name.
+func (s daemonSetNamespaceLister) Get(name string) (*v1.DaemonSet, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("daemonset"), name)
+	}
+	return obj.(*v1.DaemonSet), nil
 }

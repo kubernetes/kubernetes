@@ -208,8 +208,14 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 				".Spec.HostNetwork":                          "true",
 				".Spec.Containers[0].Ports[0].ContainerPort": "12345",
 			}
-			m[".Spec.Containers"] = `[{"name":"","ports":[{"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
-			m[".Spec.Containers[0].Ports"] = `[{"containerPort":12345,"protocol":"TCP"}]`
+			if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+				m[".Spec.Containers"] = `[{"name":"","ports":[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
+				m[".Spec.Containers[0].Ports"] = `[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}]`
+				m[".Spec.Containers[0].Ports[0].HostPort"] = "12345"
+			} else {
+				m[".Spec.Containers"] = `[{"name":"","ports":[{"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
+				m[".Spec.Containers[0].Ports"] = `[{"containerPort":12345,"protocol":"TCP"}]`
+			}
 			for k, v := range expectedDefaults {
 				if _, found := m[k]; !found {
 					m[k] = v
@@ -373,23 +379,40 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 func TestPodHostNetworkDefaults(t *testing.T) {
 	cases := []struct {
 		name                 string
+		gate                 bool
 		hostNet              bool
 		expectPodDefault     bool
 		expectPodSpecDefault bool
 	}{{
-		name:                 "hostNetwork=false",
+		name:                 "gate disabled, hostNetwork=false",
+		gate:                 false,
 		hostNet:              false,
 		expectPodDefault:     false,
 		expectPodSpecDefault: false,
 	}, {
-		name:                 "hostNetwork=true",
+		name:                 "gate disabled, hostNetwork=true",
+		gate:                 false,
 		hostNet:              true,
 		expectPodDefault:     true,
 		expectPodSpecDefault: false,
+	}, {
+		name:                 "gate enabled, hostNetwork=false",
+		gate:                 true,
+		hostNet:              false,
+		expectPodDefault:     false,
+		expectPodSpecDefault: false,
+	}, {
+		name:                 "gate enabled, hostNetwork=true",
+		gate:                 true,
+		hostNet:              true,
+		expectPodDefault:     true,
+		expectPodSpecDefault: true,
 	}}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DefaultHostNetworkHostPortsInPodTemplates, tc.gate)()
+
 			const portNum = 12345
 			spec := v1.PodSpec{
 				HostNetwork: tc.hostNet,

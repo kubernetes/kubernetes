@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type ExampleLister interface {
 
 // exampleLister implements the ExampleLister interface.
 type exampleLister struct {
-	listers.ResourceIndexer[*v1.Example]
+	indexer cache.Indexer
 }
 
 // NewExampleLister returns a new ExampleLister.
 func NewExampleLister(indexer cache.Indexer) ExampleLister {
-	return &exampleLister{listers.New[*v1.Example](indexer, v1.Resource("example"))}
+	return &exampleLister{indexer: indexer}
+}
+
+// List lists all Examples in the indexer.
+func (s *exampleLister) List(selector labels.Selector) (ret []*v1.Example, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Example))
+	})
+	return ret, err
 }
 
 // Examples returns an object that can list and get Examples.
 func (s *exampleLister) Examples(namespace string) ExampleNamespaceLister {
-	return exampleNamespaceLister{listers.NewNamespaced[*v1.Example](s.ResourceIndexer, namespace)}
+	return exampleNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // ExampleNamespaceLister helps list and get Examples.
@@ -66,5 +74,26 @@ type ExampleNamespaceLister interface {
 // exampleNamespaceLister implements the ExampleNamespaceLister
 // interface.
 type exampleNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Example]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all Examples in the indexer for a given namespace.
+func (s exampleNamespaceLister) List(selector labels.Selector) (ret []*v1.Example, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Example))
+	})
+	return ret, err
+}
+
+// Get retrieves the Example from the indexer for a given namespace and name.
+func (s exampleNamespaceLister) Get(name string) (*v1.Example, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("example"), name)
+	}
+	return obj.(*v1.Example), nil
 }

@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,10 +39,30 @@ type VolumeAttachmentLister interface {
 
 // volumeAttachmentLister implements the VolumeAttachmentLister interface.
 type volumeAttachmentLister struct {
-	listers.ResourceIndexer[*v1beta1.VolumeAttachment]
+	indexer cache.Indexer
 }
 
 // NewVolumeAttachmentLister returns a new VolumeAttachmentLister.
 func NewVolumeAttachmentLister(indexer cache.Indexer) VolumeAttachmentLister {
-	return &volumeAttachmentLister{listers.New[*v1beta1.VolumeAttachment](indexer, v1beta1.Resource("volumeattachment"))}
+	return &volumeAttachmentLister{indexer: indexer}
+}
+
+// List lists all VolumeAttachments in the indexer.
+func (s *volumeAttachmentLister) List(selector labels.Selector) (ret []*v1beta1.VolumeAttachment, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.VolumeAttachment))
+	})
+	return ret, err
+}
+
+// Get retrieves the VolumeAttachment from the index for a given name.
+func (s *volumeAttachmentLister) Get(name string) (*v1beta1.VolumeAttachment, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1beta1.Resource("volumeattachment"), name)
+	}
+	return obj.(*v1beta1.VolumeAttachment), nil
 }

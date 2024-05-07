@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/coordination/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type LeaseLister interface {
 
 // leaseLister implements the LeaseLister interface.
 type leaseLister struct {
-	listers.ResourceIndexer[*v1beta1.Lease]
+	indexer cache.Indexer
 }
 
 // NewLeaseLister returns a new LeaseLister.
 func NewLeaseLister(indexer cache.Indexer) LeaseLister {
-	return &leaseLister{listers.New[*v1beta1.Lease](indexer, v1beta1.Resource("lease"))}
+	return &leaseLister{indexer: indexer}
+}
+
+// List lists all Leases in the indexer.
+func (s *leaseLister) List(selector labels.Selector) (ret []*v1beta1.Lease, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.Lease))
+	})
+	return ret, err
 }
 
 // Leases returns an object that can list and get Leases.
 func (s *leaseLister) Leases(namespace string) LeaseNamespaceLister {
-	return leaseNamespaceLister{listers.NewNamespaced[*v1beta1.Lease](s.ResourceIndexer, namespace)}
+	return leaseNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // LeaseNamespaceLister helps list and get Leases.
@@ -66,5 +74,26 @@ type LeaseNamespaceLister interface {
 // leaseNamespaceLister implements the LeaseNamespaceLister
 // interface.
 type leaseNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.Lease]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all Leases in the indexer for a given namespace.
+func (s leaseNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.Lease, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.Lease))
+	})
+	return ret, err
+}
+
+// Get retrieves the Lease from the indexer for a given namespace and name.
+func (s leaseNamespaceLister) Get(name string) (*v1beta1.Lease, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1beta1.Resource("lease"), name)
+	}
+	return obj.(*v1beta1.Lease), nil
 }

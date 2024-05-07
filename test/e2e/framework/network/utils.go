@@ -90,6 +90,9 @@ const (
 	echoHostname = "hostname"
 )
 
+// NetexecImageName is the image name for agnhost.
+var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
+
 // Option is used to configure the NetworkingTest object
 type Option func(*NetworkingTestConfig)
 
@@ -584,7 +587,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 			Containers: []v1.Container{
 				{
 					Name:            "webserver",
-					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+					Image:           NetexecImageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args:            netexecArgs,
 					Ports: []v1.ContainerPort{
@@ -654,7 +657,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            "webserver",
-					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+					Image:           NetexecImageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
@@ -882,10 +885,10 @@ func (config *NetworkingTestConfig) createNetProxyPods(ctx context.Context, podN
 // DeleteNetProxyPod deletes the first endpoint pod and waits for it being removed.
 func (config *NetworkingTestConfig) DeleteNetProxyPod(ctx context.Context) {
 	pod := config.EndpointPods[0]
-	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0)))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
-	err := e2epod.WaitForPodNotFoundInNamespace(ctx, config.f.ClientSet, pod.Name, config.Namespace, config.f.Timeouts.PodDelete)
+	err := e2epod.WaitForPodNotFoundInNamespace(ctx, config.f.ClientSet, pod.Name, config.Namespace, wait.ForeverTestTimeout)
 	if err != nil {
 		framework.Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}

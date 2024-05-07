@@ -93,10 +93,10 @@ func parseCPUStat(line string) (CPUStat, int64, error) {
 		&cpuStat.Guest, &cpuStat.GuestNice)
 
 	if err != nil && err != io.EOF {
-		return CPUStat{}, -1, fmt.Errorf("%s: couldn't parse %q (cpu): %w", ErrFileParse, line, err)
+		return CPUStat{}, -1, fmt.Errorf("couldn't parse %q (cpu): %w", line, err)
 	}
 	if count == 0 {
-		return CPUStat{}, -1, fmt.Errorf("%w: couldn't parse %q (cpu): 0 elements parsed", ErrFileParse, line)
+		return CPUStat{}, -1, fmt.Errorf("couldn't parse %q (cpu): 0 elements parsed", line)
 	}
 
 	cpuStat.User /= userHZ
@@ -116,7 +116,7 @@ func parseCPUStat(line string) (CPUStat, int64, error) {
 
 	cpuID, err := strconv.ParseInt(cpu[3:], 10, 64)
 	if err != nil {
-		return CPUStat{}, -1, fmt.Errorf("%s: couldn't parse %q (cpu/cpuid): %w", ErrFileParse, line, err)
+		return CPUStat{}, -1, fmt.Errorf("couldn't parse %q (cpu/cpuid): %w", line, err)
 	}
 
 	return cpuStat, cpuID, nil
@@ -136,7 +136,7 @@ func parseSoftIRQStat(line string) (SoftIRQStat, uint64, error) {
 		&softIRQStat.Hrtimer, &softIRQStat.Rcu)
 
 	if err != nil {
-		return SoftIRQStat{}, 0, fmt.Errorf("%s: couldn't parse %q (softirq): %w", ErrFileParse, line, err)
+		return SoftIRQStat{}, 0, fmt.Errorf("couldn't parse %q (softirq): %w", line, err)
 	}
 
 	return softIRQStat, total, nil
@@ -187,10 +187,6 @@ func parseStat(r io.Reader, fileName string) (Stat, error) {
 		err error
 	)
 
-	// Increase default scanner buffer to handle very long `intr` lines.
-	buf := make([]byte, 0, 8*1024)
-	scanner.Buffer(buf, 1024*1024)
-
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Fields(scanner.Text())
@@ -201,34 +197,34 @@ func parseStat(r io.Reader, fileName string) (Stat, error) {
 		switch {
 		case parts[0] == "btime":
 			if stat.BootTime, err = strconv.ParseUint(parts[1], 10, 64); err != nil {
-				return Stat{}, fmt.Errorf("%s: couldn't parse %q (btime): %w", ErrFileParse, parts[1], err)
+				return Stat{}, fmt.Errorf("couldn't parse %q (btime): %w", parts[1], err)
 			}
 		case parts[0] == "intr":
 			if stat.IRQTotal, err = strconv.ParseUint(parts[1], 10, 64); err != nil {
-				return Stat{}, fmt.Errorf("%s: couldn't parse %q (intr): %w", ErrFileParse, parts[1], err)
+				return Stat{}, fmt.Errorf("couldn't parse %q (intr): %w", parts[1], err)
 			}
 			numberedIRQs := parts[2:]
 			stat.IRQ = make([]uint64, len(numberedIRQs))
 			for i, count := range numberedIRQs {
 				if stat.IRQ[i], err = strconv.ParseUint(count, 10, 64); err != nil {
-					return Stat{}, fmt.Errorf("%s: couldn't parse %q (intr%d): %w", ErrFileParse, count, i, err)
+					return Stat{}, fmt.Errorf("couldn't parse %q (intr%d): %w", count, i, err)
 				}
 			}
 		case parts[0] == "ctxt":
 			if stat.ContextSwitches, err = strconv.ParseUint(parts[1], 10, 64); err != nil {
-				return Stat{}, fmt.Errorf("%s: couldn't parse %q (ctxt): %w", ErrFileParse, parts[1], err)
+				return Stat{}, fmt.Errorf("couldn't parse %q (ctxt): %w", parts[1], err)
 			}
 		case parts[0] == "processes":
 			if stat.ProcessCreated, err = strconv.ParseUint(parts[1], 10, 64); err != nil {
-				return Stat{}, fmt.Errorf("%s: couldn't parse %q (processes): %w", ErrFileParse, parts[1], err)
+				return Stat{}, fmt.Errorf("couldn't parse %q (processes): %w", parts[1], err)
 			}
 		case parts[0] == "procs_running":
 			if stat.ProcessesRunning, err = strconv.ParseUint(parts[1], 10, 64); err != nil {
-				return Stat{}, fmt.Errorf("%s: couldn't parse %q (procs_running): %w", ErrFileParse, parts[1], err)
+				return Stat{}, fmt.Errorf("couldn't parse %q (procs_running): %w", parts[1], err)
 			}
 		case parts[0] == "procs_blocked":
 			if stat.ProcessesBlocked, err = strconv.ParseUint(parts[1], 10, 64); err != nil {
-				return Stat{}, fmt.Errorf("%s: couldn't parse %q (procs_blocked): %w", ErrFileParse, parts[1], err)
+				return Stat{}, fmt.Errorf("couldn't parse %q (procs_blocked): %w", parts[1], err)
 			}
 		case parts[0] == "softirq":
 			softIRQStats, total, err := parseSoftIRQStat(line)
@@ -251,7 +247,7 @@ func parseStat(r io.Reader, fileName string) (Stat, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return Stat{}, fmt.Errorf("%s: couldn't parse %q: %w", ErrFileParse, fileName, err)
+		return Stat{}, fmt.Errorf("couldn't parse %q: %w", fileName, err)
 	}
 
 	return stat, nil

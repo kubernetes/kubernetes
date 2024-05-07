@@ -44,14 +44,6 @@ const (
 
 	fieldTransport11TCPLen = 13
 	fieldTransport11UDPLen = 10
-
-	// kernel version >= 4.14 MaxLen
-	// See: https://elixir.bootlin.com/linux/v6.4.8/source/net/sunrpc/xprtrdma/xprt_rdma.h#L393
-	fieldTransport11RDMAMaxLen = 28
-
-	// kernel version <= 4.2 MinLen
-	// See: https://elixir.bootlin.com/linux/v4.2.8/source/net/sunrpc/xprtrdma/xprt_rdma.h#L331
-	fieldTransport11RDMAMinLen = 20
 )
 
 // A Mount is a device mount parsed from /proc/[pid]/mountstats.
@@ -241,33 +233,6 @@ type NFSTransportStats struct {
 	// A running counter, incremented on each request as the current size of the
 	// pending queue.
 	CumulativePendingQueue uint64
-
-	// Stats below only available with stat version 1.1.
-	// Transport over RDMA
-
-	// accessed when sending a call
-	ReadChunkCount   uint64
-	WriteChunkCount  uint64
-	ReplyChunkCount  uint64
-	TotalRdmaRequest uint64
-
-	// rarely accessed error counters
-	PullupCopyCount      uint64
-	HardwayRegisterCount uint64
-	FailedMarshalCount   uint64
-	BadReplyCount        uint64
-	MrsRecovered         uint64
-	MrsOrphaned          uint64
-	MrsAllocated         uint64
-	EmptySendctxQ        uint64
-
-	// accessed when receiving a reply
-	TotalRdmaReply    uint64
-	FixupCopyCount    uint64
-	ReplyWaitsForSend uint64
-	LocalInvNeeded    uint64
-	NomsgCallCount    uint64
-	BcallCount        uint64
 }
 
 // parseMountStats parses a /proc/[pid]/mountstats file and returns a slice
@@ -301,7 +266,7 @@ func parseMountStats(r io.Reader) ([]*Mount, error) {
 		if len(ss) > deviceEntryLen {
 			// Only NFSv3 and v4 are supported for parsing statistics
 			if m.Type != nfs3Type && m.Type != nfs4Type {
-				return nil, fmt.Errorf("%w: Cannot parse MountStats for %q", ErrFileParse, m.Type)
+				return nil, fmt.Errorf("cannot parse MountStats for fstype %q", m.Type)
 			}
 
 			statVersion := strings.TrimPrefix(ss[8], statVersionPrefix)
@@ -325,7 +290,7 @@ func parseMountStats(r io.Reader) ([]*Mount, error) {
 //	device [device] mounted on [mount] with fstype [type]
 func parseMount(ss []string) (*Mount, error) {
 	if len(ss) < deviceEntryLen {
-		return nil, fmt.Errorf("%w: Invalid device %q", ErrFileParse, ss)
+		return nil, fmt.Errorf("invalid device entry: %v", ss)
 	}
 
 	// Check for specific words appearing at specific indices to ensure
@@ -343,7 +308,7 @@ func parseMount(ss []string) (*Mount, error) {
 
 	for _, f := range format {
 		if ss[f.i] != f.s {
-			return nil, fmt.Errorf("%w: Invalid device %q", ErrFileParse, ss)
+			return nil, fmt.Errorf("invalid device entry: %v", ss)
 		}
 	}
 
@@ -380,7 +345,7 @@ func parseMountStatsNFS(s *bufio.Scanner, statVersion string) (*MountStatsNFS, e
 		switch ss[0] {
 		case fieldOpts:
 			if len(ss) < 2 {
-				return nil, fmt.Errorf("%w: Incomplete information for NFS stats: %v", ErrFileParse, ss)
+				return nil, fmt.Errorf("not enough information for NFS stats: %v", ss)
 			}
 			if stats.Opts == nil {
 				stats.Opts = map[string]string{}
@@ -395,7 +360,7 @@ func parseMountStatsNFS(s *bufio.Scanner, statVersion string) (*MountStatsNFS, e
 			}
 		case fieldAge:
 			if len(ss) < 2 {
-				return nil, fmt.Errorf("%w: Incomplete information for NFS stats: %v", ErrFileParse, ss)
+				return nil, fmt.Errorf("not enough information for NFS stats: %v", ss)
 			}
 			// Age integer is in seconds
 			d, err := time.ParseDuration(ss[1] + "s")
@@ -406,7 +371,7 @@ func parseMountStatsNFS(s *bufio.Scanner, statVersion string) (*MountStatsNFS, e
 			stats.Age = d
 		case fieldBytes:
 			if len(ss) < 2 {
-				return nil, fmt.Errorf("%w: Incomplete information for NFS stats: %v", ErrFileParse, ss)
+				return nil, fmt.Errorf("not enough information for NFS stats: %v", ss)
 			}
 			bstats, err := parseNFSBytesStats(ss[1:])
 			if err != nil {
@@ -416,7 +381,7 @@ func parseMountStatsNFS(s *bufio.Scanner, statVersion string) (*MountStatsNFS, e
 			stats.Bytes = *bstats
 		case fieldEvents:
 			if len(ss) < 2 {
-				return nil, fmt.Errorf("%w: Incomplete information for NFS events: %v", ErrFileParse, ss)
+				return nil, fmt.Errorf("not enough information for NFS stats: %v", ss)
 			}
 			estats, err := parseNFSEventsStats(ss[1:])
 			if err != nil {
@@ -426,7 +391,7 @@ func parseMountStatsNFS(s *bufio.Scanner, statVersion string) (*MountStatsNFS, e
 			stats.Events = *estats
 		case fieldTransport:
 			if len(ss) < 3 {
-				return nil, fmt.Errorf("%w: Incomplete information for NFS transport stats: %v", ErrFileParse, ss)
+				return nil, fmt.Errorf("not enough information for NFS transport stats: %v", ss)
 			}
 
 			tstats, err := parseNFSTransportStats(ss[1:], statVersion)
@@ -465,7 +430,7 @@ func parseMountStatsNFS(s *bufio.Scanner, statVersion string) (*MountStatsNFS, e
 // integer fields.
 func parseNFSBytesStats(ss []string) (*NFSBytesStats, error) {
 	if len(ss) != fieldBytesLen {
-		return nil, fmt.Errorf("%w: Invalid NFS bytes stats: %v", ErrFileParse, ss)
+		return nil, fmt.Errorf("invalid NFS bytes stats: %v", ss)
 	}
 
 	ns := make([]uint64, 0, fieldBytesLen)
@@ -494,7 +459,7 @@ func parseNFSBytesStats(ss []string) (*NFSBytesStats, error) {
 // integer fields.
 func parseNFSEventsStats(ss []string) (*NFSEventsStats, error) {
 	if len(ss) != fieldEventsLen {
-		return nil, fmt.Errorf("%w: invalid NFS events stats: %v", ErrFileParse, ss)
+		return nil, fmt.Errorf("invalid NFS events stats: %v", ss)
 	}
 
 	ns := make([]uint64, 0, fieldEventsLen)
@@ -558,7 +523,7 @@ func parseNFSOperationStats(s *bufio.Scanner) ([]NFSOperationStats, error) {
 		}
 
 		if len(ss) < minFields {
-			return nil, fmt.Errorf("%w: invalid NFS per-operations stats: %v", ErrFileParse, ss)
+			return nil, fmt.Errorf("invalid NFS per-operations stats: %v", ss)
 		}
 
 		// Skip string operation name for integers
@@ -611,10 +576,10 @@ func parseNFSTransportStats(ss []string, statVersion string) (*NFSTransportStats
 		} else if protocol == "udp" {
 			expectedLength = fieldTransport10UDPLen
 		} else {
-			return nil, fmt.Errorf("%w: Invalid NFS protocol \"%s\" in stats 1.0 statement: %v", ErrFileParse, protocol, ss)
+			return nil, fmt.Errorf("invalid NFS protocol \"%s\" in stats 1.0 statement: %v", protocol, ss)
 		}
 		if len(ss) != expectedLength {
-			return nil, fmt.Errorf("%w: Invalid NFS transport stats 1.0 statement: %v", ErrFileParse, ss)
+			return nil, fmt.Errorf("invalid NFS transport stats 1.0 statement: %v", ss)
 		}
 	case statVersion11:
 		var expectedLength int
@@ -622,17 +587,14 @@ func parseNFSTransportStats(ss []string, statVersion string) (*NFSTransportStats
 			expectedLength = fieldTransport11TCPLen
 		} else if protocol == "udp" {
 			expectedLength = fieldTransport11UDPLen
-		} else if protocol == "rdma" {
-			expectedLength = fieldTransport11RDMAMinLen
 		} else {
-			return nil, fmt.Errorf("%w: invalid NFS protocol \"%s\" in stats 1.1 statement: %v", ErrFileParse, protocol, ss)
+			return nil, fmt.Errorf("invalid NFS protocol \"%s\" in stats 1.1 statement: %v", protocol, ss)
 		}
-		if (len(ss) != expectedLength && (protocol == "tcp" || protocol == "udp")) ||
-			(protocol == "rdma" && len(ss) < expectedLength) {
-			return nil, fmt.Errorf("%w: invalid NFS transport stats 1.1 statement: %v, protocol: %v", ErrFileParse, ss, protocol)
+		if len(ss) != expectedLength {
+			return nil, fmt.Errorf("invalid NFS transport stats 1.1 statement: %v", ss)
 		}
 	default:
-		return nil, fmt.Errorf("%s: Unrecognized NFS transport stats version: %q, protocol: %v", ErrFileParse, statVersion, protocol)
+		return nil, fmt.Errorf("unrecognized NFS transport stats version: %q", statVersion)
 	}
 
 	// Allocate enough for v1.1 stats since zero value for v1.1 stats will be okay
@@ -642,9 +604,7 @@ func parseNFSTransportStats(ss []string, statVersion string) (*NFSTransportStats
 	// Note: slice length must be set to length of v1.1 stats to avoid a panic when
 	// only v1.0 stats are present.
 	// See: https://github.com/prometheus/node_exporter/issues/571.
-	//
-	// Note: NFS Over RDMA slice length is fieldTransport11RDMAMaxLen
-	ns := make([]uint64, fieldTransport11RDMAMaxLen+3)
+	ns := make([]uint64, fieldTransport11TCPLen)
 	for i, s := range ss {
 		n, err := strconv.ParseUint(s, 10, 64)
 		if err != nil {
@@ -662,14 +622,9 @@ func parseNFSTransportStats(ss []string, statVersion string) (*NFSTransportStats
 	// we set them to 0 here.
 	if protocol == "udp" {
 		ns = append(ns[:2], append(make([]uint64, 3), ns[2:]...)...)
-	} else if protocol == "tcp" {
-		ns = append(ns[:fieldTransport11TCPLen], make([]uint64, fieldTransport11RDMAMaxLen-fieldTransport11TCPLen+3)...)
-	} else if protocol == "rdma" {
-		ns = append(ns[:fieldTransport10TCPLen], append(make([]uint64, 3), ns[fieldTransport10TCPLen:]...)...)
 	}
 
 	return &NFSTransportStats{
-		// NFS xprt over tcp or udp
 		Protocol:                 protocol,
 		Port:                     ns[0],
 		Bind:                     ns[1],
@@ -681,32 +636,8 @@ func parseNFSTransportStats(ss []string, statVersion string) (*NFSTransportStats
 		BadTransactionIDs:        ns[7],
 		CumulativeActiveRequests: ns[8],
 		CumulativeBacklog:        ns[9],
-
-		// NFS xprt over tcp or udp
-		// And statVersion 1.1
-		MaximumRPCSlotsUsed:    ns[10],
-		CumulativeSendingQueue: ns[11],
-		CumulativePendingQueue: ns[12],
-
-		// NFS xprt over rdma
-		// And stat Version 1.1
-		ReadChunkCount:       ns[13],
-		WriteChunkCount:      ns[14],
-		ReplyChunkCount:      ns[15],
-		TotalRdmaRequest:     ns[16],
-		PullupCopyCount:      ns[17],
-		HardwayRegisterCount: ns[18],
-		FailedMarshalCount:   ns[19],
-		BadReplyCount:        ns[20],
-		MrsRecovered:         ns[21],
-		MrsOrphaned:          ns[22],
-		MrsAllocated:         ns[23],
-		EmptySendctxQ:        ns[24],
-		TotalRdmaReply:       ns[25],
-		FixupCopyCount:       ns[26],
-		ReplyWaitsForSend:    ns[27],
-		LocalInvNeeded:       ns[28],
-		NomsgCallCount:       ns[29],
-		BcallCount:           ns[30],
+		MaximumRPCSlotsUsed:      ns[10],
+		CumulativeSendingQueue:   ns[11],
+		CumulativePendingQueue:   ns[12],
 	}, nil
 }

@@ -156,7 +156,7 @@ message MatchResources {
   //
   // Default to the empty LabelSelector, which matches everything.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 1;
 
   // ObjectSelector decides whether to run the validation based on if the
   // object has matching labels. objectSelector is evaluated against both
@@ -170,7 +170,7 @@ message MatchResources {
   // users may skip the admission webhook by setting the labels.
   // Default to the empty LabelSelector, which matches everything.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector objectSelector = 2;
 
   // ResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy matches.
   // The policy cares about an operation if it matches _any_ Rule.
@@ -211,7 +211,7 @@ message NamedRuleWithOperations {
   repeated string resourceNames = 1;
 
   // RuleWithOperations is a tuple of Operations and Resources.
-  optional .k8s.io.api.admissionregistration.v1.RuleWithOperations ruleWithOperations = 2;
+  optional k8s.io.api.admissionregistration.v1.RuleWithOperations ruleWithOperations = 2;
 }
 
 // ParamKind is a tuple of Group Kind and Version.
@@ -267,7 +267,7 @@ message ParamRef {
   // mutually exclusive properties. If one is set, the other must be unset.
   //
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 3;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 3;
 
   // `parameterNotFoundAction` controls the behavior of the binding when the resource
   // exists, and name or selector is valid, but there are no parameters
@@ -295,7 +295,7 @@ message TypeChecking {
 message ValidatingAdmissionPolicy {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the ValidatingAdmissionPolicy.
   optional ValidatingAdmissionPolicySpec spec = 2;
@@ -322,7 +322,7 @@ message ValidatingAdmissionPolicy {
 message ValidatingAdmissionPolicyBinding {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
   optional ValidatingAdmissionPolicyBindingSpec spec = 2;
@@ -333,7 +333,7 @@ message ValidatingAdmissionPolicyBindingList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of PolicyBinding.
   repeated ValidatingAdmissionPolicyBinding items = 2;
@@ -409,7 +409,7 @@ message ValidatingAdmissionPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ValidatingAdmissionPolicy.
   repeated ValidatingAdmissionPolicy items = 2;
@@ -514,7 +514,7 @@ message ValidatingAdmissionPolicyStatus {
   // +optional
   // +listType=map
   // +listMapKey=type
-  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
 }
 
 // Validation specifies the CEL expression which is used to apply the validation.

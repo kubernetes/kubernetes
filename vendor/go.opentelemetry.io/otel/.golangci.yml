@@ -12,9 +12,8 @@ linters:
     - depguard
     - errcheck
     - godot
-    - gofumpt
+    - gofmt
     - goimports
-    - gosec
     - gosimple
     - govet
     - ineffassign
@@ -54,20 +53,6 @@ issues:
       text: "calls to (.+) only in main[(][)] or init[(][)] functions"
       linters:
         - revive
-    # It's okay to not run gosec in a test.
-    - path: _test\.go
-      linters:
-        - gosec
-    # Igonoring gosec G404: Use of weak random number generator (math/rand instead of crypto/rand)
-    # as we commonly use it in tests and examples.
-    - text: "G404:"
-      linters:
-        - gosec
-    # Igonoring gosec G402: TLS MinVersion too low
-    # as the https://pkg.go.dev/crypto/tls#Config handles MinVersion default well.
-    - text: "G402: TLS MinVersion too low."
-      linters:
-        - gosec
   include:
     # revive exported should have comment or be unexported.
     - EXC0012

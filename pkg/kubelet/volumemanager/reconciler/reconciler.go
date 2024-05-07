@@ -24,10 +24,10 @@ import (
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
 	rc.reconstructVolumes()
 	klog.InfoS("Reconciler: start to sync state")
-	wait.Until(rc.reconcile, rc.loopSleepDuration, stopCh)
+	wait.Until(rc.reconcileNew, rc.loopSleepDuration, stopCh)
 }
 
-func (rc *reconciler) reconcile() {
+func (rc *reconciler) reconcileNew() {
 	readyToUnmount := rc.readyToUnmount()
 	if readyToUnmount {
 		// Unmounts are triggered before mounts so that a volume that was

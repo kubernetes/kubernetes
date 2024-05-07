@@ -118,8 +118,7 @@ func NewController(
 func (c *Controller) Start(logger klog.Logger, nodeInformer informers.NodeInformer) error {
 	logger.Info("Starting IPAM controller", "config", c.config)
 
-	ctx := klog.NewContext(context.TODO(), logger)
-	nodes, err := listNodes(ctx, c.adapter.k8s)
+	nodes, err := listNodes(logger, c.adapter.k8s)
 	if err != nil {
 		return err
 	}

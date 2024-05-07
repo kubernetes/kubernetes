@@ -46,7 +46,7 @@ func parseCgroupSummaryString(CgroupSummaryStr string) (*CgroupSummary, error) {
 	fields := strings.Fields(CgroupSummaryStr)
 	// require at least 4 fields
 	if len(fields) < 4 {
-		return nil, fmt.Errorf("%w: 4+ fields required, found %d fields in cgroup info string: %s", ErrFileParse, len(fields), CgroupSummaryStr)
+		return nil, fmt.Errorf("at least 4 fields required, found %d fields in cgroup info string: %s", len(fields), CgroupSummaryStr)
 	}
 
 	CgroupSummary := &CgroupSummary{
@@ -54,15 +54,15 @@ func parseCgroupSummaryString(CgroupSummaryStr string) (*CgroupSummary, error) {
 	}
 	CgroupSummary.Hierarchy, err = strconv.Atoi(fields[1])
 	if err != nil {
-		return nil, fmt.Errorf("%w: Unable to parse hierarchy ID from %q", ErrFileParse, fields[1])
+		return nil, fmt.Errorf("failed to parse hierarchy ID")
 	}
 	CgroupSummary.Cgroups, err = strconv.Atoi(fields[2])
 	if err != nil {
-		return nil, fmt.Errorf("%w: Unable to parse Cgroup Num from %q", ErrFileParse, fields[2])
+		return nil, fmt.Errorf("failed to parse Cgroup Num")
 	}
 	CgroupSummary.Enabled, err = strconv.Atoi(fields[3])
 	if err != nil {
-		return nil, fmt.Errorf("%w: Unable to parse Enabled from %q", ErrFileParse, fields[3])
+		return nil, fmt.Errorf("failed to parse Enabled")
 	}
 	return CgroupSummary, nil
 }

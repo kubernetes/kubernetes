@@ -1091,67 +1091,6 @@ func TestGetExpectedGVKFromObject(t *testing.T) {
 	}
 }
 
-func TestWatchTimeout(t *testing.T) {
-
-	testCases := []struct {
-		name                      string
-		minWatchTimeout           time.Duration
-		expectedMinTimeoutSeconds int64
-	}{
-		{
-			name:                      "no timeout",
-			expectedMinTimeoutSeconds: 5 * 60,
-		},
-		{
-			name:                      "small timeout not honored",
-			minWatchTimeout:           time.Second,
-			expectedMinTimeoutSeconds: 5 * 60,
-		},
-		{
-			name:                      "30m timeout",
-			minWatchTimeout:           30 * time.Minute,
-			expectedMinTimeoutSeconds: 30 * 60,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
-			s := NewStore(MetaNamespaceKeyFunc)
-			var gotTimeoutSeconds int64
-
-			lw := &testLW{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					if options.TimeoutSeconds != nil {
-						gotTimeoutSeconds = *options.TimeoutSeconds
-					}
-
-					// Stop once the reflector begins watching since we're only interested in the list.
-					close(stopCh)
-					return watch.NewFake(), nil
-				},
-			}
-
-			opts := ReflectorOptions{
-				MinWatchTimeout: tc.minWatchTimeout,
-			}
-			r := NewReflectorWithOptions(lw, &v1.Pod{}, s, opts)
-			if err := r.ListAndWatch(stopCh); err != nil {
-				t.Fatal(err)
-			}
-
-			minExpected := tc.expectedMinTimeoutSeconds
-			maxExpected := 2 * tc.expectedMinTimeoutSeconds
-			if gotTimeoutSeconds < minExpected || gotTimeoutSeconds > maxExpected {
-				t.Errorf("unexpected TimeoutSecond, got %v, expected in [%v, %v]", gotTimeoutSeconds, minExpected, maxExpected)
-			}
-		})
-	}
-}
-
 type storeWithRV struct {
 	Store
 

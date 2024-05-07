@@ -129,7 +129,7 @@ func (o MarshalOptions) MarshalAppend(b []byte, m Message) ([]byte, error) {
 // MarshalState returns the wire-format encoding of a message.
 //
 // This method permits fine-grained control over the marshaler.
-// Most users should use [Marshal] instead.
+// Most users should use Marshal instead.
 func (o MarshalOptions) MarshalState(in protoiface.MarshalInput) (protoiface.MarshalOutput, error) {
 	return o.marshal(in.Buf, in.Message)
 }

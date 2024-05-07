@@ -20,8 +20,8 @@ package v1alpha2
 
 import (
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type ResourceClaimLister interface {
 
 // resourceClaimLister implements the ResourceClaimLister interface.
 type resourceClaimLister struct {
-	listers.ResourceIndexer[*v1alpha2.ResourceClaim]
+	indexer cache.Indexer
 }
 
 // NewResourceClaimLister returns a new ResourceClaimLister.
 func NewResourceClaimLister(indexer cache.Indexer) ResourceClaimLister {
-	return &resourceClaimLister{listers.New[*v1alpha2.ResourceClaim](indexer, v1alpha2.Resource("resourceclaim"))}
+	return &resourceClaimLister{indexer: indexer}
+}
+
+// List lists all ResourceClaims in the indexer.
+func (s *resourceClaimLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceClaim, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha2.ResourceClaim))
+	})
+	return ret, err
 }
 
 // ResourceClaims returns an object that can list and get ResourceClaims.
 func (s *resourceClaimLister) ResourceClaims(namespace string) ResourceClaimNamespaceLister {
-	return resourceClaimNamespaceLister{listers.NewNamespaced[*v1alpha2.ResourceClaim](s.ResourceIndexer, namespace)}
+	return resourceClaimNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // ResourceClaimNamespaceLister helps list and get ResourceClaims.
@@ -66,5 +74,26 @@ type ResourceClaimNamespaceLister interface {
 // resourceClaimNamespaceLister implements the ResourceClaimNamespaceLister
 // interface.
 type resourceClaimNamespaceLister struct {
-	listers.ResourceIndexer[*v1alpha2.ResourceClaim]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all ResourceClaims in the indexer for a given namespace.
+func (s resourceClaimNamespaceLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceClaim, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha2.ResourceClaim))
+	})
+	return ret, err
+}
+
+// Get retrieves the ResourceClaim from the indexer for a given namespace and name.
+func (s resourceClaimNamespaceLister) Get(name string) (*v1alpha2.ResourceClaim, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1alpha2.Resource("resourceclaim"), name)
+	}
+	return obj.(*v1alpha2.ResourceClaim), nil
 }

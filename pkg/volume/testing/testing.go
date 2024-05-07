@@ -212,6 +212,7 @@ var _ volume.RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.AttachableVolumePlugin = &FakeVolumePlugin{}
+var _ volume.VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ volume.DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.NodeExpandableVolumePlugin = &FakeVolumePlugin{}
 

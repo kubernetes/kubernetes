@@ -81,7 +81,7 @@ func (s *Silence) Validate() error {
 	}
 	for _, m := range s.Matchers {
 		if err := m.Validate(); err != nil {
-			return fmt.Errorf("invalid matcher: %w", err)
+			return fmt.Errorf("invalid matcher: %s", err)
 		}
 	}
 	if s.StartsAt.IsZero() {

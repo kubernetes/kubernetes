@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -538,13 +539,13 @@ func TestResolveRelativePaths(t *testing.T) {
 
 	configDir1, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir1)
-	configFile1 := filepath.Join(configDir1, ".kubeconfig")
+	configFile1 := path.Join(configDir1, ".kubeconfig")
 	configDir1, _ = filepath.Abs(configDir1)
 
 	configDir2, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir2)
 	configDir2, _ = os.MkdirTemp(configDir2, "")
-	configFile2 := filepath.Join(configDir2, ".kubeconfig")
+	configFile2 := path.Join(configDir2, ".kubeconfig")
 	configDir2, _ = filepath.Abs(configDir2)
 
 	WriteToFile(pathResolutionConfig1, configFile1)
@@ -563,11 +564,11 @@ func TestResolveRelativePaths(t *testing.T) {
 	for key, cluster := range mergedConfig.Clusters {
 		if key == "relative-server-1" {
 			foundClusterCount++
-			matchStringArg(filepath.Join(configDir1, pathResolutionConfig1.Clusters["relative-server-1"].CertificateAuthority), cluster.CertificateAuthority, t)
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.Clusters["relative-server-1"].CertificateAuthority), cluster.CertificateAuthority, t)
 		}
 		if key == "relative-server-2" {
 			foundClusterCount++
-			matchStringArg(filepath.Join(configDir2, pathResolutionConfig2.Clusters["relative-server-2"].CertificateAuthority), cluster.CertificateAuthority, t)
+			matchStringArg(path.Join(configDir2, pathResolutionConfig2.Clusters["relative-server-2"].CertificateAuthority), cluster.CertificateAuthority, t)
 		}
 		if key == "absolute-server-1" {
 			foundClusterCount++
@@ -586,13 +587,13 @@ func TestResolveRelativePaths(t *testing.T) {
 	for key, authInfo := range mergedConfig.AuthInfos {
 		if key == "relative-user-1" {
 			foundAuthInfoCount++
-			matchStringArg(filepath.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientCertificate), authInfo.ClientCertificate, t)
-			matchStringArg(filepath.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientKey), authInfo.ClientKey, t)
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientCertificate), authInfo.ClientCertificate, t)
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos["relative-user-1"].ClientKey), authInfo.ClientKey, t)
 		}
 		if key == "relative-user-2" {
 			foundAuthInfoCount++
-			matchStringArg(filepath.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientCertificate), authInfo.ClientCertificate, t)
-			matchStringArg(filepath.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientKey), authInfo.ClientKey, t)
+			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientCertificate), authInfo.ClientCertificate, t)
+			matchStringArg(path.Join(configDir2, pathResolutionConfig2.AuthInfos["relative-user-2"].ClientKey), authInfo.ClientKey, t)
 		}
 		if key == "absolute-user-1" {
 			foundAuthInfoCount++
@@ -606,7 +607,7 @@ func TestResolveRelativePaths(t *testing.T) {
 		}
 		if key == "relative-cmd-1" {
 			foundAuthInfoCount++
-			matchStringArg(filepath.Join(configDir1, pathResolutionConfig1.AuthInfos[key].Exec.Command), authInfo.Exec.Command, t)
+			matchStringArg(path.Join(configDir1, pathResolutionConfig1.AuthInfos[key].Exec.Command), authInfo.Exec.Command, t)
 		}
 		if key == "absolute-cmd-1" {
 			foundAuthInfoCount++

@@ -5,12 +5,12 @@
 // Package protoregistry provides data structures to register and lookup
 // protobuf descriptor types.
 //
-// The [Files] registry contains file descriptors and provides the ability
+// The Files registry contains file descriptors and provides the ability
 // to iterate over the files or lookup a specific descriptor within the files.
-// [Files] only contains protobuf descriptors and has no understanding of Go
+// Files only contains protobuf descriptors and has no understanding of Go
 // type information that may be associated with each descriptor.
 //
-// The [Types] registry contains descriptor types for which there is a known
+// The Types registry contains descriptor types for which there is a known
 // Go type associated with that descriptor. It provides the ability to iterate
 // over the registered types or lookup a type by name.
 package protoregistry
@@ -218,7 +218,7 @@ func (r *Files) checkGenProtoConflict(path string) {
 
 // FindDescriptorByName looks up a descriptor by the full name.
 //
-// This returns (nil, [NotFound]) if not found.
+// This returns (nil, NotFound) if not found.
 func (r *Files) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
 	if r == nil {
 		return nil, NotFound
@@ -310,7 +310,7 @@ func (s *nameSuffix) Pop() (name protoreflect.Name) {
 
 // FindFileByPath looks up a file by the path.
 //
-// This returns (nil, [NotFound]) if not found.
+// This returns (nil, NotFound) if not found.
 // This returns an error if multiple files have the same path.
 func (r *Files) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
 	if r == nil {
@@ -431,7 +431,7 @@ func rangeTopLevelDescriptors(fd protoreflect.FileDescriptor, f func(protoreflec
 // A compliant implementation must deterministically return the same type
 // if no error is encountered.
 //
-// The [Types] type implements this interface.
+// The Types type implements this interface.
 type MessageTypeResolver interface {
 	// FindMessageByName looks up a message by its full name.
 	// E.g., "google.protobuf.Any"
@@ -451,7 +451,7 @@ type MessageTypeResolver interface {
 // A compliant implementation must deterministically return the same type
 // if no error is encountered.
 //
-// The [Types] type implements this interface.
+// The Types type implements this interface.
 type ExtensionTypeResolver interface {
 	// FindExtensionByName looks up a extension field by the field's full name.
 	// Note that this is the full name of the field as determined by
@@ -590,7 +590,7 @@ func (r *Types) register(kind string, desc protoreflect.Descriptor, typ interfac
 // FindEnumByName looks up an enum by its full name.
 // E.g., "google.protobuf.Field.Kind".
 //
-// This returns (nil, [NotFound]) if not found.
+// This returns (nil, NotFound) if not found.
 func (r *Types) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumType, error) {
 	if r == nil {
 		return nil, NotFound
@@ -611,7 +611,7 @@ func (r *Types) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumTyp
 // FindMessageByName looks up a message by its full name,
 // e.g. "google.protobuf.Any".
 //
-// This returns (nil, [NotFound]) if not found.
+// This returns (nil, NotFound) if not found.
 func (r *Types) FindMessageByName(message protoreflect.FullName) (protoreflect.MessageType, error) {
 	if r == nil {
 		return nil, NotFound
@@ -632,7 +632,7 @@ func (r *Types) FindMessageByName(message protoreflect.FullName) (protoreflect.M
 // FindMessageByURL looks up a message by a URL identifier.
 // See documentation on google.protobuf.Any.type_url for the URL format.
 //
-// This returns (nil, [NotFound]) if not found.
+// This returns (nil, NotFound) if not found.
 func (r *Types) FindMessageByURL(url string) (protoreflect.MessageType, error) {
 	// This function is similar to FindMessageByName but
 	// truncates anything before and including '/' in the URL.
@@ -662,7 +662,7 @@ func (r *Types) FindMessageByURL(url string) (protoreflect.MessageType, error) {
 // where the extension is declared and is unrelated to the full name of the
 // message being extended.
 //
-// This returns (nil, [NotFound]) if not found.
+// This returns (nil, NotFound) if not found.
 func (r *Types) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
 	if r == nil {
 		return nil, NotFound
@@ -703,7 +703,7 @@ func (r *Types) FindExtensionByName(field protoreflect.FullName) (protoreflect.E
 // FindExtensionByNumber looks up a extension field by the field number
 // within some parent message, identified by full name.
 //
-// This returns (nil, [NotFound]) if not found.
+// This returns (nil, NotFound) if not found.
 func (r *Types) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
 	if r == nil {
 		return nil, NotFound

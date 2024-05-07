@@ -137,7 +137,9 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 
 				metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceTimeoutHandler, status)
-				utilruntime.HandleErrorWithContext(r.Context(), nil, "Post-timeout activity", "timeElapsed", time.Since(timedOutAt), "method", r.Method, "path", r.URL.Path, "result", res)
+				err := fmt.Errorf("post-timeout activity - time-elapsed: %s, %v %q result: %v",
+					time.Since(timedOutAt), r.Method, r.URL.Path, res)
+				utilruntime.HandleError(err)
 			}()
 		}()
 		httplog.SetStacktracePredicate(r.Context(), func(status int) bool {

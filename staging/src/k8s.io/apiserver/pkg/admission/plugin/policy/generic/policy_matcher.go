@@ -19,7 +19,7 @@ package generic
 import (
 	"fmt"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -89,7 +89,7 @@ func (c *matcher) GetNamespace(name string) (*corev1.Namespace, error) {
 var _ matching.MatchCriteria = &matchCriteria{}
 
 type matchCriteria struct {
-	constraints *admissionregistrationv1.MatchResources
+	constraints *v1beta1.MatchResources
 }
 
 // GetParsedNamespaceSelector returns the converted LabelSelector which implements labels.Selector
@@ -103,6 +103,6 @@ func (m *matchCriteria) GetParsedObjectSelector() (labels.Selector, error) {
 }
 
 // GetMatchResources returns the matchConstraints
-func (m *matchCriteria) GetMatchResources() admissionregistrationv1.MatchResources {
+func (m *matchCriteria) GetMatchResources() v1beta1.MatchResources {
 	return *m.constraints
 }

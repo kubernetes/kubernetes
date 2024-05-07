@@ -100,7 +100,7 @@ func resolveRelativePaths(paths []*string, root string) {
 	for _, path := range paths {
 		// leave empty paths alone, "no path" is a valid input
 		// do not attempt to resolve paths that are already absolute
-		if len(*path) > 0 && !utilfs.IsAbs(*path) {
+		if len(*path) > 0 && !filepath.IsAbs(*path) {
 			*path = filepath.Join(root, *path)
 		}
 	}

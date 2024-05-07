@@ -9,7 +9,6 @@ spec:
     securityContext:
       allowPrivilegeEscalation: false
       procMount: Unmasked
-  hostUsers: false
   initContainers:
   - image: registry.k8s.io/pause
     name: initcontainer1

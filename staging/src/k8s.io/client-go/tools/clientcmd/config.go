@@ -19,6 +19,7 @@ package clientcmd
 import (
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -147,7 +148,7 @@ func NewDefaultPathOptions() *PathOptions {
 		EnvVar:           RecommendedConfigPathEnvVar,
 		ExplicitFileFlag: RecommendedConfigPathFlag,
 
-		GlobalFileSubpath: filepath.Join(RecommendedHomeDir, RecommendedFileName),
+		GlobalFileSubpath: path.Join(RecommendedHomeDir, RecommendedFileName),
 
 		LoadingRules: NewDefaultClientConfigLoadingRules(),
 	}

@@ -44,24 +44,22 @@ var endpointslicesKind = v1beta1.SchemeGroupVersion.WithKind("EndpointSlice")
 
 // Get takes name of the endpointSlice, and returns the corresponding endpointSlice object, and an error if there is any.
 func (c *FakeEndpointSlices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.EndpointSlice, err error) {
-	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(endpointslicesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(endpointslicesResource, c.ns, name), &v1beta1.EndpointSlice{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.EndpointSlice), err
 }
 
 // List takes label and field selectors, and returns the list of EndpointSlices that match those selectors.
 func (c *FakeEndpointSlices) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EndpointSliceList, err error) {
-	emptyResult := &v1beta1.EndpointSliceList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(endpointslicesResource, endpointslicesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(endpointslicesResource, endpointslicesKind, c.ns, opts), &v1beta1.EndpointSliceList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,24 +84,22 @@ func (c *FakeEndpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (wa
 
 // Create takes the representation of a endpointSlice and creates it.  Returns the server's representation of the endpointSlice, and an error, if there is any.
 func (c *FakeEndpointSlices) Create(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.CreateOptions) (result *v1beta1.EndpointSlice, err error) {
-	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(endpointslicesResource, c.ns, endpointSlice), emptyResult)
+		Invokes(testing.NewCreateAction(endpointslicesResource, c.ns, endpointSlice), &v1beta1.EndpointSlice{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.EndpointSlice), err
 }
 
 // Update takes the representation of a endpointSlice and updates it. Returns the server's representation of the endpointSlice, and an error, if there is any.
 func (c *FakeEndpointSlices) Update(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.UpdateOptions) (result *v1beta1.EndpointSlice, err error) {
-	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(endpointslicesResource, c.ns, endpointSlice), emptyResult)
+		Invokes(testing.NewUpdateAction(endpointslicesResource, c.ns, endpointSlice), &v1beta1.EndpointSlice{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.EndpointSlice), err
 }
@@ -126,12 +122,11 @@ func (c *FakeEndpointSlices) DeleteCollection(ctx context.Context, opts v1.Delet
 
 // Patch applies the patch and returns the patched endpointSlice.
 func (c *FakeEndpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.EndpointSlice, err error) {
-	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, name, pt, data, subresources...), &v1beta1.EndpointSlice{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.EndpointSlice), err
 }
@@ -149,12 +144,11 @@ func (c *FakeEndpointSlices) Apply(ctx context.Context, endpointSlice *discovery
 	if name == nil {
 		return nil, fmt.Errorf("endpointSlice.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.EndpointSlice{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.EndpointSlice), err
 }

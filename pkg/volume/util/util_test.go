@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/utils/ptr"
+	utilptr "k8s.io/utils/pointer"
 )
 
 func TestLoadPodFromFile(t *testing.T) {
@@ -169,14 +169,14 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
+								RunAsUser: utilptr.Int64Ptr(1000),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
+								RunAsUser: utilptr.Int64Ptr(1000),
 							},
 						},
 						{
@@ -195,62 +195,25 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](999),
+								RunAsUser: utilptr.Int64Ptr(999),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
+								RunAsUser: utilptr.Int64Ptr(1000),
 							},
 						},
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
-							},
-						},
-					},
-					EphemeralContainers: []v1.EphemeralContainer{
-						{
-							EphemeralContainerCommon: v1.EphemeralContainerCommon{
-								SecurityContext: &v1.SecurityContext{
-									RunAsUser: ptr.To[int64](1001),
-								},
+								RunAsUser: utilptr.Int64Ptr(1000),
 							},
 						},
 					},
 				},
 			},
 			wantFsUser: nil,
-		},
-		{
-			desc: "init and regular containers have runAsUser specified and the same",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					SecurityContext: &v1.PodSecurityContext{},
-					InitContainers: []v1.Container{
-						{
-							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
-							},
-						},
-					},
-					Containers: []v1.Container{
-						{
-							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
-							},
-						},
-						{
-							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
-							},
-						},
-					},
-				},
-			},
-			wantFsUser: ptr.To[int64](1000),
 		},
 		{
 			desc: "all have runAsUser specified and the same",
@@ -260,34 +223,25 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
+								RunAsUser: utilptr.Int64Ptr(1000),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
+								RunAsUser: utilptr.Int64Ptr(1000),
 							},
 						},
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: ptr.To[int64](1000),
-							},
-						},
-					},
-					EphemeralContainers: []v1.EphemeralContainer{
-						{
-							EphemeralContainerCommon: v1.EphemeralContainerCommon{
-								SecurityContext: &v1.SecurityContext{
-									RunAsUser: ptr.To[int64](1000),
-								},
+								RunAsUser: utilptr.Int64Ptr(1000),
 							},
 						},
 					},
 				},
 			},
-			wantFsUser: ptr.To[int64](1000),
+			wantFsUser: utilptr.Int64Ptr(1000),
 		},
 	}
 

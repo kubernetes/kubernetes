@@ -23,8 +23,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -86,14 +84,4 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
-}
-
-// IsAbs returns whether the given path is absolute or not.
-// On Windows, filepath.IsAbs will not return True for paths prefixed with a slash, even
-// though they can be used as absolute paths (https://docs.microsoft.com/en-us/dotnet/standard/io/file-path-formats).
-//
-// WARN: It isn't safe to use this for API values which will propagate across systems (e.g. REST API values
-// that get validated on Unix, persisted, then consumed by Windows, etc).
-func IsAbs(path string) bool {
-	return filepath.IsAbs(path) || strings.HasPrefix(path, `\`) || strings.HasPrefix(path, `/`)
 }

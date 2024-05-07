@@ -71,7 +71,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	svmv1alpha1 "k8s.io/kubernetes/pkg/apis/storagemigration"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -657,31 +656,6 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContextList)
 
-	resourceClaimParametersColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "GeneratedFrom", Type: "string", Description: resourcev1alpha2.ResourceClaimParameters{}.SwaggerDoc()["generatedFrom"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-	}
-	_ = h.TableHandler(resourceClaimParametersColumnDefinitions, printResourceClaimParameters)
-	_ = h.TableHandler(resourceClaimParametersColumnDefinitions, printResourceClaimParametersList)
-
-	resourceClassParametersColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "GeneratedFrom", Type: "string", Description: resourcev1alpha2.ResourceClassParameters{}.SwaggerDoc()["generatedFrom"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-	}
-	_ = h.TableHandler(resourceClassParametersColumnDefinitions, printResourceClassParameters)
-	_ = h.TableHandler(resourceClassParametersColumnDefinitions, printResourceClassParametersList)
-
-	nodeResourceCapacityColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Node", Type: "string", Description: resourcev1alpha2.ResourceSlice{}.SwaggerDoc()["nodeName"]},
-		{Name: "Driver", Type: "string", Description: resourcev1alpha2.ResourceSlice{}.SwaggerDoc()["driverName"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-	}
-	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printResourceSlice)
-	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printResourceSliceList)
-
 	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "CIDRs", Type: "string", Description: networkingv1alpha1.ServiceCIDRSpec{}.SwaggerDoc()["cidrs"]},
@@ -698,13 +672,6 @@ func AddHandlers(h printers.PrintHandler) {
 
 	_ = h.TableHandler(ipAddressColumnDefinitions, printIPAddress)
 	_ = h.TableHandler(ipAddressColumnDefinitions, printIPAddressList)
-
-	storageVersionMigrationColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Resource", Type: "string", Description: "Fully qualified resource to migrate"},
-	}
-	_ = h.TableHandler(storageVersionMigrationColumnDefinitions, printStorageVersionMigration)
-	_ = h.TableHandler(storageVersionMigrationColumnDefinitions, printStorageVersionMigrationList)
 }
 
 // Pass ports=nil for all ports.
@@ -3071,102 +3038,6 @@ func printPodSchedulingContextList(list *resource.PodSchedulingContextList, opti
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodSchedulingContext(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printResourceClaimParameters(obj *resource.ResourceClaimParameters, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	generatedFrom := ""
-	if obj.GeneratedFrom != nil {
-		generatedFrom = fmt.Sprintf("%s.%s %s", obj.GeneratedFrom.Kind, obj.GeneratedFrom.APIGroup, obj.GeneratedFrom.Name)
-	}
-	row.Cells = append(row.Cells, obj.Name, generatedFrom, translateTimestampSince(obj.CreationTimestamp))
-
-	return []metav1.TableRow{row}, nil
-}
-
-func printResourceClaimParametersList(list *resource.ResourceClaimParametersList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printResourceClaimParameters(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printResourceClassParameters(obj *resource.ResourceClassParameters, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	generatedFrom := ""
-	if obj.GeneratedFrom != nil {
-		generatedFrom = fmt.Sprintf("%s.%s %s", obj.GeneratedFrom.Kind, obj.GeneratedFrom.APIGroup, obj.GeneratedFrom.Name)
-	}
-	row.Cells = append(row.Cells, obj.Name, generatedFrom, translateTimestampSince(obj.CreationTimestamp))
-
-	return []metav1.TableRow{row}, nil
-}
-
-func printResourceClassParametersList(list *resource.ResourceClassParametersList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printResourceClassParameters(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printResourceSlice(obj *resource.ResourceSlice, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	row.Cells = append(row.Cells, obj.Name, obj.NodeName, obj.DriverName, translateTimestampSince(obj.CreationTimestamp))
-
-	return []metav1.TableRow{row}, nil
-}
-
-func printResourceSliceList(list *resource.ResourceSliceList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printResourceSlice(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printStorageVersionMigration(obj *svmv1alpha1.StorageVersionMigration, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-
-	migrationGVR := obj.Spec.Resource.Resource + "." + obj.Spec.Resource.Version + "." + obj.Spec.Resource.Group
-	row.Cells = append(row.Cells, obj.Name, migrationGVR)
-	//ToDo: add migration condition 'status' and 'type' (migration successful | failed)
-
-	return []metav1.TableRow{row}, nil
-}
-
-func printStorageVersionMigrationList(list *svmv1alpha1.StorageVersionMigrationList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-
-	for i := range list.Items {
-		r, err := printStorageVersionMigration(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

@@ -299,21 +299,21 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.Logf("service port TCP: %d", svcPort)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 0")
 		err = tcpJig.Scale(ctx, 0)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the TCP service's LoadBalancer with no backends, no answer expected")
-		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
+		ginkgo.By("looking for ICMP REJECT on the TCP service's LoadBalancer")
+		testRejectedHTTP(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
 		err = tcpJig.Scale(ctx, 1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		// Change the services back to ClusterIP.
 

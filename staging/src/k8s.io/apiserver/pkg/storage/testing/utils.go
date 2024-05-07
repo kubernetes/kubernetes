@@ -197,8 +197,7 @@ func testCheckNoMoreResults(t *testing.T, w watch.Interface) {
 	select {
 	case e := <-w.ResultChan():
 		t.Errorf("Unexpected: %#v event received, expected no events", e)
-	// We consciously make the timeout short here to speed up tests.
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(time.Second):
 		return
 	}
 }

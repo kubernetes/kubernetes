@@ -31,12 +31,9 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver/load"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
-	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -93,10 +90,6 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
-			var slices resourcev1alpha2informers.ResourceSliceInformer
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				slices = config.VersionedInformerFactory.Resource().V1alpha2().ResourceSlices()
-			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
@@ -105,7 +98,6 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				config.VersionedInformerFactory.Core().V1().Pods(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
-				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 

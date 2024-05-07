@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,10 +39,30 @@ type NodeLister interface {
 
 // nodeLister implements the NodeLister interface.
 type nodeLister struct {
-	listers.ResourceIndexer[*v1.Node]
+	indexer cache.Indexer
 }
 
 // NewNodeLister returns a new NodeLister.
 func NewNodeLister(indexer cache.Indexer) NodeLister {
-	return &nodeLister{listers.New[*v1.Node](indexer, v1.Resource("node"))}
+	return &nodeLister{indexer: indexer}
+}
+
+// List lists all Nodes in the indexer.
+func (s *nodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Node))
+	})
+	return ret, err
+}
+
+// Get retrieves the Node from the index for a given name.
+func (s *nodeLister) Get(name string) (*v1.Node, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("node"), name)
+	}
+	return obj.(*v1.Node), nil
 }

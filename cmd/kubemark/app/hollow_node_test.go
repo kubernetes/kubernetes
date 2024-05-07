@@ -24,8 +24,6 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const fakeKubeconfig = `
@@ -82,8 +80,7 @@ func TestHollowNode(t *testing.T) {
 			go func() {
 				data, err := os.ReadFile(kubeconfigPath)
 				t.Logf("read %d, err=%v\n", len(data), err)
-				ctx := ktesting.Init(t)
-				errCh <- run(ctx, s)
+				errCh <- run(s)
 			}()
 
 			select {

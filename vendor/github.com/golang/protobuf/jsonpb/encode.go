@@ -55,7 +55,6 @@ type Marshaler struct {
 // implement JSONPBUnmarshaler so that the custom format can be parsed.
 //
 // The JSON marshaling must follow the proto to JSON specification:
-//
 //	https://developers.google.com/protocol-buffers/docs/proto3#json
 //
 // Deprecated: Custom types should implement protobuf reflection instead.

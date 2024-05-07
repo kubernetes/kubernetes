@@ -16,8 +16,8 @@ package ext
 
 import (
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/ast"
-	"github.com/google/cel-go/common/types"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // Bindings returns a cel.EnvOption to configure support for local variable
@@ -61,7 +61,7 @@ func (celBindings) CompileOptions() []cel.EnvOption {
 	return []cel.EnvOption{
 		cel.Macros(
 			// cel.bind(var, <init>, <expr>)
-			cel.ReceiverMacro(bindMacro, 3, celBind),
+			cel.NewReceiverMacro(bindMacro, 3, celBind),
 		),
 	}
 }
@@ -70,27 +70,27 @@ func (celBindings) ProgramOptions() []cel.ProgramOption {
 	return []cel.ProgramOption{}
 }
 
-func celBind(mef cel.MacroExprFactory, target ast.Expr, args []ast.Expr) (ast.Expr, *cel.Error) {
+func celBind(meh cel.MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *cel.Error) {
 	if !macroTargetMatchesNamespace(celNamespace, target) {
 		return nil, nil
 	}
 	varIdent := args[0]
 	varName := ""
-	switch varIdent.Kind() {
-	case ast.IdentKind:
-		varName = varIdent.AsIdent()
+	switch varIdent.GetExprKind().(type) {
+	case *exprpb.Expr_IdentExpr:
+		varName = varIdent.GetIdentExpr().GetName()
 	default:
-		return nil, mef.NewError(varIdent.ID(), "cel.bind() variable names must be simple identifiers")
+		return nil, meh.NewError(varIdent.GetId(), "cel.bind() variable names must be simple identifiers")
 	}
 	varInit := args[1]
 	resultExpr := args[2]
-	return mef.NewComprehension(
-		mef.NewList(),
+	return meh.Fold(
 		unusedIterVar,
+		meh.NewList(),
 		varName,
 		varInit,
-		mef.NewLiteral(types.False),
-		mef.NewIdent(varName),
+		meh.LiteralBool(false),
+		meh.Ident(varName),
 		resultExpr,
 	), nil
 }

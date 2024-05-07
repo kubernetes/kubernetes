@@ -509,7 +509,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 	}
 
 	// test function
-	_, tCtx := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc testCase) {
 		fakeNodeInformer := test.FakeNodeInformer(tc.fakeNodeHandler)
 		nodeList, _ := tc.fakeNodeHandler.List(tCtx, metav1.ListOptions{})
@@ -547,7 +547,7 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 			if node.Spec.PodCIDRs == nil {
 				updateCount++
 			}
-			if err := allocator.AllocateOrOccupyCIDR(tCtx, node); err != nil {
+			if err := allocator.AllocateOrOccupyCIDR(logger, node); err != nil {
 				t.Errorf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 			}
 		}
@@ -610,7 +610,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 			},
 		},
 	}
-	_, tCtx := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc testCase) {
 		// Initialize the range allocator.
 		allocator, err := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
@@ -639,7 +639,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 				}
 			}
 		}
-		if err := allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0]); err == nil {
+		if err := allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0]); err == nil {
 			t.Errorf("%v: unexpected success in AllocateOrOccupyCIDR: %v", tc.description, err)
 		}
 		// We don't expect any updates, so just sleep for some time
@@ -782,7 +782,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			}
 		}
 
-		err := allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0])
+		err := allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0])
 		if len(tc.expectedAllocatedCIDRFirstRound) != 0 {
 			if err != nil {
 				t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
@@ -812,7 +812,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 				t.Fatalf("%v: unexpected error in ReleaseCIDR: %v", tc.description, err)
 			}
 		}
-		if err = allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0]); err != nil {
+		if err = allocator.AllocateOrOccupyCIDR(logger, tc.fakeNodeHandler.Existing[0]); err != nil {
 			t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 		}
 		if err := test.WaitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {

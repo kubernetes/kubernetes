@@ -44,7 +44,7 @@ func (fs FS) SysctlInts(sysctl string) ([]int, error) {
 		vp := util.NewValueParser(f)
 		values[i] = vp.Int()
 		if err := vp.Err(); err != nil {
-			return nil, fmt.Errorf("%s: field %d in sysctl %s is not a valid int: %w", ErrFileParse, i, sysctl, err)
+			return nil, fmt.Errorf("field %d in sysctl %s is not a valid int: %w", i, sysctl, err)
 		}
 	}
 	return values, nil

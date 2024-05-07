@@ -58,97 +58,17 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 		{
 			name: "jwt authenticator is empty",
 			in:   &api.AuthenticationConfiguration{},
-			want: "",
+			want: "jwt: Required value: at least one jwt is required",
 		},
 		{
-			name: "duplicate issuer across jwt authenticators",
+			name: ">1 jwt authenticator",
 			in: &api.AuthenticationConfiguration{
 				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
-							},
-						},
-					},
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
-							},
-						},
-					},
+					{Issuer: api.Issuer{URL: "https://issuer-url", Audiences: []string{"audience"}}},
+					{Issuer: api.Issuer{URL: "https://issuer-url", Audiences: []string{"audience"}}},
 				},
 			},
-			want: `jwt[1].issuer.url: Duplicate value: "https://issuer-url"`,
-		},
-		{
-			name: "duplicate discoveryURL across jwt authenticators",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:          "https://issuer-url",
-							DiscoveryURL: "https://discovery-url/.well-known/openid-configuration",
-							Audiences:    []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
-							},
-						},
-					},
-					{
-						Issuer: api.Issuer{
-							URL:          "https://different-issuer-url",
-							DiscoveryURL: "https://discovery-url/.well-known/openid-configuration",
-							Audiences:    []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
-							},
-						},
-					},
-				},
-			},
-			want: `jwt[1].issuer.discoveryURL: Duplicate value: "https://discovery-url/.well-known/openid-configuration"`,
+			want: "jwt: Too many: 2: must have at most 1 items",
 		},
 		{
 			name: "failed issuer validation",
@@ -281,313 +201,6 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 			},
 			disallowedIssuers: []string{"a", "b", "https://issuer-url", "c"},
 			want:              `jwt[0].issuer.url: Invalid value: "https://issuer-url": URL must not overlap with disallowed issuers: [a b c https://issuer-url]`,
-		},
-		{
-			name: "valid authentication configuration that uses unverified email",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: "claims.email",
-							},
-						},
-					},
-				},
-			},
-			want: `jwt[0].claimMappings.username.expression: Invalid value: "claims.email": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid authentication configuration that almost uses unverified email",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: "claims.email_",
-							},
-						},
-					},
-				},
-			},
-			want: "",
-		},
-		{
-			name: "valid authentication configuration that uses unverified email join",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `['yay', string(claims.email), 'panda'].join(' ')`,
-							},
-						},
-					},
-				},
-			},
-			want: `jwt[0].claimMappings.username.expression: Invalid value: "['yay', string(claims.email), 'panda'].join(' ')": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid authentication configuration that uses unverified optional email",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `claims.?email`,
-							},
-						},
-					},
-				},
-			},
-			want: `jwt[0].claimMappings.username.expression: Invalid value: "claims.?email": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid authentication configuration that uses unverified optional map email key",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `{claims.?email: "panda"}`,
-							},
-						},
-					},
-				},
-			},
-			want: `jwt[0].claimMappings.username.expression: Invalid value: "{claims.?email: \"panda\"}": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid authentication configuration that uses unverified optional map email value",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `{"fancy": claims.?email}`,
-							},
-						},
-					},
-				},
-			},
-			want: `jwt[0].claimMappings.username.expression: Invalid value: "{\"fancy\": claims.?email}": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid authentication configuration that uses unverified email value in list iteration",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `["a"].map(i, i + claims.email)`,
-							},
-						},
-					},
-				},
-			},
-			want: `jwt[0].claimMappings.username.expression: Invalid value: "[\"a\"].map(i, i + claims.email)": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid authentication configuration that uses verified email join via rule",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Expression: `string(claims.email_verified) == "panda"`,
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `['yay', string(claims.email), 'panda'].join(' ')`,
-							},
-						},
-					},
-				},
-			},
-			want: "",
-		},
-		{
-			name: "valid authentication configuration that uses verified email join via extra",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `['yay', string(claims.email), 'panda'].join(' ')`,
-							},
-							Extra: []api.ExtraMapping{
-								{Key: "panda.io/foo", ValueExpression: "claims.email_verified.upperAscii()"},
-							},
-						},
-					},
-				},
-			},
-			want: "",
-		},
-		{
-			name: "valid authentication configuration that uses verified email join via extra optional",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `['yay', string(claims.email), 'panda'].join(' ')`,
-							},
-							Extra: []api.ExtraMapping{
-								{Key: "panda.io/foo", ValueExpression: "claims.?email_verified"},
-							},
-						},
-					},
-				},
-			},
-			want: "",
-		},
-		{
-			name: "valid authentication configuration that uses email and email_verified || true via username",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						// allow email claim when email_verified is true or absent
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `claims.?email_verified.orValue(true) ? claims.email : claims.sub`,
-							},
-						},
-					},
-				},
-			},
-			want: "",
-		},
-		{
-			name: "valid authentication configuration that uses email and email_verified || false via username",
-			in: &api.AuthenticationConfiguration{
-				JWT: []api.JWTAuthenticator{
-					{
-						Issuer: api.Issuer{
-							URL:       "https://issuer-url",
-							Audiences: []string{"audience"},
-						},
-						ClaimValidationRules: []api.ClaimValidationRule{
-							{
-								Claim:         "foo",
-								RequiredValue: "bar",
-							},
-						},
-						// allow email claim only when email_verified is present and true
-						ClaimMappings: api.ClaimMappings{
-							Username: api.PrefixedClaimOrExpression{
-								Expression: `claims.?email_verified.orValue(false) ? claims.email : claims.sub`,
-							},
-						},
-					},
-				},
-			},
-			want: "",
 		},
 		{
 			name: "valid authentication configuration",
@@ -894,7 +507,6 @@ func TestValidateClaimValidationRules(t *testing.T) {
 		structuredAuthnFeatureEnabled bool
 		want                          string
 		wantCELMapper                 bool
-		wantUsesEmailVerifiedClaim    bool
 	}{
 		{
 			name:                          "claim and expression are empty, structured authn feature enabled",
@@ -980,51 +592,25 @@ func TestValidateClaimValidationRules(t *testing.T) {
 			wantCELMapper:                 true,
 		},
 		{
-			name: "valid claim validation rule with multiple rules and email_verified check",
-			in: []api.ClaimValidationRule{
-				{Claim: "claim1", RequiredValue: "value1"},
-				{Claim: "claim2", RequiredValue: "value2"},
-				{Expression: "has(claims.email_verified)"},
-			},
-			structuredAuthnFeatureEnabled: true,
-			want:                          "",
-			wantUsesEmailVerifiedClaim:    true,
-		},
-		{
-			name: "valid claim validation rule with multiple rules and almost email_verified check",
-			in: []api.ClaimValidationRule{
-				{Claim: "claim1", RequiredValue: "value1"},
-				{Claim: "claim2", RequiredValue: "value2"},
-				{Expression: "has(claims.email_verified_)"},
-			},
-			structuredAuthnFeatureEnabled: true,
-			want:                          "",
-			wantUsesEmailVerifiedClaim:    false,
-		},
-		{
 			name: "valid claim validation rule with multiple rules",
 			in: []api.ClaimValidationRule{
 				{Claim: "claim1", RequiredValue: "value1"},
-				{Claim: "claim2", RequiredValue: "claims.email_verified"}, // not a CEL expression
+				{Claim: "claim2", RequiredValue: "value2"},
 			},
 			structuredAuthnFeatureEnabled: true,
 			want:                          "",
-			wantUsesEmailVerifiedClaim:    false,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			state := &validationState{}
-			got := validateClaimValidationRules(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			celMapper := &authenticationcel.CELMapper{}
+			got := validateClaimValidationRules(compiler, celMapper, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("ClaimValidationRules validation mismatch (-want +got):\n%s", d)
 			}
-			if tt.wantCELMapper && state.mapper.ClaimValidationRules == nil {
+			if tt.wantCELMapper && celMapper.ClaimValidationRules == nil {
 				t.Fatalf("ClaimValidationRules validation mismatch: CELMapper.ClaimValidationRules is nil")
-			}
-			if tt.wantUsesEmailVerifiedClaim != state.usesEmailVerifiedClaim {
-				t.Fatalf("ClaimValidationRules state.usesEmailVerifiedClaim mismatch: want %v, got %v", tt.wantUsesEmailVerifiedClaim, state.usesEmailVerifiedClaim)
 			}
 		})
 	}
@@ -1036,7 +622,6 @@ func TestValidateClaimMappings(t *testing.T) {
 	testCases := []struct {
 		name                          string
 		in                            api.ClaimMappings
-		usesEmailVerifiedClaim        bool
 		structuredAuthnFeatureEnabled bool
 		want                          string
 		wantCELMapper                 bool
@@ -1336,133 +921,6 @@ func TestValidateClaimMappings(t *testing.T) {
 			want:                          `issuer.claimMappings.extra[0].key: Invalid value: "example.org/Foo": key must be lowercase`,
 		},
 		{
-			name: "valid claim mappings but uses email without verification",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: "claims.extra"},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          `issuer.claimMappings.username.expression: Invalid value: "claims.email": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid claim mappings but uses email in complex CEL expression without verification",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "has(claims.email) ? claims.email : claims.sub"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: "claims.extra"},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          `issuer.claimMappings.username.expression: Invalid value: "has(claims.email) ? claims.email : claims.sub": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid claim mappings but uses email in CEL expression function without verification",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.email.trim()"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: "claims.extra"},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          `issuer.claimMappings.username.expression: Invalid value: "claims.email.trim()": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid claim mappings and uses email with verification via extra",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: "claims.email_verified"},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          "",
-		},
-		{
-			name: "valid claim mappings and uses email with verification via extra optional",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: `has(claims.email_verified) ? string(claims.email_verified) : "false"`},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          "",
-		},
-		{
-			name: "valid claim mappings and almost uses email with verification via extra optional",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: `has(claims.email_verified_) ? string(claims.email_verified_) : "false"`},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          `issuer.claimMappings.username.expression: Invalid value: "claims.email": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression`,
-		},
-		{
-			name: "valid claim mappings and uses email with verification via hasVerifiedEmail",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.email"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: "claims.extra"},
-				},
-			},
-			usesEmailVerifiedClaim:        true,
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          "",
-		},
-		{
-			name: "valid claim mappings that almost use claims.email",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.email_"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: "claims.extra"},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          "",
-		},
-		{
-			name: "valid claim mappings that almost use claims.email via nesting",
-			in: api.ClaimMappings{
-				Username: api.PrefixedClaimOrExpression{Expression: "claims.other.claims.email"},
-				Groups:   api.PrefixedClaimOrExpression{Expression: "claims.groups"},
-				UID:      api.ClaimOrExpression{Expression: "claims.uid"},
-				Extra: []api.ExtraMapping{
-					{Key: "example.org/foo", ValueExpression: "claims.extra"},
-				},
-			},
-			structuredAuthnFeatureEnabled: true,
-			wantCELMapper:                 true,
-			want:                          "",
-		},
-		{
 			name: "valid claim mappings",
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{Expression: "claims.username"},
@@ -1480,23 +938,23 @@ func TestValidateClaimMappings(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			state := &validationState{usesEmailVerifiedClaim: tt.usesEmailVerifiedClaim}
-			got := validateClaimMappings(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			celMapper := &authenticationcel.CELMapper{}
+			got := validateClaimMappings(compiler, celMapper, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				fmt.Println(errString(got))
 				t.Fatalf("ClaimMappings validation mismatch (-want +got):\n%s", d)
 			}
 			if tt.wantCELMapper {
-				if len(tt.in.Username.Expression) > 0 && state.mapper.Username == nil {
+				if len(tt.in.Username.Expression) > 0 && celMapper.Username == nil {
 					t.Fatalf("ClaimMappings validation mismatch: CELMapper.Username is nil")
 				}
-				if len(tt.in.Groups.Expression) > 0 && state.mapper.Groups == nil {
+				if len(tt.in.Groups.Expression) > 0 && celMapper.Groups == nil {
 					t.Fatalf("ClaimMappings validation mismatch: CELMapper.Groups is nil")
 				}
-				if len(tt.in.UID.Expression) > 0 && state.mapper.UID == nil {
+				if len(tt.in.UID.Expression) > 0 && celMapper.UID == nil {
 					t.Fatalf("ClaimMappings validation mismatch: CELMapper.UID is nil")
 				}
-				if len(tt.in.Extra) > 0 && state.mapper.Extra == nil {
+				if len(tt.in.Extra) > 0 && celMapper.Extra == nil {
 					t.Fatalf("ClaimMappings validation mismatch: CELMapper.Extra is nil")
 				}
 			}
@@ -1569,12 +1027,12 @@ func TestValidateUserValidationRules(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			state := &validationState{}
-			got := validateUserValidationRules(compiler, state, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
+			celMapper := &authenticationcel.CELMapper{}
+			got := validateUserValidationRules(compiler, celMapper, tt.in, fldPath, tt.structuredAuthnFeatureEnabled).ToAggregate()
 			if d := cmp.Diff(tt.want, errString(got)); d != "" {
 				t.Fatalf("UserValidationRules validation mismatch (-want +got):\n%s", d)
 			}
-			if tt.wantCELMapper && state.mapper.UserValidationRules == nil {
+			if tt.wantCELMapper && celMapper.UserValidationRules == nil {
 				t.Fatalf("UserValidationRules validation mismatch: CELMapper.UserValidationRules is nil")
 			}
 		})

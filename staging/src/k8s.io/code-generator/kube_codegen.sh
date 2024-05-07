@@ -443,7 +443,6 @@ function kube::codegen::gen_client() {
     local applyconfig="false"
     local applyconfig_subdir="applyconfiguration"
     local applyconfig_external=""
-    local applyconfig_openapi_schema=""
     local watchable="false"
     local listers_subdir="listers"
     local informers_subdir="informers"
@@ -487,10 +486,6 @@ function kube::codegen::gen_client() {
                 ;;
             "--applyconfig-externals")
                 applyconfig_external="$2"
-                shift 2
-                ;;
-            "--applyconfig-openapi-schema")
-                applyconfig_openapi_schema="$2"
                 shift 2
                 ;;
             "--with-watch")
@@ -599,7 +594,6 @@ function kube::codegen::gen_client() {
             --output-dir "${out_dir}/${applyconfig_subdir}" \
             --output-pkg "${applyconfig_pkg}" \
             --external-applyconfigurations "${applyconfig_external}" \
-            --openapi-schema "${applyconfig_openapi_schema}" \
             "${input_pkgs[@]}"
     fi
 

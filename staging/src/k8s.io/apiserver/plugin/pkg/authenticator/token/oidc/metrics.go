@@ -20,13 +20,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"k8s.io/utils/clock"
 	"sync"
 	"time"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/utils/clock"
 )
 
 const (
@@ -68,11 +68,11 @@ func getHash(data string) string {
 	return ""
 }
 
-func newInstrumentedAuthenticator(jwtIssuer string, delegate AuthenticatorTokenWithHealthCheck) AuthenticatorTokenWithHealthCheck {
+func newInstrumentedAuthenticator(jwtIssuer string, delegate authenticator.Token) authenticator.Token {
 	return newInstrumentedAuthenticatorWithClock(jwtIssuer, delegate, clock.RealClock{})
 }
 
-func newInstrumentedAuthenticatorWithClock(jwtIssuer string, delegate AuthenticatorTokenWithHealthCheck, clock clock.PassiveClock) *instrumentedAuthenticator {
+func newInstrumentedAuthenticatorWithClock(jwtIssuer string, delegate authenticator.Token, clock clock.PassiveClock) *instrumentedAuthenticator {
 	RegisterMetrics()
 	return &instrumentedAuthenticator{
 		jwtIssuerHash: getHash(jwtIssuer),
@@ -83,7 +83,7 @@ func newInstrumentedAuthenticatorWithClock(jwtIssuer string, delegate Authentica
 
 type instrumentedAuthenticator struct {
 	jwtIssuerHash string
-	delegate      AuthenticatorTokenWithHealthCheck
+	delegate      authenticator.Token
 	clock         clock.PassiveClock
 }
 
@@ -103,8 +103,4 @@ func (a *instrumentedAuthenticator) AuthenticateToken(ctx context.Context, token
 		recordAuthenticationLatency("success", a.jwtIssuerHash, duration)
 	}
 	return response, ok, err
-}
-
-func (a *instrumentedAuthenticator) HealthCheck() error {
-	return a.delegate.HealthCheck()
 }

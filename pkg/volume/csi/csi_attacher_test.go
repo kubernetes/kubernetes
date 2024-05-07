@@ -83,7 +83,6 @@ func markVolumeAttached(t *testing.T, client clientset.Interface, watch *watch.R
 	for i := 0; i < 100; i++ {
 		attach, err = client.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 		if err != nil {
-			attach = nil
 			if apierrors.IsNotFound(err) {
 				<-ticker.C
 				continue

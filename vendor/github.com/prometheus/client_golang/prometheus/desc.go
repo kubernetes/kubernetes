@@ -52,7 +52,7 @@ type Desc struct {
 	constLabelPairs []*dto.LabelPair
 	// variableLabels contains names of labels and normalization function for
 	// which the metric maintains variable values.
-	variableLabels *compiledLabels
+	variableLabels ConstrainedLabels
 	// id is a hash of the values of the ConstLabels and fqName. This
 	// must be unique among all registered descriptors and can therefore be
 	// used as an identifier of the descriptor.
@@ -93,7 +93,7 @@ func (v2) NewDesc(fqName, help string, variableLabels ConstrainableLabels, const
 	d := &Desc{
 		fqName:         fqName,
 		help:           help,
-		variableLabels: variableLabels.compile(),
+		variableLabels: variableLabels.constrainedLabels(),
 	}
 	if !model.IsValidMetricName(model.LabelValue(fqName)) {
 		d.err = fmt.Errorf("%q is not a valid metric name", fqName)
@@ -103,7 +103,7 @@ func (v2) NewDesc(fqName, help string, variableLabels ConstrainableLabels, const
 	// their sorted label names) plus the fqName (at position 0).
 	labelValues := make([]string, 1, len(constLabels)+1)
 	labelValues[0] = fqName
-	labelNames := make([]string, 0, len(constLabels)+len(d.variableLabels.names))
+	labelNames := make([]string, 0, len(constLabels)+len(d.variableLabels))
 	labelNameSet := map[string]struct{}{}
 	// First add only the const label names and sort them...
 	for labelName := range constLabels {
@@ -128,13 +128,13 @@ func (v2) NewDesc(fqName, help string, variableLabels ConstrainableLabels, const
 	// Now add the variable label names, but prefix them with something that
 	// cannot be in a regular label name. That prevents matching the label
 	// dimension with a different mix between preset and variable labels.
-	for _, label := range d.variableLabels.names {
-		if !checkLabelName(label) {
-			d.err = fmt.Errorf("%q is not a valid label name for metric %q", label, fqName)
+	for _, label := range d.variableLabels {
+		if !checkLabelName(label.Name) {
+			d.err = fmt.Errorf("%q is not a valid label name for metric %q", label.Name, fqName)
 			return d
 		}
-		labelNames = append(labelNames, "$"+label)
-		labelNameSet[label] = struct{}{}
+		labelNames = append(labelNames, "$"+label.Name)
+		labelNameSet[label.Name] = struct{}{}
 	}
 	if len(labelNames) != len(labelNameSet) {
 		d.err = fmt.Errorf("duplicate label names in constant and variable labels for metric %q", fqName)
@@ -189,19 +189,11 @@ func (d *Desc) String() string {
 			fmt.Sprintf("%s=%q", lp.GetName(), lp.GetValue()),
 		)
 	}
-	vlStrings := make([]string, 0, len(d.variableLabels.names))
-	for _, vl := range d.variableLabels.names {
-		if fn, ok := d.variableLabels.labelConstraints[vl]; ok && fn != nil {
-			vlStrings = append(vlStrings, fmt.Sprintf("c(%s)", vl))
-		} else {
-			vlStrings = append(vlStrings, vl)
-		}
-	}
 	return fmt.Sprintf(
-		"Desc{fqName: %q, help: %q, constLabels: {%s}, variableLabels: {%s}}",
+		"Desc{fqName: %q, help: %q, constLabels: {%s}, variableLabels: %v}",
 		d.fqName,
 		d.help,
 		strings.Join(lpStrings, ","),
-		strings.Join(vlStrings, ","),
+		d.variableLabels,
 	)
 }

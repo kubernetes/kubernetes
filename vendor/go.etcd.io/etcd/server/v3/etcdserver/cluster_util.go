@@ -70,9 +70,6 @@ func getClusterFromRemotePeers(lg *zap.Logger, urls []string, timeout time.Durat
 	cc := &http.Client{
 		Transport: rt,
 		Timeout:   timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
 	}
 	for _, u := range urls {
 		addr := u + "/members"
@@ -278,9 +275,6 @@ func isCompatibleWithVers(lg *zap.Logger, vers map[string]*version.Versions, loc
 func getVersion(lg *zap.Logger, m *membership.Member, rt http.RoundTripper) (*version.Versions, error) {
 	cc := &http.Client{
 		Transport: rt,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
 	}
 	var (
 		err  error
@@ -327,12 +321,7 @@ func getVersion(lg *zap.Logger, m *membership.Member, rt http.RoundTripper) (*ve
 }
 
 func promoteMemberHTTP(ctx context.Context, url string, id uint64, peerRt http.RoundTripper) ([]*membership.Member, error) {
-	cc := &http.Client{
-		Transport: peerRt,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	cc := &http.Client{Transport: peerRt}
 	// TODO: refactor member http handler code
 	// cannot import etcdhttp, so manually construct url
 	requestUrl := url + "/members/promote/" + fmt.Sprintf("%d", id)
@@ -404,9 +393,6 @@ func getDowngradeEnabledFromRemotePeers(lg *zap.Logger, cl *membership.RaftClust
 func getDowngradeEnabled(lg *zap.Logger, m *membership.Member, rt http.RoundTripper) (bool, error) {
 	cc := &http.Client{
 		Transport: rt,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
 	}
 	var (
 		err  error

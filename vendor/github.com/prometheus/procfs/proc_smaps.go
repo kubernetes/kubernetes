@@ -135,12 +135,12 @@ func (s *ProcSMapsRollup) parseLine(line string) error {
 	}
 	vBytes := vKBytes * 1024
 
-	s.addValue(k, vBytes)
+	s.addValue(k, v, vKBytes, vBytes)
 
 	return nil
 }
 
-func (s *ProcSMapsRollup) addValue(k string, vUintBytes uint64) {
+func (s *ProcSMapsRollup) addValue(k string, vString string, vUint uint64, vUintBytes uint64) {
 	switch k {
 	case "Rss":
 		s.Rss += vUintBytes

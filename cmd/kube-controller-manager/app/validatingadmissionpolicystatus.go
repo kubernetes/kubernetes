@@ -52,8 +52,8 @@ func startValidatingAdmissionPolicyStatusController(ctx context.Context, control
 		RestMapper:     controllerContext.RESTMapper,
 	}
 	c, err := validatingadmissionpolicystatus.NewController(
-		controllerContext.InformerFactory.Admissionregistration().V1().ValidatingAdmissionPolicies(),
-		controllerContext.ClientBuilder.ClientOrDie(names.ValidatingAdmissionPolicyStatusController).AdmissionregistrationV1().ValidatingAdmissionPolicies(),
+		controllerContext.InformerFactory.Admissionregistration().V1beta1().ValidatingAdmissionPolicies(),
+		controllerContext.ClientBuilder.ClientOrDie(names.ValidatingAdmissionPolicyStatusController).AdmissionregistrationV1beta1().ValidatingAdmissionPolicies(),
 		typeChecker,
 	)
 

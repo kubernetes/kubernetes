@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -116,60 +115,41 @@ const (
 	AuthStyleInHeader AuthStyle = 2
 )
 
-// LazyAuthStyleCache is a backwards compatibility compromise to let Configs
-// have a lazily-initialized AuthStyleCache.
-//
-// The two users of this, oauth2.Config and oauth2/clientcredentials.Config,
-// both would ideally just embed an unexported AuthStyleCache but because both
-// were historically allowed to be copied by value we can't retroactively add an
-// uncopyable Mutex to them.
-//
-// We could use an atomic.Pointer, but that was added recently enough (in Go
-// 1.18) that we'd break Go 1.17 users where the tests as of 2023-08-03
-// still pass. By using an atomic.Value, it supports both Go 1.17 and
-// copying by value, even if that's not ideal.
-type LazyAuthStyleCache struct {
-	v atomic.Value // of *AuthStyleCache
-}
-
-func (lc *LazyAuthStyleCache) Get() *AuthStyleCache {
-	if c, ok := lc.v.Load().(*AuthStyleCache); ok {
-		return c
-	}
-	c := new(AuthStyleCache)
-	if !lc.v.CompareAndSwap(nil, c) {
-		c = lc.v.Load().(*AuthStyleCache)
-	}
-	return c
-}
-
-// AuthStyleCache is the set of tokenURLs we've successfully used via
+// authStyleCache is the set of tokenURLs we've successfully used via
 // RetrieveToken and which style auth we ended up using.
 // It's called a cache, but it doesn't (yet?) shrink. It's expected that
 // the set of OAuth2 servers a program contacts over time is fixed and
 // small.
-type AuthStyleCache struct {
-	mu sync.Mutex
-	m  map[string]AuthStyle // keyed by tokenURL
+var authStyleCache struct {
+	sync.Mutex
+	m map[string]AuthStyle // keyed by tokenURL
+}
+
+// ResetAuthCache resets the global authentication style cache used
+// for AuthStyleUnknown token requests.
+func ResetAuthCache() {
+	authStyleCache.Lock()
+	defer authStyleCache.Unlock()
+	authStyleCache.m = nil
 }
 
 // lookupAuthStyle reports which auth style we last used with tokenURL
 // when calling RetrieveToken and whether we have ever done so.
-func (c *AuthStyleCache) lookupAuthStyle(tokenURL string) (style AuthStyle, ok bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	style, ok = c.m[tokenURL]
+func lookupAuthStyle(tokenURL string) (style AuthStyle, ok bool) {
+	authStyleCache.Lock()
+	defer authStyleCache.Unlock()
+	style, ok = authStyleCache.m[tokenURL]
 	return
 }
 
 // setAuthStyle adds an entry to authStyleCache, documented above.
-func (c *AuthStyleCache) setAuthStyle(tokenURL string, v AuthStyle) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.m == nil {
-		c.m = make(map[string]AuthStyle)
+func setAuthStyle(tokenURL string, v AuthStyle) {
+	authStyleCache.Lock()
+	defer authStyleCache.Unlock()
+	if authStyleCache.m == nil {
+		authStyleCache.m = make(map[string]AuthStyle)
 	}
-	c.m[tokenURL] = v
+	authStyleCache.m[tokenURL] = v
 }
 
 // newTokenRequest returns a new *http.Request to retrieve a new token
@@ -209,10 +189,10 @@ func cloneURLValues(v url.Values) url.Values {
 	return v2
 }
 
-func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle, styleCache *AuthStyleCache) (*Token, error) {
+func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (*Token, error) {
 	needsAuthStyleProbe := authStyle == 0
 	if needsAuthStyleProbe {
-		if style, ok := styleCache.lookupAuthStyle(tokenURL); ok {
+		if style, ok := lookupAuthStyle(tokenURL); ok {
 			authStyle = style
 			needsAuthStyleProbe = false
 		} else {
@@ -242,7 +222,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		token, err = doTokenRoundTrip(ctx, req)
 	}
 	if needsAuthStyleProbe && err == nil {
-		styleCache.setAuthStyle(tokenURL, authStyle)
+		setAuthStyle(tokenURL, authStyle)
 	}
 	// Don't overwrite `RefreshToken` with an empty value
 	// if this was a token refreshing request.

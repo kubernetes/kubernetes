@@ -31,7 +31,6 @@ type Error interface {
 // Err type which extends the built-in go error and implements ref.Val.
 type Err struct {
 	error
-	id int64
 }
 
 var (
@@ -59,24 +58,7 @@ var (
 // NewErr creates a new Err described by the format string and args.
 // TODO: Audit the use of this function and standardize the error messages and codes.
 func NewErr(format string, args ...any) ref.Val {
-	return &Err{error: fmt.Errorf(format, args...)}
-}
-
-// NewErrWithNodeID creates a new Err described by the format string and args.
-// TODO: Audit the use of this function and standardize the error messages and codes.
-func NewErrWithNodeID(id int64, format string, args ...any) ref.Val {
-	return &Err{error: fmt.Errorf(format, args...), id: id}
-}
-
-// LabelErrNode returns val unaltered it is not an Err or if the error has a non-zero
-// AST node ID already present. Otherwise the id is added to the error for
-// recovery with the Err.NodeID method.
-func LabelErrNode(id int64, val ref.Val) ref.Val {
-	if err, ok := val.(*Err); ok && err.id == 0 {
-		err.id = id
-		return err
-	}
-	return val
+	return &Err{fmt.Errorf(format, args...)}
 }
 
 // NoSuchOverloadErr returns a new types.Err instance with a no such overload message.
@@ -140,11 +122,6 @@ func (e *Err) Type() ref.Type {
 // Value implements ref.Val.Value.
 func (e *Err) Value() any {
 	return e.error
-}
-
-// NodeID returns the AST node ID of the expression that returned the error.
-func (e *Err) NodeID() int64 {
-	return e.id
 }
 
 // Is implements errors.Is.

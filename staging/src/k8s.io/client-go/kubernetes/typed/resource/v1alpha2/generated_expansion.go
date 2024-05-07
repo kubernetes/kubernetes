@@ -22,12 +22,6 @@ type PodSchedulingContextExpansion interface{}
 
 type ResourceClaimExpansion interface{}
 
-type ResourceClaimParametersExpansion interface{}
-
 type ResourceClaimTemplateExpansion interface{}
 
 type ResourceClassExpansion interface{}
-
-type ResourceClassParametersExpansion interface{}
-
-type ResourceSliceExpansion interface{}

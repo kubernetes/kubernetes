@@ -265,12 +265,3 @@
 - endpoint: createAuthenticationV1SelfSubjectReview
   reason: Cluster providers are allowed to choose to not serve this API, and the whoami command handles unavailability gracefully.
   link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/3325-self-subject-attributes-review-api/README.md#ga
-- endpoint: getInternalApiserverAPIGroup
-  reason: The endpoint is part of a group that has no stable endpoints yet, reporting as a stable endpoint in apisnoop.
-  link: https://github.com/kubernetes/issues/124248
-- endpoint: getResourceAPIGroup
-  reason: The endpoint is part of a group that has no stable endpoints yet, reporting as a stable endpoint in apisnoop.
-  link: https://github.com/kubernetes/issues/124248
-- endpoint: getStoragemigrationAPIGroup
-  reason: The endpoint is part of a group that has no stable endpoints yet, reporting as a stable endpoint in apisnoop.
-  link: https://github.com/kubernetes/issues/124248

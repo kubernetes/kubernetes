@@ -7,7 +7,6 @@ spec:
   - image: registry.k8s.io/pause
     name: container1
     securityContext: {}
-  hostUsers: false
   initContainers:
   - image: registry.k8s.io/pause
     name: initcontainer1

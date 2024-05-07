@@ -23,8 +23,6 @@
 package backoff
 
 import (
-	"context"
-	"errors"
 	"time"
 
 	grpcbackoff "google.golang.org/grpc/backoff"
@@ -72,38 +70,4 @@ func (bc Exponential) Backoff(retries int) time.Duration {
 		return 0
 	}
 	return time.Duration(backoff)
-}
-
-// ErrResetBackoff is the error to be returned by the function executed by RunF,
-// to instruct the latter to reset its backoff state.
-var ErrResetBackoff = errors.New("reset backoff state")
-
-// RunF provides a convenient way to run a function f repeatedly until the
-// context expires or f returns a non-nil error that is not ErrResetBackoff.
-// When f returns ErrResetBackoff, RunF continues to run f, but resets its
-// backoff state before doing so. backoff accepts an integer representing the
-// number of retries, and returns the amount of time to backoff.
-func RunF(ctx context.Context, f func() error, backoff func(int) time.Duration) {
-	attempt := 0
-	timer := time.NewTimer(0)
-	for ctx.Err() == nil {
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		}
-
-		err := f()
-		if errors.Is(err, ErrResetBackoff) {
-			timer.Reset(0)
-			attempt = 0
-			continue
-		}
-		if err != nil {
-			return
-		}
-		timer.Reset(backoff(attempt))
-		attempt++
-	}
 }

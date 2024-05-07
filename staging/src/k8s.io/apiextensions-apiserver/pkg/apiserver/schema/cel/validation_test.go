@@ -4135,7 +4135,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf + self > 5
 			`),
 			obj:    5,
-			errors: []string{"no matching overload for '_+_' applied to '(optional_type(int), int)"},
+			errors: []string{"no matching overload for '_+_' applied to '(optional(int), int)"},
 		},
 		{
 			name: "forbid direct usage of optional string",
@@ -4143,7 +4143,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf == "foo"
 			`),
 			obj:    "bar",
-			errors: []string{"no matching overload for '_==_' applied to '(optional_type(string), string)"},
+			errors: []string{"no matching overload for '_==_' applied to '(optional(string), string)"},
 		},
 		{
 			name: "forbid direct usage of optional array",
@@ -4151,7 +4151,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf.all(x, x == x)
 			`),
 			obj:    []interface{}{"bar"},
-			errors: []string{"expression of type 'optional_type(list(string))' cannot be range of a comprehension"},
+			errors: []string{"expression of type 'optional(list(string))' cannot be range of a comprehension"},
 		},
 		{
 			name: "forbid direct usage of optional array element",
@@ -4159,7 +4159,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf[0] == "foo"
 			`),
 			obj:    []interface{}{"bar"},
-			errors: []string{"found no matching overload for '_==_' applied to '(optional_type(string), string)"},
+			errors: []string{"found no matching overload for '_==_' applied to '(optional(string), string)"},
 		},
 		{
 			name: "forbid direct usage of optional struct",

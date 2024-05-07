@@ -43,22 +43,20 @@ var priorityclassesKind = v1.SchemeGroupVersion.WithKind("PriorityClass")
 
 // Get takes name of the priorityClass, and returns the corresponding priorityClass object, and an error if there is any.
 func (c *FakePriorityClasses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PriorityClass, err error) {
-	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(priorityclassesResource, name), emptyResult)
+		Invokes(testing.NewRootGetAction(priorityclassesResource, name), &v1.PriorityClass{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PriorityClass), err
 }
 
 // List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
 func (c *FakePriorityClasses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PriorityClassList, err error) {
-	emptyResult := &v1.PriorityClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(priorityclassesResource, priorityclassesKind, opts), emptyResult)
+		Invokes(testing.NewRootListAction(priorityclassesResource, priorityclassesKind, opts), &v1.PriorityClassList{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -82,22 +80,20 @@ func (c *FakePriorityClasses) Watch(ctx context.Context, opts metav1.ListOptions
 
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
 func (c *FakePriorityClasses) Create(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.CreateOptions) (result *v1.PriorityClass, err error) {
-	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), emptyResult)
+		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), &v1.PriorityClass{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PriorityClass), err
 }
 
 // Update takes the representation of a priorityClass and updates it. Returns the server's representation of the priorityClass, and an error, if there is any.
 func (c *FakePriorityClasses) Update(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.UpdateOptions) (result *v1.PriorityClass, err error) {
-	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), emptyResult)
+		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), &v1.PriorityClass{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PriorityClass), err
 }
@@ -119,11 +115,10 @@ func (c *FakePriorityClasses) DeleteCollection(ctx context.Context, opts metav1.
 
 // Patch applies the patch and returns the patched priorityClass.
 func (c *FakePriorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PriorityClass, err error) {
-	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), &v1.PriorityClass{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PriorityClass), err
 }
@@ -141,11 +136,10 @@ func (c *FakePriorityClasses) Apply(ctx context.Context, priorityClass *scheduli
 	if name == nil {
 		return nil, fmt.Errorf("priorityClass.Name must be provided to Apply")
 	}
-	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, *name, types.ApplyPatchType, data), &v1.PriorityClass{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.PriorityClass), err
 }

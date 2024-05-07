@@ -125,13 +125,6 @@ export GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
 export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
 
-# Ability to inject custom versions (COS images ONLY)
-# if KUBE_COS_INSTALL_CONTAINERD_VERSION or KUBE_COS_INSTALL_RUNC_VERSION
-# is set to empty then we do not override the version(s) and just
-# use whatever is in the default installation of containerd package
-export COS_INSTALL_CONTAINERD_VERSION=${KUBE_COS_INSTALL_CONTAINERD_VERSION:-}
-export COS_INSTALL_RUNC_VERSION=${KUBE_COS_INSTALL_RUNC_VERSION:-}
-
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
 export MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
@@ -532,7 +525,7 @@ KUBE_PROXY_DAEMONSET=${KUBE_PROXY_DAEMONSET:-false} # true, false
 # as an addon daemonset.
 KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
 
-# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs, nftables].
+# Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-iptables}
 
 # Will be passed into the kube-proxy via `--detect-local-mode`

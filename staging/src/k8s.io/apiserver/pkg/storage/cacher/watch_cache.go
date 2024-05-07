@@ -536,14 +536,7 @@ func (w *watchCache) notFresh(resourceVersion uint64) bool {
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
 func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
-	var err error
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
-		w.waitingUntilFresh.Add()
-		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
-		w.waitingUntilFresh.Remove()
-	} else {
-		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
-	}
+	err := w.waitUntilFreshAndBlock(ctx, resourceVersion)
 	defer w.RUnlock()
 	if err != nil {
 		return nil, false, 0, err

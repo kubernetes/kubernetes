@@ -18,10 +18,9 @@ import (
 	"fmt"
 
 	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/operators"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // NewGlobalMacro creates a Macro for a global function with the specified arg count.
@@ -143,38 +142,58 @@ func makeVarArgMacroKey(name string, receiverStyle bool) string {
 // and produces as output an Expr ast node.
 //
 // Note: when the Macro.IsReceiverStyle() method returns true, the target argument will be nil.
-type MacroExpander func(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error)
+type MacroExpander func(eh ExprHelper,
+	target *exprpb.Expr,
+	args []*exprpb.Expr) (*exprpb.Expr, *common.Error)
 
-// ExprHelper assists with the creation of Expr values in a manner which is consistent
-// the internal semantics and id generation behaviors of the parser and checker libraries.
+// ExprHelper assists with the manipulation of proto-based Expr values in a manner which is
+// consistent with the source position and expression id generation code leveraged by both
+// the parser and type-checker.
 type ExprHelper interface {
 	// Copy the input expression with a brand new set of identifiers.
-	Copy(ast.Expr) ast.Expr
+	Copy(*exprpb.Expr) *exprpb.Expr
 
-	// Literal creates an Expr value for a scalar literal value.
-	NewLiteral(value ref.Val) ast.Expr
+	// LiteralBool creates an Expr value for a bool literal.
+	LiteralBool(value bool) *exprpb.Expr
 
-	// NewList creates a list literal instruction with an optional set of elements.
-	NewList(elems ...ast.Expr) ast.Expr
+	// LiteralBytes creates an Expr value for a byte literal.
+	LiteralBytes(value []byte) *exprpb.Expr
+
+	// LiteralDouble creates an Expr value for double literal.
+	LiteralDouble(value float64) *exprpb.Expr
+
+	// LiteralInt creates an Expr value for an int literal.
+	LiteralInt(value int64) *exprpb.Expr
+
+	// LiteralString creates am Expr value for a string literal.
+	LiteralString(value string) *exprpb.Expr
+
+	// LiteralUint creates an Expr value for a uint literal.
+	LiteralUint(value uint64) *exprpb.Expr
+
+	// NewList creates a CreateList instruction where the list is comprised of the optional set
+	// of elements provided as arguments.
+	NewList(elems ...*exprpb.Expr) *exprpb.Expr
 
 	// NewMap creates a CreateStruct instruction for a map where the map is comprised of the
 	// optional set of key, value entries.
-	NewMap(entries ...ast.EntryExpr) ast.Expr
+	NewMap(entries ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr
 
 	// NewMapEntry creates a Map Entry for the key, value pair.
-	NewMapEntry(key ast.Expr, val ast.Expr, optional bool) ast.EntryExpr
+	NewMapEntry(key *exprpb.Expr, val *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry
 
-	// NewStruct creates a struct literal expression with an optional set of field initializers.
-	NewStruct(typeName string, fieldInits ...ast.EntryExpr) ast.Expr
+	// NewObject creates a CreateStruct instruction for an object with a given type name and
+	// optional set of field initializers.
+	NewObject(typeName string, fieldInits ...*exprpb.Expr_CreateStruct_Entry) *exprpb.Expr
 
-	// NewStructField creates a new struct field initializer from the field name and value.
-	NewStructField(field string, init ast.Expr, optional bool) ast.EntryExpr
+	// NewObjectFieldInit creates a new Object field initializer from the field name and value.
+	NewObjectFieldInit(field string, init *exprpb.Expr, optional bool) *exprpb.Expr_CreateStruct_Entry
 
-	// NewComprehension creates a new comprehension instruction.
+	// Fold creates a fold comprehension instruction.
 	//
+	// - iterVar is the iteration variable name.
 	// - iterRange represents the expression that resolves to a list or map where the elements or
 	//   keys (respectively) will be iterated over.
-	// - iterVar is the iteration variable name.
 	// - accuVar is the accumulation variable name, typically parser.AccumulatorName.
 	// - accuInit is the initial expression whose value will be set for the accuVar prior to
 	//   folding.
@@ -185,31 +204,31 @@ type ExprHelper interface {
 	// The accuVar should not shadow variable names that you would like to reference within the
 	// environment in the step and condition expressions. Presently, the name __result__ is commonly
 	// used by built-in macros but this may change in the future.
-	NewComprehension(iterRange ast.Expr,
-		iterVar string,
+	Fold(iterVar string,
+		iterRange *exprpb.Expr,
 		accuVar string,
-		accuInit ast.Expr,
-		condition ast.Expr,
-		step ast.Expr,
-		result ast.Expr) ast.Expr
+		accuInit *exprpb.Expr,
+		condition *exprpb.Expr,
+		step *exprpb.Expr,
+		result *exprpb.Expr) *exprpb.Expr
 
-	// NewIdent creates an identifier Expr value.
-	NewIdent(name string) ast.Expr
+	// Ident creates an identifier Expr value.
+	Ident(name string) *exprpb.Expr
 
-	// NewAccuIdent returns an accumulator identifier for use with comprehension results.
-	NewAccuIdent() ast.Expr
+	// AccuIdent returns an accumulator identifier for use with comprehension results.
+	AccuIdent() *exprpb.Expr
 
-	// NewCall creates a function call Expr value for a global (free) function.
-	NewCall(function string, args ...ast.Expr) ast.Expr
+	// GlobalCall creates a function call Expr value for a global (free) function.
+	GlobalCall(function string, args ...*exprpb.Expr) *exprpb.Expr
 
-	// NewMemberCall creates a function call Expr value for a receiver-style function.
-	NewMemberCall(function string, target ast.Expr, args ...ast.Expr) ast.Expr
+	// ReceiverCall creates a function call Expr value for a receiver-style function.
+	ReceiverCall(function string, target *exprpb.Expr, args ...*exprpb.Expr) *exprpb.Expr
 
-	// NewPresenceTest creates a Select TestOnly Expr value for modelling has() semantics.
-	NewPresenceTest(operand ast.Expr, field string) ast.Expr
+	// PresenceTest creates a Select TestOnly Expr value for modelling has() semantics.
+	PresenceTest(operand *exprpb.Expr, field string) *exprpb.Expr
 
-	// NewSelect create a field traversal Expr value.
-	NewSelect(operand ast.Expr, field string) ast.Expr
+	// Select create a field traversal Expr value.
+	Select(operand *exprpb.Expr, field string) *exprpb.Expr
 
 	// OffsetLocation returns the Location of the expression identifier.
 	OffsetLocation(exprID int64) common.Location
@@ -277,21 +296,21 @@ const (
 // MakeAll expands the input call arguments into a comprehension that returns true if all of the
 // elements in the range match the predicate expressions:
 // <iterRange>.all(<iterVar>, <predicate>)
-func MakeAll(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error) {
+func MakeAll(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
 	return makeQuantifier(quantifierAll, eh, target, args)
 }
 
 // MakeExists expands the input call arguments into a comprehension that returns true if any of the
 // elements in the range match the predicate expressions:
 // <iterRange>.exists(<iterVar>, <predicate>)
-func MakeExists(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error) {
+func MakeExists(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
 	return makeQuantifier(quantifierExists, eh, target, args)
 }
 
 // MakeExistsOne expands the input call arguments into a comprehension that returns true if exactly
 // one of the elements in the range match the predicate expressions:
 // <iterRange>.exists_one(<iterVar>, <predicate>)
-func MakeExistsOne(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error) {
+func MakeExistsOne(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
 	return makeQuantifier(quantifierExistsOne, eh, target, args)
 }
 
@@ -305,14 +324,14 @@ func MakeExistsOne(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *
 //
 // In the second form only iterVar values which return true when provided to the predicate expression
 // are transformed.
-func MakeMap(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error) {
+func MakeMap(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
 	v, found := extractIdent(args[0])
 	if !found {
-		return nil, eh.NewError(args[0].ID(), "argument is not an identifier")
+		return nil, eh.NewError(args[0].GetId(), "argument is not an identifier")
 	}
 
-	var fn ast.Expr
-	var filter ast.Expr
+	var fn *exprpb.Expr
+	var filter *exprpb.Expr
 
 	if len(args) == 3 {
 		filter = args[1]
@@ -322,83 +341,84 @@ func MakeMap(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common
 		fn = args[1]
 	}
 
+	accuExpr := eh.Ident(AccumulatorName)
 	init := eh.NewList()
-	condition := eh.NewLiteral(types.True)
-	step := eh.NewCall(operators.Add, eh.NewAccuIdent(), eh.NewList(fn))
+	condition := eh.LiteralBool(true)
+	step := eh.GlobalCall(operators.Add, accuExpr, eh.NewList(fn))
 
 	if filter != nil {
-		step = eh.NewCall(operators.Conditional, filter, step, eh.NewAccuIdent())
+		step = eh.GlobalCall(operators.Conditional, filter, step, accuExpr)
 	}
-	return eh.NewComprehension(target, v, AccumulatorName, init, condition, step, eh.NewAccuIdent()), nil
+	return eh.Fold(v, target, AccumulatorName, init, condition, step, accuExpr), nil
 }
 
 // MakeFilter expands the input call arguments into a comprehension which produces a list which contains
 // only elements which match the provided predicate expression:
 // <iterRange>.filter(<iterVar>, <predicate>)
-func MakeFilter(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error) {
+func MakeFilter(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
 	v, found := extractIdent(args[0])
 	if !found {
-		return nil, eh.NewError(args[0].ID(), "argument is not an identifier")
+		return nil, eh.NewError(args[0].GetId(), "argument is not an identifier")
 	}
 
 	filter := args[1]
+	accuExpr := eh.Ident(AccumulatorName)
 	init := eh.NewList()
-	condition := eh.NewLiteral(types.True)
-	step := eh.NewCall(operators.Add, eh.NewAccuIdent(), eh.NewList(args[0]))
-	step = eh.NewCall(operators.Conditional, filter, step, eh.NewAccuIdent())
-	return eh.NewComprehension(target, v, AccumulatorName, init, condition, step, eh.NewAccuIdent()), nil
+	condition := eh.LiteralBool(true)
+	step := eh.GlobalCall(operators.Add, accuExpr, eh.NewList(args[0]))
+	step = eh.GlobalCall(operators.Conditional, filter, step, accuExpr)
+	return eh.Fold(v, target, AccumulatorName, init, condition, step, accuExpr), nil
 }
 
 // MakeHas expands the input call arguments into a presence test, e.g. has(<operand>.field)
-func MakeHas(eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error) {
-	if args[0].Kind() == ast.SelectKind {
-		s := args[0].AsSelect()
-		return eh.NewPresenceTest(s.Operand(), s.FieldName()), nil
+func MakeHas(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
+	if s, ok := args[0].ExprKind.(*exprpb.Expr_SelectExpr); ok {
+		return eh.PresenceTest(s.SelectExpr.GetOperand(), s.SelectExpr.GetField()), nil
 	}
-	return nil, eh.NewError(args[0].ID(), "invalid argument to has() macro")
+	return nil, eh.NewError(args[0].GetId(), "invalid argument to has() macro")
 }
 
-func makeQuantifier(kind quantifierKind, eh ExprHelper, target ast.Expr, args []ast.Expr) (ast.Expr, *common.Error) {
+func makeQuantifier(kind quantifierKind, eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
 	v, found := extractIdent(args[0])
 	if !found {
-		return nil, eh.NewError(args[0].ID(), "argument must be a simple name")
+		return nil, eh.NewError(args[0].GetId(), "argument must be a simple name")
 	}
 
-	var init ast.Expr
-	var condition ast.Expr
-	var step ast.Expr
-	var result ast.Expr
+	var init *exprpb.Expr
+	var condition *exprpb.Expr
+	var step *exprpb.Expr
+	var result *exprpb.Expr
 	switch kind {
 	case quantifierAll:
-		init = eh.NewLiteral(types.True)
-		condition = eh.NewCall(operators.NotStrictlyFalse, eh.NewAccuIdent())
-		step = eh.NewCall(operators.LogicalAnd, eh.NewAccuIdent(), args[1])
-		result = eh.NewAccuIdent()
+		init = eh.LiteralBool(true)
+		condition = eh.GlobalCall(operators.NotStrictlyFalse, eh.AccuIdent())
+		step = eh.GlobalCall(operators.LogicalAnd, eh.AccuIdent(), args[1])
+		result = eh.AccuIdent()
 	case quantifierExists:
-		init = eh.NewLiteral(types.False)
-		condition = eh.NewCall(
+		init = eh.LiteralBool(false)
+		condition = eh.GlobalCall(
 			operators.NotStrictlyFalse,
-			eh.NewCall(operators.LogicalNot, eh.NewAccuIdent()))
-		step = eh.NewCall(operators.LogicalOr, eh.NewAccuIdent(), args[1])
-		result = eh.NewAccuIdent()
+			eh.GlobalCall(operators.LogicalNot, eh.AccuIdent()))
+		step = eh.GlobalCall(operators.LogicalOr, eh.AccuIdent(), args[1])
+		result = eh.AccuIdent()
 	case quantifierExistsOne:
-		zeroExpr := eh.NewLiteral(types.Int(0))
-		oneExpr := eh.NewLiteral(types.Int(1))
+		zeroExpr := eh.LiteralInt(0)
+		oneExpr := eh.LiteralInt(1)
 		init = zeroExpr
-		condition = eh.NewLiteral(types.True)
-		step = eh.NewCall(operators.Conditional, args[1],
-			eh.NewCall(operators.Add, eh.NewAccuIdent(), oneExpr), eh.NewAccuIdent())
-		result = eh.NewCall(operators.Equals, eh.NewAccuIdent(), oneExpr)
+		condition = eh.LiteralBool(true)
+		step = eh.GlobalCall(operators.Conditional, args[1],
+			eh.GlobalCall(operators.Add, eh.AccuIdent(), oneExpr), eh.AccuIdent())
+		result = eh.GlobalCall(operators.Equals, eh.AccuIdent(), oneExpr)
 	default:
-		return nil, eh.NewError(args[0].ID(), fmt.Sprintf("unrecognized quantifier '%v'", kind))
+		return nil, eh.NewError(args[0].GetId(), fmt.Sprintf("unrecognized quantifier '%v'", kind))
 	}
-	return eh.NewComprehension(target, v, AccumulatorName, init, condition, step, result), nil
+	return eh.Fold(v, target, AccumulatorName, init, condition, step, result), nil
 }
 
-func extractIdent(e ast.Expr) (string, bool) {
-	switch e.Kind() {
-	case ast.IdentKind:
-		return e.AsIdent(), true
+func extractIdent(e *exprpb.Expr) (string, bool) {
+	switch e.ExprKind.(type) {
+	case *exprpb.Expr_IdentExpr:
+		return e.GetIdentExpr().GetName(), true
 	}
 	return "", false
 }

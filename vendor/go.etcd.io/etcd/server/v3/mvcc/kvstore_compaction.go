@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	humanize "github.com/dustin/go-humanize"
 	"go.etcd.io/etcd/server/v3/mvcc/buckets"
 	"go.uber.org/zap"
 )
@@ -64,16 +63,11 @@ func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyVal
 			tx.UnsafePut(buckets.Meta, finishedCompactKeyName, rbytes)
 			tx.Unlock()
 			hash := h.Hash()
-			size, sizeInUse := s.b.Size(), s.b.SizeInUse()
 			s.lg.Info(
 				"finished scheduled compaction",
 				zap.Int64("compact-revision", compactMainRev),
 				zap.Duration("took", time.Since(totalStart)),
 				zap.Uint32("hash", hash.Hash),
-				zap.Int64("current-db-size-bytes", size),
-				zap.String("current-db-size", humanize.Bytes(uint64(size))),
-				zap.Int64("current-db-size-in-use-bytes", sizeInUse),
-				zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse))),
 			)
 			return hash, nil
 		}

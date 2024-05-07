@@ -135,7 +135,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 	// If the deleted pod is unscheduled, it doesn't make the target pod schedulable.
 	if deletedPod.Spec.NodeName == "" {
-		logger.V(4).Info("the deleted pod is unscheduled and it doesn't make the target pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		logger.V(4).Info("the deleted pod is unscheduled and it doesn't make the target pod schedulable", "pod", pod, "deletedPod", deletedPod)
 		return framework.QueueSkip, nil
 	}
 
@@ -159,7 +159,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	// So, deleting that pod couldn't make `pod` schedulable.
 	nodeInfo := framework.NodeInfo{UsedPorts: usedPorts}
 	if Fits(pod, &nodeInfo) {
-		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", pod, "deletedPod", deletedPod)
 		return framework.QueueSkip, nil
 	}
 

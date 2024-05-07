@@ -12,7 +12,6 @@ spec:
         drop:
         - ALL
       procMount: Default
-  hostUsers: false
   initContainers:
   - image: registry.k8s.io/pause
     name: initcontainer1

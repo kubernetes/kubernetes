@@ -32,10 +32,19 @@ kube::golang::setup_env
 
 cd "${KUBE_ROOT}"
 
-# Ensure all modules are included in go.work
+# Avoid issues and remove the workspace files.
+rm -f go.work go.work.sum
+
+# Generate the workspace.
+go work init
+(
+  echo "// This is a generated file. Do not edit directly."
+  echo
+  cat go.work
+) > .go.work.tmp
+mv .go.work.tmp go.work
 go work edit -use .
 git ls-files -z ':(glob)./staging/src/k8s.io/*/go.mod' \
-    | xargs -0 -n1 dirname \
-    | tr '\n' '\0' \
+    | xargs -0 -n1 dirname -z \
     | xargs -0 -n1 go work edit -use
 go mod download # generate go.work.sum

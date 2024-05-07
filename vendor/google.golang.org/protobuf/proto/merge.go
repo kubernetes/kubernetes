@@ -21,7 +21,7 @@ import (
 // The unknown fields of src are appended to the unknown fields of dst.
 //
 // It is semantically equivalent to unmarshaling the encoded form of src
-// into dst with the [UnmarshalOptions.Merge] option specified.
+// into dst with the UnmarshalOptions.Merge option specified.
 func Merge(dst, src Message) {
 	// TODO: Should nil src be treated as semantically equivalent to a
 	// untyped, read-only, empty message? What about a nil dst?

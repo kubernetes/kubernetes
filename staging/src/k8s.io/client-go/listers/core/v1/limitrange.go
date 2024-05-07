@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type LimitRangeLister interface {
 
 // limitRangeLister implements the LimitRangeLister interface.
 type limitRangeLister struct {
-	listers.ResourceIndexer[*v1.LimitRange]
+	indexer cache.Indexer
 }
 
 // NewLimitRangeLister returns a new LimitRangeLister.
 func NewLimitRangeLister(indexer cache.Indexer) LimitRangeLister {
-	return &limitRangeLister{listers.New[*v1.LimitRange](indexer, v1.Resource("limitrange"))}
+	return &limitRangeLister{indexer: indexer}
+}
+
+// List lists all LimitRanges in the indexer.
+func (s *limitRangeLister) List(selector labels.Selector) (ret []*v1.LimitRange, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.LimitRange))
+	})
+	return ret, err
 }
 
 // LimitRanges returns an object that can list and get LimitRanges.
 func (s *limitRangeLister) LimitRanges(namespace string) LimitRangeNamespaceLister {
-	return limitRangeNamespaceLister{listers.NewNamespaced[*v1.LimitRange](s.ResourceIndexer, namespace)}
+	return limitRangeNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // LimitRangeNamespaceLister helps list and get LimitRanges.
@@ -66,5 +74,26 @@ type LimitRangeNamespaceLister interface {
 // limitRangeNamespaceLister implements the LimitRangeNamespaceLister
 // interface.
 type limitRangeNamespaceLister struct {
-	listers.ResourceIndexer[*v1.LimitRange]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all LimitRanges in the indexer for a given namespace.
+func (s limitRangeNamespaceLister) List(selector labels.Selector) (ret []*v1.LimitRange, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.LimitRange))
+	})
+	return ret, err
+}
+
+// Get retrieves the LimitRange from the indexer for a given namespace and name.
+func (s limitRangeNamespaceLister) Get(name string) (*v1.LimitRange, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("limitrange"), name)
+	}
+	return obj.(*v1.LimitRange), nil
 }

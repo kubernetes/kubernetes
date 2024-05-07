@@ -16,8 +16,6 @@ limitations under the License.
 
 package cache
 
-import "time"
-
 // PluginHandler is an interface a client of the pluginwatcher API needs to implement in
 // order to consume plugins
 // The PluginHandler follows the simple following state machine:
@@ -53,7 +51,7 @@ type PluginHandler interface {
 	// RegisterPlugin is called so that the plugin can be registered by any
 	// plugin consumer
 	// Error encountered here can still be Notified to the plugin.
-	RegisterPlugin(pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration) error
+	RegisterPlugin(pluginName, endpoint string, versions []string) error
 	// DeRegisterPlugin is called once the pluginwatcher observes that the socket has
 	// been deleted.
 	DeRegisterPlugin(pluginName string)

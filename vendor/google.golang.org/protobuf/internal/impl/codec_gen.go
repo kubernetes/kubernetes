@@ -162,20 +162,11 @@ func appendBoolSlice(b []byte, p pointer, f *coderFieldInfo, opts marshalOptions
 func consumeBoolSlice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.BoolSlice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := 0
-		for _, v := range b {
-			if v < 0x80 {
-				count++
-			}
-		}
-		if count > 0 {
-			p.growBoolSlice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			var v uint64
 			var n int
@@ -741,20 +732,11 @@ func appendInt32Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOption
 func consumeInt32Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Int32Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := 0
-		for _, v := range b {
-			if v < 0x80 {
-				count++
-			}
-		}
-		if count > 0 {
-			p.growInt32Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			var v uint64
 			var n int
@@ -1156,20 +1138,11 @@ func appendSint32Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOptio
 func consumeSint32Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Int32Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := 0
-		for _, v := range b {
-			if v < 0x80 {
-				count++
-			}
-		}
-		if count > 0 {
-			p.growInt32Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			var v uint64
 			var n int
@@ -1571,20 +1544,11 @@ func appendUint32Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOptio
 func consumeUint32Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Uint32Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := 0
-		for _, v := range b {
-			if v < 0x80 {
-				count++
-			}
-		}
-		if count > 0 {
-			p.growUint32Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			var v uint64
 			var n int
@@ -1986,20 +1950,11 @@ func appendInt64Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOption
 func consumeInt64Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Int64Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := 0
-		for _, v := range b {
-			if v < 0x80 {
-				count++
-			}
-		}
-		if count > 0 {
-			p.growInt64Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			var v uint64
 			var n int
@@ -2401,20 +2356,11 @@ func appendSint64Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOptio
 func consumeSint64Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Int64Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := 0
-		for _, v := range b {
-			if v < 0x80 {
-				count++
-			}
-		}
-		if count > 0 {
-			p.growInt64Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			var v uint64
 			var n int
@@ -2816,20 +2762,11 @@ func appendUint64Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOptio
 func consumeUint64Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Uint64Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := 0
-		for _, v := range b {
-			if v < 0x80 {
-				count++
-			}
-		}
-		if count > 0 {
-			p.growUint64Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			var v uint64
 			var n int
@@ -3208,15 +3145,11 @@ func appendSfixed32Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOpt
 func consumeSfixed32Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Int32Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := len(b) / protowire.SizeFixed32()
-		if count > 0 {
-			p.growInt32Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			v, n := protowire.ConsumeFixed32(b)
 			if n < 0 {
@@ -3528,15 +3461,11 @@ func appendFixed32Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOpti
 func consumeFixed32Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Uint32Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := len(b) / protowire.SizeFixed32()
-		if count > 0 {
-			p.growUint32Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			v, n := protowire.ConsumeFixed32(b)
 			if n < 0 {
@@ -3848,15 +3777,11 @@ func appendFloatSlice(b []byte, p pointer, f *coderFieldInfo, opts marshalOption
 func consumeFloatSlice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Float32Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := len(b) / protowire.SizeFixed32()
-		if count > 0 {
-			p.growFloat32Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			v, n := protowire.ConsumeFixed32(b)
 			if n < 0 {
@@ -4168,15 +4093,11 @@ func appendSfixed64Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOpt
 func consumeSfixed64Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Int64Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := len(b) / protowire.SizeFixed64()
-		if count > 0 {
-			p.growInt64Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			v, n := protowire.ConsumeFixed64(b)
 			if n < 0 {
@@ -4488,15 +4409,11 @@ func appendFixed64Slice(b []byte, p pointer, f *coderFieldInfo, opts marshalOpti
 func consumeFixed64Slice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Uint64Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := len(b) / protowire.SizeFixed64()
-		if count > 0 {
-			p.growUint64Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			v, n := protowire.ConsumeFixed64(b)
 			if n < 0 {
@@ -4808,15 +4725,11 @@ func appendDoubleSlice(b []byte, p pointer, f *coderFieldInfo, opts marshalOptio
 func consumeDoubleSlice(b []byte, p pointer, wtyp protowire.Type, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	sp := p.Float64Slice()
 	if wtyp == protowire.BytesType {
+		s := *sp
 		b, n := protowire.ConsumeBytes(b)
 		if n < 0 {
 			return out, errDecode
 		}
-		count := len(b) / protowire.SizeFixed64()
-		if count > 0 {
-			p.growFloat64Slice(count)
-		}
-		s := *sp
 		for len(b) > 0 {
 			v, n := protowire.ConsumeFixed64(b)
 			if n < 0 {

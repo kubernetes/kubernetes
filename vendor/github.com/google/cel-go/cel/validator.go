@@ -21,6 +21,8 @@ import (
 
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/overloads"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 const (
@@ -67,7 +69,7 @@ type ASTValidator interface {
 	//
 	// See individual validators for more information on their configuration keys and configuration
 	// properties.
-	Validate(*Env, ValidatorConfig, *ast.AST, *Issues)
+	Validate(*Env, ValidatorConfig, *ast.CheckedAST, *Issues)
 }
 
 // ValidatorConfig provides an accessor method for querying validator configuration state.
@@ -178,7 +180,7 @@ func ValidateComprehensionNestingLimit(limit int) ASTValidator {
 	return nestingLimitValidator{limit: limit}
 }
 
-type argChecker func(env *Env, call, arg ast.Expr) error
+type argChecker func(env *Env, call, arg ast.NavigableExpr) error
 
 func newFormatValidator(funcName string, argNum int, check argChecker) formatValidator {
 	return formatValidator{
@@ -201,8 +203,8 @@ func (v formatValidator) Name() string {
 
 // Validate searches the AST for uses of a given function name with a constant argument and performs a check
 // on whether the argument is a valid literal value.
-func (v formatValidator) Validate(e *Env, _ ValidatorConfig, a *ast.AST, iss *Issues) {
-	root := ast.NavigateAST(a)
+func (v formatValidator) Validate(e *Env, _ ValidatorConfig, a *ast.CheckedAST, iss *Issues) {
+	root := ast.NavigateCheckedAST(a)
 	funcCalls := ast.MatchDescendants(root, ast.FunctionMatcher(v.funcName))
 	for _, call := range funcCalls {
 		callArgs := call.AsCall().Args()
@@ -219,8 +221,8 @@ func (v formatValidator) Validate(e *Env, _ ValidatorConfig, a *ast.AST, iss *Is
 	}
 }
 
-func evalCall(env *Env, call, arg ast.Expr) error {
-	ast := &Ast{impl: ast.NewAST(call, ast.NewSourceInfo(nil))}
+func evalCall(env *Env, call, arg ast.NavigableExpr) error {
+	ast := ParsedExprToAst(&exprpb.ParsedExpr{Expr: call.ToExpr()})
 	prg, err := env.Program(ast)
 	if err != nil {
 		return err
@@ -229,7 +231,7 @@ func evalCall(env *Env, call, arg ast.Expr) error {
 	return err
 }
 
-func compileRegex(_ *Env, _, arg ast.Expr) error {
+func compileRegex(_ *Env, _, arg ast.NavigableExpr) error {
 	pattern := arg.AsLiteral().Value().(string)
 	_, err := regexp.Compile(pattern)
 	return err
@@ -242,14 +244,25 @@ func (homogeneousAggregateLiteralValidator) Name() string {
 	return homogeneousValidatorName
 }
 
+// Configure implements the ASTValidatorConfigurer interface and currently sets the list of standard
+// and exempt functions from homogeneous aggregate literal checks.
+//
+// TODO: Move this call into the string.format() ASTValidator once ported.
+func (homogeneousAggregateLiteralValidator) Configure(c MutableValidatorConfig) error {
+	emptyList := []string{}
+	exemptFunctions := c.GetOrDefault(HomogeneousAggregateLiteralExemptFunctions, emptyList).([]string)
+	exemptFunctions = append(exemptFunctions, "format")
+	return c.Set(HomogeneousAggregateLiteralExemptFunctions, exemptFunctions)
+}
+
 // Validate validates that all lists and map literals have homogeneous types, i.e. don't contain dyn types.
 //
 // This validator makes an exception for list and map literals which occur at any level of nesting within
 // string format calls.
-func (v homogeneousAggregateLiteralValidator) Validate(_ *Env, c ValidatorConfig, a *ast.AST, iss *Issues) {
+func (v homogeneousAggregateLiteralValidator) Validate(_ *Env, c ValidatorConfig, a *ast.CheckedAST, iss *Issues) {
 	var exemptedFunctions []string
 	exemptedFunctions = c.GetOrDefault(HomogeneousAggregateLiteralExemptFunctions, exemptedFunctions).([]string)
-	root := ast.NavigateAST(a)
+	root := ast.NavigateCheckedAST(a)
 	listExprs := ast.MatchDescendants(root, ast.KindMatcher(ast.ListKind))
 	for _, listExpr := range listExprs {
 		if inExemptFunction(listExpr, exemptedFunctions) {
@@ -260,7 +273,7 @@ func (v homogeneousAggregateLiteralValidator) Validate(_ *Env, c ValidatorConfig
 		optIndices := l.OptionalIndices()
 		var elemType *Type
 		for i, e := range elements {
-			et := a.GetType(e.ID())
+			et := e.Type()
 			if isOptionalIndex(i, optIndices) {
 				et = et.Parameters()[0]
 			}
@@ -283,10 +296,9 @@ func (v homogeneousAggregateLiteralValidator) Validate(_ *Env, c ValidatorConfig
 		entries := m.Entries()
 		var keyType, valType *Type
 		for _, e := range entries {
-			mapEntry := e.AsMapEntry()
-			key, val := mapEntry.Key(), mapEntry.Value()
-			kt, vt := a.GetType(key.ID()), a.GetType(val.ID())
-			if mapEntry.IsOptional() {
+			key, val := e.Key(), e.Value()
+			kt, vt := key.Type(), val.Type()
+			if e.IsOptional() {
 				vt = vt.Parameters()[0]
 			}
 			if keyType == nil && valType == nil {
@@ -304,8 +316,7 @@ func (v homogeneousAggregateLiteralValidator) Validate(_ *Env, c ValidatorConfig
 }
 
 func inExemptFunction(e ast.NavigableExpr, exemptFunctions []string) bool {
-	parent, found := e.Parent()
-	for found {
+	if parent, found := e.Parent(); found {
 		if parent.Kind() == ast.CallKind {
 			fnName := parent.AsCall().FunctionName()
 			for _, exempt := range exemptFunctions {
@@ -314,7 +325,9 @@ func inExemptFunction(e ast.NavigableExpr, exemptFunctions []string) bool {
 				}
 			}
 		}
-		parent, found = parent.Parent()
+		if parent.Kind() == ast.ListKind || parent.Kind() == ast.MapKind {
+			return inExemptFunction(parent, exemptFunctions)
+		}
 	}
 	return false
 }
@@ -340,8 +353,8 @@ func (v nestingLimitValidator) Name() string {
 	return "cel.lib.std.validate.comprehension_nesting_limit"
 }
 
-func (v nestingLimitValidator) Validate(e *Env, _ ValidatorConfig, a *ast.AST, iss *Issues) {
-	root := ast.NavigateAST(a)
+func (v nestingLimitValidator) Validate(e *Env, _ ValidatorConfig, a *ast.CheckedAST, iss *Issues) {
+	root := ast.NavigateCheckedAST(a)
 	comprehensions := ast.MatchDescendants(root, ast.KindMatcher(ast.ComprehensionKind))
 	if len(comprehensions) <= v.limit {
 		return

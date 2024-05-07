@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -1092,93 +1091,6 @@ func TestWarnings(t *testing.T) {
 			}
 			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
-			}
-		})
-	}
-}
-
-func TestTemplateOnlyWarnings(t *testing.T) {
-	testcases := []struct {
-		name        string
-		template    *api.PodTemplateSpec
-		oldTemplate *api.PodTemplateSpec
-		expected    []string
-	}{
-		{
-			name: "annotations",
-			template: &api.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
-				}},
-				Spec: api.PodSpec{Containers: []api.Container{{Name: "foo"}}},
-			},
-			expected: []string{
-				`template.metadata.annotations[container.apparmor.security.beta.kubernetes.io/foo]: deprecated since v1.30; use the "appArmorProfile" field instead`,
-			},
-		},
-		{
-			name: "AppArmor pod field",
-			template: &api.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
-				}},
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined},
-					},
-					Containers: []api.Container{{
-						Name: "foo",
-					}},
-				},
-			},
-			expected: []string{},
-		},
-		{
-			name: "AppArmor container field",
-			template: &api.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
-				}},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Name: "foo",
-						SecurityContext: &api.SecurityContext{
-							AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined},
-						},
-					}},
-				},
-			},
-			expected: []string{},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			var oldTemplate *api.PodTemplateSpec
-			if tc.oldTemplate != nil {
-				oldTemplate = tc.oldTemplate
-			}
-			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), field.NewPath("template"), tc.template, oldTemplate)...)
-			expected := sets.New[string](tc.expected...)
-			for _, missing := range sets.List[string](expected.Difference(actual)) {
-				t.Errorf("missing: %s", missing)
-			}
-			for _, extra := range sets.List[string](actual.Difference(expected)) {
-				t.Errorf("extra: %s", extra)
-			}
-		})
-
-		t.Run("pod_"+tc.name, func(t *testing.T) {
-			var pod *api.Pod
-			if tc.template != nil {
-				pod = &api.Pod{
-					ObjectMeta: tc.template.ObjectMeta,
-					Spec:       tc.template.Spec,
-				}
-			}
-			actual := GetWarningsForPod(context.TODO(), pod, &api.Pod{})
-			if len(actual) > 0 {
-				t.Errorf("unexpected template-only warnings on pod: %v", actual)
 			}
 		})
 	}

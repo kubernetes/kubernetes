@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/ptr"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -38,20 +38,20 @@ var (
 	validCronjobSpec = batch.CronJobSpec{
 		Schedule:          "5 5 * * ?",
 		ConcurrencyPolicy: batch.AllowConcurrent,
-		TimeZone:          ptr.To("Asia/Shanghai"),
+		TimeZone:          pointer.String("Asia/Shanghai"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
 				Template:       validPodTemplateSpec,
 				CompletionMode: completionModePtr(batch.IndexedCompletion),
-				Completions:    ptr.To[int32](10),
-				Parallelism:    ptr.To[int32](10),
+				Completions:    pointer.Int32(10),
+				Parallelism:    pointer.Int32(10),
 			},
 		},
 	}
 	cronjobSpecWithTZinSchedule = batch.CronJobSpec{
 		Schedule:          "CRON_TZ=UTC 5 5 * * ?",
 		ConcurrencyPolicy: batch.AllowConcurrent,
-		TimeZone:          ptr.To("Asia/DoesNotExist"),
+		TimeZone:          pointer.String("Asia/DoesNotExist"),
 		JobTemplate: batch.JobTemplateSpec{
 			Spec: batch.JobSpec{
 				Template: validPodTemplateSpec,

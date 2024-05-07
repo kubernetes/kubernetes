@@ -44,24 +44,22 @@ var deploymentsKind = v1beta1.SchemeGroupVersion.WithKind("Deployment")
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
 func (c *FakeDeployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Deployment), err
 }
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
 func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
-	emptyResult := &v1beta1.DeploymentList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), &v1beta1.DeploymentList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,37 +84,34 @@ func (c *FakeDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch
 
 // Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
 func (c *FakeDeployments) Create(ctx context.Context, deployment *v1beta1.Deployment, opts v1.CreateOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), emptyResult)
+		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), &v1beta1.Deployment{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Deployment), err
 }
 
 // Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
 func (c *FakeDeployments) Update(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), emptyResult)
+		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), &v1beta1.Deployment{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Deployment), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
+func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (*v1beta1.Deployment, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), &v1beta1.Deployment{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Deployment), err
 }
@@ -139,12 +134,11 @@ func (c *FakeDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 
 // Patch applies the patch and returns the patched deployment.
 func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Deployment, err error) {
-	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, pt, data, subresources...), &v1beta1.Deployment{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Deployment), err
 }
@@ -162,12 +156,11 @@ func (c *FakeDeployments) Apply(ctx context.Context, deployment *extensionsv1bet
 	if name == nil {
 		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Deployment{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Deployment), err
 }
@@ -186,36 +179,33 @@ func (c *FakeDeployments) ApplyStatus(ctx context.Context, deployment *extension
 	if name == nil {
 		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta1.Deployment{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Deployment), err
 }
 
 // GetScale takes name of the deployment, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeDeployments) GetScale(ctx context.Context, deploymentName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
-	emptyResult := &v1beta1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), emptyResult)
+		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), &v1beta1.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
 func (c *FakeDeployments) UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (result *v1beta1.Scale, err error) {
-	emptyResult := &v1beta1.Scale{}
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &v1beta1.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Scale), err
 }
@@ -230,12 +220,11 @@ func (c *FakeDeployments) ApplyScale(ctx context.Context, deploymentName string,
 	if err != nil {
 		return nil, err
 	}
-	emptyResult := &v1beta1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, "status"), &v1beta1.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Scale), err
 }

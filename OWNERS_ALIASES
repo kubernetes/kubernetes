@@ -183,6 +183,8 @@ aliases:
     - brianpursley
     - deads2k
     - eddiezane
+    - KnVerey
+    - pwittrock
     - seans3
     - soltysh
   # emeritus:
@@ -193,8 +195,6 @@ aliases:
   # - mengqiy
   # - monopole
   # - smarterclayton
-  # - KnVerey
-  # - pwittrock
   sig-cli-reviewers:
     - ardaguclu
     - brianpursley
@@ -251,7 +251,6 @@ aliases:
     - tzneal
     - rphillips
     - kannon92
-    - ffromani
   sig-network-approvers:
     - andrewsykim
     - aojea
@@ -277,13 +276,11 @@ aliases:
     - mrhohn
     - robscott
     - thockin
-    - tnqn
   sig-apps-approvers:
     - kow3ns
     - janetkuo
     - soltysh
     - smarterclayton
-    - atiratree
   sig-apps-reviewers:
     - alculquicondor
     - atiratree
@@ -494,14 +491,12 @@ aliases:
   feature-approvers:
     - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
-    - ardaguclu # CLI
     - aojea # Network, Testing
     - danwinship # Network
     - dchen1107 # Node
     - deads2k # API Machinery
     - derekwaynecarr # Node
     - dims # Architecture
-    - eddiezane # CLI
     - ehashman # Instrumentation
     - enj # Auth
     - janetkuo # Apps
@@ -519,12 +514,13 @@ aliases:
     - mrunalp # Node
     - msau42 # Storage
     - mwielgus # Autoscaling
+    - pwittrock # CLI
     - rexagod # Instrumentation
     - saad-ali # Storage
+    - seans3 # CLI
     - sergeykanzhelev # Node
     - shaneutt # Network
     - soltysh # Apps, CLI
-    - sttts # API Machinery
     - tallclair # Auth
     - thockin # Network
     - xing-yang # Storage

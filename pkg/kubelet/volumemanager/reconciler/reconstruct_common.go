@@ -385,8 +385,8 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 		volumeSpec: volumeSpec,
 		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
 		// for volume cleanup.
-		// in case reconciler calls mountOrAttachVolumes, outerVolumeSpecName will
-		// be updated from dsw information in ASW.MarkVolumeAsMounted().
+		// in case pod is added back to desired state, outerVolumeSpecName will be updated from dsw information.
+		// See issue #103143 and its fix for details.
 		outerVolumeSpecName: volume.volumeSpecName,
 		pod:                 pod,
 		deviceMounter:       deviceMounter,

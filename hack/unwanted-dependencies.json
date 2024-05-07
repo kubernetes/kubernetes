@@ -20,7 +20,6 @@
       "github.com/go-openapi/validate": "use k8s.io/kube-openapi/pkg/validation/validate instead",
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/gogo/protobuf": "unmaintained",
-      "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
@@ -188,7 +187,7 @@
         "google.golang.org/api"
       ],
       "golang.org/x/exp": [
-        "github.com/antlr4-go/antlr/v4",
+        "github.com/antlr/antlr4/runtime/Go/antlr/v4",
         "github.com/google/cel-go"
       ],
       "google.golang.org/api": [
@@ -219,6 +218,7 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/api",
         "google.golang.org/genproto/googleapis/api",
         "google.golang.org/genproto/googleapis/rpc",

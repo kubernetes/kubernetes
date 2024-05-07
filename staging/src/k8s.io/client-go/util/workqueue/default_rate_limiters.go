@@ -24,66 +24,49 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// Deprecated: RateLimiter is deprecated, use TypedRateLimiter instead.
-type RateLimiter TypedRateLimiter[any]
-
-type TypedRateLimiter[T comparable] interface {
+type RateLimiter interface {
 	// When gets an item and gets to decide how long that item should wait
-	When(item T) time.Duration
+	When(item interface{}) time.Duration
 	// Forget indicates that an item is finished being retried.  Doesn't matter whether it's for failing
 	// or for success, we'll stop tracking it
-	Forget(item T)
+	Forget(item interface{})
 	// NumRequeues returns back how many failures the item has had
-	NumRequeues(item T) int
+	NumRequeues(item interface{}) int
 }
 
 // DefaultControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has
 // both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential
-//
-// Deprecated: Use DefaultTypedControllerRateLimiter instead.
 func DefaultControllerRateLimiter() RateLimiter {
-	return DefaultTypedControllerRateLimiter[any]()
-}
-
-// DefaultTypedControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has
-// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential
-func DefaultTypedControllerRateLimiter[T comparable]() TypedRateLimiter[T] {
-	return NewTypedMaxOfRateLimiter(
-		NewTypedItemExponentialFailureRateLimiter[T](5*time.Millisecond, 1000*time.Second),
+	return NewMaxOfRateLimiter(
+		NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-		&TypedBucketRateLimiter[T]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		&BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 }
 
-// Deprecated: BucketRateLimiter is deprecated, use TypedBucketRateLimiter instead.
-type BucketRateLimiter = TypedBucketRateLimiter[any]
-
-// TypedBucketRateLimiter adapts a standard bucket to the workqueue ratelimiter API
-type TypedBucketRateLimiter[T comparable] struct {
+// BucketRateLimiter adapts a standard bucket to the workqueue ratelimiter API
+type BucketRateLimiter struct {
 	*rate.Limiter
 }
 
 var _ RateLimiter = &BucketRateLimiter{}
 
-func (r *TypedBucketRateLimiter[T]) When(item T) time.Duration {
+func (r *BucketRateLimiter) When(item interface{}) time.Duration {
 	return r.Limiter.Reserve().Delay()
 }
 
-func (r *TypedBucketRateLimiter[T]) NumRequeues(item T) int {
+func (r *BucketRateLimiter) NumRequeues(item interface{}) int {
 	return 0
 }
 
-func (r *TypedBucketRateLimiter[T]) Forget(item T) {
+func (r *BucketRateLimiter) Forget(item interface{}) {
 }
 
-// Deprecated: ItemExponentialFailureRateLimiter is deprecated, use TypedItemExponentialFailureRateLimiter instead.
-type ItemExponentialFailureRateLimiter = TypedItemExponentialFailureRateLimiter[any]
-
-// TypedItemExponentialFailureRateLimiter does a simple baseDelay*2^<num-failures> limit
+// ItemExponentialFailureRateLimiter does a simple baseDelay*2^<num-failures> limit
 // dealing with max failures and expiration are up to the caller
-type TypedItemExponentialFailureRateLimiter[T comparable] struct {
+type ItemExponentialFailureRateLimiter struct {
 	failuresLock sync.Mutex
-	failures     map[T]int
+	failures     map[interface{}]int
 
 	baseDelay time.Duration
 	maxDelay  time.Duration
@@ -91,29 +74,19 @@ type TypedItemExponentialFailureRateLimiter[T comparable] struct {
 
 var _ RateLimiter = &ItemExponentialFailureRateLimiter{}
 
-// Deprecated: NewItemExponentialFailureRateLimiter is deprecated, use NewTypedItemExponentialFailureRateLimiter instead.
 func NewItemExponentialFailureRateLimiter(baseDelay time.Duration, maxDelay time.Duration) RateLimiter {
-	return NewTypedItemExponentialFailureRateLimiter[any](baseDelay, maxDelay)
-}
-
-func NewTypedItemExponentialFailureRateLimiter[T comparable](baseDelay time.Duration, maxDelay time.Duration) TypedRateLimiter[T] {
-	return &TypedItemExponentialFailureRateLimiter[T]{
-		failures:  map[T]int{},
+	return &ItemExponentialFailureRateLimiter{
+		failures:  map[interface{}]int{},
 		baseDelay: baseDelay,
 		maxDelay:  maxDelay,
 	}
 }
 
-// Deprecated: DefaultItemBasedRateLimiter is deprecated, use DefaultTypedItemBasedRateLimiter instead.
 func DefaultItemBasedRateLimiter() RateLimiter {
-	return DefaultTypedItemBasedRateLimiter[any]()
+	return NewItemExponentialFailureRateLimiter(time.Millisecond, 1000*time.Second)
 }
 
-func DefaultTypedItemBasedRateLimiter[T comparable]() TypedRateLimiter[T] {
-	return NewTypedItemExponentialFailureRateLimiter[T](time.Millisecond, 1000*time.Second)
-}
-
-func (r *TypedItemExponentialFailureRateLimiter[T]) When(item T) time.Duration {
+func (r *ItemExponentialFailureRateLimiter) When(item interface{}) time.Duration {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
@@ -134,14 +107,14 @@ func (r *TypedItemExponentialFailureRateLimiter[T]) When(item T) time.Duration {
 	return calculated
 }
 
-func (r *TypedItemExponentialFailureRateLimiter[T]) NumRequeues(item T) int {
+func (r *ItemExponentialFailureRateLimiter) NumRequeues(item interface{}) int {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
 	return r.failures[item]
 }
 
-func (r *TypedItemExponentialFailureRateLimiter[T]) Forget(item T) {
+func (r *ItemExponentialFailureRateLimiter) Forget(item interface{}) {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
@@ -149,13 +122,9 @@ func (r *TypedItemExponentialFailureRateLimiter[T]) Forget(item T) {
 }
 
 // ItemFastSlowRateLimiter does a quick retry for a certain number of attempts, then a slow retry after that
-// Deprecated: Use TypedItemFastSlowRateLimiter instead.
-type ItemFastSlowRateLimiter = TypedItemFastSlowRateLimiter[any]
-
-// TypedItemFastSlowRateLimiter does a quick retry for a certain number of attempts, then a slow retry after that
-type TypedItemFastSlowRateLimiter[T comparable] struct {
+type ItemFastSlowRateLimiter struct {
 	failuresLock sync.Mutex
-	failures     map[T]int
+	failures     map[interface{}]int
 
 	maxFastAttempts int
 	fastDelay       time.Duration
@@ -164,21 +133,16 @@ type TypedItemFastSlowRateLimiter[T comparable] struct {
 
 var _ RateLimiter = &ItemFastSlowRateLimiter{}
 
-// Deprecated: NewItemFastSlowRateLimiter is deprecated, use NewTypedItemFastSlowRateLimiter instead.
 func NewItemFastSlowRateLimiter(fastDelay, slowDelay time.Duration, maxFastAttempts int) RateLimiter {
-	return NewTypedItemFastSlowRateLimiter[any](fastDelay, slowDelay, maxFastAttempts)
-}
-
-func NewTypedItemFastSlowRateLimiter[T comparable](fastDelay, slowDelay time.Duration, maxFastAttempts int) TypedRateLimiter[T] {
-	return &TypedItemFastSlowRateLimiter[T]{
-		failures:        map[T]int{},
+	return &ItemFastSlowRateLimiter{
+		failures:        map[interface{}]int{},
 		fastDelay:       fastDelay,
 		slowDelay:       slowDelay,
 		maxFastAttempts: maxFastAttempts,
 	}
 }
 
-func (r *TypedItemFastSlowRateLimiter[T]) When(item T) time.Duration {
+func (r *ItemFastSlowRateLimiter) When(item interface{}) time.Duration {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
@@ -191,14 +155,14 @@ func (r *TypedItemFastSlowRateLimiter[T]) When(item T) time.Duration {
 	return r.slowDelay
 }
 
-func (r *TypedItemFastSlowRateLimiter[T]) NumRequeues(item T) int {
+func (r *ItemFastSlowRateLimiter) NumRequeues(item interface{}) int {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
 	return r.failures[item]
 }
 
-func (r *TypedItemFastSlowRateLimiter[T]) Forget(item T) {
+func (r *ItemFastSlowRateLimiter) Forget(item interface{}) {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
@@ -208,18 +172,11 @@ func (r *TypedItemFastSlowRateLimiter[T]) Forget(item T) {
 // MaxOfRateLimiter calls every RateLimiter and returns the worst case response
 // When used with a token bucket limiter, the burst could be apparently exceeded in cases where particular items
 // were separately delayed a longer time.
-//
-// Deprecated: Use TypedMaxOfRateLimiter instead.
-type MaxOfRateLimiter = TypedMaxOfRateLimiter[any]
-
-// TypedMaxOfRateLimiter calls every RateLimiter and returns the worst case response
-// When used with a token bucket limiter, the burst could be apparently exceeded in cases where particular items
-// were separately delayed a longer time.
-type TypedMaxOfRateLimiter[T comparable] struct {
-	limiters []TypedRateLimiter[T]
+type MaxOfRateLimiter struct {
+	limiters []RateLimiter
 }
 
-func (r *TypedMaxOfRateLimiter[T]) When(item T) time.Duration {
+func (r *MaxOfRateLimiter) When(item interface{}) time.Duration {
 	ret := time.Duration(0)
 	for _, limiter := range r.limiters {
 		curr := limiter.When(item)
@@ -231,16 +188,11 @@ func (r *TypedMaxOfRateLimiter[T]) When(item T) time.Duration {
 	return ret
 }
 
-// Deprecated: NewMaxOfRateLimiter is deprecated, use NewTypedMaxOfRateLimiter instead.
-func NewMaxOfRateLimiter(limiters ...TypedRateLimiter[any]) RateLimiter {
-	return NewTypedMaxOfRateLimiter(limiters...)
+func NewMaxOfRateLimiter(limiters ...RateLimiter) RateLimiter {
+	return &MaxOfRateLimiter{limiters: limiters}
 }
 
-func NewTypedMaxOfRateLimiter[T comparable](limiters ...TypedRateLimiter[T]) TypedRateLimiter[T] {
-	return &TypedMaxOfRateLimiter[T]{limiters: limiters}
-}
-
-func (r *TypedMaxOfRateLimiter[T]) NumRequeues(item T) int {
+func (r *MaxOfRateLimiter) NumRequeues(item interface{}) int {
 	ret := 0
 	for _, limiter := range r.limiters {
 		curr := limiter.NumRequeues(item)
@@ -252,32 +204,23 @@ func (r *TypedMaxOfRateLimiter[T]) NumRequeues(item T) int {
 	return ret
 }
 
-func (r *TypedMaxOfRateLimiter[T]) Forget(item T) {
+func (r *MaxOfRateLimiter) Forget(item interface{}) {
 	for _, limiter := range r.limiters {
 		limiter.Forget(item)
 	}
 }
 
 // WithMaxWaitRateLimiter have maxDelay which avoids waiting too long
-// Deprecated: Use TypedWithMaxWaitRateLimiter instead.
-type WithMaxWaitRateLimiter = TypedWithMaxWaitRateLimiter[any]
-
-// TypedWithMaxWaitRateLimiter have maxDelay which avoids waiting too long
-type TypedWithMaxWaitRateLimiter[T comparable] struct {
-	limiter  TypedRateLimiter[T]
+type WithMaxWaitRateLimiter struct {
+	limiter  RateLimiter
 	maxDelay time.Duration
 }
 
-// Deprecated: NewWithMaxWaitRateLimiter is deprecated, use NewTypedWithMaxWaitRateLimiter instead.
 func NewWithMaxWaitRateLimiter(limiter RateLimiter, maxDelay time.Duration) RateLimiter {
-	return NewTypedWithMaxWaitRateLimiter[any](limiter, maxDelay)
+	return &WithMaxWaitRateLimiter{limiter: limiter, maxDelay: maxDelay}
 }
 
-func NewTypedWithMaxWaitRateLimiter[T comparable](limiter TypedRateLimiter[T], maxDelay time.Duration) TypedRateLimiter[T] {
-	return &TypedWithMaxWaitRateLimiter[T]{limiter: limiter, maxDelay: maxDelay}
-}
-
-func (w TypedWithMaxWaitRateLimiter[T]) When(item T) time.Duration {
+func (w WithMaxWaitRateLimiter) When(item interface{}) time.Duration {
 	delay := w.limiter.When(item)
 	if delay > w.maxDelay {
 		return w.maxDelay
@@ -286,10 +229,10 @@ func (w TypedWithMaxWaitRateLimiter[T]) When(item T) time.Duration {
 	return delay
 }
 
-func (w TypedWithMaxWaitRateLimiter[T]) Forget(item T) {
+func (w WithMaxWaitRateLimiter) Forget(item interface{}) {
 	w.limiter.Forget(item)
 }
 
-func (w TypedWithMaxWaitRateLimiter[T]) NumRequeues(item T) int {
+func (w WithMaxWaitRateLimiter) NumRequeues(item interface{}) int {
 	return w.limiter.NumRequeues(item)
 }

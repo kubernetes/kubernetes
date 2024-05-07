@@ -563,7 +563,6 @@
             {
               "name": "nameValue",
               "readOnly": true,
-              "recursiveReadOnly": "recursiveReadOnlyValue",
               "mountPath": "mountPathValue",
               "subPath": "subPathValue",
               "mountPropagation": "mountPropagationValue",
@@ -761,10 +760,6 @@
             "allowPrivilegeEscalation": true,
             "procMount": "procMountValue",
             "seccompProfile": {
-              "type": "typeValue",
-              "localhostProfile": "localhostProfileValue"
-            },
-            "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
             }
@@ -858,7 +853,6 @@
             {
               "name": "nameValue",
               "readOnly": true,
-              "recursiveReadOnly": "recursiveReadOnlyValue",
               "mountPath": "mountPathValue",
               "subPath": "subPathValue",
               "mountPropagation": "mountPropagationValue",
@@ -1056,10 +1050,6 @@
             "allowPrivilegeEscalation": true,
             "procMount": "procMountValue",
             "seccompProfile": {
-              "type": "typeValue",
-              "localhostProfile": "localhostProfileValue"
-            },
-            "appArmorProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
             }
@@ -1153,7 +1143,6 @@
             {
               "name": "nameValue",
               "readOnly": true,
-              "recursiveReadOnly": "recursiveReadOnlyValue",
               "mountPath": "mountPathValue",
               "subPath": "subPathValue",
               "mountPropagation": "mountPropagationValue",
@@ -1353,10 +1342,6 @@
             "seccompProfile": {
               "type": "typeValue",
               "localhostProfile": "localhostProfileValue"
-            },
-            "appArmorProfile": {
-              "type": "typeValue",
-              "localhostProfile": "localhostProfileValue"
             }
           },
           "stdin": true,
@@ -1408,10 +1393,6 @@
         ],
         "fsGroupChangePolicy": "fsGroupChangePolicyValue",
         "seccompProfile": {
-          "type": "typeValue",
-          "localhostProfile": "localhostProfileValue"
-        },
-        "appArmorProfile": {
           "type": "typeValue",
           "localhostProfile": "localhostProfileValue"
         }

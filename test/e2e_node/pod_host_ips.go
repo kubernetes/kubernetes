@@ -31,7 +31,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -39,16 +39,18 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe("Pod Host IPs", framework.WithSerial(), func() {
-	f := framework.NewDefaultFramework("host-ips")
+var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeature.PodHostIPs, feature.PodHostIPs, func() {
+	f := framework.NewDefaultFramework("dualstack")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when creating a Pod", func() {
-		ginkgo.It("should add node IPs of all supported families to hostIPs of pod-network pod", func(ctx context.Context) {
+		ginkgo.It("should create pod, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
+
 			podName := "pod-dualstack-host-ips"
 
 			pod := genPodHostIPs(podName+string(uuid.NewUUID()), false)
@@ -69,17 +71,28 @@ var _ = common.SIGDescribe("Pod Host IPs", framework.WithSerial(), func() {
 				}
 			}
 
-			ginkgo.By("comparing pod.Status.HostIPs against node.Status.Addresses")
-			hostIPs, err := genHostIPsForNode(ctx, f, p.Spec.NodeName)
-			framework.ExpectNoError(err, "failed to fetch node IPs")
-			gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(hostIPs))
+			nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+			framework.ExpectNoError(err)
+			for _, node := range nodeList.Items {
+				if node.Name == p.Spec.NodeName {
+					nodeIPs := []v1.HostIP{}
+					for _, address := range node.Status.Addresses {
+						if address.Type == v1.NodeInternalIP {
+							nodeIPs = append(nodeIPs, v1.HostIP{IP: address.Address})
+						}
+					}
+					gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(nodeIPs))
+					break
+				}
+			}
 
 			ginkgo.By("deleting the pod")
 			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
 			framework.ExpectNoError(err, "failed to delete pod")
 		})
 
-		ginkgo.It("should add node IPs of all supported families to hostIPs of host-network pod", func(ctx context.Context) {
+		ginkgo.It("should create pod with hostNetwork, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
+
 			podName := "pod-dualstack-host-ips"
 
 			pod := genPodHostIPs(podName+string(uuid.NewUUID()), true)
@@ -100,10 +113,20 @@ var _ = common.SIGDescribe("Pod Host IPs", framework.WithSerial(), func() {
 				}
 			}
 
-			ginkgo.By("comparing pod.Status.HostIPs against node.Status.Addresses")
-			hostIPs, err := genHostIPsForNode(ctx, f, p.Spec.NodeName)
-			framework.ExpectNoError(err, "failed to fetch node IPs")
-			gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(hostIPs))
+			nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+			framework.ExpectNoError(err)
+			for _, node := range nodeList.Items {
+				if node.Name == p.Spec.NodeName {
+					nodeIPs := []v1.HostIP{}
+					for _, address := range node.Status.Addresses {
+						if address.Type == v1.NodeInternalIP {
+							nodeIPs = append(nodeIPs, v1.HostIP{IP: address.Address})
+						}
+					}
+					gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(nodeIPs))
+					break
+				}
+			}
 
 			ginkgo.By("deleting the pod")
 			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
@@ -154,27 +177,6 @@ func genPodHostIPs(podName string, hostNetwork bool) *v1.Pod {
 			HostNetwork:   hostNetwork,
 		},
 	}
-}
-
-func genHostIPsForNode(ctx context.Context, f *framework.Framework, nodeName string) ([]v1.HostIP, error) {
-	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-	if err != nil {
-		return nil, err
-	}
-	for _, node := range nodeList.Items {
-		if node.Name == nodeName {
-			nodeIPs, err := utilnode.GetNodeHostIPs(&node)
-			if err != nil {
-				return nil, err
-			}
-			hostIPs := []v1.HostIP{}
-			for _, ip := range nodeIPs {
-				hostIPs = append(hostIPs, v1.HostIP{IP: ip.String()})
-			}
-			return hostIPs, nil
-		}
-	}
-	return nil, fmt.Errorf("no such node %q", nodeName)
 }
 
 func testDownwardAPI(ctx context.Context, f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {

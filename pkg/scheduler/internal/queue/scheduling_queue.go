@@ -118,7 +118,6 @@ type SchedulingQueue interface {
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod)
 	PendingPods() ([]*v1.Pod, string)
-	PodsInActiveQ() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
@@ -1226,18 +1225,6 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(logger klog
 
 	}
 	return podsToMove
-}
-
-// PodsInActiveQ returns all the Pods in the activeQ.
-// This function is only used in tests.
-func (p *PriorityQueue) PodsInActiveQ() []*v1.Pod {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	var result []*v1.Pod
-	for _, pInfo := range p.activeQ.List() {
-		result = append(result, pInfo.(*framework.QueuedPodInfo).Pod)
-	}
-	return result
 }
 
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"

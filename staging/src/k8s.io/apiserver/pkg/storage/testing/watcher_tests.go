@@ -1250,7 +1250,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 			Object: &example.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: createdInitialPods[len(createdInitialPods)-1].ResourceVersion,
-					Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+					Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
 				},
 			},
 		}}
@@ -1481,6 +1481,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 			// make sure we only get initial events
 			testCheckResultsInStrictOrder(t, w, scenario.expectedInitialEvents(createdPods))
 			testCheckResultsInStrictOrder(t, w, scenario.expectedInitialEventsBookmark(createdPods))
+			testCheckNoMoreResults(t, w)
 
 			createdPods = []*example.Pod{}
 			// add a pod that is greater than the storage's RV when the watch was started
@@ -1512,7 +1513,7 @@ func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, st
 		watchEvents = append(watchEvents, watch.Event{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: globalResourceVersion,
-				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
 			},
 		}})
 		return watchEvents

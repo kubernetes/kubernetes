@@ -17,7 +17,6 @@ limitations under the License.
 package initializer
 
 import (
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/dynamic"
@@ -33,7 +32,6 @@ type pluginInitializer struct {
 	authorizer        authorizer.Authorizer
 	featureGates      featuregate.FeatureGate
 	stopCh            <-chan struct{}
-	restMapper        meta.RESTMapper
 }
 
 // New creates an instance of admission plugins initializer.
@@ -46,7 +44,6 @@ func New(
 	authz authorizer.Authorizer,
 	featureGates featuregate.FeatureGate,
 	stopCh <-chan struct{},
-	restMapper meta.RESTMapper,
 ) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
@@ -55,7 +52,6 @@ func New(
 		authorizer:        authz,
 		featureGates:      featureGates,
 		stopCh:            stopCh,
-		restMapper:        restMapper,
 	}
 }
 
@@ -86,9 +82,6 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
-	}
-	if wants, ok := plugin.(WantsRESTMapper); ok {
-		wants.SetRESTMapper(i.restMapper)
 	}
 }
 

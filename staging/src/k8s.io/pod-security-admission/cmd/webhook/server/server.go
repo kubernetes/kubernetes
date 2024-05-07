@@ -243,6 +243,7 @@ func LoadConfig(opts *options.Options) (*Config, error) {
 
 	var c Config
 	opts.SecureServing.ApplyTo(&c.SecureServing)
+	opts.InsecureServing.ApplyTo(&c.InsecureServing)
 
 	// Load Kube Client
 	kubeConfig, err := clientcmd.BuildConfigFromFlags("", opts.Kubeconfig)

@@ -40,7 +40,8 @@ type Args struct {
 // New returns default arguments for the generator.
 func New() *Args {
 	return &Args{
-		SingleDirectory: false,
+		SingleDirectory:  false,
+		PluralExceptions: []string{"Endpoints:Endpoints"},
 	}
 }
 

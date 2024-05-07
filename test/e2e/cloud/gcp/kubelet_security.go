@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -44,7 +43,6 @@ var _ = SIGDescribe("Ports Security Check", feature.KubeletSecurity, func() {
 	var nodeName string
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		var err error
 		node, err = e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)

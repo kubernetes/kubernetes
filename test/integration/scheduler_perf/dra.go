@@ -126,11 +126,6 @@ type createResourceDriverOp struct {
 	MaxClaimsPerNodeParam string
 	// Nodes matching this glob pattern have resources managed by the driver.
 	Nodes string
-	// StructuredParameters is true if the controller that is built into the scheduler
-	// is used and the control-plane controller is not needed.
-	// Because we don't run the kubelet plugin, ResourceSlices must
-	// get created for all nodes.
-	StructuredParameters bool
 }
 
 var _ realOp = &createResourceDriverOp{}
@@ -193,23 +188,6 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 		}
 	}
 
-	if op.StructuredParameters {
-		for _, nodeName := range resources.Nodes {
-			slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
-			_, err := tCtx.Client().ResourceV1alpha2().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-			tCtx.ExpectNoError(err, "create node resource slice")
-		}
-		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-			err := tCtx.Client().ResourceV1alpha2().ResourceSlices().DeleteCollection(tCtx,
-				metav1.DeleteOptions{},
-				metav1.ListOptions{FieldSelector: "driverName=" + op.DriverName},
-			)
-			tCtx.ExpectNoError(err, "delete node resource slices")
-		})
-		// No need for the controller.
-		return
-	}
-
 	controller := draapp.NewController(tCtx.Client(), resources)
 	ctx, cancel := context.WithCancel(tCtx)
 	var wg sync.WaitGroup
@@ -226,29 +204,4 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 		wg.Wait()
 		tCtx.Logf("stopped resource driver %q", op.DriverName)
 	})
-}
-
-func resourceSlice(driverName, nodeName string, capacity int) *resourcev1alpha2.ResourceSlice {
-	slice := &resourcev1alpha2.ResourceSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: nodeName,
-		},
-
-		NodeName:   nodeName,
-		DriverName: driverName,
-
-		ResourceModel: resourcev1alpha2.ResourceModel{
-			NamedResources: &resourcev1alpha2.NamedResourcesResources{},
-		},
-	}
-
-	for i := 0; i < capacity; i++ {
-		slice.ResourceModel.NamedResources.Instances = append(slice.ResourceModel.NamedResources.Instances,
-			resourcev1alpha2.NamedResourcesInstance{
-				Name: fmt.Sprintf("instance-%d", i),
-			},
-		)
-	}
-
-	return slice
 }

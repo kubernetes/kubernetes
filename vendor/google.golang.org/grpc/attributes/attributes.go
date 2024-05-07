@@ -121,9 +121,9 @@ func (a *Attributes) String() string {
 	return sb.String()
 }
 
-func str(x any) (s string) {
+func str(x any) string {
 	if v, ok := x.(fmt.Stringer); ok {
-		return fmt.Sprint(v)
+		return v.String()
 	} else if v, ok := x.(string); ok {
 		return v
 	}

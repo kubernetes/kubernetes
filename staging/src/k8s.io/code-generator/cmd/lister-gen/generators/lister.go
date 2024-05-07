@@ -215,7 +215,6 @@ func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	imports = append(imports, "k8s.io/apimachinery/pkg/api/errors")
 	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
-	imports = append(imports, "k8s.io/client-go/listers")
 	// for Indexer
 	imports = append(imports, "k8s.io/client-go/tools/cache")
 	return
@@ -244,14 +243,18 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 
 	sw.Do(typeListerStruct, m)
 	sw.Do(typeListerConstructor, m)
+	sw.Do(typeListerList, m)
 
 	if tags.NonNamespaced {
+		sw.Do(typeListerNonNamespacedGet, m)
 		return sw.Error()
 	}
 
 	sw.Do(typeListerNamespaceLister, m)
 	sw.Do(namespaceListerInterface, m)
 	sw.Do(namespaceListerStruct, m)
+	sw.Do(namespaceListerList, m)
+	sw.Do(namespaceListerGet, m)
 
 	return sw.Error()
 }
@@ -283,27 +286,48 @@ type $.type|public$Lister interface {
 }
 `
 
-// This embeds a typed resource indexer instead of aliasing, so that the struct
-// is available as a receiver for methods specific to the generated type
-// (from the corresponding expansion interface).
 var typeListerStruct = `
 // $.type|private$Lister implements the $.type|public$Lister interface.
 type $.type|private$Lister struct {
-	listers.ResourceIndexer[*$.type|raw$]
+	indexer cache.Indexer
 }
 `
 
 var typeListerConstructor = `
 // New$.type|public$Lister returns a new $.type|public$Lister.
 func New$.type|public$Lister(indexer cache.Indexer) $.type|public$Lister {
-	return &$.type|private$Lister{listers.New[*$.type|raw$](indexer, $.Resource|raw$("$.type|lowercaseSingular$"))}
+	return &$.type|private$Lister{indexer: indexer}
+}
+`
+
+var typeListerList = `
+// List lists all $.type|publicPlural$ in the indexer.
+func (s *$.type|private$Lister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*$.type|raw$))
+	})
+	return ret, err
 }
 `
 
 var typeListerNamespaceLister = `
 // $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|public$NamespaceLister {
-	return $.type|private$NamespaceLister{listers.NewNamespaced[*$.type|raw$](s.ResourceIndexer, namespace)}
+	return $.type|private$NamespaceLister{indexer: s.indexer, namespace: namespace}
+}
+`
+
+var typeListerNonNamespacedGet = `
+// Get retrieves the $.type|public$ from the index for a given name.
+func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
+  obj, exists, err := s.indexer.GetByKey(name)
+  if err != nil {
+    return nil, err
+  }
+  if !exists {
+    return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
+  }
+  return obj.(*$.type|raw$), nil
 }
 `
 
@@ -321,13 +345,35 @@ type $.type|public$NamespaceLister interface {
 }
 `
 
-// This embeds a typed namespaced resource indexer instead of aliasing, so that the struct
-// is available as a receiver for methods specific to the generated type
-// (from the corresponding expansion interface).
 var namespaceListerStruct = `
 // $.type|private$NamespaceLister implements the $.type|public$NamespaceLister
 // interface.
 type $.type|private$NamespaceLister struct {
-	listers.ResourceIndexer[*$.type|raw$]
+	indexer cache.Indexer
+	namespace string
+}
+`
+
+var namespaceListerList = `
+// List lists all $.type|publicPlural$ in the indexer for a given namespace.
+func (s $.type|private$NamespaceLister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*$.type|raw$))
+	})
+	return ret, err
+}
+`
+
+var namespaceListerGet = `
+// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
+func (s $.type|private$NamespaceLister) Get(name string) (*$.type|raw$, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
+	}
+	return obj.(*$.type|raw$), nil
 }
 `

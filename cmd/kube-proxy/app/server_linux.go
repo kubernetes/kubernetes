@@ -70,10 +70,6 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 		config.Mode = proxyconfigapi.ProxyModeIPTables
 	}
 
-	if config.Mode == proxyconfigapi.ProxyModeNFTables && len(config.NodePortAddresses) == 0 {
-		config.NodePortAddresses = []string{proxyconfigapi.NodePortAddressesPrimary}
-	}
-
 	if config.DetectLocalMode == "" {
 		o.logger.V(4).Info("Defaulting detect-local-mode", "localModeClusterCIDR", string(proxyconfigapi.LocalModeClusterCIDR))
 		config.DetectLocalMode = proxyconfigapi.LocalModeClusterCIDR
@@ -84,19 +80,18 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 // platformSetup is called after setting up the ProxyServer, but before creating the
 // Proxier. It should fill in any platform-specific fields and perform other
 // platform-specific setup.
-func (s *ProxyServer) platformSetup(ctx context.Context) error {
-	logger := klog.FromContext(ctx)
+func (s *ProxyServer) platformSetup() error {
 	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
-		logger.Info("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
-		node, err := waitForPodCIDR(ctx, s.Client, s.Hostname)
+		s.logger.Info("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
+		node, err := waitForPodCIDR(s.Client, s.Hostname)
 		if err != nil {
 			return err
 		}
 		s.podCIDRs = node.Spec.PodCIDRs
-		logger.Info("NodeInfo", "podCIDRs", node.Spec.PodCIDRs)
+		s.logger.Info("NodeInfo", "podCIDRs", node.Spec.PodCIDRs)
 	}
 
-	err := s.setupConntrack(ctx)
+	err := s.setupConntrack()
 	if err != nil {
 		return err
 	}
@@ -134,9 +129,7 @@ func getIPTables(primaryFamily v1.IPFamily) ([2]utiliptables.Interface, utilipta
 
 // platformCheckSupported is called immediately before creating the Proxier, to check
 // what IP families are supported (and whether the configuration is usable at all).
-func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
-	logger := klog.FromContext(ctx)
-
+func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
 	if isIPTablesBased(s.Config.Mode) {
 		ipt, _ := getIPTables(v1.IPFamilyUnknown)
 		ipv4Supported = ipt[0].Present()
@@ -145,9 +138,9 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 		if !ipv4Supported && !ipv6Supported {
 			err = fmt.Errorf("iptables is not available on this host")
 		} else if !ipv4Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol)
+			s.logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol)
 		} else if !ipv6Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol)
+			s.logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol)
 		}
 	} else {
 		// Assume support for both families.
@@ -162,27 +155,25 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 }
 
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.KubeProxyConfiguration, dualStack, initOnly bool) (proxy.Provider, error) {
-	logger := klog.FromContext(ctx)
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStack, initOnly bool) (proxy.Provider, error) {
 	var proxier proxy.Provider
 	var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 	var localDetector proxyutiliptables.LocalTrafficDetector
 	var err error
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
-		logger.Info("Using iptables Proxier")
+		s.logger.Info("Using iptables Proxier")
 
 		if dualStack {
 			ipt, _ := getIPTables(s.PrimaryIPFamily)
 
-			localDetectors, err = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
+			localDetectors, err = getDualStackLocalDetectorTuple(s.logger, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewDualStackProxier(
-				ctx,
 				ipt,
 				utilsysctl.New(),
 				exec.New(),
@@ -202,14 +193,13 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
 			_, iptInterface := getIPTables(s.PrimaryIPFamily)
-			localDetector, err = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			localDetector, err = getLocalDetector(s.logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
-				ctx,
 				s.PrimaryIPFamily,
 				iptInterface,
 				utilsysctl.New(),
@@ -236,22 +226,21 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		execer := exec.New()
 		ipsetInterface := utilipset.New(execer)
 		ipvsInterface := utilipvs.New()
-		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
+		if err := ipvs.CanUseIPVSProxier(ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
 
-		logger.Info("Using ipvs Proxier")
+		s.logger.Info("Using ipvs Proxier")
 		if dualStack {
 			ipt, _ := getIPTables(s.PrimaryIPFamily)
 
 			// Always ordered to match []ipt
-			localDetectors, err = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
+			localDetectors, err = getDualStackLocalDetectorTuple(s.logger, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
 
 			proxier, err = ipvs.NewDualStackProxier(
-				ctx,
 				ipt,
 				ipvsInterface,
 				ipsetInterface,
@@ -277,13 +266,12 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			)
 		} else {
 			_, iptInterface := getIPTables(s.PrimaryIPFamily)
-			localDetector, err = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			localDetector, err = getLocalDetector(s.logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
 
 			proxier, err = ipvs.NewProxier(
-				ctx,
 				s.PrimaryIPFamily,
 				iptInterface,
 				ipvsInterface,
@@ -313,17 +301,16 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	} else if config.Mode == proxyconfigapi.ProxyModeNFTables {
-		logger.Info("Using nftables Proxier")
+		s.logger.Info("Using nftables Proxier")
 
 		if dualStack {
-			localDetectors, err = getDualStackLocalDetectorTuple(logger, config.DetectLocalMode, config, s.podCIDRs)
+			localDetectors, err = getDualStackLocalDetectorTuple(s.logger, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewDualStackProxier(
-				ctx,
 				utilsysctl.New(),
 				config.NFTables.SyncPeriod.Duration,
 				config.NFTables.MinSyncPeriod.Duration,
@@ -339,14 +326,13 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack
-			localDetector, err = getLocalDetector(logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
+			localDetector, err = getLocalDetector(s.logger, s.PrimaryIPFamily, config.DetectLocalMode, config, s.podCIDRs)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create proxier: %v", err)
 			}
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewProxier(
-				ctx,
 				s.PrimaryIPFamily,
 				utilsysctl.New(),
 				config.NFTables.SyncPeriod.Duration,
@@ -371,15 +357,17 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 	return proxier, nil
 }
 
-func (s *ProxyServer) setupConntrack(ctx context.Context) error {
-	ct := &realConntracker{}
+func (s *ProxyServer) setupConntrack() error {
+	ct := &realConntracker{
+		logger: s.logger,
+	}
 
-	max, err := getConntrackMax(ctx, s.Config.Conntrack)
+	max, err := getConntrackMax(s.logger, s.Config.Conntrack)
 	if err != nil {
 		return err
 	}
 	if max > 0 {
-		err := ct.SetMax(ctx, max)
+		err := ct.SetMax(max)
 		if err != nil {
 			if err != errReadOnlySysFS {
 				return err
@@ -399,34 +387,34 @@ func (s *ProxyServer) setupConntrack(ctx context.Context) error {
 
 	if s.Config.Conntrack.TCPEstablishedTimeout != nil && s.Config.Conntrack.TCPEstablishedTimeout.Duration > 0 {
 		timeout := int(s.Config.Conntrack.TCPEstablishedTimeout.Duration / time.Second)
-		if err := ct.SetTCPEstablishedTimeout(ctx, timeout); err != nil {
+		if err := ct.SetTCPEstablishedTimeout(timeout); err != nil {
 			return err
 		}
 	}
 
 	if s.Config.Conntrack.TCPCloseWaitTimeout != nil && s.Config.Conntrack.TCPCloseWaitTimeout.Duration > 0 {
 		timeout := int(s.Config.Conntrack.TCPCloseWaitTimeout.Duration / time.Second)
-		if err := ct.SetTCPCloseWaitTimeout(ctx, timeout); err != nil {
+		if err := ct.SetTCPCloseWaitTimeout(timeout); err != nil {
 			return err
 		}
 	}
 
 	if s.Config.Conntrack.TCPBeLiberal {
-		if err := ct.SetTCPBeLiberal(ctx, 1); err != nil {
+		if err := ct.SetTCPBeLiberal(1); err != nil {
 			return err
 		}
 	}
 
 	if s.Config.Conntrack.UDPTimeout.Duration > 0 {
 		timeout := int(s.Config.Conntrack.UDPTimeout.Duration / time.Second)
-		if err := ct.SetUDPTimeout(ctx, timeout); err != nil {
+		if err := ct.SetUDPTimeout(timeout); err != nil {
 			return err
 		}
 	}
 
 	if s.Config.Conntrack.UDPStreamTimeout.Duration > 0 {
 		timeout := int(s.Config.Conntrack.UDPStreamTimeout.Duration / time.Second)
-		if err := ct.SetUDPStreamTimeout(ctx, timeout); err != nil {
+		if err := ct.SetUDPStreamTimeout(timeout); err != nil {
 			return err
 		}
 	}
@@ -434,8 +422,7 @@ func (s *ProxyServer) setupConntrack(ctx context.Context) error {
 	return nil
 }
 
-func getConntrackMax(ctx context.Context, config proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
-	logger := klog.FromContext(ctx)
+func getConntrackMax(logger klog.Logger, config proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0
 		if config.Min != nil {
@@ -452,10 +439,10 @@ func getConntrackMax(ctx context.Context, config proxyconfigapi.KubeProxyConntra
 	return 0, nil
 }
 
-func waitForPodCIDR(ctx context.Context, client clientset.Interface, nodeName string) (*v1.Node, error) {
+func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, error) {
 	// since allocators can assign the podCIDR after the node registers, we do a watch here to wait
 	// for podCIDR to be assigned, instead of assuming that the Get() on startup will have it.
-	ctx, cancelFunc := context.WithTimeout(ctx, timeoutForNodePodCIDR)
+	ctx, cancelFunc := context.WithTimeout(context.TODO(), timeoutForNodePodCIDR)
 	defer cancelFunc()
 
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", nodeName).String()
@@ -561,7 +548,7 @@ func getDualStackLocalDetectorTuple(logger klog.Logger, mode proxyconfigapi.Loca
 // cleanupAndExit is true, it will attempt to remove rules from all known kube-proxy
 // modes. If it is false, it will only remove rules that are definitely not in use by the
 // currently-configured mode.
-func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
+func platformCleanup(mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
 	var encounteredError bool
 
 	// Clean up iptables and ipvs rules if switching to nftables, or if cleanupAndExit
@@ -572,15 +559,15 @@ func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanup
 		ipvsInterface := utilipvs.New()
 
 		for _, ipt := range ipts {
-			encounteredError = iptables.CleanupLeftovers(ctx, ipt) || encounteredError
-			encounteredError = ipvs.CleanupLeftovers(ctx, ipvsInterface, ipt, ipsetInterface) || encounteredError
+			encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
+			encounteredError = ipvs.CleanupLeftovers(ipvsInterface, ipt, ipsetInterface) || encounteredError
 		}
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NFTablesProxyMode) {
 		// Clean up nftables rules when switching to iptables or ipvs, or if cleanupAndExit
 		if isIPTablesBased(mode) || cleanupAndExit {
-			encounteredError = nftables.CleanupLeftovers(ctx) || encounteredError
+			encounteredError = nftables.CleanupLeftovers() || encounteredError
 		}
 	}
 

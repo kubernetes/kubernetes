@@ -78,6 +78,7 @@ const (
 )
 
 // nodePollInterval is used in listing node
+// This is a variable instead of a const to enable testing.
 var nodePollInterval = 10 * time.Second
 
 // CIDRAllocator is an interface implemented by things that know how
@@ -86,7 +87,7 @@ type CIDRAllocator interface {
 	// AllocateOrOccupyCIDR looks at the given node, assigns it a valid
 	// CIDR if it doesn't currently have one or mark the CIDR as used if
 	// the node already have one.
-	AllocateOrOccupyCIDR(ctx context.Context, node *v1.Node) error
+	AllocateOrOccupyCIDR(logger klog.Logger, node *v1.Node) error
 	// ReleaseCIDR releases the CIDR of the removed node.
 	ReleaseCIDR(logger klog.Logger, node *v1.Node) error
 	// Run starts all the working logic of the allocator.
@@ -106,9 +107,17 @@ type CIDRAllocatorParams struct {
 	NodeCIDRMaskSizes []int
 }
 
+// CIDRs are reserved, then node resource is patched with them.
+// nodeReservedCIDRs holds the reservation info for a node.
+type nodeReservedCIDRs struct {
+	allocatedCIDRs []*net.IPNet
+	nodeName       string
+}
+
 // New creates a new CIDR range allocator.
 func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, allocatorParams CIDRAllocatorParams) (CIDRAllocator, error) {
-	nodeList, err := listNodes(ctx, kubeClient)
+	logger := klog.FromContext(ctx)
+	nodeList, err := listNodes(logger, kubeClient)
 	if err != nil {
 		return nil, err
 	}
@@ -123,15 +132,13 @@ func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovide
 	}
 }
 
-func listNodes(ctx context.Context, kubeClient clientset.Interface) (*v1.NodeList, error) {
+func listNodes(logger klog.Logger, kubeClient clientset.Interface) (*v1.NodeList, error) {
 	var nodeList *v1.NodeList
-	logger := klog.FromContext(ctx)
-
 	// We must poll because apiserver might not be up. This error causes
 	// controller manager to restart.
-	if pollErr := wait.PollUntilContextTimeout(ctx, nodePollInterval, apiserverStartupGracePeriod, true, func(ctx context.Context) (bool, error) {
+	if pollErr := wait.Poll(nodePollInterval, apiserverStartupGracePeriod, func() (bool, error) {
 		var err error
-		nodeList, err = kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		nodeList, err = kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 			FieldSelector: fields.Everything().String(),
 			LabelSelector: labels.Everything().String(),
 		})

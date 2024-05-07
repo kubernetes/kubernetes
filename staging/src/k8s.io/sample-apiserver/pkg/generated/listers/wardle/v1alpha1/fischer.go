@@ -19,8 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 )
@@ -39,10 +39,30 @@ type FischerLister interface {
 
 // fischerLister implements the FischerLister interface.
 type fischerLister struct {
-	listers.ResourceIndexer[*v1alpha1.Fischer]
+	indexer cache.Indexer
 }
 
 // NewFischerLister returns a new FischerLister.
 func NewFischerLister(indexer cache.Indexer) FischerLister {
-	return &fischerLister{listers.New[*v1alpha1.Fischer](indexer, v1alpha1.Resource("fischer"))}
+	return &fischerLister{indexer: indexer}
+}
+
+// List lists all Fischers in the indexer.
+func (s *fischerLister) List(selector labels.Selector) (ret []*v1alpha1.Fischer, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.Fischer))
+	})
+	return ret, err
+}
+
+// Get retrieves the Fischer from the index for a given name.
+func (s *fischerLister) Get(name string) (*v1alpha1.Fischer, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1alpha1.Resource("fischer"), name)
+	}
+	return obj.(*v1alpha1.Fischer), nil
 }

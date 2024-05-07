@@ -21,18 +21,26 @@ type extensionFieldInfo struct {
 	validation          validationInfo
 }
 
+var legacyExtensionFieldInfoCache sync.Map // map[protoreflect.ExtensionType]*extensionFieldInfo
+
 func getExtensionFieldInfo(xt protoreflect.ExtensionType) *extensionFieldInfo {
 	if xi, ok := xt.(*ExtensionInfo); ok {
 		xi.lazyInit()
 		return xi.info
 	}
-	// Ideally we'd cache the resulting *extensionFieldInfo so we don't have to
-	// recompute this metadata repeatedly. But without support for something like
-	// weak references, such a cache would pin temporary values (like dynamic
-	// extension types, constructed for the duration of a user request) to the
-	// heap forever, causing memory usage of the cache to grow unbounded.
-	// See discussion in https://github.com/golang/protobuf/issues/1521.
-	return makeExtensionFieldInfo(xt.TypeDescriptor())
+	return legacyLoadExtensionFieldInfo(xt)
+}
+
+// legacyLoadExtensionFieldInfo dynamically loads a *ExtensionInfo for xt.
+func legacyLoadExtensionFieldInfo(xt protoreflect.ExtensionType) *extensionFieldInfo {
+	if xi, ok := legacyExtensionFieldInfoCache.Load(xt); ok {
+		return xi.(*extensionFieldInfo)
+	}
+	e := makeExtensionFieldInfo(xt.TypeDescriptor())
+	if e, ok := legacyMessageTypeCache.LoadOrStore(xt, e); ok {
+		return e.(*extensionFieldInfo)
+	}
+	return e
 }
 
 func makeExtensionFieldInfo(xd protoreflect.ExtensionDescriptor) *extensionFieldInfo {

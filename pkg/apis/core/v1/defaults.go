@@ -228,6 +228,12 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+		if obj.HostNetwork {
+			defaultHostNetworkPorts(&obj.Containers)
+			defaultHostNetworkPorts(&obj.InitContainers)
+		}
+	}
 	if obj.SecurityContext == nil {
 		obj.SecurityContext = &v1.PodSecurityContext{}
 	}

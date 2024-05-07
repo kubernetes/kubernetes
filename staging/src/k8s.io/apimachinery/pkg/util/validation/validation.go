@@ -21,7 +21,6 @@ import (
 	"math"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	netutils "k8s.io/utils/net"
@@ -419,9 +418,6 @@ func IsHTTPHeaderName(value string) []string {
 const envVarNameFmt = "[-._a-zA-Z][-._a-zA-Z0-9]*"
 const envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
 
-// TODO(hirazawaui): Rename this when the RelaxedEnvironmentVariableValidation gate is removed.
-const relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
-
 var envVarNameRegexp = regexp.MustCompile("^" + envVarNameFmt + "$")
 
 // IsEnvVarName tests if a string is a valid environment variable name.
@@ -432,24 +428,6 @@ func IsEnvVarName(value string) []string {
 	}
 
 	errs = append(errs, hasChDirPrefix(value)...)
-	return errs
-}
-
-// IsRelaxedEnvVarName tests if a string is a valid environment variable name.
-func IsRelaxedEnvVarName(value string) []string {
-	var errs []string
-
-	if len(value) == 0 {
-		errs = append(errs, "environment variable name "+EmptyError())
-	}
-
-	for _, r := range value {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) || r == '=' {
-			errs = append(errs, relaxedEnvVarNameFmtErrMsg)
-			break
-		}
-	}
-
 	return errs
 }
 

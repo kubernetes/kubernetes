@@ -44,24 +44,22 @@ var statefulsetsKind = v1beta2.SchemeGroupVersion.WithKind("StatefulSet")
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
 func (c *FakeStatefulSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.StatefulSet, err error) {
-	emptyResult := &v1beta2.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(statefulsetsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(statefulsetsResource, c.ns, name), &v1beta2.StatefulSet{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
 
 // List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
 func (c *FakeStatefulSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.StatefulSetList, err error) {
-	emptyResult := &v1beta2.StatefulSetList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(statefulsetsResource, statefulsetsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(statefulsetsResource, statefulsetsKind, c.ns, opts), &v1beta2.StatefulSetList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,37 +84,34 @@ func (c *FakeStatefulSets) Watch(ctx context.Context, opts v1.ListOptions) (watc
 
 // Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
 func (c *FakeStatefulSets) Create(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.CreateOptions) (result *v1beta2.StatefulSet, err error) {
-	emptyResult := &v1beta2.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), emptyResult)
+		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), &v1beta2.StatefulSet{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
 
 // Update takes the representation of a statefulSet and updates it. Returns the server's representation of the statefulSet, and an error, if there is any.
 func (c *FakeStatefulSets) Update(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.UpdateOptions) (result *v1beta2.StatefulSet, err error) {
-	emptyResult := &v1beta2.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(statefulsetsResource, c.ns, statefulSet), emptyResult)
+		Invokes(testing.NewUpdateAction(statefulsetsResource, c.ns, statefulSet), &v1beta2.StatefulSet{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.UpdateOptions) (result *v1beta2.StatefulSet, err error) {
-	emptyResult := &v1beta2.StatefulSet{}
+func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta2.StatefulSet, opts v1.UpdateOptions) (*v1beta2.StatefulSet, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "status", c.ns, statefulSet), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "status", c.ns, statefulSet), &v1beta2.StatefulSet{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
@@ -139,12 +134,11 @@ func (c *FakeStatefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteO
 
 // Patch applies the patch and returns the patched statefulSet.
 func (c *FakeStatefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.StatefulSet, err error) {
-	emptyResult := &v1beta2.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, pt, data, subresources...), &v1beta2.StatefulSet{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
@@ -162,12 +156,11 @@ func (c *FakeStatefulSets) Apply(ctx context.Context, statefulSet *appsv1beta2.S
 	if name == nil {
 		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta2.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.StatefulSet{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
@@ -186,36 +179,33 @@ func (c *FakeStatefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1b
 	if name == nil {
 		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta2.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.StatefulSet{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.StatefulSet), err
 }
 
 // GetScale takes name of the statefulSet, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeStatefulSets) GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (result *v1beta2.Scale, err error) {
-	emptyResult := &v1beta2.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(statefulsetsResource, c.ns, "scale", statefulSetName), emptyResult)
+		Invokes(testing.NewGetSubresourceAction(statefulsetsResource, c.ns, "scale", statefulSetName), &v1beta2.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
 func (c *FakeStatefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *v1beta2.Scale, opts v1.UpdateOptions) (result *v1beta2.Scale, err error) {
-	emptyResult := &v1beta2.Scale{}
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "scale", c.ns, scale), &v1beta2.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.Scale), err
 }
@@ -230,12 +220,11 @@ func (c *FakeStatefulSets) ApplyScale(ctx context.Context, statefulSetName strin
 	if err != nil {
 		return nil, err
 	}
-	emptyResult := &v1beta2.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, statefulSetName, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, statefulSetName, types.ApplyPatchType, data, "status"), &v1beta2.Scale{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta2.Scale), err
 }

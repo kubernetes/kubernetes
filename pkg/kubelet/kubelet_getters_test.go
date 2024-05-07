@@ -109,13 +109,13 @@ func TestHandlerSupportsUserNamespaces(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	kubelet.runtimeState.setRuntimeHandlers([]kubecontainer.RuntimeHandler{
-		{
+	kubelet.runtimeState.setRuntimeHandlers(map[string]kubecontainer.RuntimeHandler{
+		"has-support": {
 			Name:                   "has-support",
 			SupportsUserNamespaces: true,
 		},
-		{
-			Name:                   "has-no-support",
+		"has-no-support": {
+			Name:                   "has-support",
 			SupportsUserNamespaces: false,
 		},
 	})

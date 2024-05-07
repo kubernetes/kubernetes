@@ -693,11 +693,7 @@ func startSCTPServer(sctpPort int) {
 	for {
 		conn, err := listener.AcceptSCTP()
 		assertNoError(err, fmt.Sprintf("failed accepting SCTP connections"))
-		remoteAddr, err := conn.SCTPRemoteAddr(0)
-		if err != nil {
-			assertNoError(err, "failed to get SCTP client remote address")
-		}
-		clientAddress := remoteAddr.String()
+		clientAddress := conn.RemoteAddr().String()
 		n, err := conn.Read(buf)
 		assertNoError(err, fmt.Sprintf("failed to read from SCTP client %s", clientAddress))
 		receivedText := strings.ToLower(strings.TrimSpace(string(buf[0:n])))

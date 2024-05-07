@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // DaemonSetUpgradeTest tests that a DaemonSet is running before and after
@@ -44,7 +43,7 @@ func (DaemonSetUpgradeTest) Name() string { return "[sig-apps] daemonset-upgrade
 func (t *DaemonSetUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	daemonSetName := "ds1"
 	labelSet := map[string]string{"ds-name": daemonSetName}
-	image := imageutils.GetE2EImage(imageutils.Agnhost)
+	image := framework.ServeHostnameImage
 
 	ns := f.Namespace
 

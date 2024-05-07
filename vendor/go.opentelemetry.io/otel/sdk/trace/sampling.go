@@ -158,9 +158,9 @@ func NeverSample() Sampler {
 	return alwaysOffSampler{}
 }
 
-// ParentBased returns a sampler decorator which behaves differently,
+// ParentBased returns a composite sampler which behaves differently,
 // based on the parent of the span. If the span has no parent,
-// the decorated sampler is used to make sampling decision. If the span has
+// the root(Sampler) is used to make sampling decision. If the span has
 // a parent, depending on whether the parent is remote and whether it
 // is sampled, one of the following samplers will apply:
 //   - remoteParentSampled(Sampler) (default: AlwaysOn)

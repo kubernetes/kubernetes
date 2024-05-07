@@ -21,11 +21,9 @@ import (
 	"testing"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/ext"
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,13 +34,11 @@ import (
 
 func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string) {
 	env, err := cel.NewEnv(
-		cel.OptionalTypes(),
 		ext.Strings(),
 		library.URLs(),
 		library.Regex(),
 		library.Lists(),
 		library.Quantity(),
-		library.Format(),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -83,18 +79,7 @@ func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntime
 		require.Empty(t, missingCompileErrs, "expected compilation errors")
 		return
 	} else if len(issues.Errors()) > 0 {
-		errorStrings := []string{}
-		source := common.NewTextSource(expr)
-		for _, issue := range issues.Errors() {
-			errorStrings = append(errorStrings, issue.ToDisplayString(source))
-		}
-		t.Fatalf("%v", errorStrings)
-	}
-
-	// Typecheck expression
-	_, err = cel.AstToCheckedExpr(compiled)
-	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatalf("%v", issues.Errors())
 	}
 
 	prog, err := env.Program(compiled)
@@ -114,7 +99,7 @@ func testQuantity(t *testing.T, expr string, expectResult ref.Val, expectRuntime
 		t.Fatalf("%v", err)
 	} else if expectResult != nil {
 		converted := res.Equal(expectResult).Value().(bool)
-		require.True(t, converted, "expectation not equal to output: %v", cmp.Diff(expectResult.Value(), res.Value()))
+		require.True(t, converted, "expectation not equal to output")
 	} else {
 		t.Fatal("expected result must not be nil")
 	}

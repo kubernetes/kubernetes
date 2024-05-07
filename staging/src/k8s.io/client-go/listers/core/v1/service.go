@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type ServiceLister interface {
 
 // serviceLister implements the ServiceLister interface.
 type serviceLister struct {
-	listers.ResourceIndexer[*v1.Service]
+	indexer cache.Indexer
 }
 
 // NewServiceLister returns a new ServiceLister.
 func NewServiceLister(indexer cache.Indexer) ServiceLister {
-	return &serviceLister{listers.New[*v1.Service](indexer, v1.Resource("service"))}
+	return &serviceLister{indexer: indexer}
+}
+
+// List lists all Services in the indexer.
+func (s *serviceLister) List(selector labels.Selector) (ret []*v1.Service, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Service))
+	})
+	return ret, err
 }
 
 // Services returns an object that can list and get Services.
 func (s *serviceLister) Services(namespace string) ServiceNamespaceLister {
-	return serviceNamespaceLister{listers.NewNamespaced[*v1.Service](s.ResourceIndexer, namespace)}
+	return serviceNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // ServiceNamespaceLister helps list and get Services.
@@ -66,5 +74,26 @@ type ServiceNamespaceLister interface {
 // serviceNamespaceLister implements the ServiceNamespaceLister
 // interface.
 type serviceNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Service]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all Services in the indexer for a given namespace.
+func (s serviceNamespaceLister) List(selector labels.Selector) (ret []*v1.Service, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.Service))
+	})
+	return ret, err
+}
+
+// Get retrieves the Service from the indexer for a given namespace and name.
+func (s serviceNamespaceLister) Get(name string) (*v1.Service, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("service"), name)
+	}
+	return obj.(*v1.Service), nil
 }

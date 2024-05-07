@@ -34,11 +34,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -103,9 +101,6 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 		node.Spec.ConfigSource = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-		node.Status.RuntimeHandlers = nil
-	}
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)

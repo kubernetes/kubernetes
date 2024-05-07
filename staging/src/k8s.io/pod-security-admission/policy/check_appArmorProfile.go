@@ -23,7 +23,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -36,14 +35,6 @@ profile, or restrict overrides to an allowed set of profiles.
 metadata.annotations['container.apparmor.security.beta.kubernetes.io/*']
 
 **Allowed Values:** 'runtime/default', 'localhost/*', empty, undefined
-
-**Restricted Fields:**
-spec.securityContext.appArmorProfile.type
-spec.containers[*].securityContext.appArmorProfile.type
-spec.initContainers[*].securityContext.appArmorProfile.type
-spec.ephemeralContainers[*].securityContext.appArmorProfile.type
-
-**Allowed Values:** 'RuntimeDefault', 'Localhost', undefined
 */
 func init() {
 	addCheck(CheckAppArmorProfile)
@@ -64,78 +55,25 @@ func CheckAppArmorProfile() Check {
 	}
 }
 
-func allowedAnnotationValue(profile string) bool {
+func allowedProfile(profile string) bool {
 	return len(profile) == 0 ||
-		profile == corev1.DeprecatedAppArmorBetaProfileRuntimeDefault ||
-		strings.HasPrefix(profile, corev1.DeprecatedAppArmorBetaProfileNamePrefix)
-}
-
-func allowedProfileType(profile corev1.AppArmorProfileType) bool {
-	switch profile {
-	case corev1.AppArmorProfileTypeRuntimeDefault,
-		corev1.AppArmorProfileTypeLocalhost:
-		return true
-	default:
-		return false
-	}
+		profile == corev1.AppArmorBetaProfileRuntimeDefault ||
+		strings.HasPrefix(profile, corev1.AppArmorBetaProfileNamePrefix)
 }
 
 func appArmorProfile_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var badSetters []string // things that explicitly set appArmorProfile.type to a bad value
-	badValues := sets.NewString()
-
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil {
-		if !allowedProfileType(podSpec.SecurityContext.AppArmorProfile.Type) {
-			badSetters = append(badSetters, "pod")
-			badValues.Insert(string(podSpec.SecurityContext.AppArmorProfile.Type))
-		}
-	}
-
-	var badContainers []string // containers that set apparmorProfile.type to a bad value
-	visitContainers(podSpec, func(c *corev1.Container) {
-		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil {
-			if !allowedProfileType(c.SecurityContext.AppArmorProfile.Type) {
-				badContainers = append(badContainers, c.Name)
-				badValues.Insert(string(c.SecurityContext.AppArmorProfile.Type))
-			}
-		}
-	})
-
-	if len(badContainers) > 0 {
-		badSetters = append(
-			badSetters,
-			fmt.Sprintf(
-				"%s %s",
-				pluralize("container", "containers", len(badContainers)),
-				joinQuote(badContainers),
-			),
-		)
-	}
-
-	var forbiddenAnnotations []string
+	var forbiddenValues []string
 	for k, v := range podMetadata.Annotations {
-		if strings.HasPrefix(k, corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) && !allowedAnnotationValue(v) {
-			forbiddenAnnotations = append(forbiddenAnnotations, fmt.Sprintf("%s=%q", k, v))
+		if strings.HasPrefix(k, corev1.AppArmorBetaContainerAnnotationKeyPrefix) && !allowedProfile(v) {
+			forbiddenValues = append(forbiddenValues, fmt.Sprintf("%s=%q", k, v))
 		}
 	}
-
-	badValueList := badValues.List()
-	if len(forbiddenAnnotations) > 0 {
-		sort.Strings(forbiddenAnnotations)
-		badValueList = append(badValueList, forbiddenAnnotations...)
-		badSetters = append(badSetters, pluralize("annotation", "annotations", len(forbiddenAnnotations)))
-	}
-
-	// pod or containers explicitly set bad apparmorProfiles
-	if len(badSetters) > 0 {
+	if len(forbiddenValues) > 0 {
+		sort.Strings(forbiddenValues)
 		return CheckResult{
 			Allowed:         false,
-			ForbiddenReason: pluralize("forbidden AppArmor profile", "forbidden AppArmor profiles", len(badValueList)),
-			ForbiddenDetail: fmt.Sprintf(
-				"%s must not set AppArmor profile type to %s",
-				strings.Join(badSetters, " and "),
-				joinQuote(badValueList),
-			),
+			ForbiddenReason: pluralize("forbidden AppArmor profile", "forbidden AppArmor profiles", len(forbiddenValues)),
+			ForbiddenDetail: strings.Join(forbiddenValues, ", "),
 		}
 	}
 

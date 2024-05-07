@@ -61,14 +61,14 @@ type PSIStats struct {
 func (fs FS) PSIStatsForResource(resource string) (PSIStats, error) {
 	data, err := util.ReadFileNoStat(fs.proc.Path(fmt.Sprintf("%s/%s", "pressure", resource)))
 	if err != nil {
-		return PSIStats{}, fmt.Errorf("%s: psi_stats: unavailable for %q: %w", ErrFileRead, resource, err)
+		return PSIStats{}, fmt.Errorf("psi_stats: unavailable for %q: %w", resource, err)
 	}
 
-	return parsePSIStats(bytes.NewReader(data))
+	return parsePSIStats(resource, bytes.NewReader(data))
 }
 
 // parsePSIStats parses the specified file for pressure stall information.
-func parsePSIStats(r io.Reader) (PSIStats, error) {
+func parsePSIStats(resource string, r io.Reader) (PSIStats, error) {
 	psiStats := PSIStats{}
 
 	scanner := bufio.NewScanner(r)

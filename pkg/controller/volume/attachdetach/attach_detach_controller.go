@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -379,6 +380,7 @@ func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
+		volumesInUse := sets.New(node.Status.VolumesInUse...)
 
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			uniqueName := attachedVolume.Name
@@ -392,8 +394,12 @@ func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger
 				logger.Error(err, "Failed to mark the volume as attached")
 				continue
 			}
+			inUse := volumesInUse.Has(uniqueName)
+			err = adc.actualStateOfWorld.SetVolumeMountedByNode(logger, uniqueName, nodeName, inUse)
+			if err != nil {
+				logger.Error(err, "Failed to set volume mounted by node")
+			}
 		}
-		adc.actualStateOfWorld.SetVolumesMountedByNode(logger, node.Status.VolumesInUse, nodeName)
 		adc.addNodeToDswp(node, types.NodeName(node.Name))
 	}
 	err = adc.processVolumeAttachments(logger)
@@ -672,7 +678,24 @@ func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) 
 func (adc *attachDetachController) processVolumesInUse(
 	logger klog.Logger, nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
 	logger.V(4).Info("processVolumesInUse for node", "node", klog.KRef("", string(nodeName)))
-	adc.actualStateOfWorld.SetVolumesMountedByNode(logger, volumesInUse, nodeName)
+	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
+		mounted := false
+		for _, volumeInUse := range volumesInUse {
+			if attachedVolume.VolumeName == volumeInUse {
+				mounted = true
+				break
+			}
+		}
+		err := adc.actualStateOfWorld.SetVolumeMountedByNode(logger, attachedVolume.VolumeName, nodeName, mounted)
+		if err != nil {
+			logger.Info(
+				"SetVolumeMountedByNode returned an error",
+				"node", klog.KRef("", string(nodeName)),
+				"volumeName", attachedVolume.VolumeName,
+				"mounted", mounted,
+				"err", err)
+		}
+	}
 }
 
 // Process Volume-Attachment objects.
@@ -864,9 +887,15 @@ func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
 	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; exists {
+		keepTerminatedPodVolumes := false
+
+		if t, ok := node.Annotations[volumeutil.KeepTerminatedPodVolumesAnnotation]; ok {
+			keepTerminatedPodVolumes = t == "true"
+		}
+
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName)
+		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
 	}
 }
 

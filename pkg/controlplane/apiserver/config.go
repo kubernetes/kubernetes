@@ -140,23 +140,18 @@ func BuildGenericConfig(
 	if lastErr != nil {
 		return
 	}
-	// storageFactory.StorageConfig is copied from etcdOptions.StorageConfig,
-	// the StorageObjectCountTracker is still nil. Here we copy from genericConfig.
-	storageFactory.StorageConfig.StorageObjectCountTracker = genericConfig.StorageObjectCountTracker
 	if lastErr = s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); lastErr != nil {
 		return
 	}
 
-	ctx := wait.ContextForChannel(genericConfig.DrainedNotify())
-
 	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
-	if lastErr = s.Authentication.ApplyTo(ctx, &genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers, genericConfig.APIServerID); lastErr != nil {
+	if lastErr = s.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
 
 	var enablesRBAC bool
 	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, enablesRBAC, err = BuildAuthorizer(
-		ctx,
+		wait.ContextForChannel(genericConfig.ShutdownInitiatedNotify()),
 		s,
 		genericConfig.EgressSelector,
 		genericConfig.APIServerID,

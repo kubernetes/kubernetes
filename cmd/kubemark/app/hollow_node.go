@@ -157,7 +157,7 @@ func NewHollowNodeCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
-			return run(cmd.Context(), s)
+			return run(s)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -176,7 +176,7 @@ func NewHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, config *hollowNodeConfig) error {
+func run(config *hollowNodeConfig) error {
 	// To help debugging, immediately log version and print flags.
 	klog.Infof("Version: %+v", version.Get())
 
@@ -264,7 +264,7 @@ func run(ctx context.Context, config *hollowNodeConfig) error {
 			runtimeService,
 			containerManager,
 		)
-		hollowKubelet.Run(ctx)
+		hollowKubelet.Run()
 	}
 
 	if config.Morph == "proxy" {

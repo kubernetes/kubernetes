@@ -22,7 +22,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"os"
@@ -75,7 +74,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
-	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -229,7 +227,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
 
 	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor) {
-		controllerContext, err := CreateControllerContext(ctx, c, rootClientBuilder, clientBuilder)
+		controllerContext, err := CreateControllerContext(logger, c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
 			logger.Error(err, "Error building controller context")
 			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
@@ -380,9 +378,6 @@ type ControllerContext struct {
 
 	// ControllerManagerMetrics provides a proxy to set controller manager specific metrics.
 	ControllerManagerMetrics *controllersmetrics.ControllerManagerMetrics
-
-	// GraphBuilder gives an access to dependencyGraphBuilder which keeps tracks of resources in the cluster
-	GraphBuilder *garbagecollector.GraphBuilder
 }
 
 // IsControllerEnabled checks if the context's controllers enabled or not
@@ -563,7 +558,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
 	register(newTaintEvictionControllerDescriptor())
 	register(newServiceCIDRsControllerDescriptor())
-	register(newStorageVersionMigratorControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {
@@ -577,7 +571,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
-func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder) (ControllerContext, error) {
+func CreateControllerContext(logger klog.Logger, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	// Informer transform to trim ManagedFields for memory efficiency.
 	trim := func(obj interface{}) (interface{}, error) {
 		if accessor, err := meta.Accessor(obj); err == nil {
@@ -604,15 +598,15 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
 	go wait.Until(func() {
 		restMapper.Reset()
-	}, 30*time.Second, ctx.Done())
+	}, 30*time.Second, stop)
 
-	cloud, loopMode, err := createCloudProvider(klog.FromContext(ctx), s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
+	cloud, loopMode, err := createCloudProvider(logger, s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
 		s.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
 	if err != nil {
 		return ControllerContext{}, err
 	}
 
-	controllerContext := ControllerContext{
+	ctx := ControllerContext{
 		ClientBuilder:                   clientBuilder,
 		InformerFactory:                 sharedInformers,
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
@@ -624,26 +618,8 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		ResyncPeriod:                    ResyncPeriod(s),
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("kube-controller-manager"),
 	}
-
-	if controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector &&
-		controllerContext.IsControllerEnabled(NewControllerDescriptors()[names.GarbageCollectorController]) {
-		ignoredResources := make(map[schema.GroupResource]struct{})
-		for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
-			ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
-		}
-
-		controllerContext.GraphBuilder = garbagecollector.NewDependencyGraphBuilder(
-			ctx,
-			metadataClient,
-			controllerContext.RESTMapper,
-			ignoredResources,
-			controllerContext.ObjectOrMetadataInformerFactory,
-			controllerContext.InformersStarted,
-		)
-	}
-
 	controllersmetrics.Register()
-	return controllerContext, nil
+	return ctx, nil
 }
 
 // StartControllers starts a set of controllers with a specified ControllerContext

@@ -367,7 +367,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			conf.MemorySwap.SwapBehavior = "invalid-behavior"
 			return conf
 		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\", or \"UnlimitedSwap\"",
 	}, {
 		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

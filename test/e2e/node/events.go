@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -59,7 +58,7 @@ var _ = SIGDescribe("Events", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "p",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Image: framework.ServeHostnameImage,
 						Args:  []string{"serve-hostname"},
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					},

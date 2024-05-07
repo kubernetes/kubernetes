@@ -31,8 +31,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 	"gopkg.in/square/go-jose.v2"
 )
 

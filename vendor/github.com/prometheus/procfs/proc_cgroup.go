@@ -51,7 +51,7 @@ func parseCgroupString(cgroupStr string) (*Cgroup, error) {
 
 	fields := strings.SplitN(cgroupStr, ":", 3)
 	if len(fields) < 3 {
-		return nil, fmt.Errorf("%w: 3+ fields required, found %d fields in cgroup string: %s", ErrFileParse, len(fields), cgroupStr)
+		return nil, fmt.Errorf("at least 3 fields required, found %d fields in cgroup string: %s", len(fields), cgroupStr)
 	}
 
 	cgroup := &Cgroup{
@@ -60,7 +60,7 @@ func parseCgroupString(cgroupStr string) (*Cgroup, error) {
 	}
 	cgroup.HierarchyID, err = strconv.Atoi(fields[0])
 	if err != nil {
-		return nil, fmt.Errorf("%w: hierarchy ID: %q", ErrFileParse, cgroup.HierarchyID)
+		return nil, fmt.Errorf("failed to parse hierarchy ID")
 	}
 	if fields[1] != "" {
 		ssNames := strings.Split(fields[1], ",")

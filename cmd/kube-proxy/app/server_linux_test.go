@@ -561,7 +561,6 @@ detectLocalMode: "BridgeInterface"`)
 	}
 
 	for _, tc := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
 		file, tempDir, err := setUp()
 		if err != nil {
 			t.Fatalf("unexpected error when setting up environment: %v", err)
@@ -577,7 +576,7 @@ detectLocalMode: "BridgeInterface"`)
 
 		errCh := make(chan error, 1)
 		go func() {
-			errCh <- opt.runLoop(ctx)
+			errCh <- opt.runLoop()
 		}()
 
 		if tc.append {
@@ -599,7 +598,6 @@ detectLocalMode: "BridgeInterface"`)
 }
 
 func Test_waitForPodCIDR(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
 	nodeName := "test-node"
 	oldNode := &v1.Node{
@@ -638,7 +636,7 @@ func Test_waitForPodCIDR(t *testing.T) {
 		// set the PodCIDRs on the new node
 		fakeWatch.Modify(updatedNode)
 	}()
-	got, err := waitForPodCIDR(ctx, client, node.Name)
+	got, err := waitForPodCIDR(client, node.Name)
 	if err != nil {
 		t.Errorf("waitForPodCIDR() unexpected error %v", err)
 		return
@@ -681,8 +679,8 @@ func TestGetConntrackMax(t *testing.T) {
 			Min:        ptr.To(tc.min),
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
-		_, ctx := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(ctx, cfg)
+		logger, _ := ktesting.NewTestContext(t)
+		x, e := getConntrackMax(logger, cfg)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
@@ -722,7 +720,6 @@ func TestProxyServer_platformSetup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			client := clientsetfake.NewSimpleClientset(tt.node)
 			s := &ProxyServer{
 				Config:   tt.config,
@@ -733,7 +730,7 @@ func TestProxyServer_platformSetup(t *testing.T) {
 					v1.IPv6Protocol: net.IPv6zero,
 				},
 			}
-			err := s.platformSetup(ctx)
+			err := s.platformSetup()
 			if err != nil {
 				t.Errorf("ProxyServer.createProxier() error = %v", err)
 				return

@@ -633,7 +633,7 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 			Containers: []v1.Container{
 				{
 					Name:  "volume-tester",
-					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Image: framework.BusyBoxImage,
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",

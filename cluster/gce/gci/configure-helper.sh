@@ -1753,35 +1753,24 @@ function prepare-kube-proxy-manifest-variables {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
+  if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
+    # use 'nf_conntrack' instead of 'nf_conntrack_ipv4' for linux kernel >= 4.19
+    # https://github.com/kubernetes/kubernetes/pull/70398
+    local -r kernel_version=$(uname -r | cut -d\. -f1,2)
+    local conntrack_module="nf_conntrack"
+    if [[ $(printf '%s\n4.18\n' "${kernel_version}" | sort -V | tail -1) == "4.18" ]]; then
+      conntrack_module="nf_conntrack_ipv4"
+    fi
 
-  case "${KUBE_PROXY_MODE:-iptables}" in
-    iptables)
-      params+=" --proxy-mode=iptables --iptables-sync-period=1m --iptables-min-sync-period=10s"
-      ;;
-    ipvs)
-      # use 'nf_conntrack' instead of 'nf_conntrack_ipv4' for linux kernel >= 4.19
-      # https://github.com/kubernetes/kubernetes/pull/70398
-      local -r kernel_version=$(uname -r | cut -d\. -f1,2)
-      local conntrack_module="nf_conntrack"
-      if [[ $(printf '%s\n4.18\n' "${kernel_version}" | sort -V | tail -1) == "4.18" ]]; then
-        conntrack_module="nf_conntrack_ipv4"
-      fi
-
-      if ! sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}; then
-        # If IPVS modules are not present, make sure the node does not come up as
-        # healthy.
-        exit 1
-      fi
-      params+=" --proxy-mode=ipvs --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
-      ;;
-    nftables)
-      # Pass --conntrack-tcp-be-liberal so we can test that this makes the
-      # "proxy implementation should not be vulnerable to the invalid conntrack state bug"
-      # test pass. https://issues.k8s.io/122663#issuecomment-1885024015
-      params+=" --proxy-mode=nftables --conntrack-tcp-be-liberal"
-      ;;
-  esac
-
+    if sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}; then
+      params+=" --proxy-mode=ipvs"
+    else
+      # If IPVS modules are not present, make sure the node does not come up as
+      # healthy.
+      exit 1
+    fi
+  fi
+  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
@@ -2984,9 +2973,6 @@ EOF
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
   fi
-  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "kube-network-policies" ]]; then
-    setup-addon-manifests "addons" "kube-network-policies"
-  fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
@@ -3187,7 +3173,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.2
+    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.1
     command:
     - /bin/sh
     args:
@@ -3252,8 +3238,8 @@ function setup-containerd {
 }
 EOF
   if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
-    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
-      # Use Kubernetes cni daemonset on node if network policy provider calico is specified
+    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
+      # Use Kubernetes cni daemonset on node if network policy provider is specified
       # or netd is enabled.
       cni_template_path=""
     fi

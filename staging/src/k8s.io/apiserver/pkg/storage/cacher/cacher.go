@@ -523,7 +523,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		opts.SendInitialEvents = nil
 	}
 	// TODO: we should eventually get rid of this legacy case
-	if utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
+	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
 		return c.storage.Watch(ctx, key, opts)
 	}
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
@@ -773,7 +773,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		// minimal resource version, simply forward the request to storage.
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
-	if resourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+	if listRV == 0 && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
 		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
 		if err != nil {
 			return err
@@ -1282,13 +1282,11 @@ func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(parsedResourceVersion
 //
 //	if SendInitiaEvents != nil => ResourceVersionMatch = NotOlderThan
 //	if ResourceVersionmatch != nil => ResourceVersionMatch = NotOlderThan & SendInitialEvents != nil
+//
+// to satisfy the legacy case (SendInitialEvents = true, RV="") we skip checking opts.Predicate.AllowWatchBookmarks
 func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (uint64, error) {
 	if len(opts.ResourceVersion) != 0 {
 		return parsedWatchResourceVersion, nil
-	}
-	// legacy case
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
-		return 0, nil
 	}
 	rv, err := storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
 	return rv, err

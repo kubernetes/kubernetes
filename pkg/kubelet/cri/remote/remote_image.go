@@ -63,7 +63,6 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		tracingOpts := []otelgrpc.Option{
-			otelgrpc.WithMessageEvents(otelgrpc.ReceivedEvents, otelgrpc.SentEvents),
 			otelgrpc.WithPropagators(tracing.Propagators()),
 			otelgrpc.WithTracerProvider(tp),
 		}

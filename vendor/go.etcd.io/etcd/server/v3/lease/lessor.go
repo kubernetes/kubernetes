@@ -77,7 +77,7 @@ type RangeDeleter func() TxnDelete
 
 // Checkpointer permits checkpointing of lease remaining TTLs to the consensus log. Defined here to
 // avoid circular dependency with mvcc.
-type Checkpointer func(ctx context.Context, lc *pb.LeaseCheckpointRequest) error
+type Checkpointer func(ctx context.Context, lc *pb.LeaseCheckpointRequest)
 
 type LeaseID int64
 
@@ -423,9 +423,7 @@ func (le *lessor) Renew(id LeaseID) (int64, error) {
 	// By applying a RAFT entry only when the remainingTTL is already set, we limit the number
 	// of RAFT entries written per lease to a max of 2 per checkpoint interval.
 	if clearRemainingTTL {
-		if err := le.cp(context.Background(), &pb.LeaseCheckpointRequest{Checkpoints: []*pb.LeaseCheckpoint{{ID: int64(l.ID), Remaining_TTL: 0}}}); err != nil {
-			return -1, err
-		}
+		le.cp(context.Background(), &pb.LeaseCheckpointRequest{Checkpoints: []*pb.LeaseCheckpoint{{ID: int64(l.ID), Remaining_TTL: 0}}})
 	}
 
 	le.mu.Lock()
@@ -661,9 +659,7 @@ func (le *lessor) checkpointScheduledLeases() {
 		le.mu.Unlock()
 
 		if len(cps) != 0 {
-			if err := le.cp(context.Background(), &pb.LeaseCheckpointRequest{Checkpoints: cps}); err != nil {
-				return
-			}
+			le.cp(context.Background(), &pb.LeaseCheckpointRequest{Checkpoints: cps})
 		}
 		if len(cps) < maxLeaseCheckpointBatchSize {
 			return

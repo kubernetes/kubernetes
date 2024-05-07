@@ -338,6 +338,8 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
+	// Inject error to underlying layer and check if cacher is not bypassed.
+	backingStorage.injectError(errDummy)
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
@@ -346,32 +348,12 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
 	}
 
+	// With unset RV, check if cacher is bypassed.
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "",
-		Predicate:       storage.Everything,
 	})
-	if err != nil {
-		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)()
-	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
-		ResourceVersion: "",
-		Predicate:       storage.Everything,
-	})
-	if err != nil {
-		t.Errorf("With WatchFromStorageWithoutResourceVersion disabled, watch with unset RV should be served from cache: %v", err)
-	}
-
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)()
-	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
-		ResourceVersion: "",
-		Predicate:       storage.Everything,
-	})
-	if !errors.Is(err, errDummy) {
-		t.Errorf("With WatchFromStorageWithoutResourceVersion enabled, watch with unset RV should be served from storage: %v", err)
+	if err != errDummy {
+		t.Errorf("Watch with unset RV should bypass cacher: %v", err)
 	}
 }
 
@@ -449,14 +431,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 				if e, a := tt.expectedEvent.Object, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 					t.Errorf("Expected: %#v, got: %#v", e, a)
 				}
-			case <-time.After(1 * time.Second):
-				// the watch was established otherwise
-				// we would be blocking on cache.Watch(...)
-				// in addition to that, the tests are serial in nature,
-				// meaning that there is no other actor
-				// that could add items to the database,
-				// which could result in receiving new items.
-				// given that waiting 1s seems okay
+			case <-time.After(3 * time.Second):
 				if tt.expectedEvent != nil {
 					t.Errorf("Failed to get an event")
 				}
@@ -482,7 +457,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// terminate instead of hanging forever.
 	go func() {
 		defer cancel()
-		cacher.clock.Sleep(1 * time.Second)
+		cacher.clock.Sleep(5 * time.Second)
 	}()
 
 	// Watch hangs waiting on watchcache being initialized.
@@ -1665,7 +1640,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				ResourceVersion:   "105",
 			},
 			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+				require.NotEqual(t, 0, s.requestWatchProgressCounter, "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
 			},
 		},
 
@@ -1742,7 +1717,6 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			t.Parallel()
 			var backingStorage *dummyStorage
 			if scenario.backingStorage != nil {
 				backingStorage = scenario.backingStorage
@@ -1952,7 +1926,7 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 		{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "102",
-				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
 			},
 		}},
 	}, true)
@@ -2050,11 +2024,9 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		// | Unset           | true/false          | nil/true/false        |
 		// +-----------------+---------------------+-----------------------+
 		{
-			name: "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts: listOptions(true, nil, ""),
-			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
-			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
-			expectedWatchResourceVersion: 0,
+			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts:                         listOptions(true, nil, ""),
+			expectedWatchResourceVersion: 100,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
@@ -2067,11 +2039,9 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 			expectedWatchResourceVersion: 100,
 		},
 		{
-			name: "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts: listOptions(false, nil, ""),
-			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
-			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
-			expectedWatchResourceVersion: 0,
+			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts:                         listOptions(false, nil, ""),
+			expectedWatchResourceVersion: 100,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true, legacy",

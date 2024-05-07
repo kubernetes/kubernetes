@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

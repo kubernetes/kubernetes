@@ -123,12 +123,11 @@ func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error)
 	if rtHandlers == nil {
 		return false, fmt.Errorf("runtime handlers are not set")
 	}
-	for _, h := range rtHandlers {
-		if h.Name == rtHandler {
-			return h.SupportsUserNamespaces, nil
-		}
+	h, found := rtHandlers[rtHandler]
+	if !found {
+		return false, fmt.Errorf("the handler %q is not known", rtHandler)
 	}
-	return false, fmt.Errorf("the handler %q is not known", rtHandler)
+	return h.SupportsUserNamespaces, nil
 }
 
 // GetKubeletMappings gets the additional IDs allocated for the Kubelet.

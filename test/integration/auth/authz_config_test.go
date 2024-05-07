@@ -56,7 +56,7 @@ func TestAuthzConfig(t *testing.T) {
 
 	dir := t.TempDir()
 	configFileName := filepath.Join(dir, "config.yaml")
-	if err := atomicWriteFile(configFileName, []byte(`
+	if err := os.WriteFile(configFileName, []byte(`
 apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: AuthorizationConfiguration
 authorizers:
@@ -362,7 +362,7 @@ users:
 	}
 
 	configFileName := filepath.Join(dir, "config.yaml")
-	if err := atomicWriteFile(configFileName, []byte(`
+	if err := os.WriteFile(configFileName, []byte(`
 apiVersion: apiserver.config.k8s.io/v1alpha1
 kind: AuthorizationConfiguration
 authorizers:
@@ -583,7 +583,7 @@ authorizers:
 	}
 
 	// write bogus file
-	if err := atomicWriteFile(configFileName, []byte(`apiVersion: apiserver.config.k8s.io`), os.FileMode(0644)); err != nil {
+	if err := os.WriteFile(configFileName, []byte(`apiVersion: apiserver.config.k8s.io`), os.FileMode(0644)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -635,7 +635,7 @@ authorizers:
 	}
 
 	// write good config with different webhook
-	if err := atomicWriteFile(configFileName, []byte(`
+	if err := os.WriteFile(configFileName, []byte(`
 apiVersion: apiserver.config.k8s.io/v1beta1
 kind: AuthorizationConfiguration
 authorizers:
@@ -889,12 +889,4 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 		}
 	}
 	return &m, nil
-}
-
-func atomicWriteFile(name string, data []byte, perm os.FileMode) error {
-	tmp := name + ".tmp"
-	if err := os.WriteFile(tmp, data, perm); err != nil {
-		return err
-	}
-	return os.Rename(tmp, name)
 }

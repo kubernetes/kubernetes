@@ -25,10 +25,6 @@ import (
 	"strings"
 	"time"
 
-	celgo "github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/operators"
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
-
 	v1 "k8s.io/api/authorization/v1"
 	"k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,33 +45,32 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, dis
 	root := field.NewPath("jwt")
 	var allErrs field.ErrorList
 
-	// We allow 0 authenticators in the authentication configuration.
-	// This allows us to support scenarios where the API server is initially set up without
-	// any authenticators and then authenticators are added later via dynamic config.
-
-	if len(c.JWT) > 64 {
-		allErrs = append(allErrs, field.TooMany(root, len(c.JWT), 64))
+	// This stricter validation is solely based on what the current implementation supports.
+	// TODO(aramase): when StructuredAuthenticationConfiguration feature gate is added and wired up,
+	// relax this check to allow 0 authenticators. This will allow us to support the case where
+	// API server is initially configured with no authenticators and then authenticators are added
+	// later via dynamic config.
+	if len(c.JWT) == 0 {
+		allErrs = append(allErrs, field.Required(root, fmt.Sprintf(atLeastOneRequiredErrFmt, root)))
 		return allErrs
 	}
 
-	seenIssuers := sets.New[string]()
-	seenDiscoveryURLs := sets.New[string]()
+	// This stricter validation is because the --oidc-* flag option is singular.
+	// TODO(aramase): when StructuredAuthenticationConfiguration feature gate is added and wired up,
+	// remove the 1 authenticator limit check and add set the limit to 64.
+	if len(c.JWT) > 1 {
+		allErrs = append(allErrs, field.TooMany(root, len(c.JWT), 1))
+		return allErrs
+	}
+
+	// TODO(aramase): right now we only support a single JWT authenticator as
+	// this is wired to the --oidc-* flags. When StructuredAuthenticationConfiguration
+	// feature gate is added and wired up, we will remove the 1 authenticator limit
+	// check and add validation for duplicate issuers.
 	for i, a := range c.JWT {
 		fldPath := root.Index(i)
 		_, errs := validateJWTAuthenticator(a, fldPath, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
 		allErrs = append(allErrs, errs...)
-
-		if seenIssuers.Has(a.Issuer.URL) {
-			allErrs = append(allErrs, field.Duplicate(fldPath.Child("issuer").Child("url"), a.Issuer.URL))
-		}
-		seenIssuers.Insert(a.Issuer.URL)
-
-		if len(a.Issuer.DiscoveryURL) > 0 {
-			if seenDiscoveryURLs.Has(a.Issuer.DiscoveryURL) {
-				allErrs = append(allErrs, field.Duplicate(fldPath.Child("issuer").Child("discoveryURL"), a.Issuer.DiscoveryURL))
-			}
-			seenDiscoveryURLs.Insert(a.Issuer.DiscoveryURL)
-		}
 	}
 
 	return allErrs
@@ -92,20 +87,14 @@ func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field
 	var allErrs field.ErrorList
 
 	compiler := authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
-	state := &validationState{}
+	mapper := &authenticationcel.CELMapper{}
 
 	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, disallowedIssuers, fldPath.Child("issuer"))...)
-	allErrs = append(allErrs, validateClaimValidationRules(compiler, state, authenticator.ClaimValidationRules, fldPath.Child("claimValidationRules"), structuredAuthnFeatureEnabled)...)
-	allErrs = append(allErrs, validateClaimMappings(compiler, state, authenticator.ClaimMappings, fldPath.Child("claimMappings"), structuredAuthnFeatureEnabled)...)
-	allErrs = append(allErrs, validateUserValidationRules(compiler, state, authenticator.UserValidationRules, fldPath.Child("userValidationRules"), structuredAuthnFeatureEnabled)...)
+	allErrs = append(allErrs, validateClaimValidationRules(compiler, mapper, authenticator.ClaimValidationRules, fldPath.Child("claimValidationRules"), structuredAuthnFeatureEnabled)...)
+	allErrs = append(allErrs, validateClaimMappings(compiler, mapper, authenticator.ClaimMappings, fldPath.Child("claimMappings"), structuredAuthnFeatureEnabled)...)
+	allErrs = append(allErrs, validateUserValidationRules(compiler, mapper, authenticator.UserValidationRules, fldPath.Child("userValidationRules"), structuredAuthnFeatureEnabled)...)
 
-	return state.mapper, allErrs
-}
-
-type validationState struct {
-	mapper                 authenticationcel.CELMapper
-	usesEmailClaim         bool
-	usesEmailVerifiedClaim bool
+	return *mapper, allErrs
 }
 
 func validateIssuer(issuer api.Issuer, disallowedIssuers sets.Set[string], fldPath *field.Path) field.ErrorList {
@@ -215,7 +204,7 @@ func validateCertificateAuthority(certificateAuthority string, fldPath *field.Pa
 	return allErrs
 }
 
-func validateClaimValidationRules(compiler authenticationcel.Compiler, state *validationState, rules []api.ClaimValidationRule, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
+func validateClaimValidationRules(compiler authenticationcel.Compiler, celMapper *authenticationcel.CELMapper, rules []api.ClaimValidationRule, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	seenClaims := sets.NewString()
@@ -268,14 +257,13 @@ func validateClaimValidationRules(compiler authenticationcel.Compiler, state *va
 	}
 
 	if structuredAuthnFeatureEnabled && len(compilationResults) > 0 {
-		state.mapper.ClaimValidationRules = authenticationcel.NewClaimsMapper(compilationResults)
-		state.usesEmailVerifiedClaim = state.usesEmailVerifiedClaim || anyUsesEmailVerifiedClaim(compilationResults)
+		celMapper.ClaimValidationRules = authenticationcel.NewClaimsMapper(compilationResults)
 	}
 
 	return allErrs
 }
 
-func validateClaimMappings(compiler authenticationcel.Compiler, state *validationState, m api.ClaimMappings, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
+func validateClaimMappings(compiler authenticationcel.Compiler, celMapper *authenticationcel.CELMapper, m api.ClaimMappings, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if !structuredAuthnFeatureEnabled {
@@ -293,20 +281,18 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 		}
 	}
 
-	compilationResult, err := validatePrefixClaimOrExpression(compiler, m.Username, fldPath.Child("username"), true)
+	compilationResult, err := validatePrefixClaimOrExpression(compiler, m.Username, fldPath.Child("username"), true, structuredAuthnFeatureEnabled)
 	if err != nil {
 		allErrs = append(allErrs, err...)
 	} else if compilationResult != nil && structuredAuthnFeatureEnabled {
-		state.usesEmailClaim = state.usesEmailClaim || usesEmailClaim(compilationResult.AST)
-		state.usesEmailVerifiedClaim = state.usesEmailVerifiedClaim || usesEmailVerifiedClaim(compilationResult.AST)
-		state.mapper.Username = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
+		celMapper.Username = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
 	}
 
-	compilationResult, err = validatePrefixClaimOrExpression(compiler, m.Groups, fldPath.Child("groups"), false)
+	compilationResult, err = validatePrefixClaimOrExpression(compiler, m.Groups, fldPath.Child("groups"), false, structuredAuthnFeatureEnabled)
 	if err != nil {
 		allErrs = append(allErrs, err...)
 	} else if compilationResult != nil && structuredAuthnFeatureEnabled {
-		state.mapper.Groups = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
+		celMapper.Groups = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
 	}
 
 	switch {
@@ -320,7 +306,7 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 		if err != nil {
 			allErrs = append(allErrs, err)
 		} else if structuredAuthnFeatureEnabled && compilationResult != nil {
-			state.mapper.UID = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
+			celMapper.UID = authenticationcel.NewClaimsMapper([]authenticationcel.CompilationResult{*compilationResult})
 		}
 	}
 
@@ -364,124 +350,13 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 	}
 
 	if structuredAuthnFeatureEnabled && len(extraCompilationResults) > 0 {
-		state.mapper.Extra = authenticationcel.NewClaimsMapper(extraCompilationResults)
-		state.usesEmailVerifiedClaim = state.usesEmailVerifiedClaim || anyUsesEmailVerifiedClaim(extraCompilationResults)
-	}
-
-	if structuredAuthnFeatureEnabled && state.usesEmailClaim && !state.usesEmailVerifiedClaim {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("username", "expression"), m.Username.Expression,
-			"claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression"))
+		celMapper.Extra = authenticationcel.NewClaimsMapper(extraCompilationResults)
 	}
 
 	return allErrs
 }
 
-func usesEmailClaim(ast *celgo.Ast) bool {
-	return hasSelectExp(ast.Expr(), "claims", "email")
-}
-
-func anyUsesEmailVerifiedClaim(results []authenticationcel.CompilationResult) bool {
-	for _, result := range results {
-		if usesEmailVerifiedClaim(result.AST) {
-			return true
-		}
-	}
-	return false
-}
-
-func usesEmailVerifiedClaim(ast *celgo.Ast) bool {
-	return hasSelectExp(ast.Expr(), "claims", "email_verified")
-}
-
-func hasSelectExp(exp *exprpb.Expr, operand, field string) bool {
-	if exp == nil {
-		return false
-	}
-	switch e := exp.ExprKind.(type) {
-	case *exprpb.Expr_ConstExpr,
-		*exprpb.Expr_IdentExpr:
-		return false
-	case *exprpb.Expr_SelectExpr:
-		s := e.SelectExpr
-		if s == nil {
-			return false
-		}
-		if isIdentOperand(s.Operand, operand) && s.Field == field {
-			return true
-		}
-		return hasSelectExp(s.Operand, operand, field)
-	case *exprpb.Expr_CallExpr:
-		c := e.CallExpr
-		if c == nil {
-			return false
-		}
-		if c.Target == nil && c.Function == operators.OptSelect && len(c.Args) == 2 &&
-			isIdentOperand(c.Args[0], operand) && isConstField(c.Args[1], field) {
-			return true
-		}
-		for _, arg := range c.Args {
-			if hasSelectExp(arg, operand, field) {
-				return true
-			}
-		}
-		return hasSelectExp(c.Target, operand, field)
-	case *exprpb.Expr_ListExpr:
-		l := e.ListExpr
-		if l == nil {
-			return false
-		}
-		for _, element := range l.Elements {
-			if hasSelectExp(element, operand, field) {
-				return true
-			}
-		}
-		return false
-	case *exprpb.Expr_StructExpr:
-		s := e.StructExpr
-		if s == nil {
-			return false
-		}
-		for _, entry := range s.Entries {
-			if hasSelectExp(entry.GetMapKey(), operand, field) {
-				return true
-			}
-			if hasSelectExp(entry.Value, operand, field) {
-				return true
-			}
-		}
-		return false
-	case *exprpb.Expr_ComprehensionExpr:
-		c := e.ComprehensionExpr
-		if c == nil {
-			return false
-		}
-		return hasSelectExp(c.IterRange, operand, field) ||
-			hasSelectExp(c.AccuInit, operand, field) ||
-			hasSelectExp(c.LoopCondition, operand, field) ||
-			hasSelectExp(c.LoopStep, operand, field) ||
-			hasSelectExp(c.Result, operand, field)
-	default:
-		return false
-	}
-}
-
-func isIdentOperand(exp *exprpb.Expr, operand string) bool {
-	if len(operand) == 0 {
-		return false // sanity check against default values
-	}
-	id := exp.GetIdentExpr() // does not panic even if exp is nil
-	return id != nil && id.Name == operand
-}
-
-func isConstField(exp *exprpb.Expr, field string) bool {
-	if len(field) == 0 {
-		return false // sanity check against default values
-	}
-	c := exp.GetConstExpr()                        // does not panic even if exp is nil
-	return c != nil && c.GetStringValue() == field // does not panic even if c is not a string
-}
-
-func validatePrefixClaimOrExpression(compiler authenticationcel.Compiler, mapping api.PrefixedClaimOrExpression, fldPath *field.Path, claimOrExpressionRequired bool) (*authenticationcel.CompilationResult, field.ErrorList) {
+func validatePrefixClaimOrExpression(compiler authenticationcel.Compiler, mapping api.PrefixedClaimOrExpression, fldPath *field.Path, claimOrExpressionRequired, structuredAuthnFeatureEnabled bool) (*authenticationcel.CompilationResult, field.ErrorList) {
 	var allErrs field.ErrorList
 
 	var compilationResult *authenticationcel.CompilationResult
@@ -513,7 +388,7 @@ func validatePrefixClaimOrExpression(compiler authenticationcel.Compiler, mappin
 	return compilationResult, allErrs
 }
 
-func validateUserValidationRules(compiler authenticationcel.Compiler, state *validationState, rules []api.UserValidationRule, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
+func validateUserValidationRules(compiler authenticationcel.Compiler, celMapper *authenticationcel.CELMapper, rules []api.UserValidationRule, fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 	var compilationResults []authenticationcel.CompilationResult
 
@@ -552,7 +427,7 @@ func validateUserValidationRules(compiler authenticationcel.Compiler, state *val
 	}
 
 	if structuredAuthnFeatureEnabled && len(compilationResults) > 0 {
-		state.mapper.UserValidationRules = authenticationcel.NewUserMapper(compilationResults)
+		celMapper.UserValidationRules = authenticationcel.NewUserMapper(compilationResults)
 	}
 
 	return allErrs

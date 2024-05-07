@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"path/filepath"
 	"time"
 	"unicode"
 
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/cpuset"
 )
@@ -195,10 +195,10 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if localFeatureGate.Enabled(features.NodeSwap) {
 		switch kc.MemorySwap.SwapBehavior {
 		case "":
-		case kubetypes.NoSwap:
 		case kubetypes.LimitedSwap:
+		case kubetypes.UnlimitedSwap:
 		default:
-			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q, or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.UnlimitedSwap))
 		}
 	}
 	if !localFeatureGate.Enabled(features.NodeSwap) && kc.MemorySwap != (kubeletconfig.MemorySwapConfiguration{}) {
@@ -293,11 +293,11 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: podLogsDir was not specified"))
 	}
 
-	if !utilfs.IsAbs(kc.PodLogsDir) {
+	if !filepath.IsAbs(kc.PodLogsDir) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be absolute path", kc.PodLogsDir))
 	}
 
-	if !utilfs.IsPathClean(kc.PodLogsDir) {
+	if filepath.Clean(kc.PodLogsDir) != kc.PodLogsDir {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: pod logs path %q must be normalized", kc.PodLogsDir))
 	}
 

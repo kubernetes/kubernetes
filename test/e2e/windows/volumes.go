@@ -41,6 +41,10 @@ const (
 	volumeName         = "test-volume"
 )
 
+var (
+	image = imageutils.GetE2EImage(imageutils.Pause)
+)
+
 var _ = sigDescribe(feature.Windows, "Windows volume mounts", skipUnlessWindows(func() {
 	f := framework.NewDefaultFramework("windows-volumes")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -119,7 +123,7 @@ func doReadWriteReadOnlyTest(ctx context.Context, f *framework.Framework, source
 
 	rwcontainer := v1.Container{
 		Name:  containerName + "-rw",
-		Image: imageutils.GetE2EImage(imageutils.Pause),
+		Image: image,
 		VolumeMounts: []v1.VolumeMount{
 			{
 				Name:      volumeName,
@@ -167,7 +171,7 @@ func testPodWithROVolume(podName string, source v1.VolumeSource, path string) *v
 			Containers: []v1.Container{
 				{
 					Name:  containerName,
-					Image: imageutils.GetE2EImage(imageutils.Pause),
+					Image: image,
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,

@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type IngressLister interface {
 
 // ingressLister implements the IngressLister interface.
 type ingressLister struct {
-	listers.ResourceIndexer[*v1beta1.Ingress]
+	indexer cache.Indexer
 }
 
 // NewIngressLister returns a new IngressLister.
 func NewIngressLister(indexer cache.Indexer) IngressLister {
-	return &ingressLister{listers.New[*v1beta1.Ingress](indexer, v1beta1.Resource("ingress"))}
+	return &ingressLister{indexer: indexer}
+}
+
+// List lists all Ingresses in the indexer.
+func (s *ingressLister) List(selector labels.Selector) (ret []*v1beta1.Ingress, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.Ingress))
+	})
+	return ret, err
 }
 
 // Ingresses returns an object that can list and get Ingresses.
 func (s *ingressLister) Ingresses(namespace string) IngressNamespaceLister {
-	return ingressNamespaceLister{listers.NewNamespaced[*v1beta1.Ingress](s.ResourceIndexer, namespace)}
+	return ingressNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // IngressNamespaceLister helps list and get Ingresses.
@@ -66,5 +74,26 @@ type IngressNamespaceLister interface {
 // ingressNamespaceLister implements the IngressNamespaceLister
 // interface.
 type ingressNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.Ingress]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all Ingresses in the indexer for a given namespace.
+func (s ingressNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.Ingress, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.Ingress))
+	})
+	return ret, err
+}
+
+// Get retrieves the Ingress from the indexer for a given namespace and name.
+func (s ingressNamespaceLister) Get(name string) (*v1beta1.Ingress, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1beta1.Resource("ingress"), name)
+	}
+	return obj.(*v1beta1.Ingress), nil
 }

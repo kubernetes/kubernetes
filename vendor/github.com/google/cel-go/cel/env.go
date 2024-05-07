@@ -38,42 +38,26 @@ type Source = common.Source
 // Ast representing the checked or unchecked expression, its source, and related metadata such as
 // source position information.
 type Ast struct {
-	source Source
-	impl   *celast.AST
-}
-
-// NativeRep converts the AST to a Go-native representation.
-func (ast *Ast) NativeRep() *celast.AST {
-	return ast.impl
+	expr    *exprpb.Expr
+	info    *exprpb.SourceInfo
+	source  Source
+	refMap  map[int64]*celast.ReferenceInfo
+	typeMap map[int64]*types.Type
 }
 
 // Expr returns the proto serializable instance of the parsed/checked expression.
-//
-// Deprecated: prefer cel.AstToCheckedExpr() or cel.AstToParsedExpr() and call GetExpr()
-// the result instead.
 func (ast *Ast) Expr() *exprpb.Expr {
-	if ast == nil {
-		return nil
-	}
-	pbExpr, _ := celast.ExprToProto(ast.impl.Expr())
-	return pbExpr
+	return ast.expr
 }
 
 // IsChecked returns whether the Ast value has been successfully type-checked.
 func (ast *Ast) IsChecked() bool {
-	if ast == nil {
-		return false
-	}
-	return ast.impl.IsChecked()
+	return ast.typeMap != nil && len(ast.typeMap) > 0
 }
 
 // SourceInfo returns character offset and newline position information about expression elements.
 func (ast *Ast) SourceInfo() *exprpb.SourceInfo {
-	if ast == nil {
-		return nil
-	}
-	pbInfo, _ := celast.SourceInfoToProto(ast.impl.SourceInfo())
-	return pbInfo
+	return ast.info
 }
 
 // ResultType returns the output type of the expression if the Ast has been type-checked, else
@@ -81,6 +65,9 @@ func (ast *Ast) SourceInfo() *exprpb.SourceInfo {
 //
 // Deprecated: use OutputType
 func (ast *Ast) ResultType() *exprpb.Type {
+	if !ast.IsChecked() {
+		return chkdecls.Dyn
+	}
 	out := ast.OutputType()
 	t, err := TypeToExprType(out)
 	if err != nil {
@@ -92,18 +79,16 @@ func (ast *Ast) ResultType() *exprpb.Type {
 // OutputType returns the output type of the expression if the Ast has been type-checked, else
 // returns cel.DynType as the parse step cannot infer types.
 func (ast *Ast) OutputType() *Type {
-	if ast == nil {
-		return types.ErrorType
+	t, found := ast.typeMap[ast.expr.GetId()]
+	if !found {
+		return DynType
 	}
-	return ast.impl.GetType(ast.impl.Expr().ID())
+	return t
 }
 
 // Source returns a view of the input used to create the Ast. This source may be complete or
 // constructed from the SourceInfo.
 func (ast *Ast) Source() Source {
-	if ast == nil {
-		return nil
-	}
 	return ast.source
 }
 
@@ -213,28 +198,29 @@ func NewCustomEnv(opts ...EnvOption) (*Env, error) {
 // It is possible to have both non-nil Ast and Issues values returned from this call: however,
 // the mere presence of an Ast does not imply that it is valid for use.
 func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
+	// Note, errors aren't currently possible on the Ast to ParsedExpr conversion.
+	pe, _ := AstToParsedExpr(ast)
+
 	// Construct the internal checker env, erroring if there is an issue adding the declarations.
 	chk, err := e.initChecker()
 	if err != nil {
 		errs := common.NewErrors(ast.Source())
 		errs.ReportError(common.NoLocation, err.Error())
-		return nil, NewIssuesWithSourceInfo(errs, ast.impl.SourceInfo())
+		return nil, NewIssuesWithSourceInfo(errs, ast.SourceInfo())
 	}
 
-	checked, errs := checker.Check(ast.impl, ast.Source(), chk)
+	res, errs := checker.Check(pe, ast.Source(), chk)
 	if len(errs.GetErrors()) > 0 {
-		return nil, NewIssuesWithSourceInfo(errs, ast.impl.SourceInfo())
+		return nil, NewIssuesWithSourceInfo(errs, ast.SourceInfo())
 	}
 	// Manually create the Ast to ensure that the Ast source information (which may be more
 	// detailed than the information provided by Check), is returned to the caller.
 	ast = &Ast{
-		source: ast.Source(),
-		impl:   checked}
-
-	// Avoid creating a validator config if it's not needed.
-	if len(e.validators) == 0 {
-		return ast, nil
-	}
+		source:  ast.Source(),
+		expr:    res.Expr,
+		info:    res.SourceInfo,
+		refMap:  res.ReferenceMap,
+		typeMap: res.TypeMap}
 
 	// Generate a validator configuration from the set of configured validators.
 	vConfig := newValidatorConfig()
@@ -244,9 +230,9 @@ func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
 		}
 	}
 	// Apply additional validators on the type-checked result.
-	iss := NewIssuesWithSourceInfo(errs, ast.impl.SourceInfo())
+	iss := NewIssuesWithSourceInfo(errs, ast.SourceInfo())
 	for _, v := range e.validators {
-		v.Validate(e, vConfig, checked, iss)
+		v.Validate(e, vConfig, res, iss)
 	}
 	if iss.Err() != nil {
 		return nil, iss
@@ -443,11 +429,16 @@ func (e *Env) Parse(txt string) (*Ast, *Issues) {
 // It is possible to have both non-nil Ast and Issues values returned from this call; however,
 // the mere presence of an Ast does not imply that it is valid for use.
 func (e *Env) ParseSource(src Source) (*Ast, *Issues) {
-	parsed, errs := e.prsr.Parse(src)
+	res, errs := e.prsr.Parse(src)
 	if len(errs.GetErrors()) > 0 {
 		return nil, &Issues{errs: errs}
 	}
-	return &Ast{source: src, impl: parsed}, nil
+	// Manually create the Ast to ensure that the text source information is propagated on
+	// subsequent calls to Check.
+	return &Ast{
+		source: src,
+		expr:   res.GetExpr(),
+		info:   res.GetSourceInfo()}, nil
 }
 
 // Program generates an evaluable instance of the Ast within the environment (Env).
@@ -543,9 +534,8 @@ func (e *Env) PartialVars(vars any) (interpreter.PartialActivation, error) {
 // TODO: Consider adding an option to generate a Program.Residual to avoid round-tripping to an
 // Ast format and then Program again.
 func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
-	pruned := interpreter.PruneAst(a.impl.Expr(), a.impl.SourceInfo().MacroCalls(), details.State())
-	newAST := &Ast{source: a.Source(), impl: pruned}
-	expr, err := AstToString(newAST)
+	pruned := interpreter.PruneAst(a.Expr(), a.SourceInfo().GetMacroCalls(), details.State())
+	expr, err := AstToString(ParsedExprToAst(pruned))
 	if err != nil {
 		return nil, err
 	}
@@ -566,10 +556,16 @@ func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
 // EstimateCost estimates the cost of a type checked CEL expression using the length estimates of input data and
 // extension functions provided by estimator.
 func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator, opts ...checker.CostOption) (checker.CostEstimate, error) {
+	checked := &celast.CheckedAST{
+		Expr:         ast.Expr(),
+		SourceInfo:   ast.SourceInfo(),
+		TypeMap:      ast.typeMap,
+		ReferenceMap: ast.refMap,
+	}
 	extendedOpts := make([]checker.CostOption, 0, len(e.costOptions))
 	extendedOpts = append(extendedOpts, opts...)
 	extendedOpts = append(extendedOpts, e.costOptions...)
-	return checker.Cost(ast.impl, estimator, extendedOpts...)
+	return checker.Cost(checked, estimator, extendedOpts...)
 }
 
 // configure applies a series of EnvOptions to the current environment.
@@ -711,7 +707,7 @@ type Error = common.Error
 // Note: in the future, non-fatal warnings and notices may be inspectable via the Issues struct.
 type Issues struct {
 	errs *common.Errors
-	info *celast.SourceInfo
+	info *exprpb.SourceInfo
 }
 
 // NewIssues returns an Issues struct from a common.Errors object.
@@ -722,7 +718,7 @@ func NewIssues(errs *common.Errors) *Issues {
 // NewIssuesWithSourceInfo returns an Issues struct from a common.Errors object with SourceInfo metatata
 // which can be used with the `ReportErrorAtID` method for additional error reports within the context
 // information that's inferred from an expression id.
-func NewIssuesWithSourceInfo(errs *common.Errors, info *celast.SourceInfo) *Issues {
+func NewIssuesWithSourceInfo(errs *common.Errors, info *exprpb.SourceInfo) *Issues {
 	return &Issues{
 		errs: errs,
 		info: info,
@@ -772,7 +768,30 @@ func (i *Issues) String() string {
 // The source metadata for the expression at `id`, if present, is attached to the error report.
 // To ensure that source metadata is attached to error reports, use NewIssuesWithSourceInfo.
 func (i *Issues) ReportErrorAtID(id int64, message string, args ...any) {
-	i.errs.ReportErrorAtID(id, i.info.GetStartLocation(id), message, args...)
+	i.errs.ReportErrorAtID(id, locationByID(id, i.info), message, args...)
+}
+
+// locationByID returns a common.Location given an expression id.
+//
+// TODO: move this functionality into the native SourceInfo and an overhaul of the common.Source
+// as this implementation relies on the abstractions present in the protobuf SourceInfo object,
+// and is replicated in the checker.
+func locationByID(id int64, sourceInfo *exprpb.SourceInfo) common.Location {
+	positions := sourceInfo.GetPositions()
+	var line = 1
+	if offset, found := positions[id]; found {
+		col := int(offset)
+		for _, lineOffset := range sourceInfo.GetLineOffsets() {
+			if lineOffset < offset {
+				line++
+				col = int(offset - lineOffset)
+			} else {
+				break
+			}
+		}
+		return common.NewLocation(line, col)
+	}
+	return common.NoLocation
 }
 
 // getStdEnv lazy initializes the CEL standard environment.
@@ -801,13 +820,6 @@ func (p *interopCELTypeProvider) FindStructType(typeName string) (*types.Type, b
 		return t, true
 	}
 	return nil, false
-}
-
-// FindStructFieldNames returns an empty set of field for the interop provider.
-//
-// To inspect the field names, migrate to a `types.Provider` implementation.
-func (p *interopCELTypeProvider) FindStructFieldNames(typeName string) ([]string, bool) {
-	return []string{}, false
 }
 
 // FindStructFieldType returns a types.FieldType instance for the given fully-qualified typeName and field

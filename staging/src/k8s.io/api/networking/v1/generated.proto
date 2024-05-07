@@ -96,7 +96,7 @@ message Ingress {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the desired state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -121,7 +121,7 @@ message IngressBackend {
   // service.Port must not be specified.
   // This is a mutually exclusive setting with "Service".
   // +optional
-  optional .k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
+  optional k8s.io.api.core.v1.TypedLocalObjectReference resource = 3;
 }
 
 // IngressClass represents the class of the Ingress, referenced by the Ingress
@@ -133,7 +133,7 @@ message IngressClass {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the desired state of the IngressClass.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -145,7 +145,7 @@ message IngressClass {
 message IngressClassList {
   // Standard list metadata.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of IngressClasses.
   repeated IngressClass items = 2;
@@ -200,7 +200,7 @@ message IngressList {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of Ingress.
   repeated Ingress items = 2;
@@ -381,7 +381,7 @@ message NetworkPolicy {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents the specification of the desired behavior for this NetworkPolicy.
   // +optional
@@ -438,7 +438,7 @@ message NetworkPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of schema objects.
   repeated NetworkPolicy items = 2;
@@ -454,7 +454,7 @@ message NetworkPolicyPeer {
   // the pods matching podSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects the pods matching podSelector in the policy's own namespace.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // namespaceSelector selects namespaces using cluster-scoped labels. This field follows
   // standard label selector semantics; if present but empty, it selects all namespaces.
@@ -463,7 +463,7 @@ message NetworkPolicyPeer {
   // the pods matching podSelector in the namespaces selected by namespaceSelector.
   // Otherwise it selects all pods in the namespaces selected by namespaceSelector.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
 
   // ipBlock defines policy on a particular IPBlock. If this field is set then
   // neither of the other fields can be.
@@ -483,7 +483,7 @@ message NetworkPolicyPort {
   // numbers.
   // If present, only traffic on the specified protocol AND port will be matched.
   // +optional
-  optional .k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
+  optional k8s.io.apimachinery.pkg.util.intstr.IntOrString port = 2;
 
   // endPort indicates that the range of ports from port to endPort if set, inclusive,
   // should be allowed by the policy. This field cannot be defined if the port field
@@ -501,7 +501,7 @@ message NetworkPolicySpec {
   // the ingress rules for each are combined additively.
   // This field is NOT optional and follows standard label selector semantics.
   // An empty podSelector matches all pods in this namespace.
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // ingress is a list of ingress rules to be applied to the selected pods.
   // Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod

@@ -64,7 +64,7 @@ func parseSwapString(swapString string) (*Swap, error) {
 	swapFields := strings.Fields(swapString)
 	swapLength := len(swapFields)
 	if swapLength < 5 {
-		return nil, fmt.Errorf("%w: too few fields in swap string: %s", ErrFileParse, swapString)
+		return nil, fmt.Errorf("too few fields in swap string: %s", swapString)
 	}
 
 	swap := &Swap{
@@ -74,15 +74,15 @@ func parseSwapString(swapString string) (*Swap, error) {
 
 	swap.Size, err = strconv.Atoi(swapFields[2])
 	if err != nil {
-		return nil, fmt.Errorf("%s: invalid swap size: %s: %w", ErrFileParse, swapFields[2], err)
+		return nil, fmt.Errorf("invalid swap size: %s", swapFields[2])
 	}
 	swap.Used, err = strconv.Atoi(swapFields[3])
 	if err != nil {
-		return nil, fmt.Errorf("%s: invalid swap used: %s: %w", ErrFileParse, swapFields[3], err)
+		return nil, fmt.Errorf("invalid swap used: %s", swapFields[3])
 	}
 	swap.Priority, err = strconv.Atoi(swapFields[4])
 	if err != nil {
-		return nil, fmt.Errorf("%s: invalid swap priority: %s: %w", ErrFileParse, swapFields[4], err)
+		return nil, fmt.Errorf("invalid swap priority: %s", swapFields[4])
 	}
 
 	return swap, nil

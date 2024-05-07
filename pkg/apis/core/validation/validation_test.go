@@ -50,12 +50,10 @@ import (
 )
 
 const (
-	dnsLabelErrMsg                    = "a lowercase RFC 1123 label must consist of"
-	dnsSubdomainLabelErrMsg           = "a lowercase RFC 1123 subdomain"
-	envVarNameErrMsg                  = "a valid environment variable name must consist of"
-	relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
-	defaultGracePeriod                = int64(30)
-	noUserNamespace                   = false
+	dnsLabelErrMsg          = "a lowercase RFC 1123 label must consist of"
+	dnsSubdomainLabelErrMsg = "a lowercase RFC 1123 subdomain"
+	envVarNameErrMsg        = "a valid environment variable name must consist of"
+	defaultGracePeriod      = int64(30)
 )
 
 var (
@@ -5400,6 +5398,99 @@ func TestValidateVolumes(t *testing.T) {
 
 }
 
+func TestValidateReadOnlyPersistentDisks(t *testing.T) {
+	cases := []struct {
+		name        string
+		volumes     []core.Volume
+		oldVolume   []core.Volume
+		gateValue   bool
+		expectError bool
+	}{{
+		name:        "gate on, read-only disk, nil old",
+		gateValue:   true,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		oldVolume:   []core.Volume(nil),
+		expectError: false,
+	}, {
+		name:        "gate off, read-only disk, nil old",
+		gateValue:   false,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		oldVolume:   []core.Volume(nil),
+		expectError: false,
+	}, {
+		name:        "gate on, read-write, nil old",
+		gateValue:   true,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		oldVolume:   []core.Volume(nil),
+		expectError: false,
+	}, {
+		name:        "gate off, read-write, nil old",
+		gateValue:   false,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		oldVolume:   []core.Volume(nil),
+		expectError: true,
+	}, {
+		name:        "gate on, new read-only and old read-write",
+		gateValue:   true,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		expectError: false,
+	}, {
+		name:        "gate off, new read-only and old read-write",
+		gateValue:   false,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		expectError: false,
+	}, {
+		name:        "gate on, new read-write and old read-write",
+		gateValue:   true,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		expectError: false,
+	}, {
+		name:        "gate off, new read-write and old read-write",
+		gateValue:   false,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		expectError: false,
+	}, {
+		name:        "gate on, new read-only and old read-only",
+		gateValue:   true,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		expectError: false,
+	}, {
+		name:        "gate off, new read-only and old read-only",
+		gateValue:   false,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		expectError: false,
+	}, {
+		name:        "gate on, new read-write and old read-only",
+		gateValue:   true,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		expectError: false,
+	}, {
+		name:        "gate off, new read-write and old read-only",
+		gateValue:   false,
+		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
+		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
+		expectError: true,
+	},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fidPath := field.NewPath("testField")
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, testCase.gateValue)()
+			errs := ValidateReadOnlyPersistentDisks(testCase.volumes, testCase.oldVolume, fidPath)
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("expected success, got:%v", errs)
+			}
+		})
+	}
+}
+
 func TestHugePagesIsolation(t *testing.T) {
 	testCases := map[string]struct {
 		pod         *core.Pod
@@ -5890,361 +5981,6 @@ func TestHugePagesEnv(t *testing.T) {
 	}
 }
 
-func TestRelaxedValidateEnv(t *testing.T) {
-	successCase := []core.EnvVar{
-		{Name: "!\"#$%&'()", Value: "value"},
-		{Name: "* +,-./0123456789", Value: "value"},
-		{Name: ":;<>?@", Value: "value"},
-		{Name: "ABCDEFG", Value: "value"},
-		{Name: "abcdefghijklmn", Value: "value"},
-		{Name: "[\\]^_`{}|~", Value: "value"},
-		{
-			Name: "!\"#$%&'()",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.annotations['key']",
-				},
-			},
-		}, {
-			Name: "!\"#$%&'()",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.labels['key']",
-				},
-			},
-		}, {
-			Name: "* +,-./0123456789",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.name",
-				},
-			},
-		}, {
-			Name: "* +,-./0123456789",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.namespace",
-				},
-			},
-		}, {
-			Name: "* +,-./0123456789",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.uid",
-				},
-			},
-		}, {
-			Name: ":;<>?@",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "spec.nodeName",
-				},
-			},
-		}, {
-			Name: ":;<>?@",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "spec.serviceAccountName",
-				},
-			},
-		}, {
-			Name: ":;<>?@",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "status.hostIP",
-				},
-			},
-		}, {
-			Name: ":;<>?@",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "status.podIP",
-				},
-			},
-		}, {
-			Name: "abcdefghijklmn",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "status.podIPs",
-				},
-			},
-		},
-		{
-			Name: "abcdefghijklmn",
-			ValueFrom: &core.EnvVarSource{
-				SecretKeyRef: &core.SecretKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "some-secret",
-					},
-					Key: "secret-key",
-				},
-			},
-		}, {
-			Name: "!\"#$%&'()",
-			ValueFrom: &core.EnvVarSource{
-				ConfigMapKeyRef: &core.ConfigMapKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "some-config-map",
-					},
-					Key: "some-key",
-				},
-			},
-		},
-	}
-	if errs := ValidateEnv(successCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
-		t.Errorf("expected success, got: %v", errs)
-	}
-
-	errorCases := []struct {
-		name          string
-		envs          []core.EnvVar
-		expectedError string
-	}{{
-		name:          "illegal character",
-		envs:          []core.EnvVar{{Name: "=abc"}},
-		expectedError: `[0].name: Invalid value: "=abc": ` + relaxedEnvVarNameFmtErrMsg,
-	}, {
-		name:          "zero-length name",
-		envs:          []core.EnvVar{{Name: ""}},
-		expectedError: "[0].name: Required value",
-	}, {
-		name: "value and valueFrom specified",
-		envs: []core.EnvVar{{
-			Name:  "abc",
-			Value: "foo",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.name",
-				},
-			},
-		}},
-		expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
-	}, {
-		name: "valueFrom without a source",
-		envs: []core.EnvVar{{
-			Name:      "abc",
-			ValueFrom: &core.EnvVarSource{},
-		}},
-		expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
-	}, {
-		name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.name",
-				},
-				SecretKeyRef: &core.SecretKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "a-secret",
-					},
-					Key: "a-key",
-				},
-			},
-		}},
-		expectedError: "[0].valueFrom: Invalid value: \"\": may not have more than one field specified at a time",
-	}, {
-		name: "valueFrom.fieldRef and valueFrom.configMapKeyRef set",
-		envs: []core.EnvVar{{
-			Name: "some_var_name",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.name",
-				},
-				ConfigMapKeyRef: &core.ConfigMapKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "some-config-map",
-					},
-					Key: "some-key",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
-	}, {
-		name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.name",
-				},
-				SecretKeyRef: &core.SecretKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "a-secret",
-					},
-					Key: "a-key",
-				},
-				ConfigMapKeyRef: &core.ConfigMapKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "some-config-map",
-					},
-					Key: "some-key",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
-	}, {
-		name: "valueFrom.secretKeyRef.name invalid",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				SecretKeyRef: &core.SecretKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "$%^&*#",
-					},
-					Key: "a-key",
-				},
-			},
-		}},
-	}, {
-		name: "valueFrom.configMapKeyRef.name invalid",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				ConfigMapKeyRef: &core.ConfigMapKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: "$%^&*#",
-					},
-					Key: "some-key",
-				},
-			},
-		}},
-	}, {
-		name: "missing FieldPath on ObjectFieldSelector",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Required value`,
-	}, {
-		name: "missing APIVersion on ObjectFieldSelector",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom.fieldRef.apiVersion: Required value`,
-	}, {
-		name: "invalid fieldPath",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath:  "metadata.whoops",
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Invalid value: "metadata.whoops": error converting fieldPath`,
-	}, {
-		name: "metadata.name with subscript",
-		envs: []core.EnvVar{{
-			Name: "labels",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath:  "metadata.name['key']",
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Invalid value: "metadata.name['key']": error converting fieldPath: field label does not support subscript`,
-	}, {
-		name: "metadata.labels without subscript",
-		envs: []core.EnvVar{{
-			Name: "labels",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath:  "metadata.labels",
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
-	}, {
-		name: "metadata.annotations without subscript",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath:  "metadata.annotations",
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
-	}, {
-		name: "metadata.annotations with invalid key",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath:  "metadata.annotations['invalid~key']",
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `field[0].valueFrom.fieldRef: Invalid value: "invalid~key"`,
-	}, {
-		name: "metadata.labels with invalid key",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath:  "metadata.labels['Www.k8s.io/test']",
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `field[0].valueFrom.fieldRef: Invalid value: "Www.k8s.io/test"`,
-	}, {
-		name: "unsupported fieldPath",
-		envs: []core.EnvVar{{
-			Name: "abc",
-			ValueFrom: &core.EnvVarSource{
-				FieldRef: &core.ObjectFieldSelector{
-					FieldPath:  "status.phase",
-					APIVersion: "v1",
-				},
-			},
-		}},
-		expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: "metadata.name", "metadata.namespace", "metadata.uid", "spec.nodeName", "spec.serviceAccountName", "status.hostIP", "status.hostIPs", "status.podIP", "status.podIPs"`,
-	},
-	}
-	for _, tc := range errorCases {
-		if errs := ValidateEnv(tc.envs, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", tc.name)
-		} else {
-			for i := range errs {
-				str := errs[i].Error()
-				if str != "" && !strings.Contains(str, tc.expectedError) {
-					t.Errorf("%s: expected error detail either empty or %q, got %q", tc.name, tc.expectedError, str)
-				}
-			}
-		}
-	}
-}
-
 func TestValidateEnv(t *testing.T) {
 	successCase := []core.EnvVar{
 		{Name: "abc", Value: "value"},
@@ -6358,67 +6094,6 @@ func TestValidateEnv(t *testing.T) {
 		t.Errorf("expected success, got: %v", errs)
 	}
 
-	updateSuccessCase := []core.EnvVar{
-		{Name: "!\"#$%&'()", Value: "value"},
-		{Name: "* +,-./0123456789", Value: "value"},
-		{Name: ":;<>?@", Value: "value"},
-		{Name: "ABCDEFG", Value: "value"},
-		{Name: "abcdefghijklmn", Value: "value"},
-		{Name: "[\\]^_`{}|~", Value: "value"},
-	}
-
-	if errs := ValidateEnv(updateSuccessCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
-		t.Errorf("expected success, got: %v", errs)
-	}
-
-	updateErrorCase := []struct {
-		name          string
-		envs          []core.EnvVar
-		expectedError string
-	}{
-		{
-			name: "invalid name a",
-			envs: []core.EnvVar{
-				{Name: "!\"#$%&'()", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\"!\\\"#$%&'()\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name b",
-			envs: []core.EnvVar{
-				{Name: "* +,-./0123456789", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\"* +,-./0123456789\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name c",
-			envs: []core.EnvVar{
-				{Name: ":;<>?@", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\":;<>?@\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name d",
-			envs: []core.EnvVar{
-				{Name: "[\\]^_{}|~", Value: "value"},
-			},
-			expectedError: `field[0].name: Invalid value: ` + "\"[\\\\]^_{}|~\": " + envVarNameErrMsg,
-		},
-	}
-
-	for _, tc := range updateErrorCase {
-		if errs := ValidateEnv(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", tc.name)
-		} else {
-			for i := range errs {
-				str := errs[i].Error()
-				if str != "" && !strings.Contains(str, tc.expectedError) {
-					t.Errorf("%s: expected error detail either empty or %q, got %q", tc.name, tc.expectedError, str)
-				}
-			}
-		}
-	}
-
 	errorCases := []struct {
 		name          string
 		envs          []core.EnvVar
@@ -6427,6 +6102,22 @@ func TestValidateEnv(t *testing.T) {
 		name:          "zero-length name",
 		envs:          []core.EnvVar{{Name: ""}},
 		expectedError: "[0].name: Required value",
+	}, {
+		name:          "illegal character",
+		envs:          []core.EnvVar{{Name: "a!b"}},
+		expectedError: `[0].name: Invalid value: "a!b": ` + envVarNameErrMsg,
+	}, {
+		name:          "dot only",
+		envs:          []core.EnvVar{{Name: "."}},
+		expectedError: `[0].name: Invalid value: ".": must not be`,
+	}, {
+		name:          "double dots only",
+		envs:          []core.EnvVar{{Name: ".."}},
+		expectedError: `[0].name: Invalid value: "..": must not be`,
+	}, {
+		name:          "leading double dots",
+		envs:          []core.EnvVar{{Name: "..abc"}},
+		expectedError: `[0].name: Invalid value: "..abc": must not start with`,
 	}, {
 		name: "value and valueFrom specified",
 		envs: []core.EnvVar{{
@@ -6686,110 +6377,8 @@ func TestValidateEnvFrom(t *testing.T) {
 		},
 	},
 	}
-	if errs := ValidateEnvFrom(successCase, nil, PodValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateEnvFrom(successCase, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
-	}
-
-	updateSuccessCase := []core.EnvFromSource{{
-		ConfigMapRef: &core.ConfigMapEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: "* +,-./0123456789",
-		ConfigMapRef: &core.ConfigMapEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: ":;<>?@",
-		ConfigMapRef: &core.ConfigMapEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: "abcdefghijklmn",
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: "[\\]^_`{}|~",
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}}
-
-	if errs := ValidateEnvFrom(updateSuccessCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
-		t.Errorf("expected success, got: %v", errs)
-	}
-
-	updateErrorCase := []struct {
-		name          string
-		envs          []core.EnvFromSource
-		expectedError string
-	}{
-		{
-			name: "invalid name a",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: "!\"#$%&'()",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\"!\\\"#$%&'()\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name b",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: "* +,-./0123456789",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\"* +,-./0123456789\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name c",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: ":;<>?@",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\":;<>?@\": " + envVarNameErrMsg,
-		},
-		{
-			name: "invalid name d",
-			envs: []core.EnvFromSource{
-				{
-					Prefix: "[\\]^_{}|~",
-					SecretRef: &core.SecretEnvSource{
-						LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-					},
-				},
-			},
-			expectedError: `field[0].prefix: Invalid value: ` + "\"[\\\\]^_{}|~\": " + envVarNameErrMsg,
-		},
-	}
-
-	for _, tc := range updateErrorCase {
-		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", tc.name)
-		} else {
-			for i := range errs {
-				str := errs[i].Error()
-				if str != "" && !strings.Contains(str, tc.expectedError) {
-					t.Errorf("%s: expected error detail either empty or %q, got %q", tc.name, tc.expectedError, str)
-				}
-			}
-		}
 	}
 
 	errorCases := []struct {
@@ -6811,6 +6400,14 @@ func TestValidateEnvFrom(t *testing.T) {
 		}},
 		expectedError: "field[0].configMapRef.name: Invalid value",
 	}, {
+		name: "invalid prefix",
+		envs: []core.EnvFromSource{{
+			Prefix: "a!b",
+			ConfigMapRef: &core.ConfigMapEnvSource{
+				LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
+		}},
+		expectedError: `field[0].prefix: Invalid value: "a!b": ` + envVarNameErrMsg,
+	}, {
 		name: "zero-length name",
 		envs: []core.EnvFromSource{{
 			SecretRef: &core.SecretEnvSource{
@@ -6824,6 +6421,14 @@ func TestValidateEnvFrom(t *testing.T) {
 				LocalObjectReference: core.LocalObjectReference{Name: "&"}},
 		}},
 		expectedError: "field[0].secretRef.name: Invalid value",
+	}, {
+		name: "invalid prefix",
+		envs: []core.EnvFromSource{{
+			Prefix: "a!b",
+			SecretRef: &core.SecretEnvSource{
+				LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
+		}},
+		expectedError: `field[0].prefix: Invalid value: "a!b": ` + envVarNameErrMsg,
 	}, {
 		name: "no refs",
 		envs: []core.EnvFromSource{
@@ -6856,123 +6461,7 @@ func TestValidateEnvFrom(t *testing.T) {
 	},
 	}
 	for _, tc := range errorCases {
-		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", tc.name)
-		} else {
-			for i := range errs {
-				str := errs[i].Error()
-				if str != "" && !strings.Contains(str, tc.expectedError) {
-					t.Errorf("%s: expected error detail either empty or %q, got %q", tc.name, tc.expectedError, str)
-				}
-			}
-		}
-	}
-}
-
-func TestRelaxedValidateEnvFrom(t *testing.T) {
-	successCase := []core.EnvFromSource{{
-		ConfigMapRef: &core.ConfigMapEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: "!\"#$%&'()",
-		ConfigMapRef: &core.ConfigMapEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: "* +,-./0123456789",
-		ConfigMapRef: &core.ConfigMapEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: ":;<>?@",
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	}, {
-		Prefix: "[\\]^_`{}|~",
-		SecretRef: &core.SecretEnvSource{
-			LocalObjectReference: core.LocalObjectReference{Name: "abc"},
-		},
-	},
-	}
-	if errs := ValidateEnvFrom(successCase, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
-	}
-
-	errorCases := []struct {
-		name          string
-		envs          []core.EnvFromSource
-		expectedError string
-	}{
-		{
-			name: "zero-length name",
-			envs: []core.EnvFromSource{{
-				ConfigMapRef: &core.ConfigMapEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: ""}},
-			}},
-			expectedError: "field[0].configMapRef.name: Required value",
-		},
-		{
-			name: "invalid prefix",
-			envs: []core.EnvFromSource{{
-				Prefix: "=abc",
-				ConfigMapRef: &core.ConfigMapEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
-			}},
-			expectedError: `field[0].prefix: Invalid value: "=abc": ` + relaxedEnvVarNameFmtErrMsg,
-		},
-		{
-			name: "zero-length name",
-			envs: []core.EnvFromSource{{
-				SecretRef: &core.SecretEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: ""}},
-			}},
-			expectedError: "field[0].secretRef.name: Required value",
-		}, {
-			name: "invalid name",
-			envs: []core.EnvFromSource{{
-				SecretRef: &core.SecretEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: "&"}},
-			}},
-			expectedError: "field[0].secretRef.name: Invalid value",
-		}, {
-			name: "no refs",
-			envs: []core.EnvFromSource{
-				{},
-			},
-			expectedError: "field: Invalid value: \"\": must specify one of: `configMapRef` or `secretRef`",
-		}, {
-			name: "multiple refs",
-			envs: []core.EnvFromSource{{
-				SecretRef: &core.SecretEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
-				ConfigMapRef: &core.ConfigMapEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: "abc"}},
-			}},
-			expectedError: "field: Invalid value: \"\": may not have more than one field specified at a time",
-		}, {
-			name: "invalid secret ref name",
-			envs: []core.EnvFromSource{{
-				SecretRef: &core.SecretEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: "$%^&*#"}},
-			}},
-			expectedError: "field[0].secretRef.name: Invalid value: \"$%^&*#\": " + dnsSubdomainLabelErrMsg,
-		}, {
-			name: "invalid config ref name",
-			envs: []core.EnvFromSource{{
-				ConfigMapRef: &core.ConfigMapEnvSource{
-					LocalObjectReference: core.LocalObjectReference{Name: "$%^&*#"}},
-			}},
-			expectedError: "field[0].configMapRef.name: Invalid value: \"$%^&*#\": " + dnsSubdomainLabelErrMsg,
-		},
-	}
-	for _, tc := range errorCases {
-		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field"), PodValidationOptions{AllowRelaxedEnvironmentVariableValidation: true}); len(errs) == 0 {
+		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -7025,12 +6514,6 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
 		{Name: "ephemeral", MountPath: "/foobar"},
-		{Name: "123", MountPath: "/rro-nil", ReadOnly: true, RecursiveReadOnly: nil},
-		{Name: "123", MountPath: "/rro-disabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyDisabled)},
-		{Name: "123", MountPath: "/rro-disabled-2", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyDisabled)},
-		{Name: "123", MountPath: "/rro-ifpossible", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)},
-		{Name: "123", MountPath: "/rro-enabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)},
-		{Name: "123", MountPath: "/rro-enabled-2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationNone)},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -7053,9 +6536,6 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"name exists in volumeDevice":            {{Name: "xyz", MountPath: "/bar"}},
 		"mountpath exists in volumeDevice":       {{Name: "uvw", MountPath: "/mnt/exists"}},
 		"both exist in volumeDevice":             {{Name: "xyz", MountPath: "/mnt/exists"}},
-		"rro but not ro":                         {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
-		"rro with incompatible propagation":      {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
-		"rro-if-possible but not ro":             {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
 	}
 	badVolumeDevice := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/mnt/exists"},
@@ -7812,17 +7292,17 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	} {
 		var PodRestartPolicy core.RestartPolicy
 		PodRestartPolicy = "Never"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "Always"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 
 		PodRestartPolicy = "OnFailure"
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -8147,19 +7627,19 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
 
 			PodRestartPolicy = "Never"
-			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "Always"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
 			PodRestartPolicy = "OnFailure"
-			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs = validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8459,7 +7939,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9073,7 +8553,7 @@ func TestValidateContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -9162,7 +8642,7 @@ func TestValidateInitContainers(t *testing.T) {
 	},
 	}
 	var PodRestartPolicy core.RestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9541,7 +9021,7 @@ func TestValidateInitContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -10809,22 +10289,22 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     core.DNSDefault,
 			},
 		},
-		"default AppArmor annotation for a container": {
+		"default AppArmor profile for a container": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+					v1.AppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.AppArmorBetaProfileRuntimeDefault,
 				},
 			},
 			Spec: validPodSpec(nil),
 		},
-		"default AppArmor annotation for an init container": {
+		"default AppArmor profile for an init container": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+					v1.AppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.AppArmorBetaProfileRuntimeDefault,
 				},
 			},
 			Spec: core.PodSpec{
@@ -10834,157 +10314,15 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:      core.DNSClusterFirst,
 			},
 		},
-		"localhost AppArmor annotation for a container": {
+		"localhost AppArmor profile for a container": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.DeprecatedAppArmorBetaProfileNamePrefix + "foo",
+					v1.AppArmorBetaContainerAnnotationKeyPrefix + "ctr": v1.AppArmorBetaProfileNamePrefix + "foo",
 				},
 			},
 			Spec: validPodSpec(nil),
-		},
-		"runtime default AppArmor profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
-					AppArmorProfile: &core.AppArmorProfile{
-						Type: core.AppArmorProfileTypeRuntimeDefault,
-					},
-				},
-			},
-		},
-		"runtime default AppArmor profile for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: core.AppArmorProfileTypeRuntimeDefault,
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"unconfined AppArmor profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
-					AppArmorProfile: &core.AppArmorProfile{
-						Type: core.AppArmorProfileTypeUnconfined,
-					},
-				},
-			},
-		},
-		"unconfined AppArmor profile for a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: core.AppArmorProfileTypeUnconfined,
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"localhost AppArmor profile for a pod": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-				SecurityContext: &core.PodSecurityContext{
-					AppArmorProfile: &core.AppArmorProfile{
-						Type:             core.AppArmorProfileTypeLocalhost,
-						LocalhostProfile: ptr.To("example-org/application-foo"),
-					},
-				},
-			},
-		},
-		"localhost AppArmor profile for a container field": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To("example-org/application-foo"),
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"matching AppArmor fields and annotations": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
-				},
-			},
-			Spec: core.PodSpec{
-				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To("foo"),
-						},
-					},
-				}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
-		},
-		"matching AppArmor pod field and annotations": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
-				},
-			},
-			Spec: core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
-					AppArmorProfile: &core.AppArmorProfile{
-						Type:             core.AppArmorProfileTypeLocalhost,
-						LocalhostProfile: ptr.To("foo"),
-					},
-				},
-				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSDefault,
-			},
 		},
 		"syntactically valid sysctls": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -12503,9 +11841,9 @@ func TestValidatePod(t *testing.T) {
 					Name:      "123",
 					Namespace: "ns",
 					Annotations: map[string]string{
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr":      v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "fake-ctr": v1.DeprecatedAppArmorBetaProfileRuntimeDefault,
+						v1.AppArmorBetaContainerAnnotationKeyPrefix + "ctr":      v1.AppArmorBetaProfileRuntimeDefault,
+						v1.AppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.AppArmorBetaProfileRuntimeDefault,
+						v1.AppArmorBetaContainerAnnotationKeyPrefix + "fake-ctr": v1.AppArmorBetaProfileRuntimeDefault,
 					},
 				},
 				Spec: core.PodSpec{
@@ -12523,7 +11861,7 @@ func TestValidatePod(t *testing.T) {
 					Name:      "123",
 					Namespace: "ns",
 					Annotations: map[string]string{
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "bad-name",
+						v1.AppArmorBetaContainerAnnotationKeyPrefix + "ctr": "bad-name",
 					},
 				},
 				Spec: validPodSpec(nil),
@@ -12536,236 +11874,10 @@ func TestValidatePod(t *testing.T) {
 					Name:      "123",
 					Namespace: "ns",
 					Annotations: map[string]string{
-						v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
+						v1.AppArmorBetaContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
 					},
 				},
 				Spec: validPodSpec(nil),
-			},
-		},
-		"unsupported pod AppArmor profile type": {
-			expectedError: `Unsupported value: "test"`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: "test",
-						},
-					},
-				},
-			},
-		},
-		"unsupported container AppArmor profile type": {
-			expectedError: `Unsupported value: "test"`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						SecurityContext: &core.SecurityContext{
-							AppArmorProfile: &core.AppArmorProfile{
-								Type: "test",
-							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
-			},
-		},
-		"missing pod AppArmor profile type": {
-			expectedError: "Required value: type is required when appArmorProfile is set",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: "",
-						},
-					},
-				},
-			},
-		},
-		"missing AppArmor localhost profile": {
-			expectedError: "Required value: must be set when AppArmor type is Localhost",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: core.AppArmorProfileTypeLocalhost,
-						},
-					},
-				},
-			},
-		},
-		"empty AppArmor localhost profile": {
-			expectedError: "Required value: must be set when AppArmor type is Localhost",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To(""),
-						},
-					},
-				},
-			},
-		},
-		"invalid AppArmor localhost profile type": {
-			expectedError: `Invalid value: "foo-bar"`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeRuntimeDefault,
-							LocalhostProfile: ptr.To("foo-bar"),
-						},
-					},
-				},
-			},
-		},
-		"invalid AppArmor localhost profile": {
-			expectedError: `Invalid value: "foo-bar "`,
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To("foo-bar "),
-						},
-					},
-				},
-			},
-		},
-		"too long AppArmor localhost profile": {
-			expectedError: "Too long: may not be longer than 4095",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-				},
-				Spec: core.PodSpec{
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: ptr.To(strings.Repeat("a", 4096)),
-						},
-					},
-				},
-			},
-		},
-		"mismatched AppArmor field and annotation types": {
-			expectedError: "Forbidden: apparmor type in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
-					},
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						SecurityContext: &core.SecurityContext{
-							AppArmorProfile: &core.AppArmorProfile{
-								Type: core.AppArmorProfileTypeUnconfined,
-							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
-			},
-		},
-		"mismatched AppArmor pod field and annotation types": {
-			expectedError: "Forbidden: apparmor type in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
-					},
-				},
-				Spec: core.PodSpec{
-					SecurityContext: &core.PodSecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type: core.AppArmorProfileTypeUnconfined,
-						},
-					},
-					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
-			},
-		},
-		"mismatched AppArmor localhost profiles": {
-			expectedError: "Forbidden: apparmor profile in annotation and field must match",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
-					},
-				},
-				Spec: core.PodSpec{
-					Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
-						SecurityContext: &core.SecurityContext{
-							AppArmorProfile: &core.AppArmorProfile{
-								Type:             core.AppArmorProfileTypeLocalhost,
-								LocalhostProfile: ptr.To("bar"),
-							},
-						},
-					}},
-					RestartPolicy: core.RestartPolicyAlways,
-					DNSPolicy:     core.DNSDefault,
-				},
 			},
 		},
 		"invalid extended resource name in container request": {
@@ -22468,12 +21580,6 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorMsg:    "cannot be set for a windows pod",
 		errorType:   "FieldValueForbidden",
 	}, {
-		name:        "pod with AppArmorProfile",
-		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{AppArmorProfile: &core.AppArmorProfile{Type: core.AppArmorProfileTypeRuntimeDefault}}}}},
-		expectError: true,
-		errorMsg:    "cannot be set for a windows pod",
-		errorType:   "FieldValueForbidden",
-	}, {
 		name:        "pod with WindowsOptions, no error",
 		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
 		expectError: false,
@@ -22507,7 +21613,6 @@ func TestValidateOSFields(t *testing.T) {
 	// - Add documentation to the os field in the api
 	// - Add validation logic validateLinux, validateWindows functions to make sure the field is only set for eligible OSes
 	osSpecificFields := sets.NewString(
-		"Containers[*].SecurityContext.AppArmorProfile",
 		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
 		"Containers[*].SecurityContext.Capabilities",
 		"Containers[*].SecurityContext.Privileged",
@@ -22518,7 +21623,6 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.SELinuxOptions",
 		"Containers[*].SecurityContext.SeccompProfile",
 		"Containers[*].SecurityContext.WindowsOptions",
-		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
 		"InitContainers[*].SecurityContext.Capabilities",
 		"InitContainers[*].SecurityContext.Privileged",
@@ -22529,7 +21633,6 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.SELinuxOptions",
 		"InitContainers[*].SecurityContext.SeccompProfile",
 		"InitContainers[*].SecurityContext.WindowsOptions",
-		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Capabilities",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Privileged",
@@ -22541,7 +21644,6 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SeccompProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.WindowsOptions",
 		"OS",
-		"SecurityContext.AppArmorProfile",
 		"SecurityContext.FSGroup",
 		"SecurityContext.FSGroupChangePolicy",
 		"SecurityContext.HostIPC",
@@ -22919,28 +22021,17 @@ func TestValidateSecurityContext(t *testing.T) {
 	noRunAsUser := fullValidSC()
 	noRunAsUser.RunAsUser = nil
 
-	procMountSet := fullValidSC()
-	defPmt := core.DefaultProcMount
-	procMountSet.ProcMount = &defPmt
-
-	umPmt := core.UnmaskedProcMount
-	procMountUnmasked := fullValidSC()
-	procMountUnmasked.ProcMount = &umPmt
-
 	successCases := map[string]struct {
-		sc        *core.SecurityContext
-		hostUsers bool
+		sc *core.SecurityContext
 	}{
-		"all settings":        {allSettings, false},
-		"no capabilities":     {noCaps, false},
-		"no selinux":          {noSELinux, false},
-		"no priv request":     {noPrivRequest, false},
-		"no run as user":      {noRunAsUser, false},
-		"proc mount set":      {procMountSet, true},
-		"proc mount unmasked": {procMountUnmasked, false},
+		"all settings":    {allSettings},
+		"no capabilities": {noCaps},
+		"no selinux":      {noSELinux},
+		"no priv request": {noPrivRequest},
+		"no run as user":  {noRunAsUser},
 	}
 	for k, v := range successCases {
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers); len(errs) != 0 {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("[%s] Expected success, got %v", k, errs)
 		}
 	}
@@ -22987,19 +22078,12 @@ func TestValidateSecurityContext(t *testing.T) {
 			errorDetail:  "cannot set `allowPrivilegeEscalation` to false and `privileged` to true",
 			capAllowPriv: true,
 		},
-		"with unmasked proc mount type and no user namespace": {
-			sc:          procMountUnmasked,
-			errorType:   "FieldValueInvalid",
-			errorDetail: "`hostUsers` must be false to use `Unmasked`",
-		},
 	}
 	for k, v := range errorCases {
 		capabilities.SetForTests(capabilities.Capabilities{
 			AllowPrivileged: v.capAllowPriv,
 		})
-		// note the unconditional `true` here for hostUsers. The failure case to test for ProcMount only includes it being true,
-		// and the field is ignored if ProcMount isn't set. Thus, we can unconditionally set to `true` and simplify the test matrix setup.
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
 	}
@@ -25744,11 +24828,11 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		expectValid bool
 	}{
 		{"", true},
-		{v1.DeprecatedAppArmorBetaProfileRuntimeDefault, true},
-		{v1.DeprecatedAppArmorBetaProfileNameUnconfined, true},
+		{v1.AppArmorBetaProfileRuntimeDefault, true},
+		{v1.AppArmorBetaProfileNameUnconfined, true},
 		{"baz", false}, // Missing local prefix.
-		{v1.DeprecatedAppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
-		{v1.DeprecatedAppArmorBetaProfileNamePrefix + "foo-bar", true},
+		{v1.AppArmorBetaProfileNamePrefix + "/usr/sbin/ntpd", true},
+		{v1.AppArmorBetaProfileNamePrefix + "foo-bar", true},
 	}
 
 	for _, test := range tests {

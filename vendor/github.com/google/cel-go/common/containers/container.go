@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/cel-go/common/ast"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 var (
@@ -297,19 +297,19 @@ func Name(name string) ContainerOption {
 
 // ToQualifiedName converts an expression AST into a qualified name if possible, with a boolean
 // 'found' value that indicates if the conversion is successful.
-func ToQualifiedName(e ast.Expr) (string, bool) {
-	switch e.Kind() {
-	case ast.IdentKind:
-		id := e.AsIdent()
-		return id, true
-	case ast.SelectKind:
-		sel := e.AsSelect()
+func ToQualifiedName(e *exprpb.Expr) (string, bool) {
+	switch e.GetExprKind().(type) {
+	case *exprpb.Expr_IdentExpr:
+		id := e.GetIdentExpr()
+		return id.GetName(), true
+	case *exprpb.Expr_SelectExpr:
+		sel := e.GetSelectExpr()
 		// Test only expressions are not valid as qualified names.
-		if sel.IsTestOnly() {
+		if sel.GetTestOnly() {
 			return "", false
 		}
-		if qual, found := ToQualifiedName(sel.Operand()); found {
-			return qual + "." + sel.FieldName(), true
+		if qual, found := ToQualifiedName(sel.GetOperand()); found {
+			return qual + "." + sel.GetField(), true
 		}
 	}
 	return "", false

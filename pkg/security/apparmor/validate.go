@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -61,15 +62,15 @@ func (v *validator) Validate(pod *v1.Pod) error {
 
 	var retErr error
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
-		profile := GetProfile(pod, container)
-		if profile == nil {
-			return true
+		profile := GetProfileName(pod, container.Name)
+		retErr = validation.ValidateAppArmorProfileFormat(profile)
+		if retErr != nil {
+			return false
 		}
-
 		// TODO(#64841): This would ideally be part of validation.ValidateAppArmorProfileFormat, but
 		// that is called for API validation, and this is tightening validation.
-		if profile.Type == v1.AppArmorProfileTypeLocalhost {
-			if profile.LocalhostProfile == nil || strings.TrimSpace(*profile.LocalhostProfile) == "" {
+		if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
+			if strings.TrimSpace(strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)) == "" {
 				retErr = fmt.Errorf("invalid empty AppArmor profile name: %q", profile)
 				return false
 			}

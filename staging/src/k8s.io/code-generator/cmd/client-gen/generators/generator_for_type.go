@@ -21,8 +21,6 @@ import (
 	"path"
 	"strings"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -45,8 +43,6 @@ type genClientForType struct {
 }
 
 var _ generator.Generator = &genClientForType{}
-
-var titler = cases.Title(language.Und)
 
 // Filter ignores all but one type because we're making a single file per type.
 func (g *genClientForType) Filter(c *generator.Context, t *types.Type) bool {
@@ -123,9 +119,13 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		}
 		var updatedVerbtemplate string
 		if _, exists := subresourceDefaultVerbTemplates[e.VerbType]; e.IsSubresource() && exists {
-			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(subresourceDefaultVerbTemplates[e.VerbType], titler.String(e.VerbType)+"(")
+			//nolint:staticcheck
+			// TODO: convert this to use golang.org/x/text/cases
+			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(subresourceDefaultVerbTemplates[e.VerbType], strings.Title(e.VerbType)+"(")
 		} else {
-			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(defaultVerbTemplates[e.VerbType], titler.String(e.VerbType)+"(")
+			//nolint:staticcheck
+			// TODO: convert this to use golang.org/x/text/cases
+			updatedVerbtemplate = e.VerbName + "(" + strings.TrimPrefix(defaultVerbTemplates[e.VerbType], strings.Title(e.VerbType)+"(")
 		}
 		extendedMethod := extendedInterfaceMethod{
 			template: updatedVerbtemplate,
@@ -348,7 +348,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
-	return strings.ReplaceAll(template, " "+titler.String(verbType), " "+name)
+	//nolint:staticcheck
+	// TODO: convert this to use golang.org/x/text/cases
+	return strings.ReplaceAll(template, " "+strings.Title(verbType), " "+name)
 }
 
 func generateInterface(defaultVerbTemplates map[string]string, tags util.Tags) string {

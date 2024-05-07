@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -126,7 +125,6 @@ func (podSchedulingStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	newScheduling := obj.(*resource.PodSchedulingContext)
 	oldScheduling := old.(*resource.PodSchedulingContext)
 	newScheduling.Spec = oldScheduling.Spec
-	metav1.ResetObjectMetaForStatus(&newScheduling.ObjectMeta, &oldScheduling.ObjectMeta)
 }
 
 func (podSchedulingStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

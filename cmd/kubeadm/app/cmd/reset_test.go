@@ -34,18 +34,17 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-var defaultURLScheme = kubeadmapiv1.DefaultContainerRuntimeURLScheme
 var testResetConfig = fmt.Sprintf(`apiVersion: %s
 kind: ResetConfiguration
 force: true
 dryRun: true
 cleanupTmpDir: true
-criSocket: %s:///var/run/fake.sock
+criSocket: unix:///var/run/fake.sock
 certificatesDir: /etc/kubernetes/pki2
 ignorePreflightErrors:
 - a
 - b
-`, kubeadmapiv1.SchemeGroupVersion.String(), defaultURLScheme)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewResetData(t *testing.T) {
 	// create temp directory
@@ -106,7 +105,7 @@ func TestNewResetData(t *testing.T) {
 			name: "fails if preflight ignores all but has individual check",
 			flags: map[string]string{
 				options.IgnorePreflightErrors: "all,something-else",
-				options.NodeCRISocket:         fmt.Sprintf("%s:///var/run/crio/crio.sock", defaultURLScheme),
+				options.NodeCRISocket:         "unix:///var/run/crio/crio.sock",
 			},
 			expectError: "don't specify individual checks if 'all' is used",
 		},
@@ -114,7 +113,7 @@ func TestNewResetData(t *testing.T) {
 			name: "pre-flights errors from CLI args",
 			flags: map[string]string{
 				options.IgnorePreflightErrors: "a,b",
-				options.NodeCRISocket:         fmt.Sprintf("%s:///var/run/crio/crio.sock", defaultURLScheme),
+				options.NodeCRISocket:         "unix:///var/run/crio/crio.sock",
 			},
 			validate: expectedResetIgnorePreflightErrors(sets.New("a", "b")),
 		},
@@ -125,8 +124,8 @@ func TestNewResetData(t *testing.T) {
 				options.CfgPath: configFilePath,
 			},
 			data: &resetData{
-				certificatesDir:       "/etc/kubernetes/pki2",                                   // cover the case that default is overridden as well
-				criSocketPath:         fmt.Sprintf("%s:///var/run/fake.sock", defaultURLScheme), // cover the case that default is overridden as well
+				certificatesDir:       "/etc/kubernetes/pki2",      // cover the case that default is overridden as well
+				criSocketPath:         "unix:///var/run/fake.sock", // cover the case that default is overridden as well
 				ignorePreflightErrors: sets.New("a", "b"),
 				forceReset:            true,
 				dryRun:                true,
@@ -135,7 +134,7 @@ func TestNewResetData(t *testing.T) {
 					TypeMeta:              metav1.TypeMeta{Kind: "", APIVersion: ""},
 					Force:                 true,
 					CertificatesDir:       "/etc/kubernetes/pki2",
-					CRISocket:             fmt.Sprintf("%s:///var/run/fake.sock", defaultURLScheme),
+					CRISocket:             "unix:///var/run/fake.sock",
 					IgnorePreflightErrors: []string{"a", "b"},
 					CleanupTmpDir:         true,
 					DryRun:                true,
@@ -177,7 +176,7 @@ func TestNewResetData(t *testing.T) {
 			name: "--cri-socket flag is not allowed to mix with config",
 			flags: map[string]string{
 				options.CfgPath:       configFilePath,
-				options.NodeCRISocket: fmt.Sprintf("%s:///var/run/bogus.sock", defaultURLScheme),
+				options.NodeCRISocket: "unix:///var/run/bogus.sock",
 			},
 			expectError: "can not mix '--config' with arguments",
 		},

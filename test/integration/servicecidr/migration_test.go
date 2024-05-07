@@ -209,7 +209,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 
 	// ServiceCIDR controller
 	tCtx2 := ktesting.Init(t)
-	defer tCtx2.Cancel("tearing down ServiceCIDR controller 2")
+	defer tCtx.Cancel("tearing down ServiceCIDR controller 2")
 	informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
 	go servicecidrs.NewController(
 		tCtx2,

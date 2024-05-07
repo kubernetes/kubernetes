@@ -35,7 +35,7 @@ const (
 func TestRecordAuthenticationLatency(t *testing.T) {
 	tests := []struct {
 		name            string
-		authenticator   AuthenticatorTokenWithHealthCheck
+		authenticator   authenticator.Token
 		generateMetrics func()
 		expectedValue   string
 	}{
@@ -115,10 +115,6 @@ type dummyAuthenticator struct {
 
 func (a *dummyAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	return a.response, a.ok, a.err
-}
-
-func (a *dummyAuthenticator) HealthCheck() error {
-	panic("should not be called")
 }
 
 type dummyClock struct {

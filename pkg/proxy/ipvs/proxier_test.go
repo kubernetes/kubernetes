@@ -21,7 +21,6 @@ package ipvs
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -56,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -127,7 +125,7 @@ func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
 	return fake.version, fake.err
 }
 
-func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []string, excludeCIDRs []*net.IPNet, ipFamily v1.IPFamily) *Proxier {
+func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []string, excludeCIDRs []*net.IPNet, ipFamily v1.IPFamily) *Proxier {
 
 	netlinkHandle := netlinktest.NewFakeNetlinkHandle(ipFamily == v1.IPv6Protocol)
 	netlinkHandle.SetLocalAddresses("eth0", nodeIPs...)
@@ -160,7 +158,7 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 		filterRules:           proxyutil.NewLineBuffer(),
 		netlinkHandle:         netlinkHandle,
 		ipsetList:             ipsetList,
-		nodePortAddresses:     proxyutil.NewNodePortAddresses(ipFamily, nil),
+		nodePortAddresses:     proxyutil.NewNodePortAddresses(ipFamily, nil, nil),
 		networkInterfacer:     proxyutiltest.NewFakeNetwork(),
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 		ipFamily:              ipFamily,
@@ -226,11 +224,10 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 }
 
 func TestCleanupLeftovers(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -269,13 +266,12 @@ func TestCleanupLeftovers(t *testing.T) {
 	fp.syncProxyRules()
 
 	// test cleanup left over
-	if CleanupLeftovers(ctx, ipvs, ipt, ipset) {
+	if CleanupLeftovers(ipvs, ipt, ipset) {
 		t.Errorf("Cleanup leftovers failed")
 	}
 }
 
 func TestCanUseIPVSProxier(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name         string
 		scheduler    string
@@ -325,7 +321,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 	for _, tc := range testCases {
 		ipvs := &fakeIpvs{tc.ipvsErr, false}
 		versioner := &fakeIPSetVersioner{version: tc.ipsetVersion, err: tc.ipsetErr}
-		err := CanUseIPVSProxier(ctx, ipvs, versioner, tc.scheduler)
+		err := CanUseIPVSProxier(ipvs, versioner, tc.scheduler)
 		if (err == nil) != tc.ok {
 			t.Errorf("Case [%s], expect %v, got err: %v", tc.name, tc.ok, err)
 		}
@@ -945,12 +941,11 @@ func TestNodePortIPv4(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			ipt := iptablestest.NewFake()
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv4Protocol)
-			fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, test.nodePortAddresses)
+			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv4Protocol)
+			fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, test.nodePortAddresses, nil)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -1288,12 +1283,11 @@ func TestNodePortIPv6(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			ipt := iptablestest.NewFake()
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv6Protocol)
-			fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv6Protocol, test.nodePortAddresses)
+			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv6Protocol)
+			fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv6Protocol, test.nodePortAddresses, nil)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -1318,11 +1312,10 @@ func TestNodePortIPv6(t *testing.T) {
 }
 
 func Test_syncEndpoint_updateWeightsOnRestart(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 	svc1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
 		svc.Spec.ClusterIP = "10.20.30.41"
@@ -1516,11 +1509,10 @@ func TestIPv4Proxier(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			ipt := iptablestest.NewFake()
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -1654,11 +1646,10 @@ func TestIPv6Proxier(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			ipt := iptablestest.NewFake()
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv6Protocol)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv6Protocol)
 
 			makeServiceMap(fp, test.services...)
 			populateEndpointSlices(fp, test.endpoints...)
@@ -1676,11 +1667,10 @@ func TestIPv6Proxier(t *testing.T) {
 
 func TestMasqueradeRule(t *testing.T) {
 	for _, testcase := range []bool{false, true} {
-		_, ctx := ktesting.NewTestContext(t)
 		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 		makeServiceMap(fp)
 		fp.syncProxyRules()
 
@@ -1710,11 +1700,10 @@ func TestMasqueradeRule(t *testing.T) {
 }
 
 func TestExternalIPsNoEndpoint(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -1763,11 +1752,10 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 }
 
 func TestExternalIPs(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := sets.New[string]("50.60.70.81", "2012::51", "127.0.0.1")
@@ -1834,11 +1822,10 @@ func TestExternalIPs(t *testing.T) {
 }
 
 func TestOnlyLocalExternalIPs(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := sets.New[string]("50.60.70.81", "2012::51", "127.0.0.1")
@@ -1916,7 +1903,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	ipt, fp := buildFakeProxier(t)
+	ipt, fp := buildFakeProxier()
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -2002,7 +1989,7 @@ func TestLoadBalancer(t *testing.T) {
 
 func TestOnlyLocalNodePorts(t *testing.T) {
 	nodeIP := netutils.ParseIPSloppy("100.101.102.103")
-	ipt, fp := buildFakeProxier(t)
+	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -2053,7 +2040,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"}, nil)
 
 	fp.syncProxyRules()
 
@@ -2100,7 +2087,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 }
 
 func TestHealthCheckNodePort(t *testing.T) {
-	ipt, fp := buildFakeProxier(t)
+	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -2141,7 +2128,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	addrs1 := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::"), Mask: net.CIDRMask(64, 128)}}
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
 	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
-	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"})
+	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"100.101.102.0/24"}, nil)
 
 	fp.syncProxyRules()
 
@@ -2173,7 +2160,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 }
 
 func TestLoadBalancerSourceRanges(t *testing.T) {
-	ipt, fp := buildFakeProxier(t)
+	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -2278,7 +2265,7 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 }
 
 func TestAcceptIPVSTraffic(t *testing.T) {
-	ipt, fp := buildFakeProxier(t)
+	ipt, fp := buildFakeProxier()
 
 	ingressIP := "1.2.3.4"
 	externalIP := []string{"5.6.7.8"}
@@ -2348,7 +2335,7 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 }
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
-	ipt, fp := buildFakeProxier(t)
+	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
 	svcPort := 80
@@ -2462,11 +2449,10 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 }
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 	services := []*v1.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *v1.Service) {
@@ -2575,11 +2561,10 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "headless", func(svc *v1.Service) {
@@ -2616,11 +2601,10 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *v1.Service) {
@@ -2647,11 +2631,10 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -2739,12 +2722,11 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 }
 
 func TestSessionAffinity(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := "100.101.102.103"
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, []string{nodeIP}, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, []string{nodeIP}, nil, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -3555,11 +3537,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 
 	for tci, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			ipt := iptablestest.NewFake()
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
@@ -3832,11 +3813,10 @@ func Test_syncService(t *testing.T) {
 	}
 
 	for i := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		proxier := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+		proxier := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 		proxier.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 		if testCases[i].oldVirtualServer != nil {
@@ -3862,12 +3842,11 @@ func Test_syncService(t *testing.T) {
 	}
 }
 
-func buildFakeProxier(t *testing.T) (*iptablestest.FakeIPTables, *Proxier) {
-	_, ctx := ktesting.NewTestContext(t)
+func buildFakeProxier() (*iptablestest.FakeIPTables, *Proxier) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	return ipt, NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	return ipt, NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 }
 
 func getRules(ipt *iptablestest.FakeIPTables, chain utiliptables.Chain) []*iptablestest.Rule {
@@ -3956,12 +3935,11 @@ func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer)
 }
 
 func TestCleanLegacyService(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	excludeCIDRs, _ := netutils.ParseCIDRs([]string{"3.3.3.0/24", "4.4.4.0/24"})
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, excludeCIDRs, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, excludeCIDRs, v1.IPv4Protocol)
 
 	// All ipvs services that were processed in the latest sync loop.
 	activeServices := sets.New("ipvs0", "ipvs1")
@@ -4038,11 +4016,10 @@ func TestCleanLegacyService(t *testing.T) {
 }
 
 func TestCleanLegacyServiceWithRealServers(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 	// all deleted expect ipvs2
 	activeServices := sets.New("ipvs2")
@@ -4108,13 +4085,12 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 }
 
 func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	gtm := NewGracefulTerminationManager(ipvs)
 	excludeCIDRs, _ := netutils.ParseCIDRs([]string{"4.4.4.4/32"})
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, excludeCIDRs, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, excludeCIDRs, v1.IPv4Protocol)
 	fp.gracefuldeleteManager = gtm
 
 	vs := &utilipvs.VirtualServer{
@@ -4161,12 +4137,11 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 }
 
 func TestCleanLegacyService6(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	excludeCIDRs, _ := netutils.ParseCIDRs([]string{"3000::/64", "4000::/64"})
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, excludeCIDRs, v1.IPv6Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, excludeCIDRs, v1.IPv6Protocol)
 	fp.nodeIP = netutils.ParseIPSloppy("::1")
 
 	// All ipvs services that were processed in the latest sync loop.
@@ -4244,11 +4219,10 @@ func TestCleanLegacyService6(t *testing.T) {
 }
 
 func TestMultiPortServiceBindAddr(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
 	service1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -4349,11 +4323,10 @@ raid10 57344 0 - Live 0xffffffffc0597000`,
 // the shared EndpointsChangeTracker and EndpointSliceCache. This test ensures that the
 // ipvs proxier supports translating EndpointSlices to ipvs output.
 func TestEndpointSliceE2E(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	fp.endpointSlicesSynced = true
 
@@ -4435,11 +4408,10 @@ func TestEndpointSliceE2E(t *testing.T) {
 }
 
 func TestHealthCheckNodePortE2E(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	fp.endpointSlicesSynced = true
 
@@ -4490,11 +4462,10 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 
 // Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
 func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
@@ -4635,11 +4606,10 @@ func TestFilterCIDRs(t *testing.T) {
 }
 
 func TestCreateAndLinkKubeChain(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.createAndLinkKubeChain()
 	expectedNATChains := `:KUBE-SERVICES - [0:0]
 :KUBE-POSTROUTING - [0:0]
@@ -4739,11 +4709,10 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 		fp.servicesSynced = true
 		// fp.endpointsSynced = true
 		fp.endpointSlicesSynced = true
@@ -4836,11 +4805,11 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 // Test_EndpointSliceReadyAndTerminatingCluster tests that when there are ready and ready + terminating
 // endpoints and the traffic policy is "Cluster", only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
@@ -5009,11 +4978,11 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 // Test_EndpointSliceReadyAndTerminatingLocal tests that when there are local ready and ready + terminating
 // endpoints, only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
@@ -5181,11 +5150,11 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 // Test_EndpointSliceOnlyReadyTerminatingCluster tests that when there are only ready terminating
 // endpoints and the traffic policy is "Cluster",  we fall back to terminating endpoints.
 func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
@@ -5353,11 +5322,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 // Test_EndpointSliceOnlyReadyTerminatingLocal tests that when there are only local ready terminating
 // endpoints, we fall back to those endpoints.
 func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
+
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	// fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
@@ -5696,11 +5665,10 @@ func TestNoEndpointsMetric(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		_, ctx := ktesting.NewTestContext(t)
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ctx, ipt, ipvs, ipset, []string{"10.0.0.1"}, nil, v1.IPv4Protocol)
+		fp := NewFakeProxier(ipt, ipvs, ipset, []string{"10.0.0.1"}, nil, v1.IPv4Protocol)
 		fp.servicesSynced = true
 		// fp.endpointsSynced = true
 		fp.endpointSlicesSynced = true
@@ -5792,14 +5760,13 @@ func TestDismissLocalhostRuleExist(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			ipt := iptablestest.NewFake()
 			if test.ipFamily == v1.IPv6Protocol {
 				ipt = iptablestest.NewIPv6Fake()
 			}
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, test.ipFamily)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, test.ipFamily)
 
 			fp.syncProxyRules()
 
@@ -5886,7 +5853,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, testCase.ipModeEnabled)()
-			_, fp := buildFakeProxier(t)
+			_, fp := buildFakeProxier()
 			makeServiceMap(fp,
 				makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
 					svc.Spec.Type = "LoadBalancer"

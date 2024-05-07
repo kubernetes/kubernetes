@@ -39,6 +39,7 @@ var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDiskDriver,
 	drivers.InitAzureFileDriver,
+	drivers.InitAwsDriver,
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryBindMounted),
@@ -58,9 +59,6 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 			testDrivers = append(testDrivers, drivers.InitGcePdDriver)
 			testDrivers = append(testDrivers, drivers.InitWindowsGcePdDriver)
 			gceEnabled = true
-		case "aws":
-			testDrivers = append(testDrivers, drivers.InitAwsDriver)
-			framework.Logf("Enabled aws in-tree volume drivers")
 		default:
 			framework.Failf("Invalid volume type %s in %v", driver, framework.TestContext.EnabledVolumeDrivers)
 		}

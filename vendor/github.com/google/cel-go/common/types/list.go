@@ -190,13 +190,7 @@ func (l *baseList) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// Allow the element ConvertToNative() function to determine whether conversion is possible.
 	otherElemType := typeDesc.Elem()
 	elemCount := l.size
-	var nativeList reflect.Value
-	if typeDesc.Kind() == reflect.Array {
-		nativeList = reflect.New(reflect.ArrayOf(elemCount, typeDesc)).Elem().Index(0)
-	} else {
-		nativeList = reflect.MakeSlice(typeDesc, elemCount, elemCount)
-
-	}
+	nativeList := reflect.MakeSlice(typeDesc, elemCount, elemCount)
 	for i := 0; i < elemCount; i++ {
 		elem := l.NativeToValue(l.get(i))
 		nativeElemVal, err := elem.ConvertToNative(otherElemType)

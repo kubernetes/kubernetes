@@ -38,35 +38,6 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 	return map_AllocationResult
 }
 
-var map_AllocationResultModel = map[string]string{
-	"":               "AllocationResultModel must have one and only one field set.",
-	"namedResources": "NamedResources describes the allocation result when using the named resources model.",
-}
-
-func (AllocationResultModel) SwaggerDoc() map[string]string {
-	return map_AllocationResultModel
-}
-
-var map_DriverAllocationResult = map[string]string{
-	"":                        "DriverAllocationResult contains vendor parameters and the allocation result for one request.",
-	"vendorRequestParameters": "VendorRequestParameters are the per-request configuration parameters from the time that the claim was allocated.",
-}
-
-func (DriverAllocationResult) SwaggerDoc() map[string]string {
-	return map_DriverAllocationResult
-}
-
-var map_DriverRequests = map[string]string{
-	"":                 "DriverRequests describes all resources that are needed from one particular driver.",
-	"driverName":       "DriverName is the name used by the DRA driver kubelet plugin.",
-	"vendorParameters": "VendorParameters are arbitrary setup parameters for all requests of the claim. They are ignored while allocating the claim.",
-	"requests":         "Requests describes all resources that are needed from the driver.",
-}
-
-func (DriverRequests) SwaggerDoc() map[string]string {
-	return map_DriverRequests
-}
-
 var map_PodSchedulingContext = map[string]string{
 	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
@@ -138,28 +109,6 @@ var map_ResourceClaimList = map[string]string{
 
 func (ResourceClaimList) SwaggerDoc() map[string]string {
 	return map_ResourceClaimList
-}
-
-var map_ResourceClaimParameters = map[string]string{
-	"":               "ResourceClaimParameters defines resource requests for a ResourceClaim in an in-tree format understood by Kubernetes.",
-	"metadata":       "Standard object metadata",
-	"generatedFrom":  "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the claim parameters when the parameter reference of the claim refers to some unknown type.",
-	"shareable":      "Shareable indicates whether the allocated claim is meant to be shareable by multiple consumers at the same time.",
-	"driverRequests": "DriverRequests describes all resources that are needed for the allocated claim. A single claim may use resources coming from different drivers. For each driver, this array has at most one entry which then may have one or more per-driver requests.\n\nMay be empty, in which case the claim can always be allocated.",
-}
-
-func (ResourceClaimParameters) SwaggerDoc() map[string]string {
-	return map_ResourceClaimParameters
-}
-
-var map_ResourceClaimParametersList = map[string]string{
-	"":         "ResourceClaimParametersList is a collection of ResourceClaimParameters.",
-	"metadata": "Standard list metadata",
-	"items":    "Items is the list of node resource capacity objects.",
-}
-
-func (ResourceClaimParametersList) SwaggerDoc() map[string]string {
-	return map_ResourceClaimParametersList
 }
 
 var map_ResourceClaimParametersReference = map[string]string{
@@ -237,12 +186,11 @@ func (ResourceClaimTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClass = map[string]string{
-	"":                     "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
-	"metadata":             "Standard object metadata",
-	"driverName":           "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
-	"parametersRef":        "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec.",
-	"suitableNodes":        "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates.",
-	"structuredParameters": "If and only if allocation of claims using this class is handled via structured parameters, then StructuredParameters must be set to true.",
+	"":              "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+	"metadata":      "Standard object metadata",
+	"driverName":    "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
+	"parametersRef": "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec.",
+	"suitableNodes": "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates.",
 }
 
 func (ResourceClass) SwaggerDoc() map[string]string {
@@ -259,28 +207,6 @@ func (ResourceClassList) SwaggerDoc() map[string]string {
 	return map_ResourceClassList
 }
 
-var map_ResourceClassParameters = map[string]string{
-	"":                 "ResourceClassParameters defines resource requests for a ResourceClass in an in-tree format understood by Kubernetes.",
-	"metadata":         "Standard object metadata",
-	"generatedFrom":    "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the class parameters when the parameter reference of the class refers to some unknown type.",
-	"vendorParameters": "VendorParameters are arbitrary setup parameters for all claims using this class. They are ignored while allocating the claim. There must not be more than one entry per driver.",
-	"filters":          "Filters describes additional contraints that must be met when using the class.",
-}
-
-func (ResourceClassParameters) SwaggerDoc() map[string]string {
-	return map_ResourceClassParameters
-}
-
-var map_ResourceClassParametersList = map[string]string{
-	"":         "ResourceClassParametersList is a collection of ResourceClassParameters.",
-	"metadata": "Standard list metadata",
-	"items":    "Items is the list of node resource capacity objects.",
-}
-
-func (ResourceClassParametersList) SwaggerDoc() map[string]string {
-	return map_ResourceClassParametersList
-}
-
 var map_ResourceClassParametersReference = map[string]string{
 	"":          "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass.",
 	"apiGroup":  "APIGroup is the group for the resource being referenced. It is empty for the core API. This matches the group in the APIVersion that is used when creating the resources.",
@@ -293,103 +219,14 @@ func (ResourceClassParametersReference) SwaggerDoc() map[string]string {
 	return map_ResourceClassParametersReference
 }
 
-var map_ResourceFilter = map[string]string{
-	"":           "ResourceFilter is a filter for resources from one particular driver.",
-	"driverName": "DriverName is the name used by the DRA driver kubelet plugin.",
-}
-
-func (ResourceFilter) SwaggerDoc() map[string]string {
-	return map_ResourceFilter
-}
-
-var map_ResourceFilterModel = map[string]string{
-	"":               "ResourceFilterModel must have one and only one field set.",
-	"namedResources": "NamedResources describes a resource filter using the named resources model.",
-}
-
-func (ResourceFilterModel) SwaggerDoc() map[string]string {
-	return map_ResourceFilterModel
-}
-
 var map_ResourceHandle = map[string]string{
-	"":               "ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.",
-	"driverName":     "DriverName specifies the name of the resource driver whose kubelet plugin should be invoked to process this ResourceHandle's data once it lands on a node. This may differ from the DriverName set in ResourceClaimStatus this ResourceHandle is embedded in.",
-	"data":           "Data contains the opaque data associated with this ResourceHandle. It is set by the controller component of the resource driver whose name matches the DriverName set in the ResourceClaimStatus this ResourceHandle is embedded in. It is set at allocation time and is intended for processing by the kubelet plugin whose name matches the DriverName set in this ResourceHandle.\n\nThe maximum size of this field is 16KiB. This may get increased in the future, but not reduced.",
-	"structuredData": "If StructuredData is set, then it needs to be used instead of Data.",
+	"":           "ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.",
+	"driverName": "DriverName specifies the name of the resource driver whose kubelet plugin should be invoked to process this ResourceHandle's data once it lands on a node. This may differ from the DriverName set in ResourceClaimStatus this ResourceHandle is embedded in.",
+	"data":       "Data contains the opaque data associated with this ResourceHandle. It is set by the controller component of the resource driver whose name matches the DriverName set in the ResourceClaimStatus this ResourceHandle is embedded in. It is set at allocation time and is intended for processing by the kubelet plugin whose name matches the DriverName set in this ResourceHandle.\n\nThe maximum size of this field is 16KiB. This may get increased in the future, but not reduced.",
 }
 
 func (ResourceHandle) SwaggerDoc() map[string]string {
 	return map_ResourceHandle
-}
-
-var map_ResourceModel = map[string]string{
-	"":               "ResourceModel must have one and only one field set.",
-	"namedResources": "NamedResources describes available resources using the named resources model.",
-}
-
-func (ResourceModel) SwaggerDoc() map[string]string {
-	return map_ResourceModel
-}
-
-var map_ResourceRequest = map[string]string{
-	"":                 "ResourceRequest is a request for resources from one particular driver.",
-	"vendorParameters": "VendorParameters are arbitrary setup parameters for the requested resource. They are ignored while allocating a claim.",
-}
-
-func (ResourceRequest) SwaggerDoc() map[string]string {
-	return map_ResourceRequest
-}
-
-var map_ResourceRequestModel = map[string]string{
-	"":               "ResourceRequestModel must have one and only one field set.",
-	"namedResources": "NamedResources describes a request for resources with the named resources model.",
-}
-
-func (ResourceRequestModel) SwaggerDoc() map[string]string {
-	return map_ResourceRequestModel
-}
-
-var map_ResourceSlice = map[string]string{
-	"":           "ResourceSlice provides information about available resources on individual nodes.",
-	"metadata":   "Standard object metadata",
-	"nodeName":   "NodeName identifies the node which provides the resources if they are local to a node.\n\nA field selector can be used to list only ResourceSlice objects with a certain node name.",
-	"driverName": "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.",
-}
-
-func (ResourceSlice) SwaggerDoc() map[string]string {
-	return map_ResourceSlice
-}
-
-var map_ResourceSliceList = map[string]string{
-	"":         "ResourceSliceList is a collection of ResourceSlices.",
-	"metadata": "Standard list metadata",
-	"items":    "Items is the list of node resource capacity objects.",
-}
-
-func (ResourceSliceList) SwaggerDoc() map[string]string {
-	return map_ResourceSliceList
-}
-
-var map_StructuredResourceHandle = map[string]string{
-	"":                      "StructuredResourceHandle is the in-tree representation of the allocation result.",
-	"vendorClassParameters": "VendorClassParameters are the per-claim configuration parameters from the resource class at the time that the claim was allocated.",
-	"vendorClaimParameters": "VendorClaimParameters are the per-claim configuration parameters from the resource claim parameters at the time that the claim was allocated.",
-	"nodeName":              "NodeName is the name of the node providing the necessary resources if the resources are local to a node.",
-	"results":               "Results lists all allocated driver resources.",
-}
-
-func (StructuredResourceHandle) SwaggerDoc() map[string]string {
-	return map_StructuredResourceHandle
-}
-
-var map_VendorParameters = map[string]string{
-	"":           "VendorParameters are opaque parameters for one particular driver.",
-	"driverName": "DriverName is the name used by the DRA driver kubelet plugin.",
-	"parameters": "Parameters can be arbitrary setup parameters. They are ignored while allocating a claim.",
-}
-
-func (VendorParameters) SwaggerDoc() map[string]string {
-	return map_VendorParameters
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

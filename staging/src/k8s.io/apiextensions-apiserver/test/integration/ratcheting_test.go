@@ -220,12 +220,23 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 		}
 
 		uuidString := string(uuid.NewUUID())
+		// UUID string is just hex separated by dashes, which is safe to
+		// throw into regex like this
+		pattern := "^" + uuidString + "$"
 		sentinelName := "__ratcheting_sentinel_field__"
 		sch.Properties[sentinelName] = apiextensionsv1.JSONSchemaProps{
-			Type: "string",
-			Enum: []apiextensionsv1.JSON{{
-				Raw: []byte(`"` + uuidString + `"`),
-			}},
+			Type:    "string",
+			Pattern: pattern,
+
+			// Put MaxLength condition inside AllOf since the string_validator
+			// in kube-openapi short circuits upon seeing MaxLength, and we
+			// want both pattern and MaxLength errors
+			AllOf: []apiextensionsv1.JSONSchemaProps{
+				{
+					MinLength: ptr((int64(1))), // 1 MinLength to prevent empty value from ever being admitted
+					MaxLength: ptr((int64(0))), // 0 MaxLength to prevent non-empty value from ever being admitted
+				},
+			},
 		}
 
 		for _, v := range myCRD.Spec.Versions {
@@ -243,7 +254,7 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 		}
 
 		// Keep trying to create an invalid instance of the CRD until we
-		// get an error containing the message we are looking for
+		// get an error containing the ResourceVersion we are looking for
 		//
 		counter := 0
 		return wait.PollUntilContextCancel(context.TODO(), 100*time.Millisecond, true, func(_ context.Context) (done bool, err error) {
@@ -252,7 +263,8 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 				gvr:  myCRDV1Beta1,
 				name: "sentinel-resource",
 				patch: map[string]interface{}{
-					sentinelName: fmt.Sprintf("invalid-%d", counter),
+					// Just keep using different values
+					sentinelName: fmt.Sprintf("invalid %v %v", uuidString, counter),
 				}}.Do(ctx)
 
 			if err == nil {

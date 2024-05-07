@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -349,7 +349,7 @@ func handleSecretFromFileSources(secret *corev1.Secret, fileSources []string) er
 				return fmt.Errorf("error listing files in %s: %v", filePath, err)
 			}
 			for _, item := range fileList {
-				itemPath := filepath.Join(filePath, item.Name())
+				itemPath := path.Join(filePath, item.Name())
 				if item.Type().IsRegular() {
 					keyName = item.Name()
 					if err := addKeyFromFileToSecret(secret, keyName, itemPath); err != nil {

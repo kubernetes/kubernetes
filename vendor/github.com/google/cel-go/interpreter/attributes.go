@@ -287,9 +287,6 @@ func (a *absoluteAttribute) Resolve(vars Activation) (any, error) {
 		// determine whether the type is unknown before returning.
 		obj, found := vars.ResolveName(nm)
 		if found {
-			if celErr, ok := obj.(*types.Err); ok {
-				return nil, celErr.Unwrap()
-			}
 			obj, isOpt, err := applyQualifiers(vars, obj, a.qualifiers)
 			if err != nil {
 				return nil, err

@@ -44,24 +44,22 @@ var podsKind = v1.SchemeGroupVersion.WithKind("Pod")
 
 // Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
 func (c *FakePods) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Pod, err error) {
-	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(podsResource, c.ns, name), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }
 
 // List takes label and field selectors, and returns the list of Pods that match those selectors.
 func (c *FakePods) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodList, err error) {
-	emptyResult := &v1.PodList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podsResource, podsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(podsResource, podsKind, c.ns, opts), &v1.PodList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,37 +84,34 @@ func (c *FakePods) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
 func (c *FakePods) Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOptions) (result *v1.Pod, err error) {
-	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), emptyResult)
+		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }
 
 // Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
 func (c *FakePods) Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
-	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), emptyResult)
+		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePods) UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
-	emptyResult := &v1.Pod{}
+func (c *FakePods) UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }
@@ -139,12 +134,11 @@ func (c *FakePods) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 
 // Patch applies the patch and returns the patched pod.
 func (c *FakePods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error) {
-	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, pt, data, subresources...), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }
@@ -162,12 +156,11 @@ func (c *FakePods) Apply(ctx context.Context, pod *corev1.PodApplyConfiguration,
 	if name == nil {
 		return nil, fmt.Errorf("pod.Name must be provided to Apply")
 	}
-	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }
@@ -186,24 +179,22 @@ func (c *FakePods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfigur
 	if name == nil {
 		return nil, fmt.Errorf("pod.Name must be provided to Apply")
 	}
-	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }
 
 // UpdateEphemeralContainers takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
 func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
-	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(podsResource, "ephemeralcontainers", c.ns, pod), &v1.Pod{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.Pod), err
 }

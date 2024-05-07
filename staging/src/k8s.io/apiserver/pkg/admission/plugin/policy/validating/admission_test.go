@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,18 +61,18 @@ var (
 	}
 
 	// Common objects
-	denyPolicy *admissionregistrationv1.ValidatingAdmissionPolicy = &admissionregistrationv1.ValidatingAdmissionPolicy{
+	denyPolicy *v1beta1.ValidatingAdmissionPolicy = &v1beta1.ValidatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "denypolicy.example.com",
 			ResourceVersion: "1",
 		},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
-			ParamKind: &admissionregistrationv1.ParamKind{
+		Spec: v1beta1.ValidatingAdmissionPolicySpec{
+			ParamKind: &v1beta1.ParamKind{
 				APIVersion: paramsGVK.GroupVersion().String(),
 				Kind:       paramsGVK.Kind,
 			},
-			FailurePolicy: ptrTo(admissionregistrationv1.Fail),
-			Validations: []admissionregistrationv1.Validation{
+			FailurePolicy: ptrTo(v1beta1.Fail),
+			Validations: []v1beta1.Validation{
 				{
 					Expression: "messageId for deny policy",
 				},
@@ -93,61 +93,61 @@ var (
 		},
 	}
 
-	denyBinding *admissionregistrationv1.ValidatingAdmissionPolicyBinding = &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	denyBinding *v1beta1.ValidatingAdmissionPolicyBinding = &v1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "denybinding.example.com",
 			ResourceVersion: "1",
 		},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName: denyPolicy.Name,
-			ParamRef: &admissionregistrationv1.ParamRef{
+			ParamRef: &v1beta1.ParamRef{
 				Name:      fakeParams.GetName(),
 				Namespace: fakeParams.GetNamespace(),
 				// fake object tracker does not populate defaults
-				ParameterNotFoundAction: ptrTo(admissionregistrationv1.DenyAction),
+				ParameterNotFoundAction: ptrTo(v1beta1.DenyAction),
 			},
-			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
+			ValidationActions: []v1beta1.ValidationAction{v1beta1.Deny},
 		},
 	}
-	denyBindingWithNoParamRef *admissionregistrationv1.ValidatingAdmissionPolicyBinding = &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	denyBindingWithNoParamRef *v1beta1.ValidatingAdmissionPolicyBinding = &v1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "denybinding.example.com",
 			ResourceVersion: "1",
 		},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName:        denyPolicy.Name,
-			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
+			ValidationActions: []v1beta1.ValidationAction{v1beta1.Deny},
 		},
 	}
 
-	denyBindingWithAudit = &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	denyBindingWithAudit = &v1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "denybinding.example.com",
 			ResourceVersion: "1",
 		},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName:        denyPolicy.Name,
-			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Audit},
+			ValidationActions: []v1beta1.ValidationAction{v1beta1.Audit},
 		},
 	}
-	denyBindingWithWarn = &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	denyBindingWithWarn = &v1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "denybinding.example.com",
 			ResourceVersion: "1",
 		},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName:        denyPolicy.Name,
-			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Warn},
+			ValidationActions: []v1beta1.ValidationAction{v1beta1.Warn},
 		},
 	}
-	denyBindingWithAll = &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	denyBindingWithAll = &v1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "denybinding.example.com",
 			ResourceVersion: "1",
 		},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName:        denyPolicy.Name,
-			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny, admissionregistrationv1.Warn, admissionregistrationv1.Audit},
+			ValidationActions: []v1beta1.ValidationAction{v1beta1.Deny, v1beta1.Warn, v1beta1.Audit},
 		},
 	}
 )
@@ -277,7 +277,7 @@ type fakeMatcher struct {
 	BindingMatchFuncs    map[types.NamespacedName]func(generic.BindingAccessor, admission.Attributes) bool
 }
 
-func (f *fakeMatcher) RegisterDefinition(definition *admissionregistrationv1.ValidatingAdmissionPolicy, matchFunc func(generic.PolicyAccessor, admission.Attributes) bool) {
+func (f *fakeMatcher) RegisterDefinition(definition *v1beta1.ValidatingAdmissionPolicy, matchFunc func(generic.PolicyAccessor, admission.Attributes) bool) {
 	namespace, name := definition.Namespace, definition.Name
 	key := types.NamespacedName{
 		Name:      name,
@@ -292,7 +292,7 @@ func (f *fakeMatcher) RegisterDefinition(definition *admissionregistrationv1.Val
 	}
 }
 
-func (f *fakeMatcher) RegisterBinding(binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, matchFunc func(generic.BindingAccessor, admission.Attributes) bool) {
+func (f *fakeMatcher) RegisterBinding(binding *v1beta1.ValidatingAdmissionPolicyBinding, matchFunc func(generic.BindingAccessor, admission.Attributes) bool) {
 	namespace, name := binding.Namespace, binding.Name
 	key := types.NamespacedName{
 		Name:      name,
@@ -644,19 +644,19 @@ func TestReconfigureBinding(t *testing.T) {
 		}
 	})
 
-	denyBinding2 := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+	denyBinding2 := &v1beta1.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "denybinding.example.com",
 			ResourceVersion: "2",
 		},
-		Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+		Spec: v1beta1.ValidatingAdmissionPolicyBindingSpec{
 			PolicyName: denyPolicy.Name,
-			ParamRef: &admissionregistrationv1.ParamRef{
+			ParamRef: &v1beta1.ParamRef{
 				Name:                    fakeParams2.GetName(),
 				Namespace:               fakeParams2.GetNamespace(),
-				ParameterNotFoundAction: ptrTo(admissionregistrationv1.DenyAction),
+				ParameterNotFoundAction: ptrTo(v1beta1.DenyAction),
 			},
-			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
+			ValidationActions: []v1beta1.ValidationAction{v1beta1.Deny},
 		},
 	}
 
@@ -805,7 +805,7 @@ func TestInvalidParamSourceGVK(t *testing.T) {
 	passedParams := make(chan *unstructured.Unstructured)
 
 	badPolicy := *denyPolicy
-	badPolicy.Spec.ParamKind = &admissionregistrationv1.ParamKind{
+	badPolicy.Spec.ParamKind = &v1beta1.ParamKind{
 		APIVersion: paramsGVK.GroupVersion().String(),
 		Kind:       "BadParamKind",
 	}
@@ -985,13 +985,13 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	// Use ConfigMap native-typed param
 	policy1 := *denyPolicy
 	policy1.Name = "denypolicy1.example.com"
-	policy1.Spec = admissionregistrationv1.ValidatingAdmissionPolicySpec{
-		ParamKind: &admissionregistrationv1.ParamKind{
+	policy1.Spec = v1beta1.ValidatingAdmissionPolicySpec{
+		ParamKind: &v1beta1.ParamKind{
 			APIVersion: paramsGVK.GroupVersion().String(),
 			Kind:       paramsGVK.Kind,
 		},
-		FailurePolicy: ptrTo(admissionregistrationv1.Fail),
-		Validations: []admissionregistrationv1.Validation{
+		FailurePolicy: ptrTo(v1beta1.Fail),
+		Validations: []v1beta1.Validation{
 			{
 				Expression: "policy1",
 			},
@@ -1000,13 +1000,13 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 
 	policy2 := *denyPolicy
 	policy2.Name = "denypolicy2.example.com"
-	policy2.Spec = admissionregistrationv1.ValidatingAdmissionPolicySpec{
-		ParamKind: &admissionregistrationv1.ParamKind{
+	policy2.Spec = v1beta1.ValidatingAdmissionPolicySpec{
+		ParamKind: &v1beta1.ParamKind{
 			APIVersion: paramsGVK.GroupVersion().String(),
 			Kind:       paramsGVK.Kind,
 		},
-		FailurePolicy: ptrTo(admissionregistrationv1.Fail),
-		Validations: []admissionregistrationv1.Validation{
+		FailurePolicy: ptrTo(v1beta1.Fail),
+		Validations: []v1beta1.Validation{
 			{
 				Expression: "policy2",
 			},
@@ -1106,7 +1106,7 @@ func TestNativeTypeParam(t *testing.T) {
 
 	// Use ConfigMap native-typed param
 	nativeTypeParamPolicy := *denyPolicy
-	nativeTypeParamPolicy.Spec.ParamKind = &admissionregistrationv1.ParamKind{
+	nativeTypeParamPolicy.Spec.ParamKind = &v1beta1.ParamKind{
 		APIVersion: "v1",
 		Kind:       "ConfigMap",
 	}
@@ -1208,7 +1208,7 @@ func TestAuditValidationAction(t *testing.T) {
 	expected := []validating.ValidationFailureValue{{
 		ExpressionIndex:   0,
 		Message:           "I'm sorry Dave",
-		ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Audit},
+		ValidationActions: []v1beta1.ValidationAction{v1beta1.Audit},
 		Binding:           "denybinding.example.com",
 		Policy:            noParamSourcePolicy.Name,
 	}}
@@ -1305,7 +1305,7 @@ func TestAllValidationActions(t *testing.T) {
 	expected := []validating.ValidationFailureValue{{
 		ExpressionIndex:   0,
 		Message:           "I'm sorry Dave",
-		ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny, admissionregistrationv1.Warn, admissionregistrationv1.Audit},
+		ValidationActions: []v1beta1.ValidationAction{v1beta1.Deny, v1beta1.Warn, v1beta1.Audit},
 		Binding:           "denybinding.example.com",
 		Policy:            noParamSourcePolicy.Name,
 	}}
@@ -1325,13 +1325,13 @@ func TestNamespaceParamRefName(t *testing.T) {
 
 	// Use ConfigMap native-typed param
 	nativeTypeParamPolicy := *denyPolicy
-	nativeTypeParamPolicy.Spec.ParamKind = &admissionregistrationv1.ParamKind{
+	nativeTypeParamPolicy.Spec.ParamKind = &v1beta1.ParamKind{
 		APIVersion: "v1",
 		Kind:       "ConfigMap",
 	}
 
 	namespaceParamBinding := *denyBinding
-	namespaceParamBinding.Spec.ParamRef = &admissionregistrationv1.ParamRef{
+	namespaceParamBinding.Spec.ParamRef = &v1beta1.ParamRef{
 		Name: "replicas-test.example.com",
 	}
 	lock := sync.Mutex{}
@@ -1543,7 +1543,7 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 	// Create a cluster scoped and a namespace scoped CRD
 	policy := *denyPolicy
 	binding := *denyBinding
-	binding.Spec.ParamRef = &admissionregistrationv1.ParamRef{}
+	binding.Spec.ParamRef = &v1beta1.ParamRef{}
 	paramRef := binding.Spec.ParamRef
 
 	shouldErrorOnClusterScopedRequests := !namespaceIsSet && !paramIsClusterScoped
@@ -1557,12 +1557,12 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 	otherNonmatchingLabels := labels.Set{"notaffiliated": "no"}
 
 	if paramIsClusterScoped {
-		policy.Spec.ParamKind = &admissionregistrationv1.ParamKind{
+		policy.Spec.ParamKind = &v1beta1.ParamKind{
 			APIVersion: clusterScopedParamsGVK.GroupVersion().String(),
 			Kind:       clusterScopedParamsGVK.Kind,
 		}
 	} else {
-		policy.Spec.ParamKind = &admissionregistrationv1.ParamKind{
+		policy.Spec.ParamKind = &v1beta1.ParamKind{
 			APIVersion: paramsGVK.GroupVersion().String(),
 			Kind:       paramsGVK.Kind,
 		}
@@ -1581,9 +1581,9 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 	}
 
 	if denyNotFound {
-		paramRef.ParameterNotFoundAction = ptrTo(admissionregistrationv1.DenyAction)
+		paramRef.ParameterNotFoundAction = ptrTo(v1beta1.DenyAction)
 	} else {
-		paramRef.ParameterNotFoundAction = ptrTo(admissionregistrationv1.AllowAction)
+		paramRef.ParameterNotFoundAction = ptrTo(v1beta1.AllowAction)
 	}
 
 	compiler := &fakeCompiler{}
@@ -1815,20 +1815,20 @@ func TestNamespaceParamRefClusterScopedParamError(t *testing.T) {
 
 	// Use ValidatingAdmissionPolicy for param type since it is cluster-scoped
 	nativeTypeParamPolicy := *denyPolicy
-	nativeTypeParamPolicy.Spec.ParamKind = &admissionregistrationv1.ParamKind{
+	nativeTypeParamPolicy.Spec.ParamKind = &v1beta1.ParamKind{
 		APIVersion: "admissionregistration.k8s.io/v1beta1",
 		Kind:       "ValidatingAdmissionPolicy",
 	}
 
 	namespaceParamBinding := *denyBinding
-	namespaceParamBinding.Spec.ParamRef = &admissionregistrationv1.ParamRef{
+	namespaceParamBinding.Spec.ParamRef = &v1beta1.ParamRef{
 		Name:      "other-param-to-use-with-no-label.example.com",
 		Namespace: "mynamespace",
 	}
 
 	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
 		evaluations.Add(1)
-		if _, ok := versionedParams.(*admissionregistrationv1.ValidatingAdmissionPolicy); ok {
+		if _, ok := versionedParams.(*v1beta1.ValidatingAdmissionPolicy); ok {
 			return validating.ValidateResult{
 				Decisions: []validating.PolicyDecision{
 					{

@@ -344,7 +344,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			rcInstance.volumesNeedUpdateFromNodeStatus = nil
 
 			// Act 2 - reconcile once
-			rcInstance.reconcile()
+			rcInstance.reconcileNew()
 
 			// Assert 2
 			// MountDevice was attempted

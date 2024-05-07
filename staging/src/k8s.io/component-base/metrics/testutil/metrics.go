@@ -70,7 +70,7 @@ func NewMetrics() Metrics {
 
 // ParseMetrics parses Metrics from data returned from prometheus endpoint
 func ParseMetrics(data string, output *Metrics) error {
-	dec := expfmt.NewDecoder(strings.NewReader(data), expfmt.NewFormat(expfmt.TypeTextPlain))
+	dec := expfmt.NewDecoder(strings.NewReader(data), expfmt.FmtText)
 	decoder := expfmt.SampleDecoder{
 		Dec:  dec,
 		Opts: &expfmt.DecodeOptions{},

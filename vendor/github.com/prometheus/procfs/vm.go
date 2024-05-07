@@ -86,7 +86,7 @@ func (fs FS) VM() (*VM, error) {
 		return nil, err
 	}
 	if !file.Mode().IsDir() {
-		return nil, fmt.Errorf("%w: %s is not a directory", ErrFileRead, path)
+		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
 	files, err := os.ReadDir(path)

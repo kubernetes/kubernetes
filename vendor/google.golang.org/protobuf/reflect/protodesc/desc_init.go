@@ -28,7 +28,6 @@ func (r descsByName) initEnumDeclarations(eds []*descriptorpb.EnumDescriptorProt
 			opts = proto.Clone(opts).(*descriptorpb.EnumOptions)
 			e.L2.Options = func() protoreflect.ProtoMessage { return opts }
 		}
-		e.L1.EditionFeatures = mergeEditionFeatures(parent, ed.GetOptions().GetFeatures())
 		for _, s := range ed.GetReservedName() {
 			e.L2.ReservedNames.List = append(e.L2.ReservedNames.List, protoreflect.Name(s))
 		}
@@ -68,9 +67,6 @@ func (r descsByName) initMessagesDeclarations(mds []*descriptorpb.DescriptorProt
 		m.L2 = new(filedesc.MessageL2)
 		if m.L0, err = r.makeBase(m, parent, md.GetName(), i, sb); err != nil {
 			return nil, err
-		}
-		if m.Base.L0.ParentFile.Syntax() == protoreflect.Editions {
-			m.L1.EditionFeatures = mergeEditionFeatures(parent, md.GetOptions().GetFeatures())
 		}
 		if opts := md.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.MessageOptions)
@@ -118,27 +114,6 @@ func (r descsByName) initMessagesDeclarations(mds []*descriptorpb.DescriptorProt
 	return ms, nil
 }
 
-// canBePacked returns whether the field can use packed encoding:
-// https://protobuf.dev/programming-guides/encoding/#packed
-func canBePacked(fd *descriptorpb.FieldDescriptorProto) bool {
-	if fd.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
-		return false // not a repeated field
-	}
-
-	switch protoreflect.Kind(fd.GetType()) {
-	case protoreflect.MessageKind, protoreflect.GroupKind:
-		return false // not a scalar type field
-
-	case protoreflect.StringKind, protoreflect.BytesKind:
-		// string and bytes can explicitly not be declared as packed,
-		// see https://protobuf.dev/programming-guides/encoding/#packed
-		return false
-
-	default:
-		return true
-	}
-}
-
 func (r descsByName) initFieldsFromDescriptorProto(fds []*descriptorpb.FieldDescriptorProto, parent protoreflect.Descriptor, sb *strs.Builder) (fs []filedesc.Field, err error) {
 	fs = make([]filedesc.Field, len(fds)) // allocate up-front to ensure stable pointers
 	for i, fd := range fds {
@@ -162,34 +137,6 @@ func (r descsByName) initFieldsFromDescriptorProto(fds []*descriptorpb.FieldDesc
 		if fd.JsonName != nil {
 			f.L1.StringName.InitJSON(fd.GetJsonName())
 		}
-
-		if f.Base.L0.ParentFile.Syntax() == protoreflect.Editions {
-			f.L1.EditionFeatures = mergeEditionFeatures(parent, fd.GetOptions().GetFeatures())
-
-			if f.L1.EditionFeatures.IsLegacyRequired {
-				f.L1.Cardinality = protoreflect.Required
-			}
-			// We reuse the existing field because the old option `[packed =
-			// true]` is mutually exclusive with the editions feature.
-			if canBePacked(fd) {
-				f.L1.HasPacked = true
-				f.L1.IsPacked = f.L1.EditionFeatures.IsPacked
-			}
-
-			// We pretend this option is always explicitly set because the only
-			// use of HasEnforceUTF8 is to determine whether to use EnforceUTF8
-			// or to return the appropriate default.
-			// When using editions we either parse the option or resolve the
-			// appropriate default here (instead of later when this option is
-			// requested from the descriptor).
-			// In proto2/proto3 syntax HasEnforceUTF8 might be false.
-			f.L1.HasEnforceUTF8 = true
-			f.L1.EnforceUTF8 = f.L1.EditionFeatures.IsUTF8Validated
-
-			if f.L1.Kind == protoreflect.MessageKind && f.L1.EditionFeatures.IsDelimitedEncoded {
-				f.L1.Kind = protoreflect.GroupKind
-			}
-		}
 	}
 	return fs, nil
 }
@@ -204,9 +151,6 @@ func (r descsByName) initOneofsFromDescriptorProto(ods []*descriptorpb.OneofDesc
 		if opts := od.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.OneofOptions)
 			o.L1.Options = func() protoreflect.ProtoMessage { return opts }
-			if parent.Syntax() == protoreflect.Editions {
-				o.L1.EditionFeatures = mergeEditionFeatures(parent, opts.GetFeatures())
-			}
 		}
 	}
 	return os, nil

@@ -333,7 +333,7 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(ctx context.Context, userid int64) {
 			podName := fmt.Sprintf("busybox-user-%d-%s", userid, uuid.NewUUID())
 			podClient.Create(ctx, makeUserPod(podName,
-				imageutils.GetE2EImage(imageutils.BusyBox),
+				framework.BusyBoxImage,
 				[]string{"sh", "-c", fmt.Sprintf("test $(id -u) -eq %d", userid)},
 				userid,
 			))
@@ -454,7 +454,7 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(ctx context.Context, readOnlyRootFilesystem bool) string {
 			podName := fmt.Sprintf("busybox-readonly-%v-%s", readOnlyRootFilesystem, uuid.NewUUID())
 			podClient.Create(ctx, makeUserPod(podName,
-				imageutils.GetE2EImage(imageutils.BusyBox),
+				framework.BusyBoxImage,
 				[]string{"sh", "-c", "touch checkfile"},
 				readOnlyRootFilesystem,
 			))
@@ -515,7 +515,7 @@ var _ = SIGDescribe("Security Context", func() {
 		createAndWaitUserPod := func(ctx context.Context, privileged bool) string {
 			podName := fmt.Sprintf("busybox-privileged-%v-%s", privileged, uuid.NewUUID())
 			podClient.Create(ctx, makeUserPod(podName,
-				imageutils.GetE2EImage(imageutils.BusyBox),
+				framework.BusyBoxImage,
 				[]string{"sh", "-c", "ip link add dummy0 type dummy || true"},
 				privileged,
 			))

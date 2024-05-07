@@ -585,7 +585,7 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			vec.WithLabelValues("value1-1", "value2-1").Observe(4.5)
 			metricName := fmt.Sprintf("%s_%s_%s", HistogramOpts.Namespace, HistogramOpts.Subsystem, HistogramOpts.Name)
 			histogramVec, _ := GetHistogramVecFromGatherer(gather, metricName, tt.lvMap)
-			if diff := cmp.Diff(tt.wantVec, histogramVec, cmpopts.IgnoreFields(dto.Histogram{}, "state", "sizeCache", "unknownFields", "CreatedTimestamp"), cmpopts.IgnoreFields(dto.Bucket{}, "state", "sizeCache", "unknownFields")); diff != "" {
+			if diff := cmp.Diff(tt.wantVec, histogramVec, cmpopts.IgnoreFields(dto.Histogram{}, "state", "sizeCache", "unknownFields"), cmpopts.IgnoreFields(dto.Bucket{}, "state", "sizeCache", "unknownFields")); diff != "" {
 				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
 			}
 		})

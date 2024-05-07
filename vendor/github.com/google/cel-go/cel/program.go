@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sync"
 
+	celast "github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
@@ -151,7 +152,7 @@ func (p *prog) clone() *prog {
 // ProgramOption values.
 //
 // If the program cannot be configured the prog will be nil, with a non-nil error response.
-func newProgram(e *Env, a *Ast, opts []ProgramOption) (Program, error) {
+func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 	// Build the dispatcher, interpreter, and default program value.
 	disp := interpreter.NewDispatcher()
 
@@ -212,6 +213,34 @@ func newProgram(e *Env, a *Ast, opts []ProgramOption) (Program, error) {
 	if len(p.regexOptimizations) > 0 {
 		decorators = append(decorators, interpreter.CompileRegexConstants(p.regexOptimizations...))
 	}
+	// Enable compile-time checking of syntax/cardinality for string.format calls.
+	if p.evalOpts&OptCheckStringFormat == OptCheckStringFormat {
+		var isValidType func(id int64, validTypes ...ref.Type) (bool, error)
+		if ast.IsChecked() {
+			isValidType = func(id int64, validTypes ...ref.Type) (bool, error) {
+				t := ast.typeMap[id]
+				if t.Kind() == DynKind {
+					return true, nil
+				}
+				for _, vt := range validTypes {
+					k, err := typeValueToKind(vt)
+					if err != nil {
+						return false, err
+					}
+					if t.Kind() == k {
+						return true, nil
+					}
+				}
+				return false, nil
+			}
+		} else {
+			// if the AST isn't type-checked, short-circuit validation
+			isValidType = func(id int64, validTypes ...ref.Type) (bool, error) {
+				return true, nil
+			}
+		}
+		decorators = append(decorators, interpreter.InterpolateFormattedString(isValidType))
+	}
 
 	// Enable exhaustive eval, state tracking and cost tracking last since they require a factory.
 	if p.evalOpts&(OptExhaustiveEval|OptTrackState|OptTrackCost) != 0 {
@@ -245,16 +274,33 @@ func newProgram(e *Env, a *Ast, opts []ProgramOption) (Program, error) {
 				decs = append(decs, interpreter.Observe(observers...))
 			}
 
-			return p.clone().initInterpretable(a, decs)
+			return p.clone().initInterpretable(ast, decs)
 		}
 		return newProgGen(factory)
 	}
-	return p.initInterpretable(a, decorators)
+	return p.initInterpretable(ast, decorators)
 }
 
-func (p *prog) initInterpretable(a *Ast, decs []interpreter.InterpretableDecorator) (*prog, error) {
-	// When the AST has been exprAST it contains metadata that can be used to speed up program execution.
-	interpretable, err := p.interpreter.NewInterpretable(a.impl, decs...)
+func (p *prog) initInterpretable(ast *Ast, decs []interpreter.InterpretableDecorator) (*prog, error) {
+	// Unchecked programs do not contain type and reference information and may be slower to execute.
+	if !ast.IsChecked() {
+		interpretable, err :=
+			p.interpreter.NewUncheckedInterpretable(ast.Expr(), decs...)
+		if err != nil {
+			return nil, err
+		}
+		p.interpretable = interpretable
+		return p, nil
+	}
+
+	// When the AST has been checked it contains metadata that can be used to speed up program execution.
+	checked := &celast.CheckedAST{
+		Expr:         ast.Expr(),
+		SourceInfo:   ast.SourceInfo(),
+		TypeMap:      ast.typeMap,
+		ReferenceMap: ast.refMap,
+	}
+	interpretable, err := p.interpreter.NewInterpretable(checked, decs...)
 	if err != nil {
 		return nil, err
 	}
@@ -534,6 +580,8 @@ func (p *evalActivationPool) Put(value any) {
 }
 
 var (
+	emptyEvalState = interpreter.NewEvalState()
+
 	// activationPool is an internally managed pool of Activation values that wrap map[string]any inputs
 	activationPool = newEvalActivationPool()
 

@@ -44,24 +44,22 @@ var eventsKind = v1beta1.SchemeGroupVersion.WithKind("Event")
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
 func (c *FakeEvents) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Event, err error) {
-	emptyResult := &v1beta1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(eventsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(eventsResource, c.ns, name), &v1beta1.Event{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Event), err
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
 func (c *FakeEvents) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EventList, err error) {
-	emptyResult := &v1beta1.EventList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(eventsResource, eventsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(eventsResource, eventsKind, c.ns, opts), &v1beta1.EventList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,24 +84,22 @@ func (c *FakeEvents) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
 func (c *FakeEvents) Create(ctx context.Context, event *v1beta1.Event, opts v1.CreateOptions) (result *v1beta1.Event, err error) {
-	emptyResult := &v1beta1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), emptyResult)
+		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &v1beta1.Event{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Event), err
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
 func (c *FakeEvents) Update(ctx context.Context, event *v1beta1.Event, opts v1.UpdateOptions) (result *v1beta1.Event, err error) {
-	emptyResult := &v1beta1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), emptyResult)
+		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), &v1beta1.Event{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Event), err
 }
@@ -126,12 +122,11 @@ func (c *FakeEvents) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 
 // Patch applies the patch and returns the patched event.
 func (c *FakeEvents) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error) {
-	emptyResult := &v1beta1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, name, pt, data, subresources...), &v1beta1.Event{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Event), err
 }
@@ -149,12 +144,11 @@ func (c *FakeEvents) Apply(ctx context.Context, event *eventsv1beta1.EventApplyC
 	if name == nil {
 		return nil, fmt.Errorf("event.Name must be provided to Apply")
 	}
-	emptyResult := &v1beta1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.Event{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.Event), err
 }

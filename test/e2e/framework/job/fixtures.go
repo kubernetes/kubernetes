@@ -71,7 +71,7 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Image:   framework.BusyBoxImage,
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{

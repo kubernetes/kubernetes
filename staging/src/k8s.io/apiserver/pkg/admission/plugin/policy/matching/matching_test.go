@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,10 +38,10 @@ import (
 var _ MatchCriteria = &fakeCriteria{}
 
 type fakeCriteria struct {
-	matchResources v1.MatchResources
+	matchResources v1beta1.MatchResources
 }
 
-func (fc *fakeCriteria) GetMatchResources() v1.MatchResources {
+func (fc *fakeCriteria) GetMatchResources() v1beta1.MatchResources {
 	return fc.matchResources
 }
 
@@ -64,8 +65,8 @@ func TestMatcher(t *testing.T) {
 	a := &Matcher{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
 
 	allScopes := v1.AllScopes
-	exactMatch := v1.Exact
-	equivalentMatch := v1.Equivalent
+	exactMatch := v1beta1.Exact
+	equivalentMatch := v1beta1.Equivalent
 
 	mapper := runtime.NewEquivalentResourceRegistryWithIdentity(func(resource schema.GroupResource) string {
 		if resource.Resource == "deployments" {
@@ -94,7 +95,7 @@ func TestMatcher(t *testing.T) {
 	testcases := []struct {
 		name string
 
-		criteria *v1.MatchResources
+		criteria *v1beta1.MatchResources
 		attrs    admission.Attributes
 
 		expectMatches       bool
@@ -104,17 +105,17 @@ func TestMatcher(t *testing.T) {
 	}{
 		{
 			name:          "no rules (just write)",
-			criteria:      &v1.MatchResources{NamespaceSelector: &metav1.LabelSelector{}, ResourceRules: []v1.NamedRuleWithOperations{}},
+			criteria:      &v1beta1.MatchResources{NamespaceSelector: &metav1.LabelSelector{}, ResourceRules: []v1beta1.NamedRuleWithOperations{}},
 			attrs:         admission.NewAttributesRecord(nil, nil, gvk("apps", "v1", "Deployment"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "wildcard rule, match as requested",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
@@ -125,21 +126,21 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, prefer exact match",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
-						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -150,16 +151,16 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, match miss",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -169,17 +170,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, exact match miss",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -189,17 +190,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, equivalent match, prefer extensions",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -211,17 +212,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, equivalent match, prefer apps",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -234,21 +235,21 @@ func TestMatcher(t *testing.T) {
 
 		{
 			name: "specific rules, subresource prefer exact match",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
@@ -259,16 +260,16 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource match miss",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
@@ -278,17 +279,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource exact match miss",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
@@ -298,17 +299,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
@@ -320,17 +321,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer apps",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}, {
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
@@ -342,12 +343,12 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, prefer exact match and name match",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"name"},
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -358,12 +359,12 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, prefer exact match and name match miss",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"wrong-name"},
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -373,13 +374,13 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions and name match",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"name"},
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
@@ -391,13 +392,13 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions and name match miss",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
 					ResourceNames: []string{"wrong-name"},
-					RuleWithOperations: v1.RuleWithOperations{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
@@ -407,17 +408,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "exclude resource match on miss",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
 				}},
-				ExcludeResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ExcludeResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -429,17 +430,17 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "exclude resource miss on match",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
 				}},
-				ExcludeResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ExcludeResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -450,11 +451,11 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "treat empty ResourceRules as match",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ExcludeResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
+				ExcludeResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
 						Operations: []v1.OperationType{"*"},
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
@@ -465,23 +466,23 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "treat non-empty ResourceRules as no match",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules:     []v1.NamedRuleWithOperations{{}},
+				ResourceRules:     []v1beta1.NamedRuleWithOperations{{}},
 			},
 			attrs:         admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
 		},
 		{
 			name: "erroring namespace selector on otherwise non-matching rule doesn't error",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key ", Operator: "In", Values: []string{"bad value"}}}},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
-						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
-						Operations: []v1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
@@ -491,13 +492,13 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "erroring namespace selector on otherwise matching rule errors",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key", Operator: "In", Values: []string{"bad value"}}}},
 				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
-						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
-						Operations: []v1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
@@ -507,13 +508,13 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "erroring object selector on otherwise non-matching rule doesn't error",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key", Operator: "In", Values: []string{"bad value"}}}},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
-						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
-						Operations: []v1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"deployments"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
@@ -523,13 +524,13 @@ func TestMatcher(t *testing.T) {
 		},
 		{
 			name: "erroring object selector on otherwise matching rule errors",
-			criteria: &v1.MatchResources{
+			criteria: &v1beta1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key", Operator: "In", Values: []string{"bad value"}}}},
-				ResourceRules: []v1.NamedRuleWithOperations{{
-					RuleWithOperations: v1.RuleWithOperations{
-						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
-						Operations: []v1.OperationType{"*"},
+				ResourceRules: []v1beta1.NamedRuleWithOperations{{
+					RuleWithOperations: v1beta1.RuleWithOperations{
+						Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
+						Operations: []v1beta1.OperationType{"*"},
 					},
 				}},
 			},
@@ -600,7 +601,7 @@ func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
 
 func BenchmarkMatcher(b *testing.B) {
 	allScopes := v1.AllScopes
-	equivalentMatch := v1.Equivalent
+	equivalentMatch := v1beta1.Equivalent
 
 	namespace1Labels := map[string]string{"ns": "ns1"}
 	namespace1 := corev1.Namespace{
@@ -641,19 +642,19 @@ func BenchmarkMatcher(b *testing.B) {
 		nsSelector[fmt.Sprintf("key-%d", i)] = fmt.Sprintf("val-%d", i)
 	}
 
-	mr := v1.MatchResources{
+	mr := v1beta1.MatchResources{
 		MatchPolicy:       &equivalentMatch,
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: nsSelector},
 		ObjectSelector:    &metav1.LabelSelector{},
-		ResourceRules: []v1.NamedRuleWithOperations{
+		ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1.RuleWithOperations{
+				RuleWithOperations: v1beta1.RuleWithOperations{
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				},
 			},
 			{
-				RuleWithOperations: v1.RuleWithOperations{
+				RuleWithOperations: v1beta1.RuleWithOperations{
 					Operations: []v1.OperationType{"*"},
 					Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 				},
@@ -673,7 +674,7 @@ func BenchmarkMatcher(b *testing.B) {
 
 func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 	allScopes := v1.AllScopes
-	equivalentMatch := v1.Equivalent
+	equivalentMatch := v1beta1.Equivalent
 
 	namespace1Labels := map[string]string{"ns": "ns1"}
 	namespace1 := corev1.Namespace{
@@ -709,16 +710,16 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 	mapper.RegisterKindFor(gvr("apps", "v1beta1", "statefulset"), "scale", gvk("apps", "v1beta1", "Scale"))
 	mapper.RegisterKindFor(gvr("apps", "v1alpha2", "statefulset"), "scale", gvk("apps", "v1beta2", "Scale"))
 
-	mr := v1.MatchResources{
+	mr := v1beta1.MatchResources{
 		MatchPolicy:       &equivalentMatch,
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
 		ObjectSelector:    &metav1.LabelSelector{},
-		ResourceRules:     []v1.NamedRuleWithOperations{},
+		ResourceRules:     []v1beta1.NamedRuleWithOperations{},
 	}
 
 	for i := 0; i < 100; i++ {
-		rule := v1.NamedRuleWithOperations{
-			RuleWithOperations: v1.RuleWithOperations{
+		rule := v1beta1.NamedRuleWithOperations{
+			RuleWithOperations: v1beta1.RuleWithOperations{
 				Operations: []v1.OperationType{"*"},
 				Rule: v1.Rule{
 					APIGroups:   []string{fmt.Sprintf("app-%d", i)},
@@ -743,7 +744,7 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 
 func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 	allScopes := v1.AllScopes
-	equivalentMatch := v1.Equivalent
+	equivalentMatch := v1beta1.Equivalent
 
 	namespace1Labels := map[string]string{"ns": "ns1"}
 	namespace1 := corev1.Namespace{
@@ -784,16 +785,16 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 		nsSelector[fmt.Sprintf("key-%d", i)] = fmt.Sprintf("val-%d", i)
 	}
 
-	mr := v1.MatchResources{
+	mr := v1beta1.MatchResources{
 		MatchPolicy:       &equivalentMatch,
 		NamespaceSelector: &metav1.LabelSelector{MatchLabels: nsSelector},
 		ObjectSelector:    &metav1.LabelSelector{},
-		ResourceRules:     []v1.NamedRuleWithOperations{},
+		ResourceRules:     []v1beta1.NamedRuleWithOperations{},
 	}
 
 	for i := 0; i < 100; i++ {
-		rule := v1.NamedRuleWithOperations{
-			RuleWithOperations: v1.RuleWithOperations{
+		rule := v1beta1.NamedRuleWithOperations{
+			RuleWithOperations: v1beta1.RuleWithOperations{
 				Operations: []v1.OperationType{"*"},
 				Rule: v1.Rule{
 					APIGroups:   []string{fmt.Sprintf("app-%d", i)},

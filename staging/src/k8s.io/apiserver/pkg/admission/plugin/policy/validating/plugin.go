@@ -21,6 +21,7 @@ import (
 	"io"
 
 	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
@@ -61,8 +62,8 @@ func Register(plugins *admission.Plugins) {
 }
 
 // Plugin is an implementation of admission.Interface.
-type Policy = v1.ValidatingAdmissionPolicy
-type PolicyBinding = v1.ValidatingAdmissionPolicyBinding
+type Policy = v1beta1.ValidatingAdmissionPolicy
+type PolicyBinding = v1beta1.ValidatingAdmissionPolicyBinding
 type PolicyEvaluator = Validator
 type PolicyHook = generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]
 
@@ -83,8 +84,8 @@ func NewPlugin(_ io.Reader) *Plugin {
 			handler,
 			func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
 				return generic.NewPolicySource(
-					f.Admissionregistration().V1().ValidatingAdmissionPolicies().Informer(),
-					f.Admissionregistration().V1().ValidatingAdmissionPolicyBindings().Informer(),
+					f.Admissionregistration().V1beta1().ValidatingAdmissionPolicies().Informer(),
+					f.Admissionregistration().V1beta1().ValidatingAdmissionPolicyBindings().Informer(),
 					NewValidatingAdmissionPolicyAccessor,
 					NewValidatingAdmissionPolicyBindingAccessor,
 					compilePolicy,
@@ -116,7 +117,7 @@ func compilePolicy(policy *Policy) Validator {
 	}
 	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
 	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
-	failurePolicy := policy.Spec.FailurePolicy
+	failurePolicy := convertv1beta1FailurePolicyTypeTov1FailurePolicyType(policy.Spec.FailurePolicy)
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
 
@@ -131,17 +132,31 @@ func compilePolicy(policy *Policy) Validator {
 		matcher = matchconditions.NewMatcher(filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "policy", "validate", policy.Name)
 	}
 	res := NewValidator(
-		filterCompiler.Compile(convertv1Validations(policy.Spec.Validations), optionalVars, environment.StoredExpressions),
+		filterCompiler.Compile(convertv1beta1Validations(policy.Spec.Validations), optionalVars, environment.StoredExpressions),
 		matcher,
-		filterCompiler.Compile(convertv1AuditAnnotations(policy.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
-		filterCompiler.Compile(convertv1MessageExpressions(policy.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
+		filterCompiler.Compile(convertv1beta1AuditAnnotations(policy.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
+		filterCompiler.Compile(convertv1beta1MessageExpressions(policy.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 		failurePolicy,
 	)
 
 	return res
 }
 
-func convertv1Validations(inputValidations []v1.Validation) []cel.ExpressionAccessor {
+func convertv1beta1FailurePolicyTypeTov1FailurePolicyType(policyType *v1beta1.FailurePolicyType) *v1.FailurePolicyType {
+	if policyType == nil {
+		return nil
+	}
+
+	var v1FailPolicy v1.FailurePolicyType
+	if *policyType == v1beta1.Fail {
+		v1FailPolicy = v1.Fail
+	} else if *policyType == v1beta1.Ignore {
+		v1FailPolicy = v1.Ignore
+	}
+	return &v1FailPolicy
+}
+
+func convertv1beta1Validations(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		validation := ValidationCondition{
@@ -154,7 +169,7 @@ func convertv1Validations(inputValidations []v1.Validation) []cel.ExpressionAcce
 	return celExpressionAccessor
 }
 
-func convertv1MessageExpressions(inputValidations []v1.Validation) []cel.ExpressionAccessor {
+func convertv1beta1MessageExpressions(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		if validation.MessageExpression != "" {
@@ -167,7 +182,7 @@ func convertv1MessageExpressions(inputValidations []v1.Validation) []cel.Express
 	return celExpressionAccessor
 }
 
-func convertv1AuditAnnotations(inputValidations []v1.AuditAnnotation) []cel.ExpressionAccessor {
+func convertv1beta1AuditAnnotations(inputValidations []v1beta1.AuditAnnotation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		validation := AuditAnnotationCondition{
@@ -179,7 +194,7 @@ func convertv1AuditAnnotations(inputValidations []v1.AuditAnnotation) []cel.Expr
 	return celExpressionAccessor
 }
 
-func convertv1beta1Variables(variables []v1.Variable) []cel.NamedExpressionAccessor {
+func convertv1beta1Variables(variables []v1beta1.Variable) []cel.NamedExpressionAccessor {
 	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
 	for i, variable := range variables {
 		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}

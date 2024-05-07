@@ -11,8 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !windows && !js && !wasip1
-// +build !windows,!js,!wasip1
+//go:build !windows && !js
+// +build !windows,!js
 
 package prometheus
 

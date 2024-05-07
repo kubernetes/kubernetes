@@ -127,7 +127,7 @@ func (d *DummyImpl) ValidatePlugin(pluginName string, endpoint string, versions 
 }
 
 // RegisterPlugin is a dummy implementation
-func (d *DummyImpl) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (d *DummyImpl) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
 	return nil
 }
 

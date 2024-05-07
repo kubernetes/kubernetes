@@ -60,12 +60,6 @@ func (p *TypeProvider) FindStructType(structType string) (*types.Type, bool) {
 	return p.underlyingTypeProvider.FindStructType(structType)
 }
 
-// FindStructFieldNames returns the field names associated with the type, if the type
-// is found.
-func (p *TypeProvider) FindStructFieldNames(structType string) ([]string, bool) {
-	return nil, true
-}
-
 // FindStructFieldType returns the field type for a checked type value.
 // Returns false if the field could not be found.
 func (p *TypeProvider) FindStructFieldType(structType, fieldName string) (*types.FieldType, bool) {

@@ -337,8 +337,6 @@ type ContainerResources struct {
 }
 
 // Status represents the status of a container.
-//
-// Status does not contain VolumeMap because CRI API is unaware of volume names.
 type Status struct {
 	// ID of the container.
 	ID ContainerID
@@ -440,9 +438,6 @@ type Mount struct {
 	HostPath string
 	// Whether the mount is read-only.
 	ReadOnly bool
-	// Whether the mount is recursive read-only.
-	// Must not be true if ReadOnly is false.
-	RecursiveReadOnly bool
 	// Whether the mount needs SELinux relabeling
 	SELinuxRelabel bool
 	// Requested propagation mode
@@ -535,8 +530,8 @@ const (
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
 	Conditions []RuntimeCondition
-	// Handlers is an array of current available handlers
-	Handlers []RuntimeHandler
+	// Handlers is a map of current available handlers
+	Handlers map[string]RuntimeHandler
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
@@ -567,9 +562,6 @@ func (r *RuntimeStatus) String() string {
 type RuntimeHandler struct {
 	// Name is the handler name.
 	Name string
-	// SupportsRecursiveReadOnlyMounts is true if the handler has support for
-	// recursive read-only mounts.
-	SupportsRecursiveReadOnlyMounts bool
 	// SupportsUserNamespaces is true if the handler has support for
 	// user namespaces.
 	SupportsUserNamespaces bool
@@ -577,8 +569,7 @@ type RuntimeHandler struct {
 
 // String formats the runtime handler into human readable string.
 func (h *RuntimeHandler) String() string {
-	return fmt.Sprintf("Name=%s SupportsRecursiveReadOnlyMounts: %v SupportsUserNamespaces: %v",
-		h.Name, h.SupportsRecursiveReadOnlyMounts, h.SupportsUserNamespaces)
+	return fmt.Sprintf("Name=%s SupportsUserNamespaces: %v", h.Name, h.SupportsUserNamespaces)
 }
 
 // RuntimeCondition contains condition information for the runtime.

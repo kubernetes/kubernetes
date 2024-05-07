@@ -301,9 +301,6 @@ spec:
     restartPolicy: restartPolicyValue
     securityContext:
       allowPrivilegeEscalation: true
-      appArmorProfile:
-        localhostProfile: localhostProfileValue
-        type: typeValue
       capabilities:
         add:
         - addValue
@@ -365,7 +362,6 @@ spec:
       mountPropagation: mountPropagationValue
       name: nameValue
       readOnly: true
-      recursiveReadOnly: recursiveReadOnlyValue
       subPath: subPathValue
       subPathExpr: subPathExprValue
     workingDir: workingDirValue
@@ -516,9 +512,6 @@ spec:
     restartPolicy: restartPolicyValue
     securityContext:
       allowPrivilegeEscalation: true
-      appArmorProfile:
-        localhostProfile: localhostProfileValue
-        type: typeValue
       capabilities:
         add:
         - addValue
@@ -581,7 +574,6 @@ spec:
       mountPropagation: mountPropagationValue
       name: nameValue
       readOnly: true
-      recursiveReadOnly: recursiveReadOnlyValue
       subPath: subPathValue
       subPathExpr: subPathExprValue
     workingDir: workingDirValue
@@ -733,9 +725,6 @@ spec:
     restartPolicy: restartPolicyValue
     securityContext:
       allowPrivilegeEscalation: true
-      appArmorProfile:
-        localhostProfile: localhostProfileValue
-        type: typeValue
       capabilities:
         add:
         - addValue
@@ -797,7 +786,6 @@ spec:
       mountPropagation: mountPropagationValue
       name: nameValue
       readOnly: true
-      recursiveReadOnly: recursiveReadOnlyValue
       subPath: subPathValue
       subPathExpr: subPathExprValue
     workingDir: workingDirValue
@@ -824,9 +812,6 @@ spec:
   schedulingGates:
   - name: nameValue
   securityContext:
-    appArmorProfile:
-      localhostProfile: localhostProfileValue
-      type: typeValue
     fsGroup: 5
     fsGroupChangePolicy: fsGroupChangePolicyValue
     runAsGroup: 6
@@ -1217,11 +1202,6 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
-    volumeMounts:
-    - mountPath: mountPathValue
-      name: nameValue
-      readOnly: true
-      recursiveReadOnly: recursiveReadOnlyValue
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -1267,11 +1247,6 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
-    volumeMounts:
-    - mountPath: mountPathValue
-      name: nameValue
-      readOnly: true
-      recursiveReadOnly: recursiveReadOnlyValue
   hostIP: hostIPValue
   hostIPs:
   - ip: ipValue
@@ -1320,11 +1295,6 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
-    volumeMounts:
-    - mountPath: mountPathValue
-      name: nameValue
-      readOnly: true
-      recursiveReadOnly: recursiveReadOnlyValue
   message: messageValue
   nominatedNodeName: nominatedNodeNameValue
   phase: phaseValue

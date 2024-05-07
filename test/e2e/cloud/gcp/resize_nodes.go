@@ -47,7 +47,7 @@ func resizeRC(ctx context.Context, c clientset.Interface, ns, name string, repli
 var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("resize-nodes")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	var systemPodsNo int
+	var systemPodsNo int32
 	var c clientset.Interface
 	var ns string
 	var group string
@@ -57,7 +57,7 @@ var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 		ns = f.Namespace.Name
 		systemPods, err := e2epod.GetPodsInNamespace(ctx, c, ns, map[string]string{})
 		framework.ExpectNoError(err)
-		systemPodsNo = len(systemPods)
+		systemPodsNo = int32(len(systemPods))
 		if strings.Contains(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
@@ -99,7 +99,7 @@ var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 				// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 				// the cluster is restored to health.
 				ginkgo.By("waiting for system pods to successfully restart")
-				err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout)
+				err := e2epod.WaitForPodsRunningReady(ctx, c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout)
 				framework.ExpectNoError(err)
 			})
 		})

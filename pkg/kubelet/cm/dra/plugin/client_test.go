@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 )
 
@@ -34,25 +35,24 @@ type fakeV1alpha3GRPCServer struct {
 	drapbv1alpha3.UnimplementedNodeServer
 }
 
-var _ drapbv1alpha3.NodeServer = &fakeV1alpha3GRPCServer{}
-
-func (f *fakeV1alpha3GRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
+func (f *fakeV1alpha3GRPCServer) NodePrepareResource(ctx context.Context, in *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
 	return &drapbv1alpha3.NodePrepareResourcesResponse{Claims: map[string]*drapbv1alpha3.NodePrepareResourceResponse{"dummy": {CDIDevices: []string{"dummy"}}}}, nil
 }
 
-func (f *fakeV1alpha3GRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
-
+func (f *fakeV1alpha3GRPCServer) NodeUnprepareResource(ctx context.Context, in *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
 	return &drapbv1alpha3.NodeUnprepareResourcesResponse{}, nil
 }
 
-func (f *fakeV1alpha3GRPCServer) NodeListAndWatchResources(req *drapbv1alpha3.NodeListAndWatchResourcesRequest, srv drapbv1alpha3.Node_NodeListAndWatchResourcesServer) error {
-	if err := srv.Send(&drapbv1alpha3.NodeListAndWatchResourcesResponse{}); err != nil {
-		return err
-	}
-	if err := srv.Send(&drapbv1alpha3.NodeListAndWatchResourcesResponse{}); err != nil {
-		return err
-	}
-	return nil
+type fakeV1alpha2GRPCServer struct {
+	drapbv1alpha2.UnimplementedNodeServer
+}
+
+func (f *fakeV1alpha2GRPCServer) NodePrepareResource(ctx context.Context, in *drapbv1alpha2.NodePrepareResourceRequest) (*drapbv1alpha2.NodePrepareResourceResponse, error) {
+	return &drapbv1alpha2.NodePrepareResourceResponse{CdiDevices: []string{"dummy"}}, nil
+}
+
+func (f *fakeV1alpha2GRPCServer) NodeUnprepareResource(ctx context.Context, in *drapbv1alpha2.NodeUnprepareResourceRequest) (*drapbv1alpha2.NodeUnprepareResourceResponse, error) {
+	return &drapbv1alpha2.NodeUnprepareResourceResponse{}, nil
 }
 
 type tearDown func()
@@ -78,6 +78,9 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 
 	s := grpc.NewServer()
 	switch version {
+	case v1alpha2Version:
+		fakeGRPCServer := &fakeV1alpha2GRPCServer{}
+		drapbv1alpha2.RegisterNodeServer(s, fakeGRPCServer)
 	case v1alpha3Version:
 		fakeGRPCServer := &fakeV1alpha3GRPCServer{}
 		drapbv1alpha3.RegisterNodeServer(s, fakeGRPCServer)
@@ -107,6 +110,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	p := &plugin{
 		endpoint: addr,
+		version:  v1alpha3Version,
 	}
 
 	conn, err := p.getOrCreateGRPCConn()
@@ -217,7 +221,7 @@ func TestNewDRAPluginClient(t *testing.T) {
 	}
 }
 
-func TestNodeUnprepareResources(t *testing.T) {
+func TestNodeUnprepareResource(t *testing.T) {
 	for _, test := range []struct {
 		description   string
 		serverSetup   func(string) (string, tearDown, error)
@@ -230,6 +234,21 @@ func TestNodeUnprepareResources(t *testing.T) {
 			serverVersion: v1alpha3Version,
 			request:       &drapbv1alpha3.NodeUnprepareResourcesRequest{},
 		},
+		{
+			description:   "server supports v1alpha2, plugin client should fallback",
+			serverSetup:   setupFakeGRPCServer,
+			serverVersion: v1alpha2Version,
+			request: &drapbv1alpha3.NodeUnprepareResourcesRequest{
+				Claims: []*drapbv1alpha3.Claim{
+					{
+						Namespace:      "dummy-namespace",
+						Uid:            "dummy-uid",
+						Name:           "dummy-claim",
+						ResourceHandle: "dummy-resource",
+					},
+				},
+			},
+		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
@@ -239,8 +258,8 @@ func TestNodeUnprepareResources(t *testing.T) {
 			defer teardown()
 
 			p := &plugin{
-				endpoint:      addr,
-				clientTimeout: PluginClientTimeout,
+				endpoint: addr,
+				version:  v1alpha3Version,
 			}
 
 			conn, err := p.getOrCreateGRPCConn()
@@ -266,77 +285,6 @@ func TestNodeUnprepareResources(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-		})
-	}
-}
-
-func TestListAndWatchResources(t *testing.T) {
-	for _, test := range []struct {
-		description   string
-		serverSetup   func(string) (string, tearDown, error)
-		serverVersion string
-		request       *drapbv1alpha3.NodeListAndWatchResourcesRequest
-		responses     []*drapbv1alpha3.NodeListAndWatchResourcesResponse
-		expectError   string
-	}{
-		{
-			description:   "server supports NodeResources API",
-			serverSetup:   setupFakeGRPCServer,
-			serverVersion: v1alpha3Version,
-			request:       &drapbv1alpha3.NodeListAndWatchResourcesRequest{},
-			responses: []*drapbv1alpha3.NodeListAndWatchResourcesResponse{
-				{},
-				{},
-			},
-			expectError: "EOF",
-		},
-	} {
-		t.Run(test.description, func(t *testing.T) {
-			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer teardown()
-
-			p := &plugin{
-				endpoint: addr,
-			}
-
-			conn, err := p.getOrCreateGRPCConn()
-			defer func() {
-				err := conn.Close()
-				if err != nil {
-					t.Error(err)
-				}
-			}()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			draPlugins.add("dummy-plugin", p)
-			defer draPlugins.delete("dummy-plugin")
-
-			client, err := NewDRAPluginClient("dummy-plugin")
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			stream, err := client.NodeListAndWatchResources(context.Background(), test.request)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var actualResponses []*drapbv1alpha3.NodeListAndWatchResourcesResponse
-			var actualErr error
-			for {
-				resp, err := stream.Recv()
-				if err != nil {
-					actualErr = err
-					break
-				}
-				actualResponses = append(actualResponses, resp)
-			}
-			assert.Equal(t, test.responses, actualResponses)
-			assert.Contains(t, actualErr.Error(), test.expectError)
 		})
 	}
 }

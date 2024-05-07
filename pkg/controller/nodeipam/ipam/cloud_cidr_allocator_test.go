@@ -51,16 +51,14 @@ func TestBoundedRetries(t *testing.T) {
 		nodesSynced:       sharedInfomer.Core().V1().Nodes().Informer().HasSynced,
 		nodesInProcessing: map[string]*nodeProcessingInfo{},
 	}
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	go ca.worker(ctx)
 	nodeName := "testNode"
-	if err := ca.AllocateOrOccupyCIDR(ctx, &v1.Node{
+	ca.AllocateOrOccupyCIDR(logger, &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 		},
-	}); err != nil {
-		t.Errorf("unexpected error in AllocateOrOccupyCIDR: %v", err)
-	}
+	})
 	for hasNodeInProcessing(ca, nodeName) {
 		// wait for node to finish processing (should terminate and not time out)
 	}

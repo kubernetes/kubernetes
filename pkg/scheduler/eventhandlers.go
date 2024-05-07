@@ -472,24 +472,6 @@ func addAllEventHandlers(
 				}
 				handlers = append(handlers, handlerRegistration)
 			}
-		case framework.ResourceClaimParameters:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClaimParameters().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClaimParameters, "ResourceClaimParameters"),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
-		case framework.ResourceClassParameters:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClassParameters().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClassParameters, "ResourceClassParameters"),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
 		case framework.StorageClass:
 			if at&framework.Add != 0 {
 				if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(

@@ -408,9 +408,7 @@ func TestErrConnKilled(t *testing.T) {
 	if isStackTraceLoggedByRuntime(capturedOutput) {
 		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	// For the sake of simplicity and clarity this matches the full log line.
-	// This is not part of the Kubernetes API and could change.
-	if !strings.Contains(capturedOutput, `"Timeout or abort while handling" logger="UnhandledError" method="GET" URI="/" auditID=""`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 }
@@ -503,9 +501,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	if isStackTraceLoggedByRuntime(capturedOutput) {
 		t.Errorf("unexpected stack trace in log, actual = %v", capturedOutput)
 	}
-	// For the sake of simplicity and clarity this matches the full log line.
-	// This is not part of the Kubernetes API and could change.
-	if !strings.Contains(capturedOutput, `"Timeout or abort while handling" logger="UnhandledError" method="GET" URI="/" auditID=""`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 

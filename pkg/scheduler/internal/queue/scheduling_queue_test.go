@@ -684,20 +684,10 @@ func Test_InFlightPods(t *testing.T) {
 			for _, p := range test.initialPods {
 				obj = append(obj, p)
 			}
-			fakeClock := testingclock.NewFakeClock(time.Now())
-			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), obj, WithQueueingHintMapPerProfile(test.queueingHintMap), WithClock(fakeClock))
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), obj, WithQueueingHintMapPerProfile(test.queueingHintMap))
 
-			// When a Pod is added to the queue, the QueuedPodInfo will have a new timestamp.
-			// On Windows, time.Now() is not as precise, 2 consecutive calls may return the same timestamp.
-			// Thus, all the QueuedPodInfos can have the same timestamps, which can be an issue
-			// when we're expecting them to be popped in a certain order (the Less function
-			// sorts them by Timestamps if they have the same Pod Priority).
-			// Using a fake clock for the queue and incrementing it after each added Pod will
-			// solve this issue on Windows unit test runs.
-			// For more details on the Windows clock resolution issue, see: https://github.com/golang/go/issues/8687
 			for _, p := range test.initialPods {
 				q.Add(logger, p)
-				fakeClock.Step(time.Second)
 			}
 
 			for _, action := range test.actions {

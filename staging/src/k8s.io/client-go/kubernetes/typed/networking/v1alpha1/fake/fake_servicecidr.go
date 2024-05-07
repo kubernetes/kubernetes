@@ -43,22 +43,20 @@ var servicecidrsKind = v1alpha1.SchemeGroupVersion.WithKind("ServiceCIDR")
 
 // Get takes name of the serviceCIDR, and returns the corresponding serviceCIDR object, and an error if there is any.
 func (c *FakeServiceCIDRs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ServiceCIDR, err error) {
-	emptyResult := &v1alpha1.ServiceCIDR{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(servicecidrsResource, name), emptyResult)
+		Invokes(testing.NewRootGetAction(servicecidrsResource, name), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.ServiceCIDR), err
 }
 
 // List takes label and field selectors, and returns the list of ServiceCIDRs that match those selectors.
 func (c *FakeServiceCIDRs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ServiceCIDRList, err error) {
-	emptyResult := &v1alpha1.ServiceCIDRList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(servicecidrsResource, servicecidrsKind, opts), emptyResult)
+		Invokes(testing.NewRootListAction(servicecidrsResource, servicecidrsKind, opts), &v1alpha1.ServiceCIDRList{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -82,34 +80,31 @@ func (c *FakeServiceCIDRs) Watch(ctx context.Context, opts v1.ListOptions) (watc
 
 // Create takes the representation of a serviceCIDR and creates it.  Returns the server's representation of the serviceCIDR, and an error, if there is any.
 func (c *FakeServiceCIDRs) Create(ctx context.Context, serviceCIDR *v1alpha1.ServiceCIDR, opts v1.CreateOptions) (result *v1alpha1.ServiceCIDR, err error) {
-	emptyResult := &v1alpha1.ServiceCIDR{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(servicecidrsResource, serviceCIDR), emptyResult)
+		Invokes(testing.NewRootCreateAction(servicecidrsResource, serviceCIDR), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.ServiceCIDR), err
 }
 
 // Update takes the representation of a serviceCIDR and updates it. Returns the server's representation of the serviceCIDR, and an error, if there is any.
 func (c *FakeServiceCIDRs) Update(ctx context.Context, serviceCIDR *v1alpha1.ServiceCIDR, opts v1.UpdateOptions) (result *v1alpha1.ServiceCIDR, err error) {
-	emptyResult := &v1alpha1.ServiceCIDR{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(servicecidrsResource, serviceCIDR), emptyResult)
+		Invokes(testing.NewRootUpdateAction(servicecidrsResource, serviceCIDR), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.ServiceCIDR), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeServiceCIDRs) UpdateStatus(ctx context.Context, serviceCIDR *v1alpha1.ServiceCIDR, opts v1.UpdateOptions) (result *v1alpha1.ServiceCIDR, err error) {
-	emptyResult := &v1alpha1.ServiceCIDR{}
+func (c *FakeServiceCIDRs) UpdateStatus(ctx context.Context, serviceCIDR *v1alpha1.ServiceCIDR, opts v1.UpdateOptions) (*v1alpha1.ServiceCIDR, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(servicecidrsResource, "status", serviceCIDR), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceAction(servicecidrsResource, "status", serviceCIDR), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.ServiceCIDR), err
 }
@@ -131,11 +126,10 @@ func (c *FakeServiceCIDRs) DeleteCollection(ctx context.Context, opts v1.DeleteO
 
 // Patch applies the patch and returns the patched serviceCIDR.
 func (c *FakeServiceCIDRs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ServiceCIDR, err error) {
-	emptyResult := &v1alpha1.ServiceCIDR{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, name, pt, data, subresources...), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.ServiceCIDR), err
 }
@@ -153,11 +147,10 @@ func (c *FakeServiceCIDRs) Apply(ctx context.Context, serviceCIDR *networkingv1a
 	if name == nil {
 		return nil, fmt.Errorf("serviceCIDR.Name must be provided to Apply")
 	}
-	emptyResult := &v1alpha1.ServiceCIDR{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, *name, types.ApplyPatchType, data), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.ServiceCIDR), err
 }
@@ -176,11 +169,10 @@ func (c *FakeServiceCIDRs) ApplyStatus(ctx context.Context, serviceCIDR *network
 	if name == nil {
 		return nil, fmt.Errorf("serviceCIDR.Name must be provided to Apply")
 	}
-	emptyResult := &v1alpha1.ServiceCIDR{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceAction(servicecidrsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ServiceCIDR{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1alpha1.ServiceCIDR), err
 }

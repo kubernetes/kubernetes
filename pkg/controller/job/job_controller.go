@@ -563,7 +563,7 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 	// all controllers there will still be some replica instability. One way to handle this is
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
-	logger.Info("enqueueing job", "key", key, "delay", delay)
+	logger.Info("enqueueing job", "key", key)
 	jm.queue.AddAfter(key, delay)
 }
 
@@ -838,11 +838,8 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	var manageJobErr error
 
 	exceedsBackoffLimit := jobCtx.failed > *job.Spec.BackoffLimit
-	jobCtx.finishedCondition = hasSuccessCriteriaMetCondition(&job)
 
-	// Given that the Job already has the SuccessCriteriaMet condition, the termination condition already had confirmed in another cycle.
-	// So, the job-controller evaluates the podFailurePolicy only when the Job doesn't have the SuccessCriteriaMet condition.
-	if jobCtx.finishedCondition == nil && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
+	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
 		if failureTargetCondition := findConditionByType(job.Status.Conditions, batch.JobFailureTarget); failureTargetCondition != nil {
 			jobCtx.finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition, jm.clock.Now())
 		} else if failJobMessage := getFailJobMessage(&job, pods); failJobMessage != nil {
@@ -877,11 +874,6 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 				}
 			}
 			jobCtx.podsWithDelayedDeletionPerIndex = getPodsWithDelayedDeletionPerIndex(logger, jobCtx)
-		}
-		if jobCtx.finishedCondition == nil && hasSuccessCriteriaMetCondition(jobCtx.job) == nil {
-			if msg, met := matchSuccessPolicy(logger, job.Spec.SuccessPolicy, *job.Spec.Completions, jobCtx.succeededIndexes); met {
-				jobCtx.finishedCondition = newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, batch.JobReasonSuccessPolicy, msg, jm.clock.Now())
-			}
 		}
 	}
 	suspendCondChanged := false
@@ -1097,8 +1089,8 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 				needsFlush = true
 				uncountedStatus.Succeeded = append(uncountedStatus.Succeeded, pod.UID)
 			}
-		} else if considerPodFailed || (jobCtx.finishedCondition != nil && !isSuccessCriteriaMetCondition(jobCtx.finishedCondition)) {
-			// When the job is considered finished, every non-terminated pod is considered failed.
+		} else if considerPodFailed || jobCtx.finishedCondition != nil {
+			// When the job is considered finished, every non-terminated pod is considered failed
 			ix := getCompletionIndex(pod.Annotations)
 			if !jobCtx.uncounted.failed.Has(string(pod.UID)) && (!isIndexed || (ix != unknownCompletionIndex && ix < int(*jobCtx.job.Spec.Completions))) {
 				if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && jobCtx.job.Spec.PodFailurePolicy != nil {
@@ -1158,17 +1150,6 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			jobCtx.finishedCondition = newFailedConditionForFailureTarget(jobCtx.finishedCondition, jm.clock.Now())
 		}
 	}
-	if isSuccessCriteriaMetCondition(jobCtx.finishedCondition) {
-		// Append the interim SuccessCriteriaMet condition to update the job status with before finalizers are removed.
-		if hasSuccessCriteriaMetCondition(jobCtx.job) == nil {
-			jobCtx.job.Status.Conditions = append(jobCtx.job.Status.Conditions, *jobCtx.finishedCondition)
-			needsFlush = true
-		}
-
-		// Prepare the final Complete condition to update the job status with after the finalizers are removed.
-		// It is also used in the enactJobFinished function for reporting.
-		jobCtx.finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, jobCtx.finishedCondition.Reason, jobCtx.finishedCondition.Message, jm.clock.Now())
-	}
 	var err error
 	if jobCtx.job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, jobCtx, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, podFailureCountByPolicyAction, needsFlush); err != nil {
 		return err
@@ -1196,8 +1177,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 //   - the Pod is considered failed, unless it's removal is delayed for the
 //     purpose of transferring the JobIndexFailureCount annotations to the
 //     replacement pod. the entire Job is terminating the finalizer can be
-//     removed unconditionally; or
-//   - the Job met successPolicy.
+//     removed unconditionally.
 func canRemoveFinalizer(logger klog.Logger, jobCtx *syncJobCtx, pod *v1.Pod, considerPodFailed bool) bool {
 	if jobCtx.job.DeletionTimestamp != nil || jobCtx.finishedCondition != nil || pod.Status.Phase == v1.PodSucceeded {
 		return true
@@ -1217,8 +1197,8 @@ func canRemoveFinalizer(logger klog.Logger, jobCtx *syncJobCtx, pod *v1.Pod, con
 }
 
 // flushUncountedAndRemoveFinalizers does:
-//  1. flush the Job status that might include new uncounted Pod UIDs.
-//     Also flush the interim FailureTarget and SuccessCriteriaMet conditions if present.
+//  1. flush the Job status that might include new uncounted Pod UIDs. Also flush the interim FailureTarget condition
+//     if present.
 //  2. perform the removal of finalizers from Pods which are in the uncounted
 //     lists.
 //  3. update the counters based on the Pods for which it successfully removed

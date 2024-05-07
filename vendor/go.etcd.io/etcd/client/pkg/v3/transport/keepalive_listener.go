@@ -87,6 +87,11 @@ func (l *keepAliveConn) SetKeepAlive(doKeepAlive bool) error {
 	return l.TCPConn.SetKeepAlive(doKeepAlive)
 }
 
+// SetKeepAlivePeriod sets keepalive period
+func (l *keepAliveConn) SetKeepAlivePeriod(d time.Duration) error {
+	return l.TCPConn.SetKeepAlivePeriod(d)
+}
+
 // A tlsKeepaliveListener implements a network listener (net.Listener) for TLS connections.
 type tlsKeepaliveListener struct {
 	net.Listener

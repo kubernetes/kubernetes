@@ -31,8 +31,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-var noEndpoints = &corev1.Endpoints{}
-
 func TestEndpointsAdapterGet(t *testing.T) {
 	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
 
@@ -59,21 +57,21 @@ func TestEndpointsAdapterGet(t *testing.T) {
 		},
 		"endpointslice exists, endpoints does not": {
 			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
-			expectedEndpoints: noEndpoints,
+			expectedEndpoints: nil,
 			initialState:      []runtime.Object{epSlice1},
 			namespaceParam:    "testing",
 			nameParam:         "foo",
 		},
 		"wrong-namespace": {
 			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
-			expectedEndpoints: noEndpoints,
+			expectedEndpoints: nil,
 			initialState:      []runtime.Object{endpoints1, epSlice1},
 			namespaceParam:    "foo",
 			nameParam:         "foo",
 		},
 		"wrong-name": {
 			expectedError:     errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
-			expectedEndpoints: noEndpoints,
+			expectedEndpoints: nil,
 			initialState:      []runtime.Object{endpoints1, epSlice1},
 			namespaceParam:    "testing",
 			nameParam:         "bar",
@@ -146,7 +144,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 		},
 		"existing-endpoints": {
 			expectedError:  errors.NewAlreadyExists(schema.GroupResource{Group: "", Resource: "endpoints"}, "foo"),
-			expectedResult: noEndpoints,
+			expectedResult: nil,
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			namespaceParam: endpoints1.Namespace,
 			endpointsParam: endpoints1,
@@ -271,7 +269,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 		},
 		"wrong-endpoints": {
 			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
-			expectedResult: noEndpoints,
+			expectedResult: nil,
 			expectUpdate:   []runtime.Object{endpoints3},
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			namespaceParam: "testing",
@@ -279,7 +277,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 		},
 		"missing-endpoints": {
 			expectedError:  errors.NewNotFound(schema.GroupResource{Group: "", Resource: "endpoints"}, "bar"),
-			expectedResult: noEndpoints,
+			expectedResult: nil,
 			initialState:   []runtime.Object{endpoints1, epSlice1},
 			namespaceParam: "testing",
 			endpointsParam: endpoints3,

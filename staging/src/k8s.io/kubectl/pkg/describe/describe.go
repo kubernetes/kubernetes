@@ -4471,7 +4471,6 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 		for k, v := range configMap.Data {
 			w.Write(LEVEL_0, "%s:\n----\n", k)
 			w.Write(LEVEL_0, "%s\n", string(v))
-			w.Write(LEVEL_0, "\n")
 		}
 		w.Write(LEVEL_0, "\nBinaryData\n====\n")
 		for k, v := range configMap.BinaryData {
@@ -4577,11 +4576,7 @@ func printNetworkPolicySpecIngressFrom(npirs []networkingv1.NetworkPolicyIngress
 				} else {
 					proto = corev1.ProtocolTCP
 				}
-				if port.EndPort == nil {
-					w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
-				} else {
-					w.Write(LEVEL_0, "%s%s: %s-%d/%s\n", initialIndent, "To Port Range", port.Port, *port.EndPort, proto)
-				}
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
 			}
 		}
 		if len(npir.From) == 0 {
@@ -4625,11 +4620,7 @@ func printNetworkPolicySpecEgressTo(npers []networkingv1.NetworkPolicyEgressRule
 				} else {
 					proto = corev1.ProtocolTCP
 				}
-				if port.EndPort == nil {
-					w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
-				} else {
-					w.Write(LEVEL_0, "%s%s: %s-%d/%s\n", initialIndent, "To Port Range", port.Port, *port.EndPort, proto)
-				}
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
 			}
 		}
 		if len(nper.To) == 0 {

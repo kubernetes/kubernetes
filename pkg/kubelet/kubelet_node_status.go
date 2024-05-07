@@ -40,6 +40,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -358,6 +359,14 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		klog.V(2).InfoS("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
+	if kl.keepTerminatedPodVolumes {
+		if node.Annotations == nil {
+			node.Annotations = make(map[string]string)
+		}
+		klog.V(2).InfoS("Setting node annotation to keep pod volumes of terminated pods attached to the node")
+		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
+	}
+
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
@@ -545,19 +554,15 @@ func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
-	// To reduce the load on control-plane, we are serving GET operations from
-	// local lister (the data might be slightly delayed but it doesn't
+	// To reduce the load on etcd, we are serving GET operations from
+	// apiserver cache (the data might be slightly delayed but it doesn't
 	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
-	var originalNode *v1.Node
-	var err error
-
+	opts := metav1.GetOptions{}
 	if tryNumber == 0 {
-		originalNode, err = kl.nodeLister.Get(string(kl.nodeName))
-	} else {
-		opts := metav1.GetOptions{}
-		originalNode, err = kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
+		util.FromApiserverCache(&opts)
 	}
+	originalNode, err := kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
@@ -727,6 +732,10 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 	if kl.cloud != nil {
 		nodeAddressesFunc = kl.cloudResourceSyncManager.NodeAddresses
 	}
+	var validateHostFunc func() error
+	if kl.appArmorValidator != nil {
+		validateHostFunc = kl.appArmorValidator.ValidateHost
+	}
 	var setters []func(ctx context.Context, n *v1.Node) error
 	setters = append(setters,
 		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
@@ -736,15 +745,16 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
 		nodestatus.GoRuntime(),
-		nodestatus.RuntimeHandlers(kl.runtimeState.runtimeHandlers),
 	)
+	// Volume limits
+	setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))
 
 	setters = append(setters,
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
 		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors,
-			kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.recordNodeStatusEvent, kl.supportLocalStorageCapacityIsolation()),
+			validateHostFunc, kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.recordNodeStatusEvent, kl.supportLocalStorageCapacityIsolation()),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
 		// TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event
 		// and record state back to the Kubelet runtime object. In the future, I'd like to isolate

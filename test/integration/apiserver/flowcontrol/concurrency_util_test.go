@@ -314,7 +314,7 @@ func getRequestMetricsSnapshot(c clientset.Interface) (metricSnapshot, error) {
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.NewFormat(expfmt.TypeTextPlain))
+	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
 	decoder := expfmt.SampleDecoder{
 		Dec:  dec,
 		Opts: &expfmt.DecodeOptions{},

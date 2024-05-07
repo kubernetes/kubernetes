@@ -67,7 +67,7 @@ func NewAbstractType(name string, paramTypes ...*exprpb.Type) *exprpb.Type {
 // NewOptionalType constructs an abstract type indicating that the parameterized type
 // may be contained within the object.
 func NewOptionalType(paramType *exprpb.Type) *exprpb.Type {
-	return NewAbstractType("optional_type", paramType)
+	return NewAbstractType("optional", paramType)
 }
 
 // NewFunctionType creates a function invocation contract, typically only used

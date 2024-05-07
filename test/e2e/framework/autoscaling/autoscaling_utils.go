@@ -77,6 +77,10 @@ const (
 )
 
 var (
+	resourceConsumerImage = imageutils.GetE2EImage(imageutils.ResourceConsumer)
+)
+
+var (
 	// KindRC is the GVK for ReplicationController
 	KindRC = schema.GroupVersionKind{Version: "v1", Kind: "ReplicationController"}
 	// KindDeployment is the GVK for Deployment
@@ -140,7 +144,7 @@ func NewDynamicResourceConsumer(ctx context.Context, name, nsName string, kind s
 func getSidecarContainer(name string, cpuLimit, memLimit int64) v1.Container {
 	container := v1.Container{
 		Name:    name + "-sidecar",
-		Image:   imageutils.GetE2EImage(imageutils.ResourceConsumer),
+		Image:   resourceConsumerImage,
 		Command: []string{"/consumer", "-port=8081"},
 		Ports:   []v1.ContainerPort{{ContainerPort: 80}},
 	}
@@ -624,7 +628,7 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 
 	rcConfig := testutils.RCConfig{
 		Client:               c,
-		Image:                imageutils.GetE2EImage(imageutils.ResourceConsumer),
+		Image:                resourceConsumerImage,
 		Name:                 name,
 		Namespace:            ns,
 		Timeout:              timeoutRC,

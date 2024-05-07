@@ -220,20 +220,18 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) erro
 			h.Set("Grpc-Message", encodeGrpcMessage(m))
 		}
 
-		s.hdrMu.Lock()
 		if p := st.Proto(); p != nil && len(p.Details) > 0 {
-			delete(s.trailer, grpcStatusDetailsBinHeader)
 			stBytes, err := proto.Marshal(p)
 			if err != nil {
 				// TODO: return error instead, when callers are able to handle it.
 				panic(err)
 			}
 
-			h.Set(grpcStatusDetailsBinHeader, encodeBinHeader(stBytes))
+			h.Set("Grpc-Status-Details-Bin", encodeBinHeader(stBytes))
 		}
 
-		if len(s.trailer) > 0 {
-			for k, vv := range s.trailer {
+		if md := s.Trailer(); len(md) > 0 {
+			for k, vv := range md {
 				// Clients don't tolerate reading restricted headers after some non restricted ones were sent.
 				if isReservedHeader(k) {
 					continue
@@ -245,7 +243,6 @@ func (ht *serverHandlerTransport) WriteStatus(s *Stream, st *status.Status) erro
 				}
 			}
 		}
-		s.hdrMu.Unlock()
 	})
 
 	if err == nil { // transport has not been closed
@@ -290,7 +287,7 @@ func (ht *serverHandlerTransport) writeCommonHeaders(s *Stream) {
 }
 
 // writeCustomHeaders sets custom headers set on the stream via SetHeader
-// on the first write call (Write, WriteHeader, or WriteStatus)
+// on the first write call (Write, WriteHeader, or WriteStatus).
 func (ht *serverHandlerTransport) writeCustomHeaders(s *Stream) {
 	h := ht.rw.Header()
 
@@ -347,7 +344,7 @@ func (ht *serverHandlerTransport) WriteHeader(s *Stream, md metadata.MD) error {
 	return err
 }
 
-func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream)) {
+func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), traceCtx func(context.Context, string) context.Context) {
 	// With this transport type there will be exactly 1 stream: this HTTP request.
 
 	ctx := ht.req.Context()

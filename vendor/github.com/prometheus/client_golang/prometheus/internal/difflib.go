@@ -14,7 +14,7 @@
 // It provides tools to compare sequences of strings and generate textual diffs.
 //
 // Maintaining `GetUnifiedDiffString` here because original repository
-// (https://github.com/pmezard/go-difflib) is no longer maintained.
+// (https://github.com/pmezard/go-difflib) is no loger maintained.
 package internal
 
 import (

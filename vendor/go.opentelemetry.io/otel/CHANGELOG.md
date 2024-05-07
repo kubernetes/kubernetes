@@ -8,71 +8,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-## [1.20.0/0.43.0] 2023-11-10
-
-This release brings a breaking change for custom trace API implementations. Some interfaces (`TracerProvider`, `Tracer`, `Span`) now embed the `go.opentelemetry.io/otel/trace/embedded` types. Implementors need to update their implementations based on what they want the default behavior to be. See the "API Implementations" section of the [trace API] package documentation for more information about how to accomplish this.
-
-### Added
-
-- Add `go.opentelemetry.io/otel/bridge/opencensus.InstallTraceBridge`, which installs the OpenCensus trace bridge, and replaces `opencensus.NewTracer`. (#4567)
-- Add scope version to trace and metric bridges in `go.opentelemetry.io/otel/bridge/opencensus`. (#4584)
-- Add the `go.opentelemetry.io/otel/trace/embedded` package to be embedded in the exported trace API interfaces. (#4620)
-- Add the `go.opentelemetry.io/otel/trace/noop` package as a default no-op implementation of the trace API. (#4620)
-- Add context propagation in `go.opentelemetry.io/otel/example/dice`. (#4644)
-- Add view configuration to `go.opentelemetry.io/otel/example/prometheus`. (#4649)
-- Add `go.opentelemetry.io/otel/metric.WithExplicitBucketBoundaries`, which allows defining default explicit bucket boundaries when creating histogram instruments. (#4603)
-- Add `Version` function in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc`. (#4660)
-- Add `Version` function in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp`. (#4660)
-- Add Summary, SummaryDataPoint, and QuantileValue to `go.opentelemetry.io/sdk/metric/metricdata`. (#4622)
-- `go.opentelemetry.io/otel/bridge/opencensus.NewMetricProducer` now supports exemplars from OpenCensus. (#4585)
-- Add support for `WithExplicitBucketBoundaries` in `go.opentelemetry.io/otel/sdk/metric`. (#4605)
-- Add support for Summary metrics in `go.opentelemetry.io/otel/bridge/opencensus`. (#4668)
-
-### Deprecated
-
-- Deprecate `go.opentelemetry.io/otel/bridge/opencensus.NewTracer` in favor of `opencensus.InstallTraceBridge`. (#4567)
-- Deprecate `go.opentelemetry.io/otel/example/fib` package is in favor of `go.opentelemetry.io/otel/example/dice`. (#4618)
-- Deprecate `go.opentelemetry.io/otel/trace.NewNoopTracerProvider`.
-  Use the added `NewTracerProvider` function in `go.opentelemetry.io/otel/trace/noop` instead. (#4620)
-- Deprecate `go.opentelemetry.io/otel/example/view` package in favor of `go.opentelemetry.io/otel/example/prometheus`. (#4649)
-- Deprecate `go.opentelemetry.io/otel/exporters/otlp/otlpmetric`. (#4693)
-
-### Changed
-
-- `go.opentelemetry.io/otel/bridge/opencensus.NewMetricProducer` returns a `*MetricProducer` struct instead of the metric.Producer interface. (#4583)
-- The `TracerProvider` in `go.opentelemetry.io/otel/trace` now embeds the `go.opentelemetry.io/otel/trace/embedded.TracerProvider` type.
-  This extends the `TracerProvider` interface and is is a breaking change for any existing implementation.
-  Implementors need to update their implementations based on what they want the default behavior of the interface to be.
-  See the "API Implementations" section of the `go.opentelemetry.io/otel/trace` package documentation for more information about how to accomplish this. (#4620)
-- The `Tracer` in `go.opentelemetry.io/otel/trace` now embeds the `go.opentelemetry.io/otel/trace/embedded.Tracer` type.
-  This extends the `Tracer` interface and is is a breaking change for any existing implementation.
-  Implementors need to update their implementations based on what they want the default behavior of the interface to be.
-  See the "API Implementations" section of the `go.opentelemetry.io/otel/trace` package documentation for more information about how to accomplish this. (#4620)
-- The `Span` in `go.opentelemetry.io/otel/trace` now embeds the `go.opentelemetry.io/otel/trace/embedded.Span` type.
-  This extends the `Span` interface and is is a breaking change for any existing implementation.
-  Implementors need to update their implementations based on what they want the default behavior of the interface to be.
-  See the "API Implementations" section of the `go.opentelemetry.io/otel/trace` package documentation for more information about how to accomplish this. (#4620)
-- `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc` does no longer depend on `go.opentelemetry.io/otel/exporters/otlp/otlpmetric`. (#4660)
-- `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp` does no longer depend on `go.opentelemetry.io/otel/exporters/otlp/otlpmetric`. (#4660)
-- Retry for `502 Bad Gateway` and `504 Gateway Timeout` HTTP statuses in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp`. (#4670)
-- Retry for `502 Bad Gateway` and `504 Gateway Timeout` HTTP statuses in `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp`. (#4670)
-- Retry for `RESOURCE_EXHAUSTED` only if RetryInfo is returned in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc`. (#4669)
-- Retry for `RESOURCE_EXHAUSTED` only if RetryInfo is returned in `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc`. (#4669)
-- Retry temporary HTTP request failures in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp`. (#4679)
-- Retry temporary HTTP request failures in `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp`. (#4679)
-
-### Fixed
-
-- Fix improper parsing of characters such us `+`, `/` by `Parse` in `go.opentelemetry.io/otel/baggage` as they were rendered as a whitespace. (#4667)
-- Fix improper parsing of characters such us `+`, `/` passed via `OTEL_RESOURCE_ATTRIBUTES` in `go.opentelemetry.io/otel/sdk/resource` as they were rendered as a whitespace. (#4699)
-- Fix improper parsing of characters such us `+`, `/` passed via `OTEL_EXPORTER_OTLP_HEADERS` and `OTEL_EXPORTER_OTLP_METRICS_HEADERS` in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc` as they were rendered as a whitespace. (#4699)
-- Fix improper parsing of characters such us `+`, `/` passed via `OTEL_EXPORTER_OTLP_HEADERS` and `OTEL_EXPORTER_OTLP_METRICS_HEADERS` in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp` as they were rendered as a whitespace. (#4699)
-- Fix improper parsing of characters such us `+`, `/` passed via `OTEL_EXPORTER_OTLP_HEADERS` and `OTEL_EXPORTER_OTLP_TRACES_HEADERS` in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlptracegrpc` as they were rendered as a whitespace. (#4699)
-- Fix improper parsing of characters such us `+`, `/` passed via `OTEL_EXPORTER_OTLP_HEADERS` and `OTEL_EXPORTER_OTLP_TRACES_HEADERS` in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlptracehttp` as they were rendered as a whitespace. (#4699)
-- In `go.opentelemetry.op/otel/exporters/prometheus`, the exporter no longer `Collect`s metrics after `Shutdown` is invoked. (#4648)
-- Fix documentation for `WithCompressor` in `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc`. (#4695)
-- Fix documentation for `WithCompressor` in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc`. (#4695)
-
 ## [1.19.0/0.42.0/0.0.7] 2023-09-28
 
 This release contains the first stable release of the OpenTelemetry Go [metric SDK].
@@ -2721,8 +2656,7 @@ It contains api and sdk for trace and meter.
 - CircleCI build CI manifest files.
 - CODEOWNERS file to track owners of this project.
 
-[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.20.0...HEAD
-[1.20.0/0.43.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.20.0
+[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.19.0...HEAD
 [1.19.0/0.42.0/0.0.7]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.19.0
 [1.19.0-rc.1/0.42.0-rc.1]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.19.0-rc.1
 [1.18.0/0.41.0/0.0.6]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.18.0
@@ -2797,7 +2731,7 @@ It contains api and sdk for trace and meter.
 [Go 1.20]: https://go.dev/doc/go1.20
 [Go 1.19]: https://go.dev/doc/go1.19
 [Go 1.18]: https://go.dev/doc/go1.18
+[Go 1.19]: https://go.dev/doc/go1.19
 
 [metric API]:https://pkg.go.dev/go.opentelemetry.io/otel/metric
 [metric SDK]:https://pkg.go.dev/go.opentelemetry.io/otel/sdk/metric
-[trace API]:https://pkg.go.dev/go.opentelemetry.io/otel/trace

@@ -19,9 +19,11 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"gopkg.in/yaml.v2"
@@ -140,6 +142,7 @@ func TestMain(m *testing.M) {
 		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}
 
+	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
 }
 

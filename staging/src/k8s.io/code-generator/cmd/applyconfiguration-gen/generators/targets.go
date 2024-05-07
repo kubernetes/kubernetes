@@ -185,7 +185,6 @@ func targetForApplyConfigurationsPackage(outputDirBase, outputPkgBase, pkgSubdir
 						OutputFilename: strings.ToLower(toGenerate.Type.Name.Name) + ".go",
 					},
 					outPkgBase:   outputPkgBase,
-					localPkg:     outputPkg,
 					groupVersion: gv,
 					applyConfig:  toGenerate,
 					imports:      generator.NewImportTracker(),

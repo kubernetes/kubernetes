@@ -366,11 +366,6 @@ func (s *watchableStore) syncWatchers() int {
 	var victims watcherBatch
 	wb := newWatcherBatch(wg, evs)
 	for w := range wg.watchers {
-		if w.minRev < compactionRev {
-			// Skip the watcher that failed to send compacted watch response due to w.ch is full.
-			// Next retry of syncWatchers would try to resend the compacted watch response to w.ch
-			continue
-		}
 		w.minRev = curRev + 1
 
 		eb, ok := wb[w]

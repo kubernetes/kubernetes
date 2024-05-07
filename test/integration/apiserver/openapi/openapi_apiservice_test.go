@@ -119,7 +119,7 @@ func TestFetchingOpenAPIBeforeReady(t *testing.T) {
 			SwaggerProps: spec.SwaggerProps{
 				Paths: &spec.Paths{
 					Paths: map[string]spec.PathItem{
-						"/apis/wardle.example.com/v1alpha1/": {},
+						"/apis/wardle.example.com/v1alpha1": {},
 					},
 				},
 			},
@@ -150,7 +150,7 @@ func TestFetchingOpenAPIBeforeReady(t *testing.T) {
 		require.NoError(t, err)
 		var openapi spec.Swagger
 		require.NoError(t, openapi.UnmarshalJSON(b))
-		if _, ok := openapi.Paths.Paths["/apis/wardle.example.com/v1alpha1/"]; ok {
+		if _, ok := openapi.Paths.Paths["/apis/wardle.example.com/v1alpha1"]; ok {
 			return true, nil
 		}
 		return false, nil

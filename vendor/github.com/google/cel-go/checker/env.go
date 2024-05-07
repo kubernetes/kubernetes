@@ -146,14 +146,6 @@ func (e *Env) LookupIdent(name string) *decls.VariableDecl {
 			return decl
 		}
 
-		if i, found := e.provider.FindIdent(candidate); found {
-			if t, ok := i.(*types.Type); ok {
-				decl := decls.NewVariable(candidate, types.NewTypeTypeWithParam(t))
-				e.declarations.AddIdent(decl)
-				return decl
-			}
-		}
-
 		// Next try to import this as an enum value by splitting the name in a type prefix and
 		// the enum inside.
 		if enumValue := e.provider.EnumValue(candidate); enumValue.Type() != types.ErrType {

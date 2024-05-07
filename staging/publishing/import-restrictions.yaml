@@ -41,7 +41,6 @@
   - k8s.io/utils/net
   - k8s.io/utils/strings
   - k8s.io/klog
-  - k8s.io/utils/ptr
 
 - baseImportPath: "./staging/src/k8s.io/api"
   allowedImports:
@@ -251,9 +250,6 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
-  - k8s.io/apiserver/pkg/apis/cel
-  - k8s.io/apiserver/pkg/cel
-  - k8s.io/apiserver/pkg/cel/environment
   - k8s.io/client-go
   - k8s.io/dynamic-resource-allocation
   - k8s.io/klog

@@ -90,7 +90,7 @@ func AddKubernetesVersionFlag(fs *pflag.FlagSet, kubernetesVersion *string) {
 func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
 	flagSet.StringVar(
 		rootfsPath, "rootfs", *rootfsPath,
-		"The path to the 'real' host root filesystem. This will cause kubeadm to chroot into the provided path.",
+		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
 	)
 }
 

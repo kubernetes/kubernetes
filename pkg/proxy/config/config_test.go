@@ -32,7 +32,6 @@ import (
 	informers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
-	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -227,7 +226,6 @@ func (h *EndpointSliceHandlerMock) ValidateEndpointSlices(t *testing.T, expected
 }
 
 func TestNewServiceAddedAndNotified(t *testing.T) {
-	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -237,7 +235,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
@@ -252,7 +250,6 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 }
 
 func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
-	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -262,7 +259,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
@@ -289,7 +286,6 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 }
 
 func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
-	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -299,7 +295,7 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
+	config := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	handler2 := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -324,7 +320,6 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
-	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -334,7 +329,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	config := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
 	handler := NewEndpointSliceHandlerMock()
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -371,7 +366,6 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 }
 
 func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
-	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
@@ -381,7 +375,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	config := NewEndpointSliceConfig(sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
 	handler := NewEndpointSliceHandlerMock()
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)

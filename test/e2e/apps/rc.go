@@ -68,7 +68,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
 	*/
 	framework.ConformanceIt("should serve a basic image on each replica with a public image", func(ctx context.Context) {
-		TestReplicationControllerServeImageOrFail(ctx, f, "basic", imageutils.GetE2EImage(imageutils.Agnhost))
+		TestReplicationControllerServeImageOrFail(ctx, f, "basic", framework.ServeHostnameImage)
 	})
 
 	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {

@@ -18,7 +18,6 @@ package runtime
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -44,8 +43,8 @@ func TestCustomHandleCrash(t *testing.T) {
 	old := PanicHandlers
 	defer func() { PanicHandlers = old }()
 	var result interface{}
-	PanicHandlers = []func(context.Context, interface{}){
-		func(_ context.Context, r interface{}) {
+	PanicHandlers = []func(interface{}){
+		func(r interface{}) {
 			result = r
 		},
 	}
@@ -67,8 +66,8 @@ func TestCustomHandleError(t *testing.T) {
 	old := ErrorHandlers
 	defer func() { ErrorHandlers = old }()
 	var result error
-	ErrorHandlers = []ErrorHandler{
-		func(_ context.Context, err error, msg string, keysAndValues ...interface{}) {
+	ErrorHandlers = []func(error){
+		func(err error) {
 			result = err
 		},
 	}
@@ -102,8 +101,7 @@ func TestHandleCrashLog(t *testing.T) {
 	if len(lines) < 4 {
 		t.Fatalf("panic log should have 1 line of message, 1 line per goroutine and 2 lines per function call")
 	}
-	t.Logf("Got log output:\n%s", strings.Join(lines, "\n"))
-	if match, _ := regexp.MatchString(`"Observed a panic" panic="test panic"`, lines[0]); !match {
+	if match, _ := regexp.MatchString("Observed a panic: test panic", lines[0]); !match {
 		t.Errorf("mismatch panic message: %s", lines[0])
 	}
 	// The following regexp's verify that Kubernetes panic log matches Golang stdlib
@@ -172,7 +170,7 @@ func Test_rudimentaryErrorBackoff_OnError_ParallelSleep(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			<-start
-			r.OnError()
+			r.OnError(nil) // input error is ignored
 			wg.Done()
 		}()
 	}

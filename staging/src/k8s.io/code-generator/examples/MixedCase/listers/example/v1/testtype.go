@@ -19,8 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 	v1 "k8s.io/code-generator/examples/MixedCase/apis/example/v1"
 )
@@ -38,17 +38,25 @@ type TestTypeLister interface {
 
 // testTypeLister implements the TestTypeLister interface.
 type testTypeLister struct {
-	listers.ResourceIndexer[*v1.TestType]
+	indexer cache.Indexer
 }
 
 // NewTestTypeLister returns a new TestTypeLister.
 func NewTestTypeLister(indexer cache.Indexer) TestTypeLister {
-	return &testTypeLister{listers.New[*v1.TestType](indexer, v1.Resource("testtype"))}
+	return &testTypeLister{indexer: indexer}
+}
+
+// List lists all TestTypes in the indexer.
+func (s *testTypeLister) List(selector labels.Selector) (ret []*v1.TestType, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.TestType))
+	})
+	return ret, err
 }
 
 // TestTypes returns an object that can list and get TestTypes.
 func (s *testTypeLister) TestTypes(namespace string) TestTypeNamespaceLister {
-	return testTypeNamespaceLister{listers.NewNamespaced[*v1.TestType](s.ResourceIndexer, namespace)}
+	return testTypeNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // TestTypeNamespaceLister helps list and get TestTypes.
@@ -66,5 +74,26 @@ type TestTypeNamespaceLister interface {
 // testTypeNamespaceLister implements the TestTypeNamespaceLister
 // interface.
 type testTypeNamespaceLister struct {
-	listers.ResourceIndexer[*v1.TestType]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all TestTypes in the indexer for a given namespace.
+func (s testTypeNamespaceLister) List(selector labels.Selector) (ret []*v1.TestType, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.TestType))
+	})
+	return ret, err
+}
+
+// Get retrieves the TestType from the indexer for a given namespace and name.
+func (s testTypeNamespaceLister) Get(name string) (*v1.TestType, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("testtype"), name)
+	}
+	return obj.(*v1.TestType), nil
 }

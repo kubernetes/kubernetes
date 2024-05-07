@@ -23,7 +23,7 @@
 "containers":[
     {
     "name": "cloud-controller-manager",
-    "image": "gcr.io/k8s-staging-cloud-provider-gcp/cloud-controller-manager:v30.0.0",
+    "image": "gcr.io/k8s-staging-cloud-provider-gcp/cloud-controller-manager:v29.0.0",
     "resources": {
       "requests": {
         "cpu": "{{cpurequest}}"

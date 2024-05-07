@@ -131,7 +131,7 @@ func (ps NetProtocolStats) parseLine(rawLine string) (*NetProtocolStatLine, erro
 	} else if fields[6] == disabled {
 		line.Slab = false
 	} else {
-		return nil, fmt.Errorf("%w: capability for protocol: %s", ErrFileParse, line.Name)
+		return nil, fmt.Errorf("unable to parse capability for protocol: %s", line.Name)
 	}
 	line.ModuleName = fields[7]
 
@@ -173,7 +173,7 @@ func (pc *NetProtocolCapabilities) parseCapabilities(capabilities []string) erro
 		} else if capabilities[i] == "n" {
 			*capabilityFields[i] = false
 		} else {
-			return fmt.Errorf("%w: capability block for protocol: position %d", ErrFileParse, i)
+			return fmt.Errorf("unable to parse capability block for protocol: position %d", i)
 		}
 	}
 	return nil

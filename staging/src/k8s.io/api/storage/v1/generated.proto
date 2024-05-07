@@ -44,7 +44,7 @@ message CSIDriver {
   // an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
   // alphanumerics between.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents the specification of the CSI Driver.
   optional CSIDriverSpec spec = 2;
@@ -55,7 +55,7 @@ message CSIDriverList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CSIDriver
   repeated CSIDriver items = 2;
@@ -226,7 +226,7 @@ message CSIDriverSpec {
 message CSINode {
   // Standard object's metadata.
   // metadata.name must be the Kubernetes node name.
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec is the specification of CSINode
   optional CSINodeSpec spec = 2;
@@ -275,7 +275,7 @@ message CSINodeList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CSINode
   repeated CSINode items = 2;
@@ -327,7 +327,7 @@ message CSIStorageCapacity {
   //
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // nodeTopology defines which nodes have access to the storage
   // for which capacity was reported. If not set, the storage is
@@ -336,7 +336,7 @@ message CSIStorageCapacity {
   // immutable.
   //
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector nodeTopology = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector nodeTopology = 2;
 
   // storageClassName represents the name of the StorageClass that the reported capacity applies to.
   // It must meet the same requirements as the name of a StorageClass
@@ -356,7 +356,7 @@ message CSIStorageCapacity {
   // unavailable.
   //
   // +optional
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;
 
   // maximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
   // for a GetCapacityRequest with topology and parameters that match the
@@ -370,7 +370,7 @@ message CSIStorageCapacity {
   // API is ResourceRequirements.Requests in a volume claim.
   //
   // +optional
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity maximumVolumeSize = 5;
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity maximumVolumeSize = 5;
 }
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
@@ -378,7 +378,7 @@ message CSIStorageCapacityList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of CSIStorageCapacity objects.
   repeated CSIStorageCapacity items = 2;
@@ -393,7 +393,7 @@ message StorageClass {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // provisioner indicates the type of the provisioner.
   optional string provisioner = 2;
@@ -431,7 +431,7 @@ message StorageClass {
   // This field is only honored by servers that enable the VolumeScheduling feature.
   // +optional
   // +listType=atomic
-  repeated .k8s.io.api.core.v1.TopologySelectorTerm allowedTopologies = 8;
+  repeated k8s.io.api.core.v1.TopologySelectorTerm allowedTopologies = 8;
 }
 
 // StorageClassList is a collection of storage classes.
@@ -439,7 +439,7 @@ message StorageClassList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of StorageClasses
   repeated StorageClass items = 2;
@@ -466,7 +466,7 @@ message VolumeAttachment {
   // Standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
@@ -484,7 +484,7 @@ message VolumeAttachmentList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of VolumeAttachments
   repeated VolumeAttachment items = 2;
@@ -506,7 +506,7 @@ message VolumeAttachmentSource {
   // PersistentVolumeSpec. This field is beta-level and is only
   // honored by servers that enabled the CSIMigration feature.
   // +optional
-  optional .k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
+  optional k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
 }
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
@@ -554,7 +554,7 @@ message VolumeAttachmentStatus {
 message VolumeError {
   // time represents the time the error was encountered.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time time = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time time = 1;
 
   // message represents the error encountered during Attach or Detach operation.
   // This string may be logged, so it should not contain sensitive

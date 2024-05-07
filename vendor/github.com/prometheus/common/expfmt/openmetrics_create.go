@@ -35,18 +35,6 @@ import (
 // sanity checks. If the input contains duplicate metrics or invalid metric or
 // label names, the conversion will result in invalid text format output.
 //
-// If metric names conform to the legacy validation pattern, they will be placed
-// outside the brackets in the traditional way, like `foo{}`. If the metric name
-// fails the legacy validation check, it will be placed quoted inside the
-// brackets: `{"foo"}`. As stated above, the input is assumed to be santized and
-// no error will be thrown in this case.
-//
-// Similar to metric names, if label names conform to the legacy validation
-// pattern, they will be unquoted as normal, like `foo{bar="baz"}`. If the label
-// name fails the legacy validation check, it will be quoted:
-// `foo{"bar"="baz"}`. As stated above, the input is assumed to be santized and
-// no error will be thrown in this case.
-//
 // This function fulfills the type 'expfmt.encoder'.
 //
 // Note that OpenMetrics requires a final `# EOF` line. Since this function acts
@@ -110,7 +98,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 		if err != nil {
 			return
 		}
-		n, err = writeName(w, shortName)
+		n, err = w.WriteString(shortName)
 		written += n
 		if err != nil {
 			return
@@ -136,7 +124,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 	if err != nil {
 		return
 	}
-	n, err = writeName(w, shortName)
+	n, err = w.WriteString(shortName)
 	written += n
 	if err != nil {
 		return
@@ -315,9 +303,21 @@ func writeOpenMetricsSample(
 	floatValue float64, intValue uint64, useIntValue bool,
 	exemplar *dto.Exemplar,
 ) (int, error) {
-	written := 0
-	n, err := writeOpenMetricsNameAndLabelPairs(
-		w, name+suffix, metric.Label, additionalLabelName, additionalLabelValue,
+	var written int
+	n, err := w.WriteString(name)
+	written += n
+	if err != nil {
+		return written, err
+	}
+	if suffix != "" {
+		n, err = w.WriteString(suffix)
+		written += n
+		if err != nil {
+			return written, err
+		}
+	}
+	n, err = writeOpenMetricsLabelPairs(
+		w, metric.Label, additionalLabelName, additionalLabelValue,
 	)
 	written += n
 	if err != nil {
@@ -365,58 +365,27 @@ func writeOpenMetricsSample(
 	return written, nil
 }
 
-// writeOpenMetricsNameAndLabelPairs works like writeOpenMetricsSample but
-// formats the float in OpenMetrics style.
-func writeOpenMetricsNameAndLabelPairs(
+// writeOpenMetricsLabelPairs works like writeOpenMetrics but formats the float
+// in OpenMetrics style.
+func writeOpenMetricsLabelPairs(
 	w enhancedWriter,
-	name string,
 	in []*dto.LabelPair,
 	additionalLabelName string, additionalLabelValue float64,
 ) (int, error) {
-	var (
-		written            int
-		separator          byte = '{'
-		metricInsideBraces      = false
-	)
-
-	if name != "" {
-		// If the name does not pass the legacy validity check, we must put the
-		// metric name inside the braces, quoted.
-		if !model.IsValidLegacyMetricName(model.LabelValue(name)) {
-			metricInsideBraces = true
-			err := w.WriteByte(separator)
-			written++
-			if err != nil {
-				return written, err
-			}
-			separator = ','
-		}
-
-		n, err := writeName(w, name)
-		written += n
-		if err != nil {
-			return written, err
-		}
-	}
-
 	if len(in) == 0 && additionalLabelName == "" {
-		if metricInsideBraces {
-			err := w.WriteByte('}')
-			written++
-			if err != nil {
-				return written, err
-			}
-		}
-		return written, nil
+		return 0, nil
 	}
-
+	var (
+		written   int
+		separator byte = '{'
+	)
 	for _, lp := range in {
 		err := w.WriteByte(separator)
 		written++
 		if err != nil {
 			return written, err
 		}
-		n, err := writeName(w, lp.GetName())
+		n, err := w.WriteString(lp.GetName())
 		written += n
 		if err != nil {
 			return written, err
@@ -482,7 +451,7 @@ func writeExemplar(w enhancedWriter, e *dto.Exemplar) (int, error) {
 	if err != nil {
 		return written, err
 	}
-	n, err = writeOpenMetricsNameAndLabelPairs(w, "", e.Label, "", 0)
+	n, err = writeOpenMetricsLabelPairs(w, e.Label, "", 0)
 	written += n
 	if err != nil {
 		return written, err

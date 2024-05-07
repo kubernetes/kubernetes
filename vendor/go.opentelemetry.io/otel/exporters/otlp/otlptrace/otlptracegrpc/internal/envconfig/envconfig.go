@@ -174,13 +174,13 @@ func stringToHeader(value string) map[string]string {
 			global.Error(errors.New("missing '="), "parse headers", "input", header)
 			continue
 		}
-		name, err := url.PathUnescape(n)
+		name, err := url.QueryUnescape(n)
 		if err != nil {
 			global.Error(err, "escape header key", "key", n)
 			continue
 		}
 		trimmedName := strings.TrimSpace(name)
-		value, err := url.PathUnescape(v)
+		value, err := url.QueryUnescape(v)
 		if err != nil {
 			global.Error(err, "escape header value", "value", v)
 			continue

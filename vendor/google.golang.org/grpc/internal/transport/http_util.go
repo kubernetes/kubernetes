@@ -34,9 +34,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -85,8 +88,6 @@ var (
 	}
 )
 
-var grpcStatusDetailsBinHeader = "grpc-status-details-bin"
-
 // isReservedHeader checks whether hdr belongs to HTTP2 headers
 // reserved by gRPC protocol. Any other headers are classified as the
 // user-specified metadata.
@@ -102,6 +103,7 @@ func isReservedHeader(hdr string) bool {
 		"grpc-message",
 		"grpc-status",
 		"grpc-timeout",
+		"grpc-status-details-bin",
 		// Intentionally exclude grpc-previous-rpc-attempts and
 		// grpc-retry-pushback-ms, which are "reserved", but their API
 		// intentionally works via metadata.
@@ -150,6 +152,18 @@ func decodeMetadataHeader(k, v string) (string, error) {
 		return string(b), err
 	}
 	return v, nil
+}
+
+func decodeGRPCStatusDetails(rawDetails string) (*status.Status, error) {
+	v, err := decodeBinHeader(rawDetails)
+	if err != nil {
+		return nil, err
+	}
+	st := &spb.Status{}
+	if err = proto.Unmarshal(v, st); err != nil {
+		return nil, err
+	}
+	return status.FromProto(st), nil
 }
 
 type timeoutUnit uint8

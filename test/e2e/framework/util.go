@@ -53,6 +53,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
 
@@ -131,8 +132,14 @@ const (
 )
 
 var (
+	// BusyBoxImage is the image URI of BusyBox.
+	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
+
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
 	ProvidersWithSSH = []string{"gce", "gke", "aws", "local", "azure"}
+
+	// ServeHostnameImage is a serve hostname image name.
+	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 // RunID is a unique identifier of the e2e run.

@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	k8sv1 "k8s.io/api/core/v1"

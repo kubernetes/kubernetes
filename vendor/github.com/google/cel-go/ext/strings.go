@@ -21,16 +21,19 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
+	"github.com/google/cel-go/interpreter"
 )
 
 const (
@@ -96,7 +99,7 @@ const (
 //	"a map inside a list: %s".format([[1, 2, 3, {"a": "x", "b": "y", "c": "z"}]]) // returns "a map inside a list: [1, 2, 3, {"a":"x", "b":"y", "c":"d"}]"
 //	"true bool: %s - false bool: %s\nbinary bool: %b".format([true, false, true]) // returns "true bool: true - false bool: false\nbinary bool: 1"
 //
-// Passing an incorrect type (a string to `%b`) is considered an error, as well as attempting
+// Passing an incorrect type (an integer to `%s`) is considered an error, as well as attempting
 // to use more formatting clauses than there are arguments (`%d %d %d` while passing two ints, for instance).
 // If compile-time checking is enabled, and the formatting string is a constant, and the argument list is a literal,
 // then letting any arguments go unused/unformatted is also considered an error.
@@ -202,8 +205,6 @@ const (
 //	'hello hello'.replace('he', 'we', -1) // returns 'wello wello'
 //	'hello hello'.replace('he', 'we', 1)  // returns 'wello hello'
 //	'hello hello'.replace('he', 'we', 0)  // returns 'hello hello'
-//	'hello hello'.replace('', '_')  // returns '_h_e_l_l_o_ _h_e_l_l_o_'
-//	'hello hello'.replace('h', '')  // returns 'ello ello'
 //
 // # Split
 //
@@ -269,26 +270,8 @@ const (
 //
 //	'TacoCat'.upperAscii()      // returns 'TACOCAT'
 //	'TacoCÆt Xii'.upperAscii()  // returns 'TACOCÆT XII'
-//
-// # Reverse
-//
-// Introduced at version: 3
-//
-// Returns a new string whose characters are the same as the target string, only formatted in
-// reverse order.
-// This function relies on converting strings to rune arrays in order to reverse
-//
-//	<string>.reverse() -> <string>
-//
-// Examples:
-//
-//	'gums'.reverse() // returns 'smug'
-//	'John Smith'.reverse() // returns 'htimS nhoJ'
 func Strings(options ...StringsOption) cel.EnvOption {
-	s := &stringLib{
-		version:        math.MaxUint32,
-		validateFormat: true,
-	}
+	s := &stringLib{version: math.MaxUint32}
 	for _, o := range options {
 		s = o(s)
 	}
@@ -296,9 +279,8 @@ func Strings(options ...StringsOption) cel.EnvOption {
 }
 
 type stringLib struct {
-	locale         string
-	version        uint32
-	validateFormat bool
+	locale  string
+	version uint32
 }
 
 // LibraryName implements the SingletonLibrary interface method.
@@ -332,17 +314,6 @@ func StringsVersion(version uint32) StringsOption {
 	return func(lib *stringLib) *stringLib {
 		lib.version = version
 		return lib
-	}
-}
-
-// StringsValidateFormatCalls validates type-checked ASTs to ensure that string.format() calls have
-// valid formatting clauses and valid argument types for each clause.
-//
-// Enabled by default.
-func StringsValidateFormatCalls(value bool) StringsOption {
-	return func(s *stringLib) *stringLib {
-		s.validateFormat = value
-		return s
 	}
 }
 
@@ -469,15 +440,13 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
 					s := string(args[0].(types.String))
 					formatArgs := args[1].(traits.Lister)
-					return stringOrError(parseFormatString(s, &stringFormatter{}, &stringArgList{formatArgs}, formatLocale))
+					return stringOrError(interpreter.ParseFormatString(s, &stringFormatter{}, &stringArgList{formatArgs}, formatLocale))
 				}))),
 			cel.Function("strings.quote", cel.Overload("strings_quote", []*cel.Type{cel.StringType}, cel.StringType,
 				cel.UnaryBinding(func(str ref.Val) ref.Val {
 					s := str.(types.String)
 					return stringOrError(quote(string(s)))
-				}))),
-
-			cel.ASTValidators(stringFormatValidator{}))
+				}))))
 
 	}
 	if lib.version >= 2 {
@@ -502,7 +471,7 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					cel.UnaryBinding(func(list ref.Val) ref.Val {
 						l, err := list.ConvertToNative(stringListType)
 						if err != nil {
-							return types.WrapErr(err)
+							return types.NewErr(err.Error())
 						}
 						return stringOrError(join(l.([]string)))
 					})),
@@ -510,25 +479,12 @@ func (lib *stringLib) CompileOptions() []cel.EnvOption {
 					cel.BinaryBinding(func(list, delim ref.Val) ref.Val {
 						l, err := list.ConvertToNative(stringListType)
 						if err != nil {
-							return types.WrapErr(err)
+							return types.NewErr(err.Error())
 						}
 						d := delim.(types.String)
 						return stringOrError(joinSeparator(l.([]string), string(d)))
 					}))),
 		)
-	}
-	if lib.version >= 3 {
-		opts = append(opts,
-			cel.Function("reverse",
-				cel.MemberOverload("reverse", []*cel.Type{cel.StringType}, cel.StringType,
-					cel.UnaryBinding(func(str ref.Val) ref.Val {
-						s := str.(types.String)
-						return stringOrError(reverse(string(s)))
-					}))),
-		)
-	}
-	if lib.validateFormat {
-		opts = append(opts, cel.ASTValidators(stringFormatValidator{}))
 	}
 	return opts
 }
@@ -680,14 +636,6 @@ func upperASCII(str string) (string, error) {
 	return string(runes), nil
 }
 
-func reverse(str string) (string, error) {
-	chars := []rune(str)
-	for i, j := 0, len(chars)-1; i < j; i, j = i+1, j-1 {
-		chars[i], chars[j] = chars[j], chars[i]
-	}
-	return string(chars), nil
-}
-
 func joinSeparator(strs []string, separator string) (string, error) {
 	return strings.Join(strs, separator), nil
 }
@@ -711,6 +659,238 @@ func joinValSeparator(strs traits.Lister, separator string) (string, error) {
 		sb.WriteString(string(str))
 	}
 	return sb.String(), nil
+}
+
+type clauseImpl func(ref.Val, string) (string, error)
+
+func clauseForType(argType ref.Type) (clauseImpl, error) {
+	switch argType {
+	case types.IntType, types.UintType:
+		return formatDecimal, nil
+	case types.StringType, types.BytesType, types.BoolType, types.NullType, types.TypeType:
+		return FormatString, nil
+	case types.TimestampType, types.DurationType:
+		// special case to ensure timestamps/durations get printed as CEL literals
+		return func(arg ref.Val, locale string) (string, error) {
+			argStrVal := arg.ConvertToType(types.StringType)
+			argStr := argStrVal.Value().(string)
+			if arg.Type() == types.TimestampType {
+				return fmt.Sprintf("timestamp(%q)", argStr), nil
+			}
+			if arg.Type() == types.DurationType {
+				return fmt.Sprintf("duration(%q)", argStr), nil
+			}
+			return "", fmt.Errorf("cannot convert argument of type %s to timestamp/duration", arg.Type().TypeName())
+		}, nil
+	case types.ListType:
+		return formatList, nil
+	case types.MapType:
+		return formatMap, nil
+	case types.DoubleType:
+		// avoid formatFixed so we can output a period as the decimal separator in order
+		// to always be a valid CEL literal
+		return func(arg ref.Val, locale string) (string, error) {
+			argDouble, ok := arg.Value().(float64)
+			if !ok {
+				return "", fmt.Errorf("couldn't convert %s to float64", arg.Type().TypeName())
+			}
+			fmtStr := fmt.Sprintf("%%.%df", defaultPrecision)
+			return fmt.Sprintf(fmtStr, argDouble), nil
+		}, nil
+	case types.TypeType:
+		return func(arg ref.Val, locale string) (string, error) {
+			return fmt.Sprintf("type(%s)", arg.Value().(string)), nil
+		}, nil
+	default:
+		return nil, fmt.Errorf("no formatting function for %s", argType.TypeName())
+	}
+}
+
+func formatList(arg ref.Val, locale string) (string, error) {
+	argList := arg.(traits.Lister)
+	argIterator := argList.Iterator()
+	var listStrBuilder strings.Builder
+	_, err := listStrBuilder.WriteRune('[')
+	if err != nil {
+		return "", fmt.Errorf("error writing to list string: %w", err)
+	}
+	for argIterator.HasNext() == types.True {
+		member := argIterator.Next()
+		memberFormat, err := clauseForType(member.Type())
+		if err != nil {
+			return "", err
+		}
+		unquotedStr, err := memberFormat(member, locale)
+		if err != nil {
+			return "", err
+		}
+		str := quoteForCEL(member, unquotedStr)
+		_, err = listStrBuilder.WriteString(str)
+		if err != nil {
+			return "", fmt.Errorf("error writing to list string: %w", err)
+		}
+		if argIterator.HasNext() == types.True {
+			_, err = listStrBuilder.WriteString(", ")
+			if err != nil {
+				return "", fmt.Errorf("error writing to list string: %w", err)
+			}
+		}
+	}
+	_, err = listStrBuilder.WriteRune(']')
+	if err != nil {
+		return "", fmt.Errorf("error writing to list string: %w", err)
+	}
+	return listStrBuilder.String(), nil
+}
+
+func formatMap(arg ref.Val, locale string) (string, error) {
+	argMap := arg.(traits.Mapper)
+	argIterator := argMap.Iterator()
+	type mapPair struct {
+		key   string
+		value string
+	}
+	argPairs := make([]mapPair, argMap.Size().Value().(int64))
+	i := 0
+	for argIterator.HasNext() == types.True {
+		key := argIterator.Next()
+		var keyFormat clauseImpl
+		switch key.Type() {
+		case types.StringType, types.BoolType:
+			keyFormat = FormatString
+		case types.IntType, types.UintType:
+			keyFormat = formatDecimal
+		default:
+			return "", fmt.Errorf("no formatting function for map key of type %s", key.Type().TypeName())
+		}
+		unquotedKeyStr, err := keyFormat(key, locale)
+		if err != nil {
+			return "", err
+		}
+		keyStr := quoteForCEL(key, unquotedKeyStr)
+		value, found := argMap.Find(key)
+		if !found {
+			return "", fmt.Errorf("could not find key: %q", key)
+		}
+		valueFormat, err := clauseForType(value.Type())
+		if err != nil {
+			return "", err
+		}
+		unquotedValueStr, err := valueFormat(value, locale)
+		if err != nil {
+			return "", err
+		}
+		valueStr := quoteForCEL(value, unquotedValueStr)
+		argPairs[i] = mapPair{keyStr, valueStr}
+		i++
+	}
+	sort.SliceStable(argPairs, func(x, y int) bool {
+		return argPairs[x].key < argPairs[y].key
+	})
+	var mapStrBuilder strings.Builder
+	_, err := mapStrBuilder.WriteRune('{')
+	if err != nil {
+		return "", fmt.Errorf("error writing to map string: %w", err)
+	}
+	for i, entry := range argPairs {
+		_, err = mapStrBuilder.WriteString(fmt.Sprintf("%s:%s", entry.key, entry.value))
+		if err != nil {
+			return "", fmt.Errorf("error writing to map string: %w", err)
+		}
+		if i < len(argPairs)-1 {
+			_, err = mapStrBuilder.WriteString(", ")
+			if err != nil {
+				return "", fmt.Errorf("error writing to map string: %w", err)
+			}
+		}
+	}
+	_, err = mapStrBuilder.WriteRune('}')
+	if err != nil {
+		return "", fmt.Errorf("error writing to map string: %w", err)
+	}
+	return mapStrBuilder.String(), nil
+}
+
+// quoteForCEL takes a formatted, unquoted value and quotes it in a manner
+// suitable for embedding directly in CEL.
+func quoteForCEL(refVal ref.Val, unquotedValue string) string {
+	switch refVal.Type() {
+	case types.StringType:
+		return fmt.Sprintf("%q", unquotedValue)
+	case types.BytesType:
+		return fmt.Sprintf("b%q", unquotedValue)
+	case types.DoubleType:
+		// special case to handle infinity/NaN
+		num := refVal.Value().(float64)
+		if math.IsInf(num, 1) || math.IsInf(num, -1) || math.IsNaN(num) {
+			return fmt.Sprintf("%q", unquotedValue)
+		}
+		return unquotedValue
+	default:
+		return unquotedValue
+	}
+}
+
+// FormatString returns the string representation of a CEL value.
+// It is used to implement the %s specifier in the (string).format() extension
+// function.
+func FormatString(arg ref.Val, locale string) (string, error) {
+	switch arg.Type() {
+	case types.ListType:
+		return formatList(arg, locale)
+	case types.MapType:
+		return formatMap(arg, locale)
+	case types.IntType, types.UintType, types.DoubleType,
+		types.BoolType, types.StringType, types.TimestampType, types.BytesType, types.DurationType, types.TypeType:
+		argStrVal := arg.ConvertToType(types.StringType)
+		argStr, ok := argStrVal.Value().(string)
+		if !ok {
+			return "", fmt.Errorf("could not convert argument %q to string", argStrVal)
+		}
+		return argStr, nil
+	case types.NullType:
+		return "null", nil
+	default:
+		return "", fmt.Errorf("string clause can only be used on strings, bools, bytes, ints, doubles, maps, lists, types, durations, and timestamps, was given %s", arg.Type().TypeName())
+	}
+}
+
+func formatDecimal(arg ref.Val, locale string) (string, error) {
+	switch arg.Type() {
+	case types.IntType:
+		argInt, ok := arg.ConvertToType(types.IntType).Value().(int64)
+		if !ok {
+			return "", fmt.Errorf("could not convert \"%s\" to int64", arg.Value())
+		}
+		return fmt.Sprintf("%d", argInt), nil
+	case types.UintType:
+		argInt, ok := arg.ConvertToType(types.UintType).Value().(uint64)
+		if !ok {
+			return "", fmt.Errorf("could not convert \"%s\" to uint64", arg.Value())
+		}
+		return fmt.Sprintf("%d", argInt), nil
+	default:
+		return "", fmt.Errorf("decimal clause can only be used on integers, was given %s", arg.Type().TypeName())
+	}
+}
+
+func matchLanguage(locale string) (language.Tag, error) {
+	matcher, err := makeMatcher(locale)
+	if err != nil {
+		return language.Und, err
+	}
+	tag, _ := language.MatchStrings(matcher, locale)
+	return tag, nil
+}
+
+func makeMatcher(locale string) (language.Matcher, error) {
+	tags := make([]language.Tag, 0)
+	tag, err := language.Parse(locale)
+	if err != nil {
+		return nil, err
+	}
+	tags = append(tags, tag)
+	return language.NewMatcher(tags), nil
 }
 
 // quote implements a string quoting function. The string will be wrapped in
@@ -758,6 +938,156 @@ func sanitize(s string) string {
 		}
 	}
 	return sanitizedStringBuilder.String()
+}
+
+type stringFormatter struct{}
+
+func (c *stringFormatter) String(arg ref.Val, locale string) (string, error) {
+	return FormatString(arg, locale)
+}
+
+func (c *stringFormatter) Decimal(arg ref.Val, locale string) (string, error) {
+	return formatDecimal(arg, locale)
+}
+
+func (c *stringFormatter) Fixed(precision *int) func(ref.Val, string) (string, error) {
+	if precision == nil {
+		precision = new(int)
+		*precision = defaultPrecision
+	}
+	return func(arg ref.Val, locale string) (string, error) {
+		strException := false
+		if arg.Type() == types.StringType {
+			argStr := arg.Value().(string)
+			if argStr == "NaN" || argStr == "Infinity" || argStr == "-Infinity" {
+				strException = true
+			}
+		}
+		if arg.Type() != types.DoubleType && !strException {
+			return "", fmt.Errorf("fixed-point clause can only be used on doubles, was given %s", arg.Type().TypeName())
+		}
+		argFloatVal := arg.ConvertToType(types.DoubleType)
+		argFloat, ok := argFloatVal.Value().(float64)
+		if !ok {
+			return "", fmt.Errorf("could not convert \"%s\" to float64", argFloatVal.Value())
+		}
+		fmtStr := fmt.Sprintf("%%.%df", *precision)
+
+		matchedLocale, err := matchLanguage(locale)
+		if err != nil {
+			return "", fmt.Errorf("error matching locale: %w", err)
+		}
+		return message.NewPrinter(matchedLocale).Sprintf(fmtStr, argFloat), nil
+	}
+}
+
+func (c *stringFormatter) Scientific(precision *int) func(ref.Val, string) (string, error) {
+	if precision == nil {
+		precision = new(int)
+		*precision = defaultPrecision
+	}
+	return func(arg ref.Val, locale string) (string, error) {
+		strException := false
+		if arg.Type() == types.StringType {
+			argStr := arg.Value().(string)
+			if argStr == "NaN" || argStr == "Infinity" || argStr == "-Infinity" {
+				strException = true
+			}
+		}
+		if arg.Type() != types.DoubleType && !strException {
+			return "", fmt.Errorf("scientific clause can only be used on doubles, was given %s", arg.Type().TypeName())
+		}
+		argFloatVal := arg.ConvertToType(types.DoubleType)
+		argFloat, ok := argFloatVal.Value().(float64)
+		if !ok {
+			return "", fmt.Errorf("could not convert \"%s\" to float64", argFloatVal.Value())
+		}
+		matchedLocale, err := matchLanguage(locale)
+		if err != nil {
+			return "", fmt.Errorf("error matching locale: %w", err)
+		}
+		fmtStr := fmt.Sprintf("%%%de", *precision)
+		return message.NewPrinter(matchedLocale).Sprintf(fmtStr, argFloat), nil
+	}
+}
+
+func (c *stringFormatter) Binary(arg ref.Val, locale string) (string, error) {
+	switch arg.Type() {
+	case types.IntType:
+		argInt := arg.Value().(int64)
+		// locale is intentionally unused as integers formatted as binary
+		// strings are locale-independent
+		return fmt.Sprintf("%b", argInt), nil
+	case types.UintType:
+		argInt := arg.Value().(uint64)
+		return fmt.Sprintf("%b", argInt), nil
+	case types.BoolType:
+		argBool := arg.Value().(bool)
+		if argBool {
+			return "1", nil
+		}
+		return "0", nil
+	default:
+		return "", fmt.Errorf("only integers and bools can be formatted as binary, was given %s", arg.Type().TypeName())
+	}
+}
+
+func (c *stringFormatter) Hex(useUpper bool) func(ref.Val, string) (string, error) {
+	return func(arg ref.Val, locale string) (string, error) {
+		fmtStr := "%x"
+		if useUpper {
+			fmtStr = "%X"
+		}
+		switch arg.Type() {
+		case types.StringType, types.BytesType:
+			if arg.Type() == types.BytesType {
+				return fmt.Sprintf(fmtStr, arg.Value().([]byte)), nil
+			}
+			return fmt.Sprintf(fmtStr, arg.Value().(string)), nil
+		case types.IntType:
+			argInt, ok := arg.Value().(int64)
+			if !ok {
+				return "", fmt.Errorf("could not convert \"%s\" to int64", arg.Value())
+			}
+			return fmt.Sprintf(fmtStr, argInt), nil
+		case types.UintType:
+			argInt, ok := arg.Value().(uint64)
+			if !ok {
+				return "", fmt.Errorf("could not convert \"%s\" to uint64", arg.Value())
+			}
+			return fmt.Sprintf(fmtStr, argInt), nil
+		default:
+			return "", fmt.Errorf("only integers, byte buffers, and strings can be formatted as hex, was given %s", arg.Type().TypeName())
+		}
+	}
+}
+
+func (c *stringFormatter) Octal(arg ref.Val, locale string) (string, error) {
+	switch arg.Type() {
+	case types.IntType:
+		argInt := arg.Value().(int64)
+		return fmt.Sprintf("%o", argInt), nil
+	case types.UintType:
+		argInt := arg.Value().(uint64)
+		return fmt.Sprintf("%o", argInt), nil
+	default:
+		return "", fmt.Errorf("octal clause can only be used on integers, was given %s", arg.Type().TypeName())
+	}
+}
+
+type stringArgList struct {
+	args traits.Lister
+}
+
+func (c *stringArgList) Arg(index int64) (ref.Val, error) {
+	if index >= c.args.Size().Value().(int64) {
+		return nil, fmt.Errorf("index %d out of range", index)
+	}
+	return c.args.Get(types.Int(index)), nil
+}
+
+func (c *stringArgList) ArgSize() int64 {
+	return c.args.Size().Value().(int64)
 }
 
 var (

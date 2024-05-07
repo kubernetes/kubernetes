@@ -17,9 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"k8s.io/utils/pointer"
 	"testing"
-
-	"k8s.io/utils/ptr"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -139,7 +138,7 @@ func TestCreate(t *testing.T) {
 		// invalid (empty selector)
 		&batch.Job{
 			Spec: batch.JobSpec{
-				ManualSelector: ptr.To(false),
+				ManualSelector: pointer.Bool(false),
 				Completions:    validJob.Spec.Completions,
 				Selector:       &metav1.LabelSelector{},
 				Template:       validJob.Spec.Template,

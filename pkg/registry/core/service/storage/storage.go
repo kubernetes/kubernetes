@@ -88,7 +88,6 @@ func NewREST(
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Service{} },
 		NewListFunc:               func() runtime.Object { return &api.ServiceList{} },
-		PredicateFunc:             svcreg.Matcher,
 		DefaultQualifiedResource:  api.Resource("services"),
 		SingularQualifiedResource: api.Resource("service"),
 		ReturnDeletedObject:       true,
@@ -100,10 +99,7 @@ func NewREST(
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{
-		RESTOptions: optsGetter,
-		AttrFunc:    svcreg.GetAttrs,
-	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, nil, err
 	}

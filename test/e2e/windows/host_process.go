@@ -657,8 +657,7 @@ var _ = sigDescribe(feature.WindowsHostProcessContainers, "[MinimumKubeletVersio
 
 		ginkgo.By("Waiting for the pod to start running")
 		timeout := 3 * time.Minute
-		err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, timeout)
-		framework.ExpectNoError(err)
+		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, timeout)
 
 		ginkgo.By("Getting container stats for pod")
 		statsChecked := false
@@ -712,8 +711,7 @@ var _ = sigDescribe(feature.WindowsHostProcessContainers, "[MinimumKubeletVersio
 		pc.Create(ctx, pod)
 
 		ginkgo.By("Waiting for pod to run")
-		err := e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 3*time.Minute)
-		framework.ExpectNoError(err)
+		e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute)
 
 		ginkgo.By("Waiting for 60 seconds")
 		// We wait an additional 60 seconds after the pod is Running because the

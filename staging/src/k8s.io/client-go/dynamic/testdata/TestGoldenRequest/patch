@@ -1,9 +1,0 @@
-PATCH /apis/flops/v1alpha1/namespaces/mops/flips/mips/fin?fieldManager=baz HTTP/1.1
-Host: example.com
-Accept: application/json
-Accept-Encoding: gzip
-Content-Length: 14
-Content-Type: application/strategic-merge-patch+json
-User-Agent: TestGoldenRequest
-
-{"foo":"bar"}

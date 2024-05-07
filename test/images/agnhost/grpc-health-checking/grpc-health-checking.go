@@ -30,7 +30,6 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 )
@@ -50,8 +49,6 @@ var (
 	delayUnhealthySec int
 	service           string
 	forceUnhealthy    *bool
-	certFile          string
-	privKeyFile       string
 )
 
 func init() {
@@ -59,10 +56,6 @@ func init() {
 	CmdGrpcHealthChecking.Flags().IntVar(&httpPort, "http-port", 8080, "Port number for the /make-serving and /make-not-serving.")
 	CmdGrpcHealthChecking.Flags().IntVar(&delayUnhealthySec, "delay-unhealthy-sec", -1, "Number of seconds to delay before start reporting NOT_SERVING, negative value indicates never.")
 	CmdGrpcHealthChecking.Flags().StringVar(&service, "service", "", "Service name to register the health check for.")
-	CmdGrpcHealthChecking.Flags().StringVar(&certFile, "tls-cert-file", "",
-		"File containing an x509 certificate for gRPC TLS. (CA cert, if any, concatenated after server cert).")
-	CmdGrpcHealthChecking.Flags().StringVar(&privKeyFile, "tls-private-key-file", "",
-		"File containing an x509 private key matching --tls-cert-file.")
 	forceUnhealthy = nil
 }
 
@@ -102,13 +95,6 @@ func NewHealthChecker(started time.Time) *HealthChecker {
 func main(cmd *cobra.Command, args []string) {
 	started := time.Now()
 
-	// Validate flags
-	//
-	// if certFile or privKeyFile are not both set, exit with error
-	if (certFile == "" && privKeyFile != "") || (certFile != "" && privKeyFile == "") {
-		log.Fatalf("Both --tls-cert-file and --tls-private-key-file must be set")
-	}
-
 	http.HandleFunc("/make-not-serving", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Mark as unhealthy")
 		forceUnhealthy = new(bool)
@@ -135,29 +121,17 @@ func main(cmd *cobra.Command, args []string) {
 
 	serverAdr := fmt.Sprintf(":%d", port)
 	listenAddr, err := net.Listen("tcp", serverAdr)
-
 	if err != nil {
-		log.Fatalf("Error while starting the listening service %v", err)
+		log.Fatal(fmt.Sprintf("Error while starting the listening service %v", err.Error()))
 	}
 
-	var grpcServer *grpc.Server
-
-	if certFile != "" && privKeyFile != "" {
-		creds, err := credentials.NewServerTLSFromFile(certFile, privKeyFile)
-		if err != nil {
-			log.Fatalf("Failed to generate credentials %v", err)
-		}
-		grpcServer = grpc.NewServer(grpc.Creds(creds))
-	} else {
-		grpcServer = grpc.NewServer()
-	}
-
+	grpcServer := grpc.NewServer()
 	healthService := NewHealthChecker(started)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthService)
 
 	log.Printf("gRPC server starting to listen on %s", serverAdr)
 	if err = grpcServer.Serve(listenAddr); err != nil {
-		log.Fatalf("Error while starting the gRPC server on the %s listen address %v", listenAddr, err)
+		log.Fatal(fmt.Sprintf("Error while starting the gRPC server on the %s listen address %v", listenAddr, err.Error()))
 	}
 
 	select {}

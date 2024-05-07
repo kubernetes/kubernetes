@@ -37,11 +37,10 @@ var selfsubjectreviewsKind = v1beta1.SchemeGroupVersion.WithKind("SelfSubjectRev
 
 // Create takes the representation of a selfSubjectReview and creates it.  Returns the server's representation of the selfSubjectReview, and an error, if there is any.
 func (c *FakeSelfSubjectReviews) Create(ctx context.Context, selfSubjectReview *v1beta1.SelfSubjectReview, opts v1.CreateOptions) (result *v1beta1.SelfSubjectReview, err error) {
-	emptyResult := &v1beta1.SelfSubjectReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(selfsubjectreviewsResource, selfSubjectReview), emptyResult)
+		Invokes(testing.NewRootCreateAction(selfsubjectreviewsResource, selfSubjectReview), &v1beta1.SelfSubjectReview{})
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1beta1.SelfSubjectReview), err
 }

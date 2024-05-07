@@ -27,25 +27,14 @@ import (
 
 // DelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
 // requeue items after failures without ending up in a hot-loop.
-//
-// Deprecated: use TypedDelayingInterface instead.
-type DelayingInterface TypedDelayingInterface[any]
-
-// TypedDelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
-// requeue items after failures without ending up in a hot-loop.
-type TypedDelayingInterface[T comparable] interface {
-	TypedInterface[T]
+type DelayingInterface interface {
+	Interface
 	// AddAfter adds an item to the workqueue after the indicated duration has passed
-	AddAfter(item T, duration time.Duration)
+	AddAfter(item interface{}, duration time.Duration)
 }
 
 // DelayingQueueConfig specifies optional configurations to customize a DelayingInterface.
-//
-// Deprecated: use TypedDelayingQueueConfig instead.
-type DelayingQueueConfig = TypedDelayingQueueConfig[any]
-
-// TypedDelayingQueueConfig specifies optional configurations to customize a DelayingInterface.
-type TypedDelayingQueueConfig[T comparable] struct {
+type DelayingQueueConfig struct {
 	// Name for the queue. If unnamed, the metrics will not be registered.
 	Name string
 
@@ -57,42 +46,25 @@ type TypedDelayingQueueConfig[T comparable] struct {
 	Clock clock.WithTicker
 
 	// Queue optionally allows injecting custom queue Interface instead of the default one.
-	Queue TypedInterface[T]
+	Queue Interface
 }
 
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability.
 // NewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
 // NewDelayingQueueWithConfig instead and specify a name.
-//
-// Deprecated: use TypedNewDelayingQueue instead.
 func NewDelayingQueue() DelayingInterface {
 	return NewDelayingQueueWithConfig(DelayingQueueConfig{})
 }
 
-// TypedNewDelayingQueue constructs a new workqueue with delayed queuing ability.
-// TypedNewDelayingQueue does not emit metrics. For use with a MetricsProvider, please use
-// TypedNewDelayingQueueWithConfig instead and specify a name.
-func TypedNewDelayingQueue[T comparable]() TypedDelayingInterface[T] {
-	return NewTypedDelayingQueueWithConfig(TypedDelayingQueueConfig[T]{})
-}
-
 // NewDelayingQueueWithConfig constructs a new workqueue with options to
 // customize different properties.
-//
-// Deprecated: use TypedNewDelayingQueueWithConfig instead.
 func NewDelayingQueueWithConfig(config DelayingQueueConfig) DelayingInterface {
-	return NewTypedDelayingQueueWithConfig[any](config)
-}
-
-// NewTypedDelayingQueueWithConfig constructs a new workqueue with options to
-// customize different properties.
-func NewTypedDelayingQueueWithConfig[T comparable](config TypedDelayingQueueConfig[T]) TypedDelayingInterface[T] {
 	if config.Clock == nil {
 		config.Clock = clock.RealClock{}
 	}
 
 	if config.Queue == nil {
-		config.Queue = NewTypedWithConfig[T](TypedQueueConfig[T]{
+		config.Queue = NewWithConfig(QueueConfig{
 			Name:            config.Name,
 			MetricsProvider: config.MetricsProvider,
 			Clock:           config.Clock,
@@ -128,9 +100,9 @@ func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) Delayi
 	})
 }
 
-func newDelayingQueue[T comparable](clock clock.WithTicker, q TypedInterface[T], name string, provider MetricsProvider) *delayingType[T] {
-	ret := &delayingType[T]{
-		TypedInterface:  q,
+func newDelayingQueue(clock clock.WithTicker, q Interface, name string, provider MetricsProvider) *delayingType {
+	ret := &delayingType{
+		Interface:       q,
 		clock:           clock,
 		heartbeat:       clock.NewTicker(maxWait),
 		stopCh:          make(chan struct{}),
@@ -143,8 +115,8 @@ func newDelayingQueue[T comparable](clock clock.WithTicker, q TypedInterface[T],
 }
 
 // delayingType wraps an Interface and provides delayed re-enquing
-type delayingType[T comparable] struct {
-	TypedInterface[T]
+type delayingType struct {
+	Interface
 
 	// clock tracks time for delayed firing
 	clock clock.Clock
@@ -221,16 +193,16 @@ func (pq waitForPriorityQueue) Peek() interface{} {
 
 // ShutDown stops the queue. After the queue drains, the returned shutdown bool
 // on Get() will be true. This method may be invoked more than once.
-func (q *delayingType[T]) ShutDown() {
+func (q *delayingType) ShutDown() {
 	q.stopOnce.Do(func() {
-		q.TypedInterface.ShutDown()
+		q.Interface.ShutDown()
 		close(q.stopCh)
 		q.heartbeat.Stop()
 	})
 }
 
 // AddAfter adds the given item to the work queue after the given delay
-func (q *delayingType[T]) AddAfter(item T, duration time.Duration) {
+func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	// don't add if we're already shutting down
 	if q.ShuttingDown() {
 		return
@@ -257,7 +229,7 @@ func (q *delayingType[T]) AddAfter(item T, duration time.Duration) {
 const maxWait = 10 * time.Second
 
 // waitingLoop runs until the workqueue is shutdown and keeps a check on the list of items to be added.
-func (q *delayingType[T]) waitingLoop() {
+func (q *delayingType) waitingLoop() {
 	defer utilruntime.HandleCrash()
 
 	// Make a placeholder channel to use when there are no items in our list
@@ -272,7 +244,7 @@ func (q *delayingType[T]) waitingLoop() {
 	waitingEntryByData := map[t]*waitFor{}
 
 	for {
-		if q.TypedInterface.ShuttingDown() {
+		if q.Interface.ShuttingDown() {
 			return
 		}
 
@@ -286,7 +258,7 @@ func (q *delayingType[T]) waitingLoop() {
 			}
 
 			entry = heap.Pop(waitingForQueue).(*waitFor)
-			q.Add(entry.data.(T))
+			q.Add(entry.data)
 			delete(waitingEntryByData, entry.data)
 		}
 
@@ -315,7 +287,7 @@ func (q *delayingType[T]) waitingLoop() {
 			if waitEntry.readyAt.After(q.clock.Now()) {
 				insert(waitingForQueue, waitingEntryByData, waitEntry)
 			} else {
-				q.Add(waitEntry.data.(T))
+				q.Add(waitEntry.data)
 			}
 
 			drained := false
@@ -325,7 +297,7 @@ func (q *delayingType[T]) waitingLoop() {
 					if waitEntry.readyAt.After(q.clock.Now()) {
 						insert(waitingForQueue, waitingEntryByData, waitEntry)
 					} else {
-						q.Add(waitEntry.data.(T))
+						q.Add(waitEntry.data)
 					}
 				default:
 					drained = true

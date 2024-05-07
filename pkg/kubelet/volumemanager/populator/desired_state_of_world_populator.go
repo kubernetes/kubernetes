@@ -99,6 +99,7 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	kubeContainerRuntime kubecontainer.Runtime,
+	keepTerminatedPodVolumes bool,
 	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
 	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
@@ -112,6 +113,7 @@ func NewDesiredStateOfWorldPopulator(
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
 		kubeContainerRuntime:     kubeContainerRuntime,
+		keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
 		csiMigratedPluginManager: csiMigratedPluginManager,
@@ -129,6 +131,7 @@ type desiredStateOfWorldPopulator struct {
 	actualStateOfWorld       cache.ActualStateOfWorld
 	pods                     processedPods
 	kubeContainerRuntime     kubecontainer.Runtime
+	keepTerminatedPodVolumes bool
 	hasAddedPods             bool
 	hasAddedPodsLock         sync.RWMutex
 	csiMigratedPluginManager csimigration.PluginManager
@@ -229,6 +232,9 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 			// Exclude known pods that we expect to be running
 			if !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
+				continue
+			}
+			if dswp.keepTerminatedPodVolumes {
 				continue
 			}
 		}

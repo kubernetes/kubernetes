@@ -20,8 +20,8 @@ package v1alpha1
 
 import (
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,10 +39,30 @@ type VolumeAttributesClassLister interface {
 
 // volumeAttributesClassLister implements the VolumeAttributesClassLister interface.
 type volumeAttributesClassLister struct {
-	listers.ResourceIndexer[*v1alpha1.VolumeAttributesClass]
+	indexer cache.Indexer
 }
 
 // NewVolumeAttributesClassLister returns a new VolumeAttributesClassLister.
 func NewVolumeAttributesClassLister(indexer cache.Indexer) VolumeAttributesClassLister {
-	return &volumeAttributesClassLister{listers.New[*v1alpha1.VolumeAttributesClass](indexer, v1alpha1.Resource("volumeattributesclass"))}
+	return &volumeAttributesClassLister{indexer: indexer}
+}
+
+// List lists all VolumeAttributesClasses in the indexer.
+func (s *volumeAttributesClassLister) List(selector labels.Selector) (ret []*v1alpha1.VolumeAttributesClass, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.VolumeAttributesClass))
+	})
+	return ret, err
+}
+
+// Get retrieves the VolumeAttributesClass from the index for a given name.
+func (s *volumeAttributesClassLister) Get(name string) (*v1alpha1.VolumeAttributesClass, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1alpha1.Resource("volumeattributesclass"), name)
+	}
+	return obj.(*v1alpha1.VolumeAttributesClass), nil
 }

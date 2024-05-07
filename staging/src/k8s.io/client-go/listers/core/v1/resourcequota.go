@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type ResourceQuotaLister interface {
 
 // resourceQuotaLister implements the ResourceQuotaLister interface.
 type resourceQuotaLister struct {
-	listers.ResourceIndexer[*v1.ResourceQuota]
+	indexer cache.Indexer
 }
 
 // NewResourceQuotaLister returns a new ResourceQuotaLister.
 func NewResourceQuotaLister(indexer cache.Indexer) ResourceQuotaLister {
-	return &resourceQuotaLister{listers.New[*v1.ResourceQuota](indexer, v1.Resource("resourcequota"))}
+	return &resourceQuotaLister{indexer: indexer}
+}
+
+// List lists all ResourceQuotas in the indexer.
+func (s *resourceQuotaLister) List(selector labels.Selector) (ret []*v1.ResourceQuota, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ResourceQuota))
+	})
+	return ret, err
 }
 
 // ResourceQuotas returns an object that can list and get ResourceQuotas.
 func (s *resourceQuotaLister) ResourceQuotas(namespace string) ResourceQuotaNamespaceLister {
-	return resourceQuotaNamespaceLister{listers.NewNamespaced[*v1.ResourceQuota](s.ResourceIndexer, namespace)}
+	return resourceQuotaNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // ResourceQuotaNamespaceLister helps list and get ResourceQuotas.
@@ -66,5 +74,26 @@ type ResourceQuotaNamespaceLister interface {
 // resourceQuotaNamespaceLister implements the ResourceQuotaNamespaceLister
 // interface.
 type resourceQuotaNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ResourceQuota]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all ResourceQuotas in the indexer for a given namespace.
+func (s resourceQuotaNamespaceLister) List(selector labels.Selector) (ret []*v1.ResourceQuota, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ResourceQuota))
+	})
+	return ret, err
+}
+
+// Get retrieves the ResourceQuota from the indexer for a given namespace and name.
+func (s resourceQuotaNamespaceLister) Get(name string) (*v1.ResourceQuota, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("resourcequota"), name)
+	}
+	return obj.(*v1.ResourceQuota), nil
 }

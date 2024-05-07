@@ -141,7 +141,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 func newControlPlanePrepareDownloadCertsSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name:         "download-certs [api-server-endpoint]",
-		Short:        fmt.Sprintf("Download certificates shared among control-plane nodes from the %s Secret", kubeadmconstants.KubeadmCertsSecret),
+		Short:        fmt.Sprintf("[EXPERIMENTAL] Download certificates shared among control-plane nodes from the %s Secret", kubeadmconstants.KubeadmCertsSecret),
 		Run:          runControlPlanePrepareDownloadCertsPhaseLocal,
 		InheritFlags: getControlPlanePreparePhaseFlags("download-certs"),
 	}

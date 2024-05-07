@@ -68,7 +68,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	f.Context("Resource Kubelet Plugin", f.WithSerial(), func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			kubeletPlugin = newKubeletPlugin(ctx, getNodeName(ctx, f))
+			kubeletPlugin = newKubeletPlugin(getNodeName(ctx, f))
 		})
 
 		ginkgo.It("must register after Kubelet restart", func(ctx context.Context) {
@@ -88,7 +88,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must register after plugin restart", func(ctx context.Context) {
 			ginkgo.By("restart Kubelet Plugin")
 			kubeletPlugin.Stop()
-			kubeletPlugin = newKubeletPlugin(ctx, getNodeName(ctx, f))
+			kubeletPlugin = newKubeletPlugin(getNodeName(ctx, f))
 
 			ginkgo.By("wait for Kubelet plugin re-registration")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdriver.BeRegistered)
@@ -134,10 +134,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 })
 
 // Run Kubelet plugin and wait until it's registered
-func newKubeletPlugin(ctx context.Context, nodeName string) *testdriver.ExamplePlugin {
+func newKubeletPlugin(nodeName string) *testdriver.ExamplePlugin {
 	ginkgo.By("start Kubelet plugin")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", nodeName)
-	ctx = klog.NewContext(ctx, logger)
 
 	// Ensure that directories exist, creating them if necessary. We want
 	// to know early if there is a setup problem that would prevent
@@ -148,7 +147,7 @@ func newKubeletPlugin(ctx context.Context, nodeName string) *testdriver.ExampleP
 	framework.ExpectNoError(err, "create socket directory")
 
 	plugin, err := testdriver.StartPlugin(
-		ctx,
+		logger,
 		cdiDir,
 		driverName,
 		"",

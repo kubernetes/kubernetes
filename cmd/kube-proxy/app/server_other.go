@@ -22,7 +22,6 @@ limitations under the License.
 package app
 
 import (
-	"context"
 	"fmt"
 	"runtime"
 
@@ -40,22 +39,22 @@ var unsupportedError = fmt.Errorf(runtime.GOOS + "/" + runtime.GOARCH + "is unsu
 // platformSetup is called after setting up the ProxyServer, but before creating the
 // Proxier. It should fill in any platform-specific fields and perform other
 // platform-specific setup.
-func (s *ProxyServer) platformSetup(ctx context.Context) error {
+func (s *ProxyServer) platformSetup() error {
 	return unsupportedError
 }
 
 // platformCheckSupported is called immediately before creating the Proxier, to check
 // what IP families are supported (and whether the configuration is usable at all).
-func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
+func (s *ProxyServer) platformCheckSupported() (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
 	return false, false, false, unsupportedError
 }
 
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
 	return nil, unsupportedError
 }
 
 // platformCleanup removes stale kube-proxy rules that can be safely removed.
-func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
+func platformCleanup(mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
 	return unsupportedError
 }

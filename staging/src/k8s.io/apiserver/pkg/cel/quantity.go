@@ -50,7 +50,7 @@ func (d Quantity) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 
 func (d Quantity) ConvertToType(typeVal ref.Type) ref.Val {
 	switch typeVal {
-	case quantityTypeValue:
+	case typeValue:
 		return d
 	case types.TypeType:
 		return quantityTypeValue

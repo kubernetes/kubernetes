@@ -182,6 +182,7 @@ func NewVolumeManager(
 	hostutil hostutil.HostUtils,
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
+	keepTerminatedPodVolumes bool,
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler) VolumeManager {
 
 	seLinuxTranslator := util.NewSELinuxLabelTranslator()
@@ -210,6 +211,7 @@ func NewVolumeManager(
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		kubeContainerRuntime,
+		keepTerminatedPodVolumes,
 		csiMigratedPluginManager,
 		intreeToCSITranslator,
 		volumePluginMgr)

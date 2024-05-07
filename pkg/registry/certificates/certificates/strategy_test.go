@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/utils/ptr"
+	"k8s.io/utils/pointer"
 )
 
 func TestStrategyCreate(t *testing.T) {
@@ -119,12 +119,12 @@ func TestStrategyCreate(t *testing.T) {
 			ctx: genericapirequest.NewContext(),
 			obj: &certapi.CertificateSigningRequest{
 				Spec: certapi.CertificateSigningRequestSpec{
-					ExpirationSeconds: ptr.To[int32](1234),
+					ExpirationSeconds: pointer.Int32(1234),
 				},
 			},
 			expectedObj: &certapi.CertificateSigningRequest{
 				Spec: certapi.CertificateSigningRequestSpec{
-					ExpirationSeconds: ptr.To[int32](1234),
+					ExpirationSeconds: pointer.Int32(1234),
 				},
 				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
 			},

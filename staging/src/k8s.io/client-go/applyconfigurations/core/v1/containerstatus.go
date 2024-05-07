@@ -36,7 +36,6 @@ type ContainerStatusApplyConfiguration struct {
 	Started              *bool                                   `json:"started,omitempty"`
 	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
 	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
-	VolumeMounts         []VolumeMountStatusApplyConfiguration   `json:"volumeMounts,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with
@@ -130,18 +129,5 @@ func (b *ContainerStatusApplyConfiguration) WithAllocatedResources(value corev1.
 // If called multiple times, the Resources field is set to the value of the last call.
 func (b *ContainerStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *ContainerStatusApplyConfiguration {
 	b.Resources = value
-	return b
-}
-
-// WithVolumeMounts adds the given value to the VolumeMounts field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the VolumeMounts field.
-func (b *ContainerStatusApplyConfiguration) WithVolumeMounts(values ...*VolumeMountStatusApplyConfiguration) *ContainerStatusApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithVolumeMounts")
-		}
-		b.VolumeMounts = append(b.VolumeMounts, *values[i])
-	}
 	return b
 }

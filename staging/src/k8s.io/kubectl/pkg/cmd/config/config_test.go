@@ -19,7 +19,7 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"reflect"
 	"strings"
 	"testing"
@@ -415,7 +415,7 @@ func TestEmptyTokenAndCertAllowed(t *testing.T) {
 	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
-	authInfo.ClientCertificate = filepath.Base(fakeCertFile.Name())
+	authInfo.ClientCertificate = path.Base(fakeCertFile.Name())
 	expectedConfig.AuthInfos["another-user"] = authInfo
 
 	test := configCommandTest{
@@ -660,7 +660,7 @@ func TestCAClearsInsecure(t *testing.T) {
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
 
 	clusterInfoWithCA := clientcmdapi.NewCluster()
-	clusterInfoWithCA.CertificateAuthority = filepath.Base(fakeCAFile.Name())
+	clusterInfoWithCA.CertificateAuthority = path.Base(fakeCAFile.Name())
 
 	startingConfig := newRedFederalCowHammerConfig()
 	startingConfig.Clusters["another-cluster"] = clusterInfoWithInsecure

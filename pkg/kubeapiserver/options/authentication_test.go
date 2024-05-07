@@ -214,9 +214,9 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "number of webhook retry attempts must be greater than 0, but is: 0",
 		},
 		{
-			name:                         "test when authentication config file is set (feature gate enabled by default)",
+			name:                         "test when authentication config file is set without feature gate",
 			testAuthenticationConfigFile: "configfile",
-			expectErr:                    "",
+			expectErr:                    "set --feature-gates=StructuredAuthenticationConfiguration=true to use authentication-config file",
 		},
 		{
 			name:                         "test when authentication config file and oidc-* flags are set",
@@ -691,18 +691,6 @@ jwt:
 						},
 					},
 				},
-				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
-kind: AuthenticationConfiguration
-jwt:
-- issuer:
-    url: https://test-issuer
-    audiences: [ "🐼" ]
-  claimMappings:
-    username:
-      claim: sub
-      prefix: ""
-`,
 				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
@@ -900,16 +888,15 @@ func TestValidateOIDCOptions(t *testing.T) {
 
 func TestLoadAuthenticationConfig(t *testing.T) {
 	testCases := []struct {
-		name                string
-		file                func() string
-		expectErr           string
-		expectedConfig      *apiserver.AuthenticationConfiguration
-		expectedContentData string
+		name           string
+		file           func() string
+		expectErr      string
+		expectedConfig *apiserver.AuthenticationConfiguration
 	}{
 		{
 			name:           "empty file",
 			file:           func() string { return writeTempFile(t, ``) },
-			expectErr:      "empty config data",
+			expectErr:      "empty config file",
 			expectedConfig: nil,
 		},
 		{
@@ -929,10 +916,6 @@ func TestLoadAuthenticationConfig(t *testing.T) {
 					},
 				},
 			},
-			expectedContentData: `{
-						"apiVersion":"apiserver.config.k8s.io/v1alpha1",
-						"kind":"AuthenticationConfiguration",
-						"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
 		},
 		{
 			name:           "missing file",
@@ -1006,10 +989,6 @@ func TestLoadAuthenticationConfig(t *testing.T) {
 					},
 				},
 			},
-			expectedContentData: `{
-							"apiVersion":"apiserver.config.k8s.io/v1alpha1",
-							"kind":"AuthenticationConfiguration",
-							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
 		},
 		{
 			name: "v1alpha1 - yaml",
@@ -1041,17 +1020,6 @@ jwt:
 					},
 				},
 			},
-			expectedContentData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
-kind: AuthenticationConfiguration
-jwt:
-- issuer:
-    url: https://test-issuer
-  claimMappings:
-    username:
-      claim: sub
-      prefix: ""
-`,
 		},
 		{
 			name: "v1alpha1 - no jwt",
@@ -1061,99 +1029,17 @@ jwt:
 							"kind":"AuthenticationConfiguration"}`)
 			},
 			expectedConfig: &apiserver.AuthenticationConfiguration{},
-			expectedContentData: `{
-							"apiVersion":"apiserver.config.k8s.io/v1alpha1",
-							"kind":"AuthenticationConfiguration"}`,
-		},
-		{
-			name: "v1beta1 - json",
-			file: func() string {
-				return writeTempFile(t, `{
-							"apiVersion":"apiserver.config.k8s.io/v1beta1",
-							"kind":"AuthenticationConfiguration",
-							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`)
-			},
-			expectedConfig: &apiserver.AuthenticationConfiguration{
-				JWT: []apiserver.JWTAuthenticator{
-					{
-						Issuer: apiserver.Issuer{
-							URL: "https://test-issuer",
-						},
-					},
-				},
-			},
-			expectedContentData: `{
-							"apiVersion":"apiserver.config.k8s.io/v1beta1",
-							"kind":"AuthenticationConfiguration",
-							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
-		},
-		{
-			name: "v1beta1 - yaml",
-			file: func() string {
-				return writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1beta1
-kind: AuthenticationConfiguration
-jwt:
-- issuer:
-    url: https://test-issuer
-  claimMappings:
-    username:
-      claim: sub
-      prefix: ""
-`)
-			},
-			expectedConfig: &apiserver.AuthenticationConfiguration{
-				JWT: []apiserver.JWTAuthenticator{
-					{
-						Issuer: apiserver.Issuer{
-							URL: "https://test-issuer",
-						},
-						ClaimMappings: apiserver.ClaimMappings{
-							Username: apiserver.PrefixedClaimOrExpression{
-								Claim:  "sub",
-								Prefix: pointer.String(""),
-							},
-						},
-					},
-				},
-			},
-			expectedContentData: `
-apiVersion: apiserver.config.k8s.io/v1beta1
-kind: AuthenticationConfiguration
-jwt:
-- issuer:
-    url: https://test-issuer
-  claimMappings:
-    username:
-      claim: sub
-      prefix: ""
-`,
-		},
-		{
-			name: "v1beta1 - no jwt",
-			file: func() string {
-				return writeTempFile(t, `{
-							"apiVersion":"apiserver.config.k8s.io/v1beta1",
-							"kind":"AuthenticationConfiguration"}`)
-			},
-			expectedConfig: &apiserver.AuthenticationConfiguration{},
-			expectedContentData: `{
-							"apiVersion":"apiserver.config.k8s.io/v1beta1",
-							"kind":"AuthenticationConfiguration"}`,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			config, contentData, err := loadAuthenticationConfig(tc.file())
+			config, err := loadAuthenticationConfig(tc.file())
 			if !strings.Contains(errString(err), tc.expectErr) {
 				t.Fatalf("expected error %q, got %v", tc.expectErr, err)
 			}
 			if !reflect.DeepEqual(config, tc.expectedConfig) {
 				t.Fatalf("unexpected config:\n%s", cmp.Diff(tc.expectedConfig, config))
-			}
-			if contentData != tc.expectedContentData {
-				t.Errorf("unexpected content data: want=%q, got=%q", tc.expectedContentData, contentData)
 			}
 		})
 	}

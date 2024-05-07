@@ -28,9 +28,9 @@ const (
 
 	// based on the W3C Trace Context specification, see
 	// https://www.w3.org/TR/trace-context-1/#tracestate-header
-	noTenantKeyFormat   = `[a-z][_0-9a-z\-\*\/]*`
-	withTenantKeyFormat = `[a-z0-9][_0-9a-z\-\*\/]*@[a-z][_0-9a-z\-\*\/]*`
-	valueFormat         = `[\x20-\x2b\x2d-\x3c\x3e-\x7e]*[\x21-\x2b\x2d-\x3c\x3e-\x7e]`
+	noTenantKeyFormat   = `[a-z][_0-9a-z\-\*\/]{0,255}`
+	withTenantKeyFormat = `[a-z0-9][_0-9a-z\-\*\/]{0,240}@[a-z][_0-9a-z\-\*\/]{0,13}`
+	valueFormat         = `[\x20-\x2b\x2d-\x3c\x3e-\x7e]{0,255}[\x21-\x2b\x2d-\x3c\x3e-\x7e]`
 
 	errInvalidKey    errorConst = "invalid tracestate key"
 	errInvalidValue  errorConst = "invalid tracestate value"
@@ -40,10 +40,9 @@ const (
 )
 
 var (
-	noTenantKeyRe   = regexp.MustCompile(`^` + noTenantKeyFormat + `$`)
-	withTenantKeyRe = regexp.MustCompile(`^` + withTenantKeyFormat + `$`)
-	valueRe         = regexp.MustCompile(`^` + valueFormat + `$`)
-	memberRe        = regexp.MustCompile(`^\s*((?:` + noTenantKeyFormat + `)|(?:` + withTenantKeyFormat + `))=(` + valueFormat + `)\s*$`)
+	keyRe    = regexp.MustCompile(`^((` + noTenantKeyFormat + `)|(` + withTenantKeyFormat + `))$`)
+	valueRe  = regexp.MustCompile(`^(` + valueFormat + `)$`)
+	memberRe = regexp.MustCompile(`^\s*((` + noTenantKeyFormat + `)|(` + withTenantKeyFormat + `))=(` + valueFormat + `)\s*$`)
 )
 
 type member struct {
@@ -52,19 +51,10 @@ type member struct {
 }
 
 func newMember(key, value string) (member, error) {
-	if len(key) > 256 {
+	if !keyRe.MatchString(key) {
 		return member{}, fmt.Errorf("%w: %s", errInvalidKey, key)
 	}
-	if !noTenantKeyRe.MatchString(key) {
-		if !withTenantKeyRe.MatchString(key) {
-			return member{}, fmt.Errorf("%w: %s", errInvalidKey, key)
-		}
-		atIndex := strings.LastIndex(key, "@")
-		if atIndex > 241 || len(key)-1-atIndex > 14 {
-			return member{}, fmt.Errorf("%w: %s", errInvalidKey, key)
-		}
-	}
-	if len(value) > 256 || !valueRe.MatchString(value) {
+	if !valueRe.MatchString(value) {
 		return member{}, fmt.Errorf("%w: %s", errInvalidValue, value)
 	}
 	return member{Key: key, Value: value}, nil
@@ -72,14 +62,14 @@ func newMember(key, value string) (member, error) {
 
 func parseMember(m string) (member, error) {
 	matches := memberRe.FindStringSubmatch(m)
-	if len(matches) != 3 {
+	if len(matches) != 5 {
 		return member{}, fmt.Errorf("%w: %s", errInvalidMember, m)
 	}
-	result, e := newMember(matches[1], matches[2])
-	if e != nil {
-		return member{}, fmt.Errorf("%w: %s", errInvalidMember, m)
-	}
-	return result, nil
+
+	return member{
+		Key:   matches[1],
+		Value: matches[4],
+	}, nil
 }
 
 // String encodes member into a string compliant with the W3C Trace Context

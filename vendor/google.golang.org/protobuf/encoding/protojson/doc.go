@@ -6,6 +6,6 @@
 // format. It follows the guide at
 // https://protobuf.dev/programming-guides/proto3#json.
 //
-// This package produces a different output than the standard [encoding/json]
+// This package produces a different output than the standard "encoding/json"
 // package, which does not operate correctly on protocol buffer messages.
 package protojson

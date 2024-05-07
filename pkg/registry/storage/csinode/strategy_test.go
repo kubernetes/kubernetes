@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	ptr "k8s.io/utils/ptr"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestPrepareForCreate(t *testing.T) {
@@ -92,7 +92,7 @@ func TestPrepareForUpdate(t *testing.T) {
 					Name:         "valid-driver-name",
 					NodeID:       "valid-node",
 					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-					Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](20)},
+					Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 				},
 			},
 		},
@@ -251,7 +251,7 @@ func TestCSINodeValidation(t *testing.T) {
 							Name:         "$csi-driver@",
 							NodeID:       "valid-node",
 							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-							Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](10)},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
 						},
 					},
 				},
@@ -270,7 +270,7 @@ func TestCSINodeValidation(t *testing.T) {
 							Name:         "valid-driver-name",
 							NodeID:       "",
 							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-							Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](10)},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
 						},
 					},
 				},
@@ -289,7 +289,7 @@ func TestCSINodeValidation(t *testing.T) {
 							Name:         "valid-driver-name",
 							NodeID:       "valid-node",
 							TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-							Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](-1)},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(-1)},
 						},
 					},
 				},
@@ -308,7 +308,7 @@ func TestCSINodeValidation(t *testing.T) {
 							Name:         "valid-driver-name",
 							NodeID:       "valid-node",
 							TopologyKeys: []string{"company.com/zone1", ""},
-							Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](10)},
+							Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
 						},
 					},
 				},
@@ -351,7 +351,7 @@ func getValidCSINode(name string) *storage.CSINode {
 					Name:         "valid-driver-name",
 					NodeID:       "valid-node",
 					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
-					Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](10)},
+					Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
 				},
 			},
 		},

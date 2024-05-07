@@ -282,7 +282,6 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 	if err := loggingFlags.Lookup("vmodule").Value.Set(VModuleConfigurationPflag(&c.VModule).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog vmodule: %v", err)
 	}
-	setSlogDefaultLogger()
 	klog.StartFlushDaemon(c.FlushFrequency.Duration.Duration)
 	klog.EnableContextualLogging(p.ContextualLoggingEnabled)
 	return nil

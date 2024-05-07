@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/policy/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type PodDisruptionBudgetLister interface {
 
 // podDisruptionBudgetLister implements the PodDisruptionBudgetLister interface.
 type podDisruptionBudgetLister struct {
-	listers.ResourceIndexer[*v1beta1.PodDisruptionBudget]
+	indexer cache.Indexer
 }
 
 // NewPodDisruptionBudgetLister returns a new PodDisruptionBudgetLister.
 func NewPodDisruptionBudgetLister(indexer cache.Indexer) PodDisruptionBudgetLister {
-	return &podDisruptionBudgetLister{listers.New[*v1beta1.PodDisruptionBudget](indexer, v1beta1.Resource("poddisruptionbudget"))}
+	return &podDisruptionBudgetLister{indexer: indexer}
+}
+
+// List lists all PodDisruptionBudgets in the indexer.
+func (s *podDisruptionBudgetLister) List(selector labels.Selector) (ret []*v1beta1.PodDisruptionBudget, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.PodDisruptionBudget))
+	})
+	return ret, err
 }
 
 // PodDisruptionBudgets returns an object that can list and get PodDisruptionBudgets.
 func (s *podDisruptionBudgetLister) PodDisruptionBudgets(namespace string) PodDisruptionBudgetNamespaceLister {
-	return podDisruptionBudgetNamespaceLister{listers.NewNamespaced[*v1beta1.PodDisruptionBudget](s.ResourceIndexer, namespace)}
+	return podDisruptionBudgetNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // PodDisruptionBudgetNamespaceLister helps list and get PodDisruptionBudgets.
@@ -66,5 +74,26 @@ type PodDisruptionBudgetNamespaceLister interface {
 // podDisruptionBudgetNamespaceLister implements the PodDisruptionBudgetNamespaceLister
 // interface.
 type podDisruptionBudgetNamespaceLister struct {
-	listers.ResourceIndexer[*v1beta1.PodDisruptionBudget]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all PodDisruptionBudgets in the indexer for a given namespace.
+func (s podDisruptionBudgetNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.PodDisruptionBudget, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.PodDisruptionBudget))
+	})
+	return ret, err
+}
+
+// Get retrieves the PodDisruptionBudget from the indexer for a given namespace and name.
+func (s podDisruptionBudgetNamespaceLister) Get(name string) (*v1beta1.PodDisruptionBudget, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1beta1.Resource("poddisruptionbudget"), name)
+	}
+	return obj.(*v1beta1.PodDisruptionBudget), nil
 }

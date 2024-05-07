@@ -18,7 +18,9 @@ package cli
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -84,6 +86,7 @@ func RunNoErrOutput(cmd *cobra.Command) error {
 }
 
 func run(cmd *cobra.Command) (logsInitialized bool, err error) {
+	rand.Seed(time.Now().UnixNano())
 	defer logs.FlushLogs()
 
 	cmd.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)

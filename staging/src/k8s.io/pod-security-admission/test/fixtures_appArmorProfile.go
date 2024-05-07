@@ -32,10 +32,10 @@ func init() {
 				// container with localhost/foo annotation
 				tweak(pod, func(copy *corev1.Pod) {
 					containerName := copy.Spec.Containers[0].Name
-					copy.Annotations[corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+containerName] = "runtime/default"
+					copy.Annotations[corev1.AppArmorBetaContainerAnnotationKeyPrefix+containerName] = "runtime/default"
 
 					initContainerName := copy.Spec.Containers[0].Name
-					copy.Annotations[corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+initContainerName] = "localhost/foo"
+					copy.Annotations[corev1.AppArmorBetaContainerAnnotationKeyPrefix+initContainerName] = "localhost/foo"
 				}),
 			}
 		},
@@ -45,13 +45,13 @@ func init() {
 				// container with unconfined annotation
 				tweak(pod, func(copy *corev1.Pod) {
 					name := copy.Spec.Containers[0].Name
-					copy.Annotations[corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+name] = "unconfined"
+					copy.Annotations[corev1.AppArmorBetaContainerAnnotationKeyPrefix+name] = "unconfined"
 				}),
 
 				// initContainer with unconfined annotation
 				tweak(pod, func(copy *corev1.Pod) {
 					name := copy.Spec.InitContainers[0].Name
-					copy.Annotations[corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix+name] = "unconfined"
+					copy.Annotations[corev1.AppArmorBetaContainerAnnotationKeyPrefix+name] = "unconfined"
 				}),
 			}
 		},

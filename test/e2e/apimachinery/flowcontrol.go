@@ -756,7 +756,7 @@ func getPriorityLevelNominalConcurrency(ctx context.Context, c clientset.Interfa
 		return 0, fmt.Errorf("error requesting metrics; request=%#+v, request.URL()=%s: %w", req, req.URL(), err)
 	}
 	sampleDecoder := expfmt.SampleDecoder{
-		Dec:  expfmt.NewDecoder(bytes.NewBuffer(resp), expfmt.NewFormat(expfmt.TypeTextPlain)),
+		Dec:  expfmt.NewDecoder(bytes.NewBuffer(resp), expfmt.FmtText),
 		Opts: &expfmt.DecodeOptions{},
 	}
 	for {

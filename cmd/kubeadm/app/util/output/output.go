@@ -104,9 +104,7 @@ func (pf *PrintFlags) ToPrinter() (Printer, error) {
 func (pf *PrintFlags) AddFlags(cmd *cobra.Command) {
 	pf.JSONYamlPrintFlags.AddFlags(cmd)
 	pf.KubeTemplatePrintFlags.AddFlags(cmd)
-	cmd.Flags().StringVarP(pf.OutputFormat, "output", "o", *pf.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
-	cmd.Flags().StringVarP(pf.OutputFormat, "experimental-output", "", *pf.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
-	_ = cmd.Flags().MarkDeprecated("experimental-output", "please use --output instead.")
+	cmd.Flags().StringVarP(pf.OutputFormat, "experimental-output", "o", *pf.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(pf.AllowedFormats(), "|")))
 }
 
 // WithDefaultOutput sets a default output format if one is not provided through a flag value

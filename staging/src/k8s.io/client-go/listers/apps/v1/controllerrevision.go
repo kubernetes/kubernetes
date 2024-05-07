@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type ControllerRevisionLister interface {
 
 // controllerRevisionLister implements the ControllerRevisionLister interface.
 type controllerRevisionLister struct {
-	listers.ResourceIndexer[*v1.ControllerRevision]
+	indexer cache.Indexer
 }
 
 // NewControllerRevisionLister returns a new ControllerRevisionLister.
 func NewControllerRevisionLister(indexer cache.Indexer) ControllerRevisionLister {
-	return &controllerRevisionLister{listers.New[*v1.ControllerRevision](indexer, v1.Resource("controllerrevision"))}
+	return &controllerRevisionLister{indexer: indexer}
+}
+
+// List lists all ControllerRevisions in the indexer.
+func (s *controllerRevisionLister) List(selector labels.Selector) (ret []*v1.ControllerRevision, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ControllerRevision))
+	})
+	return ret, err
 }
 
 // ControllerRevisions returns an object that can list and get ControllerRevisions.
 func (s *controllerRevisionLister) ControllerRevisions(namespace string) ControllerRevisionNamespaceLister {
-	return controllerRevisionNamespaceLister{listers.NewNamespaced[*v1.ControllerRevision](s.ResourceIndexer, namespace)}
+	return controllerRevisionNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // ControllerRevisionNamespaceLister helps list and get ControllerRevisions.
@@ -66,5 +74,26 @@ type ControllerRevisionNamespaceLister interface {
 // controllerRevisionNamespaceLister implements the ControllerRevisionNamespaceLister
 // interface.
 type controllerRevisionNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ControllerRevision]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all ControllerRevisions in the indexer for a given namespace.
+func (s controllerRevisionNamespaceLister) List(selector labels.Selector) (ret []*v1.ControllerRevision, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.ControllerRevision))
+	})
+	return ret, err
+}
+
+// Get retrieves the ControllerRevision from the indexer for a given namespace and name.
+func (s controllerRevisionNamespaceLister) Get(name string) (*v1.ControllerRevision, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("controllerrevision"), name)
+	}
+	return obj.(*v1.ControllerRevision), nil
 }

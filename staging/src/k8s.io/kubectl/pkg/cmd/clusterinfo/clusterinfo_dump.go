@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -119,8 +118,8 @@ func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fil
 	if len(dir) == 0 || dir == "-" {
 		return defaultWriter
 	}
-	fullFile := filepath.Join(dir, filename) + fileExtension
-	parent := filepath.Dir(fullFile)
+	fullFile := path.Join(dir, filename) + fileExtension
+	parent := path.Dir(fullFile)
 	cmdutil.CheckErr(os.MkdirAll(parent, 0755))
 
 	file, err := os.Create(fullFile)

@@ -538,6 +538,6 @@ func isZero(v reflect.Value) bool {
 		}
 		return true
 	default:
-		panic(&reflect.ValueError{Method: "reflect.Value.IsZero", Kind: v.Kind()})
+		panic(&reflect.ValueError{"reflect.Value.IsZero", v.Kind()})
 	}
 }

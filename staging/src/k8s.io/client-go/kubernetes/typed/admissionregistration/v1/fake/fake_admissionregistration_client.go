@@ -32,14 +32,6 @@ func (c *FakeAdmissionregistrationV1) MutatingWebhookConfigurations() v1.Mutatin
 	return &FakeMutatingWebhookConfigurations{c}
 }
 
-func (c *FakeAdmissionregistrationV1) ValidatingAdmissionPolicies() v1.ValidatingAdmissionPolicyInterface {
-	return &FakeValidatingAdmissionPolicies{c}
-}
-
-func (c *FakeAdmissionregistrationV1) ValidatingAdmissionPolicyBindings() v1.ValidatingAdmissionPolicyBindingInterface {
-	return &FakeValidatingAdmissionPolicyBindings{c}
-}
-
 func (c *FakeAdmissionregistrationV1) ValidatingWebhookConfigurations() v1.ValidatingWebhookConfigurationInterface {
 	return &FakeValidatingWebhookConfigurations{c}
 }

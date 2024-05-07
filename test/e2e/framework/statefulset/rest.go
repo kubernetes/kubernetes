@@ -25,12 +25,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
@@ -247,23 +247,21 @@ func ExecInStatefulPods(ctx context.Context, c clientset.Interface, ss *appsv1.S
 }
 
 // update updates a statefulset, and it is only used within rest.go
-func update(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) (ss *appsv1.StatefulSet) {
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		var err error
-		ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
+func update(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) *appsv1.StatefulSet {
+	for i := 0; i < 3; i++ {
+		ss, err := c.AppsV1().StatefulSets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get statefulset %q: %v", name, err)
 		}
-		if *(ss.Spec.Replicas) == replicas {
-			return nil
-		}
 		*(ss.Spec.Replicas) = replicas
 		ss, err = c.AppsV1().StatefulSets(ns).Update(ctx, ss, metav1.UpdateOptions{})
-		return err
-	})
-	if err == nil {
-		return ss
+		if err == nil {
+			return ss
+		}
+		if !apierrors.IsConflict(err) && !apierrors.IsServerTimeout(err) {
+			framework.Failf("failed to update statefulset %q: %v", name, err)
+		}
 	}
-	framework.Failf("failed to update statefulset  %q: %v", name, err)
+	framework.Failf("too many retries draining statefulset %q", name)
 	return nil
 }

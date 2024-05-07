@@ -11,7 +11,6 @@ spec:
       capabilities:
         drop:
         - ALL
-  hostUsers: false
   initContainers:
   - image: registry.k8s.io/pause
     name: initcontainer1

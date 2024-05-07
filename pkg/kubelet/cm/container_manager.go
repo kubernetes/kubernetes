@@ -135,7 +135,6 @@ type ContainerManager interface {
 }
 
 type NodeConfig struct {
-	NodeName              types.NodeName
 	RuntimeCgroupsName    string
 	SystemCgroupsName     string
 	KubeletCgroupsName    string

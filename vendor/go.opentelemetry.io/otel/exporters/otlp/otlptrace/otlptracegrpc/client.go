@@ -260,38 +260,30 @@ func (c *client) exportContext(parent context.Context) (context.Context, context
 // duration to wait for if an explicit throttle time is included in err.
 func retryable(err error) (bool, time.Duration) {
 	s := status.Convert(err)
-	return retryableGRPCStatus(s)
-}
-
-func retryableGRPCStatus(s *status.Status) (bool, time.Duration) {
 	switch s.Code() {
 	case codes.Canceled,
 		codes.DeadlineExceeded,
+		codes.ResourceExhausted,
 		codes.Aborted,
 		codes.OutOfRange,
 		codes.Unavailable,
 		codes.DataLoss:
-		// Additionally handle RetryInfo.
-		_, d := throttleDelay(s)
-		return true, d
-	case codes.ResourceExhausted:
-		// Retry only if the server signals that the recovery from resource exhaustion is possible.
-		return throttleDelay(s)
+		return true, throttleDelay(s)
 	}
 
 	// Not a retry-able error.
 	return false, 0
 }
 
-// throttleDelay returns of the status is RetryInfo
-// and the its duration to wait for if an explicit throttle time.
-func throttleDelay(s *status.Status) (bool, time.Duration) {
+// throttleDelay returns a duration to wait for if an explicit throttle time
+// is included in the response status.
+func throttleDelay(s *status.Status) time.Duration {
 	for _, detail := range s.Details() {
 		if t, ok := detail.(*errdetails.RetryInfo); ok {
-			return true, t.RetryDelay.AsDuration()
+			return t.RetryDelay.AsDuration()
 		}
 	}
-	return false, 0
+	return 0
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Client.

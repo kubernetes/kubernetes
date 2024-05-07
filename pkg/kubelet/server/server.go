@@ -161,12 +161,7 @@ func ListenAndServeKubeletServer(
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, auth, kubeCfg)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		handler.InstallTracingFilter(tp)
-	}
-
+	handler := NewServer(host, resourceAnalyzer, auth, tp, kubeCfg)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -196,14 +191,10 @@ func ListenAndServeKubeletReadOnlyServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	address net.IP,
-	port uint,
-	tp oteltrace.TracerProvider) {
+	port uint) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, nil, nil)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
-	}
+	// TODO: https://github.com/kubernetes/kubernetes/issues/109829 tracer should use WithPublicEndpoint
+	s := NewServer(host, resourceAnalyzer, nil, oteltrace.NewNoopTracerProvider(), nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -273,6 +264,7 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
+	tp oteltrace.TracerProvider,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 
 	server := Server{
@@ -285,6 +277,9 @@ func NewServer(
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		server.InstallTracingFilter(tp)
 	}
 	server.InstallDefaultHandlers()
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
@@ -339,8 +334,8 @@ func (s *Server) InstallAuthFilter() {
 }
 
 // InstallTracingFilter installs OpenTelemetry tracing filter with the restful Container.
-func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider, opts ...otelrestful.Option) {
-	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", append(opts, otelrestful.WithTracerProvider(tp))...))
+func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider) {
+	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", otelrestful.WithTracerProvider(tp)))
 }
 
 // addMetricsBucketMatcher adds a regexp matcher and the relevant bucket to use when

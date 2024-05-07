@@ -20,8 +20,8 @@ package v1alpha1
 
 import (
 	v1alpha1 "k8s.io/api/networking/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,10 +39,30 @@ type ServiceCIDRLister interface {
 
 // serviceCIDRLister implements the ServiceCIDRLister interface.
 type serviceCIDRLister struct {
-	listers.ResourceIndexer[*v1alpha1.ServiceCIDR]
+	indexer cache.Indexer
 }
 
 // NewServiceCIDRLister returns a new ServiceCIDRLister.
 func NewServiceCIDRLister(indexer cache.Indexer) ServiceCIDRLister {
-	return &serviceCIDRLister{listers.New[*v1alpha1.ServiceCIDR](indexer, v1alpha1.Resource("servicecidr"))}
+	return &serviceCIDRLister{indexer: indexer}
+}
+
+// List lists all ServiceCIDRs in the indexer.
+func (s *serviceCIDRLister) List(selector labels.Selector) (ret []*v1alpha1.ServiceCIDR, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.ServiceCIDR))
+	})
+	return ret, err
+}
+
+// Get retrieves the ServiceCIDR from the index for a given name.
+func (s *serviceCIDRLister) Get(name string) (*v1alpha1.ServiceCIDR, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1alpha1.Resource("servicecidr"), name)
+	}
+	return obj.(*v1alpha1.ServiceCIDR), nil
 }

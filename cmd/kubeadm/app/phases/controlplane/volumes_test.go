@@ -57,10 +57,10 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			volMount: []v1.VolumeMount{},
 		},
 		{
-			name:     "Should ignore files in /etc/pki/ca-trust",
-			ca:       "/etc/pki/ca-trust/my-etcd-ca.crt",
-			cert:     "/etc/pki/ca-trust/my-etcd.crt",
-			key:      "/etc/pki/ca-trust/my-etcd.key",
+			name:     "Should ignore files in /etc/pki",
+			ca:       "/etc/pki/my-etcd-ca.crt",
+			cert:     "/etc/pki/my-etcd.crt",
+			key:      "/etc/pki/my-etcd.key",
 			vol:      []v1.Volume{},
 			volMount: []v1.VolumeMount{},
 		},
@@ -519,9 +519,8 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	// set up tmp caCertsExtraVolumePaths for testing
-	originalCACertsExtraVolumePaths := caCertsExtraVolumePaths
-	caCertsExtraVolumePaths = []string{fmt.Sprintf("%s/etc/pki/ca-trust", tmpdir), fmt.Sprintf("%s/usr/share/ca-certificates", tmpdir)}
-	defer func() { caCertsExtraVolumePaths = originalCACertsExtraVolumePaths }()
+	caCertsExtraVolumePaths = []string{fmt.Sprintf("%s/etc/pki", tmpdir), fmt.Sprintf("%s/usr/share/ca-certificates", tmpdir)}
+	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {

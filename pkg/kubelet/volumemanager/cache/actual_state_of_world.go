@@ -168,6 +168,10 @@ type ActualStateOfWorld interface {
 	// or have a mount/unmount operation pending.
 	GetAttachedVolumes() []AttachedVolume
 
+	// SyncReconstructedVolume check the volume.outerVolumeSpecName in asw and
+	// the one populated from dsw, if they do not match, update this field from the value from dsw.
+	SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string)
+
 	// Add the specified volume to ASW as uncertainly attached.
 	AddAttachUncertainReconstructedVolume(volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
@@ -713,7 +717,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 		// Update uncertain volumes - the new markVolumeOpts may have updated information.
 		// Especially reconstructed volumes (marked as uncertain during reconstruction) need
 		// an update.
-		updateUncertainVolume = utilfeature.DefaultFeatureGate.Enabled(features.NewVolumeManagerReconstruction) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
+		updateUncertainVolume = utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain
 	}
 	if !podExists || updateUncertainVolume {
 		// Add new mountedPod or update existing one.
@@ -1113,6 +1117,19 @@ func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
 	}
 
 	return unmountedVolumes
+}
+
+func (asw *actualStateOfWorld) SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string) {
+	asw.Lock()
+	defer asw.Unlock()
+	if volumeObj, volumeExists := asw.attachedVolumes[volumeName]; volumeExists {
+		if podObj, podExists := volumeObj.mountedPods[podName]; podExists {
+			if podObj.outerVolumeSpecName != outerVolumeSpecName {
+				podObj.outerVolumeSpecName = outerVolumeSpecName
+				asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
+			}
+		}
+	}
 }
 
 func (asw *actualStateOfWorld) newAttachedVolume(

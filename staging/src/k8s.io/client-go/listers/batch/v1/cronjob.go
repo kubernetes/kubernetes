@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,17 +38,25 @@ type CronJobLister interface {
 
 // cronJobLister implements the CronJobLister interface.
 type cronJobLister struct {
-	listers.ResourceIndexer[*v1.CronJob]
+	indexer cache.Indexer
 }
 
 // NewCronJobLister returns a new CronJobLister.
 func NewCronJobLister(indexer cache.Indexer) CronJobLister {
-	return &cronJobLister{listers.New[*v1.CronJob](indexer, v1.Resource("cronjob"))}
+	return &cronJobLister{indexer: indexer}
+}
+
+// List lists all CronJobs in the indexer.
+func (s *cronJobLister) List(selector labels.Selector) (ret []*v1.CronJob, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.CronJob))
+	})
+	return ret, err
 }
 
 // CronJobs returns an object that can list and get CronJobs.
 func (s *cronJobLister) CronJobs(namespace string) CronJobNamespaceLister {
-	return cronJobNamespaceLister{listers.NewNamespaced[*v1.CronJob](s.ResourceIndexer, namespace)}
+	return cronJobNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
 // CronJobNamespaceLister helps list and get CronJobs.
@@ -66,5 +74,26 @@ type CronJobNamespaceLister interface {
 // cronJobNamespaceLister implements the CronJobNamespaceLister
 // interface.
 type cronJobNamespaceLister struct {
-	listers.ResourceIndexer[*v1.CronJob]
+	indexer   cache.Indexer
+	namespace string
+}
+
+// List lists all CronJobs in the indexer for a given namespace.
+func (s cronJobNamespaceLister) List(selector labels.Selector) (ret []*v1.CronJob, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1.CronJob))
+	})
+	return ret, err
+}
+
+// Get retrieves the CronJob from the indexer for a given namespace and name.
+func (s cronJobNamespaceLister) Get(name string) (*v1.CronJob, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1.Resource("cronjob"), name)
+	}
+	return obj.(*v1.CronJob), nil
 }

@@ -34,12 +34,12 @@ type execer interface {
 type realExec struct{}
 
 // LookPath is part of execer
-func (realExec) LookPath(file string) (string, error) {
+func (_ realExec) LookPath(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
 // Run is part of execer
-func (realExec) Run(cmd *exec.Cmd) (string, error) {
+func (_ realExec) Run(cmd *exec.Cmd) (string, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		err = wrapError(err)

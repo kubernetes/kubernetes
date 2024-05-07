@@ -104,9 +104,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
 		job.Spec.ManagedBy = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) {
-		job.Spec.SuccessPolicy = nil
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
 		job.Spec.BackoffLimitPerIndex = nil
@@ -139,9 +136,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
 		newJob.Spec.PodFailurePolicy = nil
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) && oldJob.Spec.SuccessPolicy == nil {
-		newJob.Spec.SuccessPolicy = nil
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
@@ -380,6 +374,8 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isCompletedIndexesChanged := oldJob.Status.CompletedIndexes != newJob.Status.CompletedIndexes
 		isFailedIndexesChanged := !ptr.Equal(oldJob.Status.FailedIndexes, newJob.Status.FailedIndexes)
 		isActiveChanged := oldJob.Status.Active != newJob.Status.Active
+		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
+		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
 		isStartTimeChanged := !ptr.Equal(oldJob.Status.StartTime, newJob.Status.StartTime)
 		isCompletionTimeChanged := !ptr.Equal(oldJob.Status.CompletionTime, newJob.Status.CompletionTime)
 		isUncountedTerminatedPodsChanged := !apiequality.Semantic.DeepEqual(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
@@ -395,7 +391,9 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectCompletedIndexesForNonIndexedJob:       isCompletedIndexesChanged,
 			RejectFailedIndexesForNoBackoffLimitPerIndex: isFailedIndexesChanged,
 			RejectFailedIndexesOverlappingCompleted:      isFailedIndexesChanged || isCompletedIndexesChanged,
+			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
 			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
+			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
 			RejectFinishedJobWithoutStartTime:            isJobFinishedChanged || isStartTimeChanged,
 			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
 			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged,

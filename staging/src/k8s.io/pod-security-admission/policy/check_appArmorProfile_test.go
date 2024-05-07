@@ -24,145 +24,69 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestCheckAppArmor_Allowed(t *testing.T) {
+func TestCheckAppArmor(t *testing.T) {
+
 	testCases := []struct {
-		name     string
-		metaData *metav1.ObjectMeta
-		podSpec  *corev1.PodSpec
+		name           string
+		metaData       *metav1.ObjectMeta
+		podSpec        *corev1.PodSpec
+		expectedResult *CheckResult
 	}{
 		{
 			name: "container with default AppArmor + extra annotations",
 			metaData: &metav1.ObjectMeta{Annotations: map[string]string{
-				corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "test": "runtime/default",
+				corev1.AppArmorBetaProfileNamePrefix + "test": "runtime/default",
 				"env": "prod",
-			}},
-			podSpec: &corev1.PodSpec{},
+			},
+			},
+			podSpec:        &corev1.PodSpec{},
+			expectedResult: &CheckResult{Allowed: true},
 		},
 		{
 			name: "container with local AppArmor + extra annotations",
 			metaData: &metav1.ObjectMeta{Annotations: map[string]string{
-				corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "test": "localhost/sec-profile01",
+				corev1.AppArmorBetaProfileNamePrefix + "test": "localhost/sec-profile01",
 				"env": "dev",
-			}},
-			podSpec: &corev1.PodSpec{},
+			},
+			},
+			podSpec:        &corev1.PodSpec{},
+			expectedResult: &CheckResult{Allowed: true},
 		},
 		{
 			name: "container with no AppArmor annotations",
 			metaData: &metav1.ObjectMeta{Annotations: map[string]string{
 				"env": "dev",
-			}},
-			podSpec: &corev1.PodSpec{},
-		},
-		{
-			name:     "container with no annotations",
-			metaData: &metav1.ObjectMeta{},
-			podSpec:  &corev1.PodSpec{},
-		},
-		{
-			name:     "pod with runtime default",
-			metaData: &metav1.ObjectMeta{},
-			podSpec: &corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{
-					AppArmorProfile: &corev1.AppArmorProfile{
-						Type: corev1.AppArmorProfileTypeRuntimeDefault,
-					},
-				},
 			},
+			},
+			podSpec:        &corev1.PodSpec{},
+			expectedResult: &CheckResult{Allowed: true},
 		},
 		{
-			name:     "container with localhost profile",
-			metaData: &metav1.ObjectMeta{},
-			podSpec: &corev1.PodSpec{
-				Containers: []corev1.Container{{
-					Name: "foo",
-					SecurityContext: &corev1.SecurityContext{
-						AppArmorProfile: &corev1.AppArmorProfile{
-							Type: corev1.AppArmorProfileTypeRuntimeDefault,
-						},
-					},
-				}},
-			},
+			name:           "container with no annotations",
+			metaData:       &metav1.ObjectMeta{},
+			podSpec:        &corev1.PodSpec{},
+			expectedResult: &CheckResult{Allowed: true},
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			result := appArmorProfile_1_0(testCase.metaData, testCase.podSpec)
-			if !result.Allowed {
-				t.Errorf("Should be allowed")
+			result := appArmorProfile_1_0(testCase.metaData, nil)
+			if result.Allowed != testCase.expectedResult.Allowed {
+				t.Errorf("Expected result was Allowed=%v for annotations %v",
+					testCase.expectedResult.Allowed, testCase.metaData.Annotations)
 			}
 		})
 	}
 }
 
-func TestCheckAppArmor_Forbidden(t *testing.T) {
+func TestAppArmorProfile(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *corev1.Pod
 		expectReason string
 		expectDetail string
 	}{
-		{
-			name: "unconfined pod",
-			pod: &corev1.Pod{
-				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						AppArmorProfile: &corev1.AppArmorProfile{
-							Type: corev1.AppArmorProfileTypeUnconfined,
-						},
-					},
-				},
-			},
-			expectReason: "forbidden AppArmor profile",
-			expectDetail: `pod must not set AppArmor profile type to "Unconfined"`,
-		},
-		{
-			name: "unconfined container",
-			pod: &corev1.Pod{
-				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						AppArmorProfile: &corev1.AppArmorProfile{
-							Type: corev1.AppArmorProfileTypeRuntimeDefault,
-						},
-					},
-					Containers: []corev1.Container{{
-						Name: "foo",
-						SecurityContext: &corev1.SecurityContext{
-							AppArmorProfile: &corev1.AppArmorProfile{
-								Type: corev1.AppArmorProfileTypeUnconfined,
-							},
-						},
-					}},
-				},
-			},
-			expectReason: "forbidden AppArmor profile",
-			expectDetail: `container "foo" must not set AppArmor profile type to "Unconfined"`,
-		},
-		{
-			name: "unconfined init container",
-			pod: &corev1.Pod{
-				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						AppArmorProfile: &corev1.AppArmorProfile{
-							Type: corev1.AppArmorProfileTypeRuntimeDefault,
-						},
-					},
-					Containers: []corev1.Container{{
-						Name: "foo",
-					}},
-					InitContainers: []corev1.Container{{
-						Name: "bar",
-						SecurityContext: &corev1.SecurityContext{
-							AppArmorProfile: &corev1.AppArmorProfile{
-								Type: corev1.AppArmorProfileTypeUnconfined,
-							},
-						},
-					}},
-				},
-			},
-			expectReason: "forbidden AppArmor profile",
-			expectDetail: `container "bar" must not set AppArmor profile type to "Unconfined"`,
-		},
 		{
 			name: "multiple containers",
 			pod: &corev1.Pod{
@@ -178,11 +102,11 @@ func TestCheckAppArmor_Forbidden(t *testing.T) {
 					},
 				},
 			},
-			expectReason: "forbidden AppArmor profiles",
-			expectDetail: "annotations must not set AppArmor profile type to " + strings.Join([]string{
-				`"container.apparmor.security.beta.kubernetes.io/="bogus""`,
-				`"container.apparmor.security.beta.kubernetes.io/e="unconfined""`,
-				`"container.apparmor.security.beta.kubernetes.io/f="unknown""`,
+			expectReason: `forbidden AppArmor profiles`,
+			expectDetail: strings.Join([]string{
+				`container.apparmor.security.beta.kubernetes.io/="bogus"`,
+				`container.apparmor.security.beta.kubernetes.io/e="unconfined"`,
+				`container.apparmor.security.beta.kubernetes.io/f="unknown"`,
 			}, ", "),
 		},
 	}

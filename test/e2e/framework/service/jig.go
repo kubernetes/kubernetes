@@ -1046,7 +1046,7 @@ func (j *TestJig) CreateServicePods(ctx context.Context, replica int) error {
 	config := testutils.RCConfig{
 		Client:       j.Client,
 		Name:         j.Name,
-		Image:        imageutils.GetE2EImage(imageutils.Agnhost),
+		Image:        framework.ServeHostnameImage,
 		Command:      []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"},
 		Namespace:    j.Namespace,
 		Labels:       j.Labels,

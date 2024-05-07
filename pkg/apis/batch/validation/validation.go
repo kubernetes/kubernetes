@@ -66,11 +66,6 @@ const (
 
 	// maximum length of the value of the managedBy field
 	maxManagedByLength = 63
-
-	// maximum length of succeededIndexes in JobSuccessPolicy.
-	maxJobSuccessPolicySucceededIndexesLimit = 64 * 1024
-	// maximum number of rules in successPolicy.
-	maxSuccessPolicyRule = 20
 )
 
 var (
@@ -264,13 +259,6 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	if spec.PodFailurePolicy != nil {
 		allErrs = append(allErrs, validatePodFailurePolicy(spec, fldPath.Child("podFailurePolicy"))...)
 	}
-	if spec.SuccessPolicy != nil {
-		if ptr.Deref(spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("successPolicy"), *spec.SuccessPolicy, "requires indexed completion mode"))
-		} else {
-			allErrs = append(allErrs, validateSuccessPolicy(spec, fldPath.Child("successPolicy"))...)
-		}
-	}
 
 	allErrs = append(allErrs, validatePodReplacementPolicy(spec, fldPath.Child("podReplacementPolicy"))...)
 
@@ -412,50 +400,6 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	return allErrs
 }
 
-func validateSuccessPolicy(spec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	rulesPath := fldPath.Child("rules")
-	if len(spec.SuccessPolicy.Rules) == 0 {
-		allErrs = append(allErrs, field.Required(rulesPath, "at least one rules must be specified when the successPolicy is specified"))
-	}
-	if len(spec.SuccessPolicy.Rules) > maxSuccessPolicyRule {
-		allErrs = append(allErrs, field.TooMany(rulesPath, len(spec.SuccessPolicy.Rules), maxSuccessPolicyRule))
-	}
-	for i, rule := range spec.SuccessPolicy.Rules {
-		allErrs = append(allErrs, validateSuccessPolicyRule(spec, &rule, rulesPath.Index(i))...)
-	}
-	return allErrs
-}
-
-func validateSuccessPolicyRule(spec *batch.JobSpec, rule *batch.SuccessPolicyRule, rulePath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if rule.SucceededCount == nil && rule.SucceededIndexes == nil {
-		allErrs = append(allErrs, field.Required(rulePath, "at least one of succeededCount or succeededIndexes must be specified"))
-	}
-	var totalIndexes int32
-	if rule.SucceededIndexes != nil {
-		succeededIndexes := rulePath.Child("succeededIndexes")
-		if len(*rule.SucceededIndexes) > maxJobSuccessPolicySucceededIndexesLimit {
-			allErrs = append(allErrs, field.TooLong(succeededIndexes, *rule.SucceededIndexes, maxJobSuccessPolicySucceededIndexesLimit))
-		}
-		var err error
-		if totalIndexes, err = validateIndexesFormat(*rule.SucceededIndexes, *spec.Completions); err != nil {
-			allErrs = append(allErrs, field.Invalid(succeededIndexes, *rule.SucceededIndexes, fmt.Sprintf("error parsing succeededIndexes: %s", err.Error())))
-		}
-	}
-	if rule.SucceededCount != nil {
-		succeededCountPath := rulePath.Child("succeededCount")
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*rule.SucceededCount), succeededCountPath)...)
-		if *rule.SucceededCount > *spec.Completions {
-			allErrs = append(allErrs, field.Invalid(succeededCountPath, *rule.SucceededCount, fmt.Sprintf("must be less than or equal to %d (the number of specified completions)", *spec.Completions)))
-		}
-		if rule.SucceededIndexes != nil && *rule.SucceededCount > totalIndexes {
-			allErrs = append(allErrs, field.Invalid(succeededCountPath, *rule.SucceededCount, fmt.Sprintf("must be less than or equal to %d (the number of indexes in the specified succeededIndexes field)", totalIndexes)))
-		}
-	}
-	return allErrs
-}
-
 // validateJobStatus validates a JobStatus and returns an ErrorList with any errors.
 func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -524,6 +468,11 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("active"), status.Active, "active>0 is invalid for finished job"))
 		}
 	}
+	if opts.RejectFinishedJobWithTerminatingPods {
+		if status.Terminating != nil && *status.Terminating > 0 && isJobFinished {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("terminating"), status.Terminating, "terminating>0 is invalid for finished job"))
+		}
+	}
 	if opts.RejectFinishedJobWithoutStartTime {
 		if status.StartTime == nil && isJobFinished {
 			allErrs = append(allErrs, field.Required(fldPath.Child("startTime"), "startTime is required for finished job"))
@@ -536,14 +485,14 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	}
 	if opts.RejectInvalidCompletedIndexes {
 		if job.Spec.Completions != nil {
-			if _, err := validateIndexesFormat(status.CompletedIndexes, int32(*job.Spec.Completions)); err != nil {
+			if err := validateIndexesFormat(status.CompletedIndexes, int32(*job.Spec.Completions)); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("completedIndexes"), status.CompletedIndexes, fmt.Sprintf("error parsing completedIndexes: %s", err.Error())))
 			}
 		}
 	}
 	if opts.RejectInvalidFailedIndexes {
 		if job.Spec.Completions != nil && job.Spec.BackoffLimitPerIndex != nil && status.FailedIndexes != nil {
-			if _, err := validateIndexesFormat(*status.FailedIndexes, int32(*job.Spec.Completions)); err != nil {
+			if err := validateIndexesFormat(*status.FailedIndexes, int32(*job.Spec.Completions)); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("failedIndexes"), status.FailedIndexes, fmt.Sprintf("error parsing failedIndexes: %s", err.Error())))
 			}
 		}
@@ -561,27 +510,17 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("failedIndexes"), *status.FailedIndexes, "cannot set non-null failedIndexes when backoffLimitPerIndex is null"))
 		}
 	}
+	if opts.RejectMoreReadyThanActivePods {
+		if status.Ready != nil && *status.Ready > status.Active {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ready"), *status.Ready, "cannot set more ready pods than active"))
+		}
+	}
 	if opts.RejectFailedIndexesOverlappingCompleted {
 		if job.Spec.Completions != nil && status.FailedIndexes != nil {
 			if err := validateFailedIndexesNotOverlapCompleted(status.CompletedIndexes, *status.FailedIndexes, int32(*job.Spec.Completions)); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("failedIndexes"), *status.FailedIndexes, err.Error()))
 			}
 		}
-	}
-	if ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet to NonIndexed Job"))
-	}
-	if isJobSuccessCriteriaMet(job) && IsJobFailed(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and Failed=true conditions"))
-	}
-	if isJobSuccessCriteriaMet(job) && isJobFailureTarget(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and FailureTarget=true conditions"))
-	}
-	if job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job without SuccessPolicy"))
-	}
-	if job.Spec.SuccessPolicy != nil && !isJobSuccessCriteriaMet(job) && IsJobComplete(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Complete=True for Job with SuccessPolicy unless SuccessCriteriaMet=True"))
 	}
 	return allErrs
 }
@@ -611,7 +550,6 @@ func ValidateJobSpecUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Path, opt
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodFailurePolicy, oldSpec.PodFailurePolicy, fldPath.Child("podFailurePolicy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.BackoffLimitPerIndex, oldSpec.BackoffLimitPerIndex, fldPath.Child("backoffLimitPerIndex"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.ManagedBy, oldSpec.ManagedBy, fldPath.Child("managedBy"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SuccessPolicy, oldSpec.SuccessPolicy, fldPath.Child("successPolicy"))...)
 	return allErrs
 }
 
@@ -682,12 +620,6 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 		if oldJob.Status.StartTime != nil && !ptr.Equal(oldJob.Status.StartTime, job.Status.StartTime) && !ptr.Deref(job.Spec.Suspend, false) {
 			allErrs = append(allErrs, field.Required(statusFld.Child("startTime"), "startTime cannot be removed for unsuspended job"))
 		}
-	}
-	if isJobSuccessCriteriaMet(oldJob) && !isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(statusFld.Child("conditions"), field.OmitValueType{}, "cannot disable the SuccessCriteriaMet=True condition"))
-	}
-	if IsJobComplete(oldJob) && !isJobSuccessCriteriaMet(oldJob) && isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(statusFld.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job already has Complete=true conditions"))
 	}
 	return allErrs
 }
@@ -883,14 +815,6 @@ func IsJobFailed(job *batch.Job) bool {
 	return IsConditionTrue(job.Status.Conditions, batch.JobFailed)
 }
 
-func isJobSuccessCriteriaMet(job *batch.Job) bool {
-	return IsConditionTrue(job.Status.Conditions, batch.JobSuccessCriteriaMet)
-}
-
-func isJobFailureTarget(job *batch.Job) bool {
-	return IsConditionTrue(job.Status.Conditions, batch.JobFailureTarget)
-}
-
 func IsConditionTrue(list []batch.JobCondition, cType batch.JobConditionType) bool {
 	for _, c := range list {
 		if c.Type == cType && c.Status == api.ConditionTrue {
@@ -946,24 +870,22 @@ func validateFailedIndexesNotOverlapCompleted(completedIndexesStr string, failed
 	return nil
 }
 
-func validateIndexesFormat(indexesStr string, completions int32) (int32, error) {
+func validateIndexesFormat(indexesStr string, completions int32) error {
 	if len(indexesStr) == 0 {
-		return 0, nil
+		return nil
 	}
 	var lastIndex *int32
-	var total int32
 	for _, intervalStr := range strings.Split(indexesStr, ",") {
 		x, y, err := parseIndexInterval(intervalStr, completions)
 		if err != nil {
-			return 0, err
+			return err
 		}
 		if lastIndex != nil && *lastIndex >= x {
-			return 0, fmt.Errorf("non-increasing order, previous: %d, current: %d", *lastIndex, x)
+			return fmt.Errorf("non-increasing order, previous: %d, current: %d", *lastIndex, x)
 		}
-		total += y - x + 1
 		lastIndex = &y
 	}
-	return total, nil
+	return nil
 }
 
 func parseIndexInterval(intervalStr string, completions int32) (int32, int32, error) {
@@ -1013,7 +935,9 @@ type JobStatusValidationOptions struct {
 	RejectFailedIndexesOverlappingCompleted      bool
 	RejectCompletedIndexesForNonIndexedJob       bool
 	RejectFailedIndexesForNoBackoffLimitPerIndex bool
+	RejectMoreReadyThanActivePods                bool
 	RejectFinishedJobWithActivePods              bool
+	RejectFinishedJobWithTerminatingPods         bool
 	RejectFinishedJobWithoutStartTime            bool
 	RejectFinishedJobWithUncountedTerminatedPods bool
 	RejectStartTimeUpdateForUnsuspendedJob       bool

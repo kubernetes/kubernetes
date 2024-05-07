@@ -30,11 +30,8 @@ type ResourceV1alpha2Interface interface {
 	RESTClient() rest.Interface
 	PodSchedulingContextsGetter
 	ResourceClaimsGetter
-	ResourceClaimParametersGetter
 	ResourceClaimTemplatesGetter
 	ResourceClassesGetter
-	ResourceClassParametersGetter
-	ResourceSlicesGetter
 }
 
 // ResourceV1alpha2Client is used to interact with features provided by the resource.k8s.io group.
@@ -50,24 +47,12 @@ func (c *ResourceV1alpha2Client) ResourceClaims(namespace string) ResourceClaimI
 	return newResourceClaims(c, namespace)
 }
 
-func (c *ResourceV1alpha2Client) ResourceClaimParameters(namespace string) ResourceClaimParametersInterface {
-	return newResourceClaimParameters(c, namespace)
-}
-
 func (c *ResourceV1alpha2Client) ResourceClaimTemplates(namespace string) ResourceClaimTemplateInterface {
 	return newResourceClaimTemplates(c, namespace)
 }
 
 func (c *ResourceV1alpha2Client) ResourceClasses() ResourceClassInterface {
 	return newResourceClasses(c)
-}
-
-func (c *ResourceV1alpha2Client) ResourceClassParameters(namespace string) ResourceClassParametersInterface {
-	return newResourceClassParameters(c, namespace)
-}
-
-func (c *ResourceV1alpha2Client) ResourceSlices() ResourceSliceInterface {
-	return newResourceSlices(c)
 }
 
 // NewForConfig creates a new ResourceV1alpha2Client for the given config.

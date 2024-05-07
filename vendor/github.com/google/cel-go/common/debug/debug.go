@@ -22,9 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/cel-go/common/ast"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // Adorner returns debug metadata that will be tacked on to the string
@@ -40,7 +38,7 @@ type Writer interface {
 
 	// Buffer pushes an expression into an internal queue of expressions to
 	// write to a string.
-	Buffer(e ast.Expr)
+	Buffer(e *exprpb.Expr)
 }
 
 type emptyDebugAdorner struct {
@@ -53,12 +51,12 @@ func (a *emptyDebugAdorner) GetMetadata(e any) string {
 }
 
 // ToDebugString gives the unadorned string representation of the Expr.
-func ToDebugString(e ast.Expr) string {
+func ToDebugString(e *exprpb.Expr) string {
 	return ToAdornedDebugString(e, emptyAdorner)
 }
 
 // ToAdornedDebugString gives the adorned string representation of the Expr.
-func ToAdornedDebugString(e ast.Expr, adorner Adorner) string {
+func ToAdornedDebugString(e *exprpb.Expr, adorner Adorner) string {
 	w := newDebugWriter(adorner)
 	w.Buffer(e)
 	return w.String()
@@ -80,51 +78,49 @@ func newDebugWriter(a Adorner) *debugWriter {
 	}
 }
 
-func (w *debugWriter) Buffer(e ast.Expr) {
+func (w *debugWriter) Buffer(e *exprpb.Expr) {
 	if e == nil {
 		return
 	}
-	switch e.Kind() {
-	case ast.LiteralKind:
-		w.append(formatLiteral(e.AsLiteral()))
-	case ast.IdentKind:
-		w.append(e.AsIdent())
-	case ast.SelectKind:
-		w.appendSelect(e.AsSelect())
-	case ast.CallKind:
-		w.appendCall(e.AsCall())
-	case ast.ListKind:
-		w.appendList(e.AsList())
-	case ast.MapKind:
-		w.appendMap(e.AsMap())
-	case ast.StructKind:
-		w.appendStruct(e.AsStruct())
-	case ast.ComprehensionKind:
-		w.appendComprehension(e.AsComprehension())
+	switch e.ExprKind.(type) {
+	case *exprpb.Expr_ConstExpr:
+		w.append(formatLiteral(e.GetConstExpr()))
+	case *exprpb.Expr_IdentExpr:
+		w.append(e.GetIdentExpr().Name)
+	case *exprpb.Expr_SelectExpr:
+		w.appendSelect(e.GetSelectExpr())
+	case *exprpb.Expr_CallExpr:
+		w.appendCall(e.GetCallExpr())
+	case *exprpb.Expr_ListExpr:
+		w.appendList(e.GetListExpr())
+	case *exprpb.Expr_StructExpr:
+		w.appendStruct(e.GetStructExpr())
+	case *exprpb.Expr_ComprehensionExpr:
+		w.appendComprehension(e.GetComprehensionExpr())
 	}
 	w.adorn(e)
 }
 
-func (w *debugWriter) appendSelect(sel ast.SelectExpr) {
-	w.Buffer(sel.Operand())
+func (w *debugWriter) appendSelect(sel *exprpb.Expr_Select) {
+	w.Buffer(sel.GetOperand())
 	w.append(".")
-	w.append(sel.FieldName())
-	if sel.IsTestOnly() {
+	w.append(sel.GetField())
+	if sel.TestOnly {
 		w.append("~test-only~")
 	}
 }
 
-func (w *debugWriter) appendCall(call ast.CallExpr) {
-	if call.IsMemberFunction() {
-		w.Buffer(call.Target())
+func (w *debugWriter) appendCall(call *exprpb.Expr_Call) {
+	if call.Target != nil {
+		w.Buffer(call.GetTarget())
 		w.append(".")
 	}
-	w.append(call.FunctionName())
+	w.append(call.GetFunction())
 	w.append("(")
-	if len(call.Args()) > 0 {
+	if len(call.GetArgs()) > 0 {
 		w.addIndent()
 		w.appendLine()
-		for i, arg := range call.Args() {
+		for i, arg := range call.GetArgs() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
@@ -137,12 +133,12 @@ func (w *debugWriter) appendCall(call ast.CallExpr) {
 	w.append(")")
 }
 
-func (w *debugWriter) appendList(list ast.ListExpr) {
+func (w *debugWriter) appendList(list *exprpb.Expr_CreateList) {
 	w.append("[")
-	if len(list.Elements()) > 0 {
+	if len(list.GetElements()) > 0 {
 		w.appendLine()
 		w.addIndent()
-		for i, elem := range list.Elements() {
+		for i, elem := range list.GetElements() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
@@ -155,25 +151,32 @@ func (w *debugWriter) appendList(list ast.ListExpr) {
 	w.append("]")
 }
 
-func (w *debugWriter) appendStruct(obj ast.StructExpr) {
-	w.append(obj.TypeName())
+func (w *debugWriter) appendStruct(obj *exprpb.Expr_CreateStruct) {
+	if obj.MessageName != "" {
+		w.appendObject(obj)
+	} else {
+		w.appendMap(obj)
+	}
+}
+
+func (w *debugWriter) appendObject(obj *exprpb.Expr_CreateStruct) {
+	w.append(obj.GetMessageName())
 	w.append("{")
-	if len(obj.Fields()) > 0 {
+	if len(obj.GetEntries()) > 0 {
 		w.appendLine()
 		w.addIndent()
-		for i, f := range obj.Fields() {
-			field := f.AsStructField()
+		for i, entry := range obj.GetEntries() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
 			}
-			if field.IsOptional() {
+			if entry.GetOptionalEntry() {
 				w.append("?")
 			}
-			w.append(field.Name())
+			w.append(entry.GetFieldKey())
 			w.append(":")
-			w.Buffer(field.Value())
-			w.adorn(f)
+			w.Buffer(entry.GetValue())
+			w.adorn(entry)
 		}
 		w.removeIndent()
 		w.appendLine()
@@ -181,24 +184,23 @@ func (w *debugWriter) appendStruct(obj ast.StructExpr) {
 	w.append("}")
 }
 
-func (w *debugWriter) appendMap(m ast.MapExpr) {
+func (w *debugWriter) appendMap(obj *exprpb.Expr_CreateStruct) {
 	w.append("{")
-	if m.Size() > 0 {
+	if len(obj.GetEntries()) > 0 {
 		w.appendLine()
 		w.addIndent()
-		for i, e := range m.Entries() {
-			entry := e.AsMapEntry()
+		for i, entry := range obj.GetEntries() {
 			if i > 0 {
 				w.append(",")
 				w.appendLine()
 			}
-			if entry.IsOptional() {
+			if entry.GetOptionalEntry() {
 				w.append("?")
 			}
-			w.Buffer(entry.Key())
+			w.Buffer(entry.GetMapKey())
 			w.append(":")
-			w.Buffer(entry.Value())
-			w.adorn(e)
+			w.Buffer(entry.GetValue())
+			w.adorn(entry)
 		}
 		w.removeIndent()
 		w.appendLine()
@@ -206,62 +208,62 @@ func (w *debugWriter) appendMap(m ast.MapExpr) {
 	w.append("}")
 }
 
-func (w *debugWriter) appendComprehension(comprehension ast.ComprehensionExpr) {
+func (w *debugWriter) appendComprehension(comprehension *exprpb.Expr_Comprehension) {
 	w.append("__comprehension__(")
 	w.addIndent()
 	w.appendLine()
 	w.append("// Variable")
 	w.appendLine()
-	w.append(comprehension.IterVar())
+	w.append(comprehension.GetIterVar())
 	w.append(",")
 	w.appendLine()
 	w.append("// Target")
 	w.appendLine()
-	w.Buffer(comprehension.IterRange())
+	w.Buffer(comprehension.GetIterRange())
 	w.append(",")
 	w.appendLine()
 	w.append("// Accumulator")
 	w.appendLine()
-	w.append(comprehension.AccuVar())
+	w.append(comprehension.GetAccuVar())
 	w.append(",")
 	w.appendLine()
 	w.append("// Init")
 	w.appendLine()
-	w.Buffer(comprehension.AccuInit())
+	w.Buffer(comprehension.GetAccuInit())
 	w.append(",")
 	w.appendLine()
 	w.append("// LoopCondition")
 	w.appendLine()
-	w.Buffer(comprehension.LoopCondition())
+	w.Buffer(comprehension.GetLoopCondition())
 	w.append(",")
 	w.appendLine()
 	w.append("// LoopStep")
 	w.appendLine()
-	w.Buffer(comprehension.LoopStep())
+	w.Buffer(comprehension.GetLoopStep())
 	w.append(",")
 	w.appendLine()
 	w.append("// Result")
 	w.appendLine()
-	w.Buffer(comprehension.Result())
+	w.Buffer(comprehension.GetResult())
 	w.append(")")
 	w.removeIndent()
 }
 
-func formatLiteral(c ref.Val) string {
-	switch v := c.(type) {
-	case types.Bool:
-		return fmt.Sprintf("%t", v)
-	case types.Bytes:
-		return fmt.Sprintf("b\"%s\"", string(v))
-	case types.Double:
-		return fmt.Sprintf("%v", float64(v))
-	case types.Int:
-		return fmt.Sprintf("%d", int64(v))
-	case types.String:
-		return strconv.Quote(string(v))
-	case types.Uint:
-		return fmt.Sprintf("%du", uint64(v))
-	case types.Null:
+func formatLiteral(c *exprpb.Constant) string {
+	switch c.GetConstantKind().(type) {
+	case *exprpb.Constant_BoolValue:
+		return fmt.Sprintf("%t", c.GetBoolValue())
+	case *exprpb.Constant_BytesValue:
+		return fmt.Sprintf("b\"%s\"", string(c.GetBytesValue()))
+	case *exprpb.Constant_DoubleValue:
+		return fmt.Sprintf("%v", c.GetDoubleValue())
+	case *exprpb.Constant_Int64Value:
+		return fmt.Sprintf("%d", c.GetInt64Value())
+	case *exprpb.Constant_StringValue:
+		return strconv.Quote(c.GetStringValue())
+	case *exprpb.Constant_Uint64Value:
+		return fmt.Sprintf("%du", c.GetUint64Value())
+	case *exprpb.Constant_NullValue:
 		return "null"
 	default:
 		panic("Unknown constant type")

@@ -309,7 +309,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 			expectedTrace: []*spanExpectation{
 				{
-					name: "POST /api/v1/nodes",
+					name: "KubernetesAPI",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"http.user_agent": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
@@ -428,7 +428,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 			expectedTrace: []*spanExpectation{
 				{
-					name: "GET /api/v1/nodes/{:name}",
+					name: "KubernetesAPI",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"http.user_agent": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
@@ -518,7 +518,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 			expectedTrace: []*spanExpectation{
 				{
-					name: "GET /api/v1/nodes",
+					name: "KubernetesAPI",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"http.user_agent": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
@@ -636,7 +636,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 			expectedTrace: []*spanExpectation{
 				{
-					name: "PUT /api/v1/nodes/{:name}",
+					name: "KubernetesAPI",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"http.user_agent": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
@@ -780,7 +780,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 			expectedTrace: []*spanExpectation{
 				{
-					name: "PATCH /api/v1/nodes/{:name}",
+					name: "KubernetesAPI",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"http.user_agent": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
@@ -901,7 +901,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 			},
 			expectedTrace: []*spanExpectation{
 				{
-					name: "DELETE /api/v1/nodes/{:name}",
+					name: "KubernetesAPI",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"http.user_agent": func(v *commonv1.AnyValue) bool {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")

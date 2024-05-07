@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/rbac/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,10 +39,30 @@ type ClusterRoleLister interface {
 
 // clusterRoleLister implements the ClusterRoleLister interface.
 type clusterRoleLister struct {
-	listers.ResourceIndexer[*v1beta1.ClusterRole]
+	indexer cache.Indexer
 }
 
 // NewClusterRoleLister returns a new ClusterRoleLister.
 func NewClusterRoleLister(indexer cache.Indexer) ClusterRoleLister {
-	return &clusterRoleLister{listers.New[*v1beta1.ClusterRole](indexer, v1beta1.Resource("clusterrole"))}
+	return &clusterRoleLister{indexer: indexer}
+}
+
+// List lists all ClusterRoles in the indexer.
+func (s *clusterRoleLister) List(selector labels.Selector) (ret []*v1beta1.ClusterRole, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1beta1.ClusterRole))
+	})
+	return ret, err
+}
+
+// Get retrieves the ClusterRole from the index for a given name.
+func (s *clusterRoleLister) Get(name string) (*v1beta1.ClusterRole, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(v1beta1.Resource("clusterrole"), name)
+	}
+	return obj.(*v1beta1.ClusterRole), nil
 }

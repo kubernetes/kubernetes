@@ -33,7 +33,6 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -42,7 +41,7 @@ var _ = utils.SIGDescribe("Multi-AZ Cluster Volumes", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var zoneCount int
 	var err error
-	image := imageutils.GetE2EImage(imageutils.Agnhost)
+	image := framework.ServeHostnameImage
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		if zoneCount <= 0 {

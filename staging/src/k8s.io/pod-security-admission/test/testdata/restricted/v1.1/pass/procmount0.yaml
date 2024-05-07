@@ -8,7 +8,6 @@ spec:
     name: container1
     securityContext:
       procMount: Default
-  hostUsers: false
   initContainers:
   - image: registry.k8s.io/pause
     name: initcontainer1

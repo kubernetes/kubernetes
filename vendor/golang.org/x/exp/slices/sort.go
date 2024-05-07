@@ -30,7 +30,7 @@ func SortFunc[E any](x []E, less func(a, b E) bool) {
 	pdqsortLessFunc(x, 0, n, bits.Len(uint(n)), less)
 }
 
-// SortStableFunc sorts the slice x while keeping the original order of equal
+// SortStable sorts the slice x while keeping the original order of equal
 // elements, using less to compare elements.
 func SortStableFunc[E any](x []E, less func(a, b E) bool) {
 	stableLessFunc(x, len(x), less)
@@ -62,47 +62,46 @@ func IsSortedFunc[E any](x []E, less func(a, b E) bool) bool {
 // sort order; it also returns a bool saying whether the target is really found
 // in the slice. The slice must be sorted in increasing order.
 func BinarySearch[E constraints.Ordered](x []E, target E) (int, bool) {
-	// Inlining is faster than calling BinarySearchFunc with a lambda.
-	n := len(x)
-	// Define x[-1] < target and x[n] >= target.
-	// Invariant: x[i-1] < target, x[j] >= target.
-	i, j := 0, n
-	for i < j {
-		h := int(uint(i+j) >> 1) // avoid overflow when computing h
-		// i ≤ h < j
-		if x[h] < target {
-			i = h + 1 // preserves x[i-1] < target
-		} else {
-			j = h // preserves x[j] >= target
-		}
+	// search returns the leftmost position where f returns true, or len(x) if f
+	// returns false for all x. This is the insertion position for target in x,
+	// and could point to an element that's either == target or not.
+	pos := search(len(x), func(i int) bool { return x[i] >= target })
+	if pos >= len(x) || x[pos] != target {
+		return pos, false
+	} else {
+		return pos, true
 	}
-	// i == j, x[i-1] < target, and x[j] (= x[i]) >= target  =>  answer is i.
-	return i, i < n && x[i] == target
 }
 
 // BinarySearchFunc works like BinarySearch, but uses a custom comparison
-// function. The slice must be sorted in increasing order, where "increasing"
-// is defined by cmp. cmp should return 0 if the slice element matches
-// the target, a negative number if the slice element precedes the target,
-// or a positive number if the slice element follows the target.
-// cmp must implement the same ordering as the slice, such that if
-// cmp(a, t) < 0 and cmp(b, t) >= 0, then a must precede b in the slice.
-func BinarySearchFunc[E, T any](x []E, target T, cmp func(E, T) int) (int, bool) {
-	n := len(x)
-	// Define cmp(x[-1], target) < 0 and cmp(x[n], target) >= 0 .
-	// Invariant: cmp(x[i - 1], target) < 0, cmp(x[j], target) >= 0.
+// function. The slice must be sorted in increasing order, where "increasing" is
+// defined by cmp. cmp(a, b) is expected to return an integer comparing the two
+// parameters: 0 if a == b, a negative number if a < b and a positive number if
+// a > b.
+func BinarySearchFunc[E any](x []E, target E, cmp func(E, E) int) (int, bool) {
+	pos := search(len(x), func(i int) bool { return cmp(x[i], target) >= 0 })
+	if pos >= len(x) || cmp(x[pos], target) != 0 {
+		return pos, false
+	} else {
+		return pos, true
+	}
+}
+
+func search(n int, f func(int) bool) int {
+	// Define f(-1) == false and f(n) == true.
+	// Invariant: f(i-1) == false, f(j) == true.
 	i, j := 0, n
 	for i < j {
 		h := int(uint(i+j) >> 1) // avoid overflow when computing h
 		// i ≤ h < j
-		if cmp(x[h], target) < 0 {
-			i = h + 1 // preserves cmp(x[i - 1], target) < 0
+		if !f(h) {
+			i = h + 1 // preserves f(i-1) == false
 		} else {
-			j = h // preserves cmp(x[j], target) >= 0
+			j = h // preserves f(j) == true
 		}
 	}
-	// i == j, cmp(x[i-1], target) < 0, and cmp(x[j], target) (= cmp(x[i], target)) >= 0  =>  answer is i.
-	return i, i < n && cmp(x[i], target) == 0
+	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
+	return i
 }
 
 type sortedHint int // hint for pdqsort when choosing the pivot

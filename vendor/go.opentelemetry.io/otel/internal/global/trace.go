@@ -39,7 +39,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/embedded"
 )
 
 // tracerProvider is a placeholder for a configured SDK TracerProvider.
@@ -47,8 +46,6 @@ import (
 // All TracerProvider functionality is forwarded to a delegate once
 // configured.
 type tracerProvider struct {
-	embedded.TracerProvider
-
 	mtx      sync.Mutex
 	tracers  map[il]*tracer
 	delegate trace.TracerProvider
@@ -122,8 +119,6 @@ type il struct {
 // All Tracer functionality is forwarded to a delegate once configured.
 // Otherwise, all functionality is forwarded to a NoopTracer.
 type tracer struct {
-	embedded.Tracer
-
 	name     string
 	opts     []trace.TracerOption
 	provider *tracerProvider
@@ -161,8 +156,6 @@ func (t *tracer) Start(ctx context.Context, name string, opts ...trace.SpanStart
 // SpanContext. It performs no operations other than to return the wrapped
 // SpanContext.
 type nonRecordingSpan struct {
-	embedded.Span
-
 	sc     trace.SpanContext
 	tracer *tracer
 }

@@ -22,7 +22,6 @@ syntax = "proto2";
 package k8s.io.api.resource.v1alpha2;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -56,156 +55,12 @@ message AllocationResult {
   // Setting this field is optional. If null, the resource is available
   // everywhere.
   // +optional
-  optional .k8s.io.api.core.v1.NodeSelector availableOnNodes = 2;
+  optional k8s.io.api.core.v1.NodeSelector availableOnNodes = 2;
 
   // Shareable determines whether the resource supports more
   // than one consumer at a time.
   // +optional
   optional bool shareable = 3;
-}
-
-// AllocationResultModel must have one and only one field set.
-message AllocationResultModel {
-  // NamedResources describes the allocation result when using the named resources model.
-  //
-  // +optional
-  optional NamedResourcesAllocationResult namedResources = 1;
-}
-
-// DriverAllocationResult contains vendor parameters and the allocation result for
-// one request.
-message DriverAllocationResult {
-  // VendorRequestParameters are the per-request configuration parameters
-  // from the time that the claim was allocated.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorRequestParameters = 1;
-
-  optional AllocationResultModel allocationResultModel = 2;
-}
-
-// DriverRequests describes all resources that are needed from one particular driver.
-message DriverRequests {
-  // DriverName is the name used by the DRA driver kubelet plugin.
-  optional string driverName = 1;
-
-  // VendorParameters are arbitrary setup parameters for all requests of the
-  // claim. They are ignored while allocating the claim.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorParameters = 2;
-
-  // Requests describes all resources that are needed from the driver.
-  // +listType=atomic
-  repeated ResourceRequest requests = 3;
-}
-
-// NamedResourcesAllocationResult is used in AllocationResultModel.
-message NamedResourcesAllocationResult {
-  // Name is the name of the selected resource instance.
-  optional string name = 1;
-}
-
-// NamedResourcesAttribute is a combination of an attribute name and its value.
-message NamedResourcesAttribute {
-  // Name is unique identifier among all resource instances managed by
-  // the driver on the node. It must be a DNS subdomain.
-  optional string name = 1;
-
-  optional NamedResourcesAttributeValue attributeValue = 2;
-}
-
-// NamedResourcesAttributeValue must have one and only one field set.
-message NamedResourcesAttributeValue {
-  // QuantityValue is a quantity.
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 6;
-
-  // BoolValue is a true/false value.
-  optional bool bool = 2;
-
-  // IntValue is a 64-bit integer.
-  optional int64 int = 7;
-
-  // IntSliceValue is an array of 64-bit integers.
-  optional NamedResourcesIntSlice intSlice = 8;
-
-  // StringValue is a string.
-  optional string string = 5;
-
-  // StringSliceValue is an array of strings.
-  optional NamedResourcesStringSlice stringSlice = 9;
-
-  // VersionValue is a semantic version according to semver.org spec 2.0.0.
-  optional string version = 10;
-}
-
-// NamedResourcesFilter is used in ResourceFilterModel.
-message NamedResourcesFilter {
-  // Selector is a CEL expression which must evaluate to true if a
-  // resource instance is suitable. The language is as defined in
-  // https://kubernetes.io/docs/reference/using-api/cel/
-  //
-  // In addition, for each type in NamedResourcesAttributeValue there is a map that
-  // resolves to the corresponding value of the instance under evaluation.
-  // For example:
-  //
-  //    attributes.quantity["a"].isGreaterThan(quantity("0")) &&
-  //    attributes.stringslice["b"].isSorted()
-  optional string selector = 1;
-}
-
-// NamedResourcesInstance represents one individual hardware instance that can be selected based
-// on its attributes.
-message NamedResourcesInstance {
-  // Name is unique identifier among all resource instances managed by
-  // the driver on the node. It must be a DNS subdomain.
-  optional string name = 1;
-
-  // Attributes defines the attributes of this resource instance.
-  // The name of each attribute must be unique.
-  //
-  // +listType=atomic
-  // +optional
-  repeated NamedResourcesAttribute attributes = 2;
-}
-
-// NamedResourcesIntSlice contains a slice of 64-bit integers.
-message NamedResourcesIntSlice {
-  // Ints is the slice of 64-bit integers.
-  //
-  // +listType=atomic
-  repeated int64 ints = 1;
-}
-
-// NamedResourcesRequest is used in ResourceRequestModel.
-message NamedResourcesRequest {
-  // Selector is a CEL expression which must evaluate to true if a
-  // resource instance is suitable. The language is as defined in
-  // https://kubernetes.io/docs/reference/using-api/cel/
-  //
-  // In addition, for each type NamedResourcesin AttributeValue there is a map that
-  // resolves to the corresponding value of the instance under evaluation.
-  // For example:
-  //
-  //    attributes.quantity["a"].isGreaterThan(quantity("0")) &&
-  //    attributes.stringslice["b"].isSorted()
-  optional string selector = 1;
-}
-
-// NamedResourcesResources is used in ResourceModel.
-message NamedResourcesResources {
-  // The list of all individual resources instances currently available.
-  //
-  // +listType=atomic
-  repeated NamedResourcesInstance instances = 1;
-}
-
-// NamedResourcesStringSlice contains a slice of strings.
-message NamedResourcesStringSlice {
-  // Strings is the slice of strings.
-  //
-  // +listType=atomic
-  repeated string strings = 1;
 }
 
 // PodSchedulingContext objects hold information that is needed to schedule
@@ -217,7 +72,7 @@ message NamedResourcesStringSlice {
 message PodSchedulingContext {
   // Standard object metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec describes where resources for the Pod are needed.
   optional PodSchedulingContextSpec spec = 2;
@@ -231,7 +86,7 @@ message PodSchedulingContext {
 message PodSchedulingContextList {
   // Standard list metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of PodSchedulingContext objects.
   repeated PodSchedulingContext items = 2;
@@ -278,7 +133,7 @@ message PodSchedulingContextStatus {
 message ResourceClaim {
   // Standard object metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec describes the desired attributes of a resource that then needs
   // to be allocated. It can only be set once when creating the
@@ -315,49 +170,10 @@ message ResourceClaimConsumerReference {
 message ResourceClaimList {
   // Standard list metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of resource claims.
   repeated ResourceClaim items = 2;
-}
-
-// ResourceClaimParameters defines resource requests for a ResourceClaim in an
-// in-tree format understood by Kubernetes.
-message ResourceClaimParameters {
-  // Standard object metadata
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // If this object was created from some other resource, then this links
-  // back to that resource. This field is used to find the in-tree representation
-  // of the claim parameters when the parameter reference of the claim refers
-  // to some unknown type.
-  // +optional
-  optional ResourceClaimParametersReference generatedFrom = 2;
-
-  // Shareable indicates whether the allocated claim is meant to be shareable
-  // by multiple consumers at the same time.
-  // +optional
-  optional bool shareable = 3;
-
-  // DriverRequests describes all resources that are needed for the
-  // allocated claim. A single claim may use resources coming from
-  // different drivers. For each driver, this array has at most one
-  // entry which then may have one or more per-driver requests.
-  //
-  // May be empty, in which case the claim can always be allocated.
-  //
-  // +listType=atomic
-  repeated DriverRequests driverRequests = 4;
-}
-
-// ResourceClaimParametersList is a collection of ResourceClaimParameters.
-message ResourceClaimParametersList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of node resource capacity objects.
-  repeated ResourceClaimParameters items = 2;
 }
 
 // ResourceClaimParametersReference contains enough information to let you
@@ -462,7 +278,7 @@ message ResourceClaimStatus {
 message ResourceClaimTemplate {
   // Standard object metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Describes the ResourceClaim that is to be generated.
   //
@@ -476,7 +292,7 @@ message ResourceClaimTemplate {
 message ResourceClaimTemplateList {
   // Standard list metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of resource claim templates.
   repeated ResourceClaimTemplate items = 2;
@@ -488,7 +304,7 @@ message ResourceClaimTemplateSpec {
   // when creating it. No other fields are allowed and will be rejected during
   // validation.
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec for the ResourceClaim. The entire content is copied unchanged
   // into the ResourceClaim that gets created from this template. The
@@ -504,7 +320,7 @@ message ResourceClaimTemplateSpec {
 message ResourceClass {
   // Standard object metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // DriverName defines the name of the dynamic resource driver that is
   // used for allocation of a ResourceClaim that uses this class.
@@ -527,59 +343,17 @@ message ResourceClass {
   //
   // Setting this field is optional. If null, all nodes are candidates.
   // +optional
-  optional .k8s.io.api.core.v1.NodeSelector suitableNodes = 4;
-
-  // If and only if allocation of claims using this class is handled
-  // via structured parameters, then StructuredParameters must be set to true.
-  // +optional
-  optional bool structuredParameters = 5;
+  optional k8s.io.api.core.v1.NodeSelector suitableNodes = 4;
 }
 
 // ResourceClassList is a collection of classes.
 message ResourceClassList {
   // Standard list metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of resource classes.
   repeated ResourceClass items = 2;
-}
-
-// ResourceClassParameters defines resource requests for a ResourceClass in an
-// in-tree format understood by Kubernetes.
-message ResourceClassParameters {
-  // Standard object metadata
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // If this object was created from some other resource, then this links
-  // back to that resource. This field is used to find the in-tree representation
-  // of the class parameters when the parameter reference of the class refers
-  // to some unknown type.
-  // +optional
-  optional ResourceClassParametersReference generatedFrom = 2;
-
-  // VendorParameters are arbitrary setup parameters for all claims using
-  // this class. They are ignored while allocating the claim. There must
-  // not be more than one entry per driver.
-  //
-  // +listType=atomic
-  // +optional
-  repeated VendorParameters vendorParameters = 3;
-
-  // Filters describes additional contraints that must be met when using the class.
-  //
-  // +listType=atomic
-  repeated ResourceFilter filters = 4;
-}
-
-// ResourceClassParametersList is a collection of ResourceClassParameters.
-message ResourceClassParametersList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of node resource capacity objects.
-  repeated ResourceClassParameters items = 2;
 }
 
 // ResourceClassParametersReference contains enough information to let you
@@ -605,22 +379,6 @@ message ResourceClassParametersReference {
   optional string namespace = 4;
 }
 
-// ResourceFilter is a filter for resources from one particular driver.
-message ResourceFilter {
-  // DriverName is the name used by the DRA driver kubelet plugin.
-  optional string driverName = 1;
-
-  optional ResourceFilterModel resourceFilterModel = 2;
-}
-
-// ResourceFilterModel must have one and only one field set.
-message ResourceFilterModel {
-  // NamedResources describes a resource filter using the named resources model.
-  //
-  // +optional
-  optional NamedResourcesFilter namedResources = 1;
-}
-
 // ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.
 message ResourceHandle {
   // DriverName specifies the name of the resource driver whose kubelet
@@ -640,110 +398,5 @@ message ResourceHandle {
   // future, but not reduced.
   // +optional
   optional string data = 2;
-
-  // If StructuredData is set, then it needs to be used instead of Data.
-  //
-  // +optional
-  optional StructuredResourceHandle structuredData = 5;
-}
-
-// ResourceModel must have one and only one field set.
-message ResourceModel {
-  // NamedResources describes available resources using the named resources model.
-  //
-  // +optional
-  optional NamedResourcesResources namedResources = 1;
-}
-
-// ResourceRequest is a request for resources from one particular driver.
-message ResourceRequest {
-  // VendorParameters are arbitrary setup parameters for the requested
-  // resource. They are ignored while allocating a claim.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorParameters = 1;
-
-  optional ResourceRequestModel resourceRequestModel = 2;
-}
-
-// ResourceRequestModel must have one and only one field set.
-message ResourceRequestModel {
-  // NamedResources describes a request for resources with the named resources model.
-  //
-  // +optional
-  optional NamedResourcesRequest namedResources = 1;
-}
-
-// ResourceSlice provides information about available
-// resources on individual nodes.
-message ResourceSlice {
-  // Standard object metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // NodeName identifies the node which provides the resources
-  // if they are local to a node.
-  //
-  // A field selector can be used to list only ResourceSlice
-  // objects with a certain node name.
-  //
-  // +optional
-  optional string nodeName = 2;
-
-  // DriverName identifies the DRA driver providing the capacity information.
-  // A field selector can be used to list only ResourceSlice
-  // objects with a certain driver name.
-  optional string driverName = 3;
-
-  optional ResourceModel resourceModel = 4;
-}
-
-// ResourceSliceList is a collection of ResourceSlices.
-message ResourceSliceList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of node resource capacity objects.
-  repeated ResourceSlice items = 2;
-}
-
-// StructuredResourceHandle is the in-tree representation of the allocation result.
-message StructuredResourceHandle {
-  // VendorClassParameters are the per-claim configuration parameters
-  // from the resource class at the time that the claim was allocated.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorClassParameters = 1;
-
-  // VendorClaimParameters are the per-claim configuration parameters
-  // from the resource claim parameters at the time that the claim was
-  // allocated.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorClaimParameters = 2;
-
-  // NodeName is the name of the node providing the necessary resources
-  // if the resources are local to a node.
-  //
-  // +optional
-  optional string nodeName = 4;
-
-  // Results lists all allocated driver resources.
-  //
-  // +listType=atomic
-  repeated DriverAllocationResult results = 5;
-}
-
-// VendorParameters are opaque parameters for one particular driver.
-message VendorParameters {
-  // DriverName is the name used by the DRA driver kubelet plugin.
-  optional string driverName = 1;
-
-  // Parameters can be arbitrary setup parameters. They are ignored while
-  // allocating a claim.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension parameters = 2;
 }
 

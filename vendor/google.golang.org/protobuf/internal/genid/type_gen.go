@@ -18,13 +18,6 @@ const (
 	Syntax_enum_name     = "Syntax"
 )
 
-// Enum values for google.protobuf.Syntax.
-const (
-	Syntax_SYNTAX_PROTO2_enum_value   = 0
-	Syntax_SYNTAX_PROTO3_enum_value   = 1
-	Syntax_SYNTAX_EDITIONS_enum_value = 2
-)
-
 // Names for google.protobuf.Type.
 const (
 	Type_message_name     protoreflect.Name     = "Type"
@@ -112,41 +105,10 @@ const (
 	Field_Kind_enum_name     = "Kind"
 )
 
-// Enum values for google.protobuf.Field.Kind.
-const (
-	Field_TYPE_UNKNOWN_enum_value  = 0
-	Field_TYPE_DOUBLE_enum_value   = 1
-	Field_TYPE_FLOAT_enum_value    = 2
-	Field_TYPE_INT64_enum_value    = 3
-	Field_TYPE_UINT64_enum_value   = 4
-	Field_TYPE_INT32_enum_value    = 5
-	Field_TYPE_FIXED64_enum_value  = 6
-	Field_TYPE_FIXED32_enum_value  = 7
-	Field_TYPE_BOOL_enum_value     = 8
-	Field_TYPE_STRING_enum_value   = 9
-	Field_TYPE_GROUP_enum_value    = 10
-	Field_TYPE_MESSAGE_enum_value  = 11
-	Field_TYPE_BYTES_enum_value    = 12
-	Field_TYPE_UINT32_enum_value   = 13
-	Field_TYPE_ENUM_enum_value     = 14
-	Field_TYPE_SFIXED32_enum_value = 15
-	Field_TYPE_SFIXED64_enum_value = 16
-	Field_TYPE_SINT32_enum_value   = 17
-	Field_TYPE_SINT64_enum_value   = 18
-)
-
 // Full and short names for google.protobuf.Field.Cardinality.
 const (
 	Field_Cardinality_enum_fullname = "google.protobuf.Field.Cardinality"
 	Field_Cardinality_enum_name     = "Cardinality"
-)
-
-// Enum values for google.protobuf.Field.Cardinality.
-const (
-	Field_CARDINALITY_UNKNOWN_enum_value  = 0
-	Field_CARDINALITY_OPTIONAL_enum_value = 1
-	Field_CARDINALITY_REQUIRED_enum_value = 2
-	Field_CARDINALITY_REPEATED_enum_value = 3
 )
 
 // Names for google.protobuf.Enum.

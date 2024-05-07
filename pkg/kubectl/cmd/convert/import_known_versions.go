@@ -41,7 +41,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
-	_ "k8s.io/kubernetes/pkg/apis/storagemigration/install"
 
 	// Put the deprecated apis last to ensure that the latest apis can be used first.
 	// Related issue: https://github.com/kubernetes/kubernetes/issues/112682

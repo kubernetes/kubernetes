@@ -401,7 +401,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 				Should(HaveAllocatableDevices())
 		})
 
-		framework.It("should deploy pod consuming devices first but fail with admission error after kubelet restart in case device plugin hasn't re-registered", framework.WithFlaky(), func(ctx context.Context) {
+		ginkgo.It("should deploy pod consuming devices first but fail with admission error after kubelet restart in case device plugin hasn't re-registered", func(ctx context.Context) {
 			var err error
 			podCMD := "while true; do sleep 1000; done;"
 

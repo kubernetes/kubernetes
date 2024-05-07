@@ -22,6 +22,8 @@ import (
 	"github.com/google/cel-go/common/overloads"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/parser"
+
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // WARNING: Any changes to cost calculations in this file require a corresponding change in interpreter/runtimecost.go
@@ -56,7 +58,7 @@ type AstNode interface {
 	// Type returns the deduced type of the AstNode.
 	Type() *types.Type
 	// Expr returns the expression of the AstNode.
-	Expr() ast.Expr
+	Expr() *exprpb.Expr
 	// ComputedSize returns a size estimate of the AstNode derived from information available in the CEL expression.
 	// For constants and inline list and map declarations, the exact size is returned. For concatenated list, strings
 	// and bytes, the size is derived from the size estimates of the operands. nil is returned if there is no
@@ -67,7 +69,7 @@ type AstNode interface {
 type astNode struct {
 	path        []string
 	t           *types.Type
-	expr        ast.Expr
+	expr        *exprpb.Expr
 	derivedSize *SizeEstimate
 }
 
@@ -79,7 +81,7 @@ func (e astNode) Type() *types.Type {
 	return e.t
 }
 
-func (e astNode) Expr() ast.Expr {
+func (e astNode) Expr() *exprpb.Expr {
 	return e.expr
 }
 
@@ -88,27 +90,29 @@ func (e astNode) ComputedSize() *SizeEstimate {
 		return e.derivedSize
 	}
 	var v uint64
-	switch e.expr.Kind() {
-	case ast.LiteralKind:
-		switch ck := e.expr.AsLiteral().(type) {
-		case types.String:
+	switch ek := e.expr.GetExprKind().(type) {
+	case *exprpb.Expr_ConstExpr:
+		switch ck := ek.ConstExpr.GetConstantKind().(type) {
+		case *exprpb.Constant_StringValue:
 			// converting to runes here is an O(n) operation, but
 			// this is consistent with how size is computed at runtime,
 			// and how the language definition defines string size
-			v = uint64(len([]rune(ck)))
-		case types.Bytes:
-			v = uint64(len(ck))
-		case types.Bool, types.Double, types.Duration,
-			types.Int, types.Timestamp, types.Uint,
-			types.Null:
+			v = uint64(len([]rune(ck.StringValue)))
+		case *exprpb.Constant_BytesValue:
+			v = uint64(len(ck.BytesValue))
+		case *exprpb.Constant_BoolValue, *exprpb.Constant_DoubleValue, *exprpb.Constant_DurationValue,
+			*exprpb.Constant_Int64Value, *exprpb.Constant_TimestampValue, *exprpb.Constant_Uint64Value,
+			*exprpb.Constant_NullValue:
 			v = uint64(1)
 		default:
 			return nil
 		}
-	case ast.ListKind:
-		v = uint64(e.expr.AsList().Size())
-	case ast.MapKind:
-		v = uint64(e.expr.AsMap().Size())
+	case *exprpb.Expr_ListExpr:
+		v = uint64(len(ek.ListExpr.GetElements()))
+	case *exprpb.Expr_StructExpr:
+		if ek.StructExpr.GetMessageName() == "" {
+			v = uint64(len(ek.StructExpr.GetEntries()))
+		}
 	default:
 		return nil
 	}
@@ -261,7 +265,7 @@ type coster struct {
 	iterRanges iterRangeScopes
 	// computedSizes tracks the computed sizes of call results.
 	computedSizes      map[int64]SizeEstimate
-	checkedAST         *ast.AST
+	checkedAST         *ast.CheckedAST
 	estimator          CostEstimator
 	overloadEstimators map[string]FunctionEstimator
 	// presenceTestCost will either be a zero or one based on whether has() macros count against cost computations.
@@ -271,8 +275,8 @@ type coster struct {
 // Use a stack of iterVar -> iterRange Expr Ids to handle shadowed variable names.
 type iterRangeScopes map[string][]int64
 
-func (vs iterRangeScopes) push(varName string, expr ast.Expr) {
-	vs[varName] = append(vs[varName], expr.ID())
+func (vs iterRangeScopes) push(varName string, expr *exprpb.Expr) {
+	vs[varName] = append(vs[varName], expr.GetId())
 }
 
 func (vs iterRangeScopes) pop(varName string) {
@@ -320,9 +324,9 @@ func OverloadCostEstimate(overloadID string, functionCoster FunctionEstimator) C
 }
 
 // Cost estimates the cost of the parsed and type checked CEL expression.
-func Cost(checked *ast.AST, estimator CostEstimator, opts ...CostOption) (CostEstimate, error) {
+func Cost(checker *ast.CheckedAST, estimator CostEstimator, opts ...CostOption) (CostEstimate, error) {
 	c := &coster{
-		checkedAST:         checked,
+		checkedAST:         checker,
 		estimator:          estimator,
 		overloadEstimators: map[string]FunctionEstimator{},
 		exprPath:           map[int64][]string{},
@@ -336,30 +340,28 @@ func Cost(checked *ast.AST, estimator CostEstimator, opts ...CostOption) (CostEs
 			return CostEstimate{}, err
 		}
 	}
-	return c.cost(checked.Expr()), nil
+	return c.cost(checker.Expr), nil
 }
 
-func (c *coster) cost(e ast.Expr) CostEstimate {
+func (c *coster) cost(e *exprpb.Expr) CostEstimate {
 	if e == nil {
 		return CostEstimate{}
 	}
 	var cost CostEstimate
-	switch e.Kind() {
-	case ast.LiteralKind:
+	switch e.GetExprKind().(type) {
+	case *exprpb.Expr_ConstExpr:
 		cost = constCost
-	case ast.IdentKind:
+	case *exprpb.Expr_IdentExpr:
 		cost = c.costIdent(e)
-	case ast.SelectKind:
+	case *exprpb.Expr_SelectExpr:
 		cost = c.costSelect(e)
-	case ast.CallKind:
+	case *exprpb.Expr_CallExpr:
 		cost = c.costCall(e)
-	case ast.ListKind:
+	case *exprpb.Expr_ListExpr:
 		cost = c.costCreateList(e)
-	case ast.MapKind:
-		cost = c.costCreateMap(e)
-	case ast.StructKind:
+	case *exprpb.Expr_StructExpr:
 		cost = c.costCreateStruct(e)
-	case ast.ComprehensionKind:
+	case *exprpb.Expr_ComprehensionExpr:
 		cost = c.costComprehension(e)
 	default:
 		return CostEstimate{}
@@ -367,51 +369,53 @@ func (c *coster) cost(e ast.Expr) CostEstimate {
 	return cost
 }
 
-func (c *coster) costIdent(e ast.Expr) CostEstimate {
-	identName := e.AsIdent()
+func (c *coster) costIdent(e *exprpb.Expr) CostEstimate {
+	identExpr := e.GetIdentExpr()
+
 	// build and track the field path
-	if iterRange, ok := c.iterRanges.peek(identName); ok {
-		switch c.checkedAST.GetType(iterRange).Kind() {
+	if iterRange, ok := c.iterRanges.peek(identExpr.GetName()); ok {
+		switch c.checkedAST.TypeMap[iterRange].Kind() {
 		case types.ListKind:
 			c.addPath(e, append(c.exprPath[iterRange], "@items"))
 		case types.MapKind:
 			c.addPath(e, append(c.exprPath[iterRange], "@keys"))
 		}
 	} else {
-		c.addPath(e, []string{identName})
+		c.addPath(e, []string{identExpr.GetName()})
 	}
 
 	return selectAndIdentCost
 }
 
-func (c *coster) costSelect(e ast.Expr) CostEstimate {
-	sel := e.AsSelect()
+func (c *coster) costSelect(e *exprpb.Expr) CostEstimate {
+	sel := e.GetSelectExpr()
 	var sum CostEstimate
-	if sel.IsTestOnly() {
+	if sel.GetTestOnly() {
 		// recurse, but do not add any cost
 		// this is equivalent to how evalTestOnly increments the runtime cost counter
 		// but does not add any additional cost for the qualifier, except here we do
 		// the reverse (ident adds cost)
 		sum = sum.Add(c.presenceTestCost)
-		sum = sum.Add(c.cost(sel.Operand()))
+		sum = sum.Add(c.cost(sel.GetOperand()))
 		return sum
 	}
-	sum = sum.Add(c.cost(sel.Operand()))
-	targetType := c.getType(sel.Operand())
+	sum = sum.Add(c.cost(sel.GetOperand()))
+	targetType := c.getType(sel.GetOperand())
 	switch targetType.Kind() {
 	case types.MapKind, types.StructKind, types.TypeParamKind:
 		sum = sum.Add(selectAndIdentCost)
 	}
 
 	// build and track the field path
-	c.addPath(e, append(c.getPath(sel.Operand()), sel.FieldName()))
+	c.addPath(e, append(c.getPath(sel.GetOperand()), sel.GetField()))
 
 	return sum
 }
 
-func (c *coster) costCall(e ast.Expr) CostEstimate {
-	call := e.AsCall()
-	args := call.Args()
+func (c *coster) costCall(e *exprpb.Expr) CostEstimate {
+	call := e.GetCallExpr()
+	target := call.GetTarget()
+	args := call.GetArgs()
 
 	var sum CostEstimate
 
@@ -422,20 +426,22 @@ func (c *coster) costCall(e ast.Expr) CostEstimate {
 		argTypes[i] = c.newAstNode(arg)
 	}
 
-	overloadIDs := c.checkedAST.GetOverloadIDs(e.ID())
-	if len(overloadIDs) == 0 {
+	ref := c.checkedAST.ReferenceMap[e.GetId()]
+	if ref == nil || len(ref.OverloadIDs) == 0 {
 		return CostEstimate{}
 	}
 	var targetType AstNode
-	if call.IsMemberFunction() {
-		sum = sum.Add(c.cost(call.Target()))
-		targetType = c.newAstNode(call.Target())
+	if target != nil {
+		if call.Target != nil {
+			sum = sum.Add(c.cost(call.GetTarget()))
+			targetType = c.newAstNode(call.GetTarget())
+		}
 	}
 	// Pick a cost estimate range that covers all the overload cost estimation ranges
 	fnCost := CostEstimate{Min: uint64(math.MaxUint64), Max: 0}
 	var resultSize *SizeEstimate
-	for _, overload := range overloadIDs {
-		overloadCost := c.functionCost(call.FunctionName(), overload, &targetType, argTypes, argCosts)
+	for _, overload := range ref.OverloadIDs {
+		overloadCost := c.functionCost(call.GetFunction(), overload, &targetType, argTypes, argCosts)
 		fnCost = fnCost.Union(overloadCost.CostEstimate)
 		if overloadCost.ResultSize != nil {
 			if resultSize == nil {
@@ -458,56 +464,64 @@ func (c *coster) costCall(e ast.Expr) CostEstimate {
 		}
 	}
 	if resultSize != nil {
-		c.computedSizes[e.ID()] = *resultSize
+		c.computedSizes[e.GetId()] = *resultSize
 	}
 	return sum.Add(fnCost)
 }
 
-func (c *coster) costCreateList(e ast.Expr) CostEstimate {
-	create := e.AsList()
+func (c *coster) costCreateList(e *exprpb.Expr) CostEstimate {
+	create := e.GetListExpr()
 	var sum CostEstimate
-	for _, e := range create.Elements() {
+	for _, e := range create.GetElements() {
 		sum = sum.Add(c.cost(e))
 	}
 	return sum.Add(createListBaseCost)
 }
 
-func (c *coster) costCreateMap(e ast.Expr) CostEstimate {
-	mapVal := e.AsMap()
+func (c *coster) costCreateStruct(e *exprpb.Expr) CostEstimate {
+	str := e.GetStructExpr()
+	if str.MessageName != "" {
+		return c.costCreateMessage(e)
+	}
+	return c.costCreateMap(e)
+}
+
+func (c *coster) costCreateMap(e *exprpb.Expr) CostEstimate {
+	mapVal := e.GetStructExpr()
 	var sum CostEstimate
-	for _, ent := range mapVal.Entries() {
-		entry := ent.AsMapEntry()
-		sum = sum.Add(c.cost(entry.Key()))
-		sum = sum.Add(c.cost(entry.Value()))
+	for _, ent := range mapVal.GetEntries() {
+		key := ent.GetMapKey()
+		sum = sum.Add(c.cost(key))
+
+		sum = sum.Add(c.cost(ent.GetValue()))
 	}
 	return sum.Add(createMapBaseCost)
 }
 
-func (c *coster) costCreateStruct(e ast.Expr) CostEstimate {
-	msgVal := e.AsStruct()
+func (c *coster) costCreateMessage(e *exprpb.Expr) CostEstimate {
+	msgVal := e.GetStructExpr()
 	var sum CostEstimate
-	for _, ent := range msgVal.Fields() {
-		field := ent.AsStructField()
-		sum = sum.Add(c.cost(field.Value()))
+	for _, ent := range msgVal.GetEntries() {
+		sum = sum.Add(c.cost(ent.GetValue()))
 	}
 	return sum.Add(createMessageBaseCost)
 }
 
-func (c *coster) costComprehension(e ast.Expr) CostEstimate {
-	comp := e.AsComprehension()
+func (c *coster) costComprehension(e *exprpb.Expr) CostEstimate {
+	comp := e.GetComprehensionExpr()
 	var sum CostEstimate
-	sum = sum.Add(c.cost(comp.IterRange()))
-	sum = sum.Add(c.cost(comp.AccuInit()))
+	sum = sum.Add(c.cost(comp.GetIterRange()))
+	sum = sum.Add(c.cost(comp.GetAccuInit()))
 
 	// Track the iterRange of each IterVar for field path construction
-	c.iterRanges.push(comp.IterVar(), comp.IterRange())
-	loopCost := c.cost(comp.LoopCondition())
-	stepCost := c.cost(comp.LoopStep())
-	c.iterRanges.pop(comp.IterVar())
-	sum = sum.Add(c.cost(comp.Result()))
-	rangeCnt := c.sizeEstimate(c.newAstNode(comp.IterRange()))
+	c.iterRanges.push(comp.GetIterVar(), comp.GetIterRange())
+	loopCost := c.cost(comp.GetLoopCondition())
+	stepCost := c.cost(comp.GetLoopStep())
+	c.iterRanges.pop(comp.GetIterVar())
+	sum = sum.Add(c.cost(comp.Result))
+	rangeCnt := c.sizeEstimate(c.newAstNode(comp.GetIterRange()))
 
-	c.computedSizes[e.ID()] = rangeCnt
+	c.computedSizes[e.GetId()] = rangeCnt
 
 	rangeCost := rangeCnt.MultiplyByCost(stepCost.Add(loopCost))
 	sum = sum.Add(rangeCost)
@@ -660,26 +674,26 @@ func (c *coster) functionCost(function, overloadID string, target *AstNode, args
 	return CallEstimate{CostEstimate: CostEstimate{Min: 1, Max: 1}.Add(argCostSum())}
 }
 
-func (c *coster) getType(e ast.Expr) *types.Type {
-	return c.checkedAST.GetType(e.ID())
+func (c *coster) getType(e *exprpb.Expr) *types.Type {
+	return c.checkedAST.TypeMap[e.GetId()]
 }
 
-func (c *coster) getPath(e ast.Expr) []string {
-	return c.exprPath[e.ID()]
+func (c *coster) getPath(e *exprpb.Expr) []string {
+	return c.exprPath[e.GetId()]
 }
 
-func (c *coster) addPath(e ast.Expr, path []string) {
-	c.exprPath[e.ID()] = path
+func (c *coster) addPath(e *exprpb.Expr, path []string) {
+	c.exprPath[e.GetId()] = path
 }
 
-func (c *coster) newAstNode(e ast.Expr) *astNode {
+func (c *coster) newAstNode(e *exprpb.Expr) *astNode {
 	path := c.getPath(e)
 	if len(path) > 0 && path[0] == parser.AccumulatorName {
 		// only provide paths to root vars; omit accumulator vars
 		path = nil
 	}
 	var derivedSize *SizeEstimate
-	if size, ok := c.computedSizes[e.ID()]; ok {
+	if size, ok := c.computedSizes[e.GetId()]; ok {
 		derivedSize = &size
 	}
 	return &astNode{

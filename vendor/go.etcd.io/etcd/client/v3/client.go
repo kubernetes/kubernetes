@@ -231,30 +231,15 @@ func (c *Client) dialSetupOpts(creds grpccredentials.TransportCredentials, dopts
 		opts = append(opts, grpc.WithInsecure())
 	}
 
-	unaryMaxRetries := defaultUnaryMaxRetries
-	if c.cfg.MaxUnaryRetries > 0 {
-		unaryMaxRetries = c.cfg.MaxUnaryRetries
-	}
-
-	backoffWaitBetween := defaultBackoffWaitBetween
-	if c.cfg.BackoffWaitBetween > 0 {
-		backoffWaitBetween = c.cfg.BackoffWaitBetween
-	}
-
-	backoffJitterFraction := defaultBackoffJitterFraction
-	if c.cfg.BackoffJitterFraction > 0 {
-		backoffJitterFraction = c.cfg.BackoffJitterFraction
-	}
-
 	// Interceptor retry and backoff.
 	// TODO: Replace all of clientv3/retry.go with RetryPolicy:
 	// https://github.com/grpc/grpc-proto/blob/cdd9ed5c3d3f87aef62f373b93361cf7bddc620d/grpc/service_config/service_config.proto#L130
-	rrBackoff := withBackoff(c.roundRobinQuorumBackoff(backoffWaitBetween, backoffJitterFraction))
+	rrBackoff := withBackoff(c.roundRobinQuorumBackoff(defaultBackoffWaitBetween, defaultBackoffJitterFraction))
 	opts = append(opts,
 		// Disable stream retry by default since go-grpc-middleware/retry does not support client streams.
 		// Streams that are safe to retry are enabled individually.
 		grpc.WithStreamInterceptor(c.streamClientInterceptor(withMax(0), rrBackoff)),
-		grpc.WithUnaryInterceptor(c.unaryClientInterceptor(withMax(unaryMaxRetries), rrBackoff)),
+		grpc.WithUnaryInterceptor(c.unaryClientInterceptor(withMax(defaultUnaryMaxRetries), rrBackoff)),
 	)
 
 	return opts, nil

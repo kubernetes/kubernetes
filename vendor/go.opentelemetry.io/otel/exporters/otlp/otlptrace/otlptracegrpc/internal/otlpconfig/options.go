@@ -141,6 +141,9 @@ func NewGRPCConfig(opts ...GRPCOption) Config {
 	if cfg.Traces.Compression == GzipCompression {
 		cfg.DialOptions = append(cfg.DialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
 	}
+	if len(cfg.DialOptions) != 0 {
+		cfg.DialOptions = append(cfg.DialOptions, cfg.DialOptions...)
+	}
 	if cfg.ReconnectionPeriod != 0 {
 		p := grpc.ConnectParams{
 			Backoff:           backoff.DefaultConfig,

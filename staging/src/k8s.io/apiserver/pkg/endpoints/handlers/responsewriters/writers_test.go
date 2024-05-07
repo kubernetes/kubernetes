@@ -53,6 +53,8 @@ func TestSerializeObjectParallel(t *testing.T) {
 	type test struct {
 		name string
 
+		compressionEnabled bool
+
 		mediaType  string
 		out        []byte
 		outErrs    []error
@@ -65,9 +67,10 @@ func TestSerializeObjectParallel(t *testing.T) {
 	}
 	newTest := func() test {
 		return test{
-			name:      "compress on gzip",
-			out:       largePayload,
-			mediaType: "application/json",
+			name:               "compress on gzip",
+			compressionEnabled: true,
+			out:                largePayload,
+			mediaType:          "application/json",
 			req: &http.Request{
 				Header: http.Header{
 					"Accept-Encoding": []string{"gzip"},
@@ -82,7 +85,6 @@ func TestSerializeObjectParallel(t *testing.T) {
 			},
 		}
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)()
 	for i := 0; i < 100; i++ {
 		ctt := newTest()
 		t.Run(ctt.name, func(t *testing.T) {
@@ -92,6 +94,7 @@ func TestSerializeObjectParallel(t *testing.T) {
 				}
 			}()
 			t.Parallel()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, ctt.compressionEnabled)()
 
 			encoder := &fakeEncoder{
 				buf:  ctt.out,

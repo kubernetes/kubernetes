@@ -281,7 +281,7 @@ func StartServeHostnameService(ctx context.Context, c clientset.Interface, svc *
 	maxContainerFailures := 0
 	config := testutils.RCConfig{
 		Client:               c,
-		Image:                imageutils.GetE2EImage(imageutils.Agnhost),
+		Image:                framework.ServeHostnameImage,
 		Command:              []string{"/agnhost", "serve-hostname"},
 		Name:                 name,
 		Namespace:            ns,
@@ -441,6 +441,21 @@ func testNotReachableHTTP(host string, port int, timeout time.Duration) {
 
 	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
 		framework.Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
+	}
+}
+
+// testRejectedHTTP tests that the given host rejects a HTTP request on the given port.
+func testRejectedHTTP(host string, port int, timeout time.Duration) {
+	pollfn := func() (bool, error) {
+		result := e2enetwork.PokeHTTP(host, port, "/", nil)
+		if result.Status == e2enetwork.HTTPRefused {
+			return true, nil
+		}
+		return false, nil // caller can retry
+	}
+
+	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+		framework.Failf("HTTP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 

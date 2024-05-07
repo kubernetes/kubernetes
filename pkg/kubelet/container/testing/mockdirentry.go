@@ -23,7 +23,7 @@ import (
 	fs "io/fs"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockDirEntry is a mock of DirEntry interface.

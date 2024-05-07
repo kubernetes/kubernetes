@@ -159,8 +159,8 @@ func parseSnmp(r io.Reader, fileName string) (ProcSnmp, error) {
 		// Remove trailing :.
 		protocol := strings.TrimSuffix(nameParts[0], ":")
 		if len(nameParts) != len(valueParts) {
-			return procSnmp, fmt.Errorf("%w: mismatch field count mismatch in %s: %s",
-				ErrFileParse, fileName, protocol)
+			return procSnmp, fmt.Errorf("mismatch field count mismatch in %s: %s",
+				fileName, protocol)
 		}
 		for i := 1; i < len(nameParts); i++ {
 			value, err := strconv.ParseFloat(valueParts[i], 64)

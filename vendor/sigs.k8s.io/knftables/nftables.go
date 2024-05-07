@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 )
 
 // Interface is an interface for running nftables commands against a given family and table.
@@ -74,8 +73,7 @@ type realNFTables struct {
 	path string
 }
 
-// newInternal creates a new nftables.Interface for interacting with the given table; this
-// is split out from New() so it can be used from unit tests with a fakeExec.
+// for unit tests
 func newInternal(family Family, table string, execer execer) (Interface, error) {
 	var err error
 
@@ -93,29 +91,17 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 		return nil, fmt.Errorf("could not find nftables binary: %w", err)
 	}
 
-	cmd := exec.Command(nft.path, "--version")
-	out, err := nft.exec.Run(cmd)
+	cmd := exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table)
+	_, err = nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("could not run nftables command: %w", err)
 	}
-	if strings.HasPrefix(out, "nftables v0.") || strings.HasPrefix(out, "nftables v1.0.0 ") {
-		return nil, fmt.Errorf("nft version must be v1.0.1 or later (got %s)", strings.TrimSpace(out))
-	}
 
-	// Check that (a) nft works, (b) we have permission, (c) the kernel is new enough
-	// to support object comments.
-	tx := nft.NewTransaction()
-	tx.Add(&Table{
-		Comment: PtrTo("test"),
-	})
-	if err := nft.Check(context.TODO(), tx); err != nil {
-		// Try again, checking just that (a) nft works, (b) we have permission.
-		tx := nft.NewTransaction()
-		tx.Add(&Table{})
-		if err := nft.Check(context.TODO(), tx); err != nil {
-			return nil, fmt.Errorf("could not run nftables command: %w", err)
-		}
-
+	cmd = exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table,
+		"{", "comment", `"test"`, "}",
+	)
+	_, err = nft.exec.Run(cmd)
+	if err != nil {
 		nft.noObjectComments = true
 	}
 
@@ -173,9 +159,10 @@ func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 	if ifVal, exists := json[key]; exists {
 		tVal, ok := ifVal.(T)
 		return tVal, ok
+	} else {
+		var zero T
+		return zero, false
 	}
-	var zero T
-	return zero, false
 }
 
 // getJSONObjects takes the output of "nft -j list", validates it, and returns an array
@@ -235,7 +222,7 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	}
 
 	nftablesResult := jsonResult["nftables"]
-	if len(nftablesResult) == 0 {
+	if nftablesResult == nil || len(nftablesResult) == 0 {
 		return nil, fmt.Errorf("could not find result in nft output %q", listOutput)
 	}
 	metainfo := nftablesResult[0]["metainfo"]

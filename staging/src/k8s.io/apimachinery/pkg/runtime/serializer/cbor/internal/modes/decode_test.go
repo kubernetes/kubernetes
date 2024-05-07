@@ -37,99 +37,14 @@ func TestDecode(t *testing.T) {
 		return b
 	}
 
-	type test struct {
+	for _, tc := range []struct {
 		name          string
-		modes         []cbor.DecMode // most tests should run for all modes
+		modes         []cbor.DecMode
 		in            []byte
 		into          interface{} // prototype for concrete destination type. if nil, decode into empty interface value.
 		want          interface{}
 		assertOnError func(t *testing.T, e error)
-	}
-
-	// Test cases are grouped by the kind of the CBOR data item being decoded, as enumerated in
-	// https://www.rfc-editor.org/rfc/rfc8949.html#section-2.
-	group := func(t *testing.T, name string, tests []test) {
-		t.Run(name, func(t *testing.T) {
-			for _, test := range tests {
-				t.Run(test.name, func(t *testing.T) {
-					decModes := test.modes
-					if len(decModes) == 0 {
-						decModes = allDecModes
-					}
-
-					for _, decMode := range decModes {
-						modeName, ok := decModeNames[decMode]
-						if !ok {
-							t.Fatal("test case configured to run against unrecognized mode")
-						}
-
-						t.Run(fmt.Sprintf("%s/mode=%s", test.name, modeName), func(t *testing.T) {
-							var dst reflect.Value
-							if test.into == nil {
-								var i interface{}
-								dst = reflect.ValueOf(&i)
-							} else {
-								dst = reflect.New(reflect.TypeOf(test.into))
-							}
-							err := decMode.Unmarshal(test.in, dst.Interface())
-							test.assertOnError(t, err)
-							if test.want != nil {
-								if diff := cmp.Diff(test.want, dst.Elem().Interface()); diff != "" {
-									t.Errorf("unexpected output:\n%s", diff)
-								}
-							}
-						})
-					}
-				})
-			}
-		})
-	}
-
-	group(t, "unsigned integer", []test{
-		{
-			name:          "unsigned integer decodes to interface{} as int64",
-			in:            hex("0a"), // 10
-			want:          int64(10),
-			assertOnError: assertNilError,
-		},
-	})
-
-	group(t, "negative integer", []test{})
-
-	group(t, "byte string", []test{})
-
-	group(t, "text string", []test{
-		{
-			name: "reject text string containing invalid utf-8 sequence",
-			in:   hex("6180"), // text string beginning with continuation byte 0x80
-			assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.SemanticError) {
-				const expected = "cbor: invalid UTF-8 string"
-				if msg := e.Error(); msg != expected {
-					t.Errorf("expected %v, got %v", expected, msg)
-				}
-			}),
-		},
-		{
-			name:          "indefinite-length text string",
-			in:            hex("7f616161626163ff"), // (_ "a", "b", "c")
-			want:          "abc",
-			assertOnError: assertNilError,
-		},
-	})
-
-	group(t, "array", []test{
-		{
-			name: "nested indefinite-length array",
-			in:   hex("9f9f8080ff9f8080ffff"), // [_ [_ [] []] [_ [][]]]
-			want: []interface{}{
-				[]interface{}{[]interface{}{}, []interface{}{}},
-				[]interface{}{[]interface{}{}, []interface{}{}},
-			},
-			assertOnError: assertNilError,
-		},
-	})
-
-	group(t, "map", []test{
+	}{
 		{
 			name:          "reject duplicate negative int keys into struct",
 			modes:         []cbor.DecMode{modes.DecodeLax},
@@ -302,6 +217,22 @@ func TestDecode(t *testing.T) {
 			assertOnError: assertNilError,
 		},
 		{
+			name: "reject text string containing invalid utf-8 sequence",
+			in:   hex("6180"), // text string beginning with continuation byte 0x80
+			assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.SemanticError) {
+				const expected = "cbor: invalid UTF-8 string"
+				if msg := e.Error(); msg != expected {
+					t.Errorf("expected %v, got %v", expected, msg)
+				}
+			}),
+		},
+		{
+			name:          "unsigned integer decodes to interface{} as int64",
+			in:            hex("0a"), // 10
+			want:          int64(10),
+			assertOnError: assertNilError,
+		},
+		{
 			name:  "unknown field error",
 			modes: []cbor.DecMode{modes.Decode},
 			in:    hex("a1616101"), // {"a": 1}
@@ -321,6 +252,21 @@ func TestDecode(t *testing.T) {
 			assertOnError: assertNilError,
 		},
 		{
+			name:          "indefinite-length text string",
+			in:            hex("7f616161626163ff"), // (_ "a", "b", "c")
+			want:          "abc",
+			assertOnError: assertNilError,
+		},
+		{
+			name: "nested indefinite-length array",
+			in:   hex("9f9f8080ff9f8080ffff"), // [_ [_ [] []] [_ [][]]]
+			want: []interface{}{
+				[]interface{}{[]interface{}{}, []interface{}{}},
+				[]interface{}{[]interface{}{}, []interface{}{}},
+			},
+			assertOnError: assertNilError,
+		},
+		{
 			name: "nested indefinite-length map",
 			in:   hex("bf6141bf616101616202ff6142bf616901616a02ffff"), // {_ "A": {_ "a": 1, "b": 2}, "B": {_ "i": 1, "j": 2}}
 			want: map[string]interface{}{
@@ -329,21 +275,34 @@ func TestDecode(t *testing.T) {
 			},
 			assertOnError: assertNilError,
 		},
-	})
+	} {
+		decModes := tc.modes
+		if len(decModes) == 0 {
+			decModes = allDecModes
+		}
 
-	group(t, "floating-point number", []test{})
+		for _, decMode := range decModes {
+			modeName, ok := decModeNames[decMode]
+			if !ok {
+				t.Fatal("test case configured to run against unrecognized mode")
+			}
 
-	group(t, "simple value", []test{})
-
-	t.Run("tag", func(t *testing.T) {
-		group(t, "rfc3339 time", []test{})
-
-		group(t, "epoch time", []test{})
-
-		group(t, "unsigned bignum", []test{})
-
-		group(t, "negative bignum", []test{})
-
-		group(t, "unrecognized", []test{})
-	})
+			t.Run(fmt.Sprintf("mode=%s/%s", modeName, tc.name), func(t *testing.T) {
+				var dst reflect.Value
+				if tc.into == nil {
+					var i interface{}
+					dst = reflect.ValueOf(&i)
+				} else {
+					dst = reflect.New(reflect.TypeOf(tc.into))
+				}
+				err := decMode.Unmarshal(tc.in, dst.Interface())
+				tc.assertOnError(t, err)
+				if tc.want != nil {
+					if diff := cmp.Diff(tc.want, dst.Elem().Interface()); diff != "" {
+						t.Errorf("unexpected output:\n%s", diff)
+					}
+				}
+			})
+		}
+	}
 }

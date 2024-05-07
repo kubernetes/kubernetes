@@ -27,57 +27,6 @@
       "categories": [
         "api-extensions"
       ],
-      "kind": "ValidatingAdmissionPolicy",
-      "name": "validatingadmissionpolicies",
-      "namespaced": false,
-      "singularName": "validatingadmissionpolicy",
-      "storageVersionHash": "P/h9c6yIbaY=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "kind": "ValidatingAdmissionPolicy",
-      "name": "validatingadmissionpolicies/status",
-      "namespaced": false,
-      "singularName": "",
-      "verbs": [
-        "get",
-        "patch",
-        "update"
-      ]
-    },
-    {
-      "categories": [
-        "api-extensions"
-      ],
-      "kind": "ValidatingAdmissionPolicyBinding",
-      "name": "validatingadmissionpolicybindings",
-      "namespaced": false,
-      "singularName": "validatingadmissionpolicybinding",
-      "storageVersionHash": "XYju31JKYek=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "categories": [
-        "api-extensions"
-      ],
       "kind": "ValidatingWebhookConfiguration",
       "name": "validatingwebhookconfigurations",
       "namespaced": false,

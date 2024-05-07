@@ -130,7 +130,7 @@ func parseIP(hexIP string) (net.IP, error) {
 	var byteIP []byte
 	byteIP, err := hex.DecodeString(hexIP)
 	if err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse socket field in %q: %w", ErrFileParse, hexIP, err)
+		return nil, fmt.Errorf("cannot parse address field in socket line %q", hexIP)
 	}
 	switch len(byteIP) {
 	case 4:
@@ -144,7 +144,7 @@ func parseIP(hexIP string) (net.IP, error) {
 		}
 		return i, nil
 	default:
-		return nil, fmt.Errorf("%s: Unable to parse IP %s: %w", ErrFileParse, hexIP, nil)
+		return nil, fmt.Errorf("Unable to parse IP %s", hexIP)
 	}
 }
 
@@ -153,8 +153,7 @@ func parseNetIPSocketLine(fields []string) (*netIPSocketLine, error) {
 	line := &netIPSocketLine{}
 	if len(fields) < 10 {
 		return nil, fmt.Errorf(
-			"%w: Less than 10 columns found %q",
-			ErrFileParse,
+			"cannot parse net socket line as it has less then 10 columns %q",
 			strings.Join(fields, " "),
 		)
 	}
@@ -163,65 +162,64 @@ func parseNetIPSocketLine(fields []string) (*netIPSocketLine, error) {
 	// sl
 	s := strings.Split(fields[0], ":")
 	if len(s) != 2 {
-		return nil, fmt.Errorf("%w: Unable to parse sl field in line %q", ErrFileParse, fields[0])
+		return nil, fmt.Errorf("cannot parse sl field in socket line %q", fields[0])
 	}
 
 	if line.Sl, err = strconv.ParseUint(s[0], 0, 64); err != nil {
-		return nil, fmt.Errorf("%s: Unable to parse sl field in %q: %w", ErrFileParse, line.Sl, err)
+		return nil, fmt.Errorf("cannot parse sl value in socket line: %w", err)
 	}
 	// local_address
 	l := strings.Split(fields[1], ":")
 	if len(l) != 2 {
-		return nil, fmt.Errorf("%w: Unable to parse local_address field in %q", ErrFileParse, fields[1])
+		return nil, fmt.Errorf("cannot parse local_address field in socket line %q", fields[1])
 	}
 	if line.LocalAddr, err = parseIP(l[0]); err != nil {
 		return nil, err
 	}
 	if line.LocalPort, err = strconv.ParseUint(l[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("%s: Unable to parse local_address port value line %q: %w", ErrFileParse, line.LocalPort, err)
+		return nil, fmt.Errorf("cannot parse local_address port value in socket line: %w", err)
 	}
 
 	// remote_address
 	r := strings.Split(fields[2], ":")
 	if len(r) != 2 {
-		return nil, fmt.Errorf("%w: Unable to parse rem_address field in %q", ErrFileParse, fields[1])
+		return nil, fmt.Errorf("cannot parse rem_address field in socket line %q", fields[1])
 	}
 	if line.RemAddr, err = parseIP(r[0]); err != nil {
 		return nil, err
 	}
 	if line.RemPort, err = strconv.ParseUint(r[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse rem_address port value in %q: %w", ErrFileParse, line.RemPort, err)
+		return nil, fmt.Errorf("cannot parse rem_address port value in socket line: %w", err)
 	}
 
 	// st
 	if line.St, err = strconv.ParseUint(fields[3], 16, 64); err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse st value in %q: %w", ErrFileParse, line.St, err)
+		return nil, fmt.Errorf("cannot parse st value in socket line: %w", err)
 	}
 
 	// tx_queue and rx_queue
 	q := strings.Split(fields[4], ":")
 	if len(q) != 2 {
 		return nil, fmt.Errorf(
-			"%w: Missing colon for tx/rx queues in socket line %q",
-			ErrFileParse,
+			"cannot parse tx/rx queues in socket line as it has a missing colon %q",
 			fields[4],
 		)
 	}
 	if line.TxQueue, err = strconv.ParseUint(q[0], 16, 64); err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse tx_queue value in %q: %w", ErrFileParse, line.TxQueue, err)
+		return nil, fmt.Errorf("cannot parse tx_queue value in socket line: %w", err)
 	}
 	if line.RxQueue, err = strconv.ParseUint(q[1], 16, 64); err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse trx_queue value in %q: %w", ErrFileParse, line.RxQueue, err)
+		return nil, fmt.Errorf("cannot parse rx_queue value in socket line: %w", err)
 	}
 
 	// uid
 	if line.UID, err = strconv.ParseUint(fields[7], 0, 64); err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse UID value in %q: %w", ErrFileParse, line.UID, err)
+		return nil, fmt.Errorf("cannot parse uid value in socket line: %w", err)
 	}
 
 	// inode
 	if line.Inode, err = strconv.ParseUint(fields[9], 0, 64); err != nil {
-		return nil, fmt.Errorf("%s: Cannot parse inode value in %q: %w", ErrFileParse, line.Inode, err)
+		return nil, fmt.Errorf("cannot parse inode value in socket line: %w", err)
 	}
 
 	return line, nil

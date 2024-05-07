@@ -41,24 +41,22 @@ var testtypesKind = v1.SchemeGroupVersion.WithKind("TestType")
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
 func (c *FakeTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), &v1.TestType{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.TestType), err
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
 func (c *FakeTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.TestTypeList, err error) {
-	emptyResult := &v1.TestTypeList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(testtypesResource, testtypesKind, c.ns, opts), &v1.TestTypeList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -83,37 +81,34 @@ func (c *FakeTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (wat
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
 func (c *FakeTestTypes) Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), emptyResult)
+		Invokes(testing.NewCreateAction(testtypesResource, c.ns, testType), &v1.TestType{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.TestType), err
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
 func (c *FakeTestTypes) Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), emptyResult)
+		Invokes(testing.NewUpdateAction(testtypesResource, c.ns, testType), &v1.TestType{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.TestType), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
+func (c *FakeTestTypes) UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (*v1.TestType, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &v1.TestType{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.TestType), err
 }
@@ -136,12 +131,11 @@ func (c *FakeTestTypes) DeleteCollection(ctx context.Context, opts metav1.Delete
 
 // Patch applies the patch and returns the patched testType.
 func (c *FakeTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
-	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(testtypesResource, c.ns, name, pt, data, subresources...), &v1.TestType{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v1.TestType), err
 }

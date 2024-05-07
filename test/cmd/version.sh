@@ -32,7 +32,7 @@ run_kubectl_version_tests() {
 
   # create version files, one for the client, one for the server.
   # these are the files we will use to ensure that the remainder output is correct
-  kube::test::version::object_to_file "Client" "" "${TEMP}/client_version_test"
+kube::test::version::object_to_file "Client" "" "${TEMP}/client_version_test"
   kube::test::version::object_to_file "Server" "" "${TEMP}/server_version_test"
 
   kube::log::status "Testing kubectl version: check client only output matches expected output"

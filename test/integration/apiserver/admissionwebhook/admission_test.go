@@ -145,9 +145,6 @@ var (
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):         true,
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies/status"):  true,
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicybindings"):   true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):              true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies/status"):       true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicybindings"):        true,
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{

@@ -44,24 +44,22 @@ var horizontalpodautoscalersKind = v2beta1.SchemeGroupVersion.WithKind("Horizont
 
 // Get takes name of the horizontalPodAutoscaler, and returns the corresponding horizontalPodAutoscaler object, and an error if there is any.
 func (c *FakeHorizontalPodAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
-	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(horizontalpodautoscalersResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetAction(horizontalpodautoscalersResource, c.ns, name), &v2beta1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v2beta1.HorizontalPodAutoscaler), err
 }
 
 // List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
 func (c *FakeHorizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOptions) (result *v2beta1.HorizontalPodAutoscalerList, err error) {
-	emptyResult := &v2beta1.HorizontalPodAutoscalerList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListAction(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), &v2beta1.HorizontalPodAutoscalerList{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -86,37 +84,34 @@ func (c *FakeHorizontalPodAutoscalers) Watch(ctx context.Context, opts v1.ListOp
 
 // Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
 func (c *FakeHorizontalPodAutoscalers) Create(ctx context.Context, horizontalPodAutoscaler *v2beta1.HorizontalPodAutoscaler, opts v1.CreateOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
-	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), emptyResult)
+		Invokes(testing.NewCreateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), &v2beta1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v2beta1.HorizontalPodAutoscaler), err
 }
 
 // Update takes the representation of a horizontalPodAutoscaler and updates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
 func (c *FakeHorizontalPodAutoscalers) Update(ctx context.Context, horizontalPodAutoscaler *v2beta1.HorizontalPodAutoscaler, opts v1.UpdateOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
-	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), emptyResult)
+		Invokes(testing.NewUpdateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), &v2beta1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v2beta1.HorizontalPodAutoscaler), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeHorizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalPodAutoscaler *v2beta1.HorizontalPodAutoscaler, opts v1.UpdateOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
-	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
+func (c *FakeHorizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalPodAutoscaler *v2beta1.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*v2beta1.HorizontalPodAutoscaler, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(horizontalpodautoscalersResource, "status", c.ns, horizontalPodAutoscaler), emptyResult)
+		Invokes(testing.NewUpdateSubresourceAction(horizontalpodautoscalersResource, "status", c.ns, horizontalPodAutoscaler), &v2beta1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v2beta1.HorizontalPodAutoscaler), err
 }
@@ -139,12 +134,11 @@ func (c *FakeHorizontalPodAutoscalers) DeleteCollection(ctx context.Context, opt
 
 // Patch applies the patch and returns the patched horizontalPodAutoscaler.
 func (c *FakeHorizontalPodAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2beta1.HorizontalPodAutoscaler, err error) {
-	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, pt, data, subresources...), &v2beta1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v2beta1.HorizontalPodAutoscaler), err
 }
@@ -162,12 +156,11 @@ func (c *FakeHorizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodA
 	if name == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
 	}
-	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data), &v2beta1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v2beta1.HorizontalPodAutoscaler), err
 }
@@ -186,12 +179,11 @@ func (c *FakeHorizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizont
 	if name == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
 	}
-	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v2beta1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
-		return emptyResult, err
+		return nil, err
 	}
 	return obj.(*v2beta1.HorizontalPodAutoscaler), err
 }

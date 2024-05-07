@@ -5,9 +5,6 @@ component-base/logs and what effect the different command line options have.
 Like most Kubernetes components, `cmd` uses Cobra and pflags. `stdlib` uses
 just plain Go libraries. `test` contains a unit test with per-test output.
 
-`slog2k8s` shows how an application using `log/slog` from Go 1.21 can include
-packages from Kubernetes. `k8s2slog` is the other direction.
-
 Below we can see examples of how some features work.
 
 ## Default

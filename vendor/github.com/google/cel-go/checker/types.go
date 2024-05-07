@@ -41,7 +41,7 @@ func isError(t *types.Type) bool {
 
 func isOptional(t *types.Type) bool {
 	if t.Kind() == types.OpaqueKind {
-		return t.TypeName() == "optional_type"
+		return t.TypeName() == "optional"
 	}
 	return false
 }
@@ -137,11 +137,7 @@ func internalIsAssignable(m *mapping, t1, t2 *types.Type) bool {
 	case types.BoolKind, types.BytesKind, types.DoubleKind, types.IntKind, types.StringKind, types.UintKind,
 		types.AnyKind, types.DurationKind, types.TimestampKind,
 		types.StructKind:
-		// Test whether t2 is assignable from t1. The order of this check won't usually matter;
-		// however, there may be cases where type capabilities are expanded beyond what is supported
-		// in the current common/types package. For example, an interface designation for a group of
-		// Struct types.
-		return t2.IsAssignableType(t1)
+		return t1.IsAssignableType(t2)
 	case types.TypeKind:
 		return kind2 == types.TypeKind
 	case types.OpaqueKind, types.ListKind, types.MapKind:
@@ -260,7 +256,7 @@ func notReferencedIn(m *mapping, t, withinType *types.Type) bool {
 			return true
 		}
 		return notReferencedIn(m, t, wtSub)
-	case types.OpaqueKind, types.ListKind, types.MapKind, types.TypeKind:
+	case types.OpaqueKind, types.ListKind, types.MapKind:
 		for _, pt := range withinType.Parameters() {
 			if !notReferencedIn(m, t, pt) {
 				return false
@@ -292,8 +288,7 @@ func substitute(m *mapping, t *types.Type, typeParamToDyn bool) *types.Type {
 			substitute(m, t.Parameters()[1], typeParamToDyn))
 	case types.TypeKind:
 		if len(t.Parameters()) > 0 {
-			tParam := t.Parameters()[0]
-			return types.NewTypeTypeWithParam(substitute(m, tParam, typeParamToDyn))
+			return types.NewTypeTypeWithParam(substitute(m, t.Parameters()[0], typeParamToDyn))
 		}
 		return t
 	default:

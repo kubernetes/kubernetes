@@ -38,7 +38,7 @@ message APIGroupDiscovery {
   // name is allowed to be "" to represent the legacy, ungroupified resources.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // versions are the versions supported in this group. They are sorted in descending order of preference,
   // with the preferred version being the first entry.
@@ -55,7 +55,7 @@ message APIGroupDiscoveryList {
   // ResourceVersion will not be set, because this does not have a replayable ordering among multiple apiservers.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is the list of groups for discovery. The groups are listed in priority order.
   repeated APIGroupDiscovery items = 2;
@@ -72,7 +72,7 @@ message APIResourceDiscovery {
   // responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
   // APIs may return other objects types at their discretion, such as error conditions, requests for alternate representations, or other operation specific behavior.
   // This value will be null or empty if an APIService reports subresources but supports no operations on the parent resource
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind responseKind = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind responseKind = 2;
 
   // scope indicates the scope of a resource, either Cluster or Namespaced
   optional string scope = 3;
@@ -112,7 +112,7 @@ message APISubresourceDiscovery {
 
   // responseKind describes the group, version, and kind of the serialization schema for the object type this endpoint typically returns.
   // Some subresources do not return normal resources, these will have null or empty return types.
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind responseKind = 2;
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind responseKind = 2;
 
   // acceptedTypes describes the kinds that this endpoint accepts.
   // Subresources may accept the standard content types or define
@@ -122,7 +122,7 @@ message APISubresourceDiscovery {
   // +listMapKey=group
   // +listMapKey=version
   // +listMapKey=kind
-  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind acceptedTypes = 3;
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.GroupVersionKind acceptedTypes = 3;
 
   // verbs is a list of supported API operation types (this includes
   // but is not limited to get, list, watch, create, update, patch,

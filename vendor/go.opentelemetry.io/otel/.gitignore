@@ -18,9 +18,8 @@ gen/
 /example/fib/traces.txt
 /example/jaeger/jaeger
 /example/namedtracer/namedtracer
-/example/otel-collector/otel-collector
 /example/opencensus/opencensus
 /example/passthrough/passthrough
 /example/prometheus/prometheus
-/example/view/view
 /example/zipkin/zipkin
+/example/otel-collector/otel-collector

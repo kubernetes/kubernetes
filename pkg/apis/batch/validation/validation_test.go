@@ -119,29 +119,6 @@ func TestValidateJob(t *testing.T) {
 		opts JobValidationOptions
 		job  batch.Job
 	}{
-		"valid success policy": {
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](10),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{
-							{
-								SucceededCount:   ptr.To[int32](1),
-								SucceededIndexes: ptr.To("0,2,4"),
-							},
-							{
-								SucceededIndexes: ptr.To("1,3,5-9"),
-							},
-						},
-					},
-				},
-			},
-		},
 		"valid pod failure policy": {
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 			job: batch.Job{
@@ -451,159 +428,6 @@ func TestValidateJob(t *testing.T) {
 					ManagedBy: ptr.To("invalid custom controller name"),
 				},
 			},
-		},
-		`spec.successPolicy: Invalid value: batch.SuccessPolicy{Rules:[]batch.SuccessPolicyRule{}}: requires indexed completion mode`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector: validGeneratedSelector,
-					Template: validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{},
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules: Required value: at least one rules must be specified when the successPolicy is specified`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy:  &batch.SuccessPolicy{},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules[0]: Required value: at least one of succeededCount or succeededIndexes must be specified`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededCount:   nil,
-							SucceededIndexes: nil,
-						}},
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules[0].succeededIndexes: Invalid value: "invalid-format": error parsing succeededIndexes: cannot convert string to integer for index: "invalid"`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededIndexes: ptr.To("invalid-format"),
-						}},
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules[0].succeededIndexes: Too long: must have at most 65536 bytes`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededIndexes: ptr.To(strings.Repeat("1", maxJobSuccessPolicySucceededIndexesLimit+1)),
-						}},
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules[0].succeededCount: must be greater than or equal to 0`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededCount: ptr.To[int32](-1),
-						}},
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules[0].succeededCount: Invalid value: 6: must be less than or equal to 5 (the number of specified completions)`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededCount: ptr.To[int32](6),
-						}},
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules[0].succeededCount: Invalid value: 4: must be less than or equal to 3 (the number of indexes in the specified succeededIndexes field)`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededCount:   ptr.To[int32](4),
-							SucceededIndexes: ptr.To("0-2"),
-						}},
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
-		},
-		`spec.successPolicy.rules: Too many: 21: must have at most 20 items`: {
-			job: batch.Job{
-				ObjectMeta: validJobObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validGeneratedSelector,
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: func() []batch.SuccessPolicyRule {
-							var rules []batch.SuccessPolicyRule
-							for i := 0; i < 21; i++ {
-								rules = append(rules, batch.SuccessPolicyRule{
-									SucceededCount: ptr.To[int32](5),
-								})
-							}
-							return rules
-						}(),
-					},
-				},
-			},
-			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
 		`spec.podFailurePolicy.rules[0]: Invalid value: specifying one of OnExitCodes and OnPodConditions is required`: {
 			job: batch.Job{
@@ -1639,76 +1463,6 @@ func TestValidateJobUpdate(t *testing.T) {
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
 				Field: "spec.selector",
-			},
-		},
-		"add success policy": {
-			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: batch.JobSpec{
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Selector:       validGeneratedSelector,
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Spec.SuccessPolicy = &batch.SuccessPolicy{
-					Rules: []batch.SuccessPolicyRule{{
-						SucceededCount: ptr.To[int32](2),
-					}},
-				}
-			},
-			err: &field.Error{
-				Type:  field.ErrorTypeInvalid,
-				Field: "spec.successPolicy",
-			},
-		},
-		"update success policy": {
-			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: batch.JobSpec{
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Selector:       validGeneratedSelector,
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededIndexes: ptr.To("1-3"),
-						}},
-					},
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Spec.SuccessPolicy.Rules = append(job.Spec.SuccessPolicy.Rules, batch.SuccessPolicyRule{
-					SucceededCount: ptr.To[int32](3),
-				})
-			},
-			err: &field.Error{
-				Type:  field.ErrorTypeInvalid,
-				Field: "spec.successPolicy",
-			},
-		},
-		"remove success policy": {
-			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: batch.JobSpec{
-					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    ptr.To[int32](5),
-					Selector:       validGeneratedSelector,
-					Template:       validPodTemplateSpecForGeneratedRestartPolicyNever,
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededIndexes: ptr.To("1-3"),
-						}},
-					},
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Spec.SuccessPolicy = nil
-			},
-			err: &field.Error{
-				Type:  field.ErrorTypeInvalid,
-				Field: "spec.successPolicy",
 			},
 		},
 		"add pod failure policy": {
@@ -3908,88 +3662,74 @@ func TestValidateIndexesString(t *testing.T) {
 	testCases := map[string]struct {
 		indexesString string
 		completions   int32
-		wantTotal     int32
 		wantError     error
 	}{
 		"empty is valid": {
 			indexesString: "",
 			completions:   6,
-			wantTotal:     0,
 		},
 		"single number is valid": {
 			indexesString: "1",
 			completions:   6,
-			wantTotal:     1,
 		},
 		"single interval is valid": {
 			indexesString: "1-3",
 			completions:   6,
-			wantTotal:     3,
 		},
 		"mixed intervals valid": {
 			indexesString: "0,1-3,5,7-10",
 			completions:   12,
-			wantTotal:     9,
 		},
 		"invalid due to extra space": {
 			indexesString: "0,1-3, 5",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`cannot convert string to integer for index: " 5"`),
 		},
 		"invalid due to too large index": {
 			indexesString: "0,1-3,5",
 			completions:   5,
-			wantTotal:     0,
 			wantError:     errors.New(`too large index: "5"`),
 		},
 		"invalid due to non-increasing order of intervals": {
 			indexesString: "1-3,0,5",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`non-increasing order, previous: 3, current: 0`),
 		},
 		"invalid due to non-increasing order between intervals": {
 			indexesString: "0,0,5",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`non-increasing order, previous: 0, current: 0`),
 		},
 		"invalid due to non-increasing order within interval": {
 			indexesString: "0,1-1,5",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`non-increasing order, previous: 1, current: 1`),
 		},
 		"invalid due to starting with '-'": {
 			indexesString: "-1,0",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`cannot convert string to integer for index: ""`),
 		},
 		"invalid due to ending with '-'": {
 			indexesString: "0,1-",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`cannot convert string to integer for index: ""`),
 		},
 		"invalid due to repeated '-'": {
 			indexesString: "0,1--3",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`the fragment "1--3" violates the requirement that an index interval can have at most two parts separated by '-'`),
 		},
 		"invalid due to repeated ','": {
 			indexesString: "0,,1,3",
 			completions:   6,
-			wantTotal:     0,
 			wantError:     errors.New(`cannot convert string to integer for index: ""`),
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			gotTotal, gotErr := validateIndexesFormat(tc.indexesString, tc.completions)
+			gotErr := validateIndexesFormat(tc.indexesString, tc.completions)
 			if tc.wantError == nil && gotErr != nil {
 				t.Errorf("unexpected error: %s", gotErr)
 			} else if tc.wantError != nil && gotErr == nil {
@@ -3998,9 +3738,6 @@ func TestValidateIndexesString(t *testing.T) {
 				if diff := cmp.Diff(tc.wantError.Error(), gotErr.Error()); diff != "" {
 					t.Errorf("unexpected error, diff: %s", diff)
 				}
-			}
-			if tc.wantTotal != gotTotal {
-				t.Errorf("unexpected total want:%d, got:%d", tc.wantTotal, gotTotal)
 			}
 		})
 	}
