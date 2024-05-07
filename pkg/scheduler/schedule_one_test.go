@@ -27,6 +27,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -55,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
@@ -80,6 +82,11 @@ var (
 	emptySnapshot         = internalcache.NewEmptySnapshot()
 	podTopologySpreadFunc = frameworkruntime.FactoryAdapter(feature.Features{}, podtopologyspread.New)
 	errPrioritize         = fmt.Errorf("priority map encounters an error")
+)
+
+var (
+	// benchmarkThroughput is a benchmark throughput used to evaluate the performance of the scheduler.
+	benchmarkThroughput = 1000.0
 )
 
 type mockScheduleResult struct {
@@ -3401,6 +3408,112 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
 			}
 		})
+	}
+}
+
+// Benchmark_ScheduleOne_onePodPerNode is a performance benchmark for ScheduleOne,
+// simulating a scenario with 5000 nodes and 5000 pods. at the same time, each pod corresponds to a node one by one
+// and the corresponding node is selected for each pod concurrently to test
+func Benchmark_ScheduleOne_onePodPerNode(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		// create nodes and pods
+		nodeNum := 5000
+		nodeNameList := make([]string, 0, nodeNum)
+		var nodes []*v1.Node
+		pods := make([]*v1.Pod, 0, nodeNum)
+		for i := 0; i < nodeNum; i++ {
+			nodeName := fmt.Sprintf("node-%d", i)
+			nodeNameList = append(nodeNameList, nodeName)
+			pod := st.MakePod().Name(fmt.Sprintf("pod-%d", i)).
+				UID(fmt.Sprintf("pod-%d", i)).
+				NodeAffinityIn(metav1.ObjectNameField, []string{nodeName}).
+				Obj()
+			// bind pod with each node
+			pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchFields = []v1.NodeSelectorRequirement{
+				{
+					Key:      metav1.ObjectNameField,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{nodeName},
+				},
+			}
+			pod.Spec.SchedulerName = "default-scheduler"
+			pods = append(pods, pod)
+		}
+		nodes = makeNodeList(nodeNameList)
+		nodeObjs := make([]runtime.Object, 0, nodeNum)
+		for i := 0; i < nodeNum; i++ {
+			nodeObjs = append(nodeObjs, nodes[i])
+		}
+
+		client := clientsetfake.NewSimpleClientset(nodeObjs...)
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
+		pluginRegistrations := []tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterPreFilterPlugin(nodeaffinity.Name, nodeaffinity.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		}
+		broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+		registry := frameworkruntime.Registry{}
+		profiles := schedulerapi.KubeSchedulerProfile{
+			SchedulerName: "default-scheduler",
+			Plugins:       &schedulerapi.Plugins{},
+		}
+		for _, fn := range pluginRegistrations {
+			fn(&registry, &profiles)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		sched, err := New(ctx, client, informerFactory, nil, profile.NewRecorderFactory(broadcaster),
+			WithProfiles(profiles))
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(nodeNum)
+		bindings := make(map[string]string)
+		client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() != "binding" {
+				return false, nil, nil
+			}
+			binding := action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
+			bindings[binding.Name] = binding.Target.Name
+			wg.Done()
+			return true, binding, nil
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		// Run scheduler.
+		informerFactory.Start(ctx.Done())
+		informerFactory.WaitForCacheSync(ctx.Done())
+		if err = sched.WaitForHandlersSync(ctx); err != nil {
+			b.Fatalf("Handlers failed to sync: %v: ", err)
+		}
+		go sched.Run(ctx)
+
+		start := time.Now()
+		logger := klog.FromContext(ctx)
+		// Send pods to be scheduled.
+		for _, p := range pods {
+			sched.SchedulingQueue.Add(logger, p)
+		}
+		wg.Wait()
+		cancel()
+		cost := time.Since(start).Seconds()
+		throughput := float64(nodeNum) / cost
+		if throughput < benchmarkThroughput {
+			b.Fatalf("ScheduleOne_onePodPerNode: %d nodes, %d pods, cost: %f seconds, throughput: %f pods/second, below the baseline throughput standard: %f pods/second",
+				nodeNum, nodeNum, cost, throughput, benchmarkThroughput)
+		}
+
+		// check each pod bind to the corresponding node
+		for k, v := range bindings {
+			if strings.TrimLeft(k, "pod-") != strings.TrimLeft(v, "node-") {
+				b.Fatalf("pod %s bind to node %s", k, v)
+			}
+		}
 	}
 }
 
