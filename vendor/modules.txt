@@ -167,9 +167,6 @@ github.com/felixge/httpsnoop
 # github.com/fsnotify/fsnotify v1.7.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
-# github.com/fvbommel/sortorder v1.1.0
-## explicit; go 1.13
-github.com/fvbommel/sortorder
 # github.com/fxamacker/cbor/v2 v2.6.0
 ## explicit; go 1.17
 github.com/fxamacker/cbor/v2
