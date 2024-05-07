@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -2940,47 +2941,57 @@ func fakeResourceVersion(object interface{}) {
 		obj.SetResourceVersion(strconv.FormatInt(intValue+1, 10))
 	}
 }
-
 func TestParallelScale(t *testing.T) {
 	for _, tc := range []struct {
-		desc            string
-		replicas        int32
-		desiredReplicas int32
+		desc                        string
+		replicas                    int32
+		desiredReplicas             int32
+		expectedMinParallelRequests int
 	}{
 		{
-			desc:            "scale up from 3 to 30",
-			replicas:        3,
-			desiredReplicas: 30,
+			desc:                        "scale up from 3 to 30",
+			replicas:                    3,
+			desiredReplicas:             30,
+			expectedMinParallelRequests: 2,
 		},
 		{
-			desc:            "scale down from 10 to 1",
-			replicas:        10,
-			desiredReplicas: 1,
+			desc:                        "scale down from 10 to 1",
+			replicas:                    10,
+			desiredReplicas:             1,
+			expectedMinParallelRequests: 2,
 		},
 
 		{
-			desc:            "scale down to 0",
-			replicas:        501,
-			desiredReplicas: 0,
+			desc:                        "scale down to 0",
+			replicas:                    501,
+			desiredReplicas:             0,
+			expectedMinParallelRequests: 10,
 		},
 		{
-			desc:            "scale up from 0",
-			replicas:        0,
-			desiredReplicas: 1000,
+			desc:                        "scale up from 0",
+			replicas:                    0,
+			desiredReplicas:             1000,
+			expectedMinParallelRequests: 20,
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			set := burst(newStatefulSet(0))
 			set.Spec.VolumeClaimTemplates[0].ObjectMeta.Labels = map[string]string{"test": "test"}
-			parallelScale(t, set, tc.replicas, tc.desiredReplicas, assertBurstInvariants)
+			parallelScale(t, set, tc.replicas, tc.desiredReplicas, tc.expectedMinParallelRequests, assertBurstInvariants)
 		})
 	}
 
 }
 
-func parallelScale(t *testing.T, set *apps.StatefulSet, replicas, desiredReplicas int32, invariants invariantFunc) {
+func parallelScale(t *testing.T, set *apps.StatefulSet, replicas, desiredReplicas int32, expectedMinParallelRequests int, invariants invariantFunc) {
 	var err error
 	diff := desiredReplicas - replicas
+
+	// maxParallelRequests: MaxBatchSize of the controller is 500, We divide the diff by 4 to allow maximum of the half of the last batch.
+	if maxParallelRequests := min(500, math.Abs(float64(diff))/4); expectedMinParallelRequests < 2 || float64(expectedMinParallelRequests) > maxParallelRequests {
+		t.Fatalf("expectedMinParallelRequests should be between 2 and %v. Batch size of the controller is expontially increasing until 500. "+
+			"Got expectedMinParallelRequests %v, ", maxParallelRequests, expectedMinParallelRequests)
+	}
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 	om.createPodTracker.shouldTrackParallelRequests = true
@@ -3016,8 +3027,8 @@ func parallelScale(t *testing.T, set *apps.StatefulSet, replicas, desiredReplica
 		t.Errorf("Failed to scale statefulset to %v replicas, got %v replicas", desiredReplicas, set.Status.Replicas)
 	}
 
-	if (diff < -1 || diff > 1) && om.createPodTracker.maxParallelRequests <= 1 {
-		t.Errorf("want max parallel requests > 1, got %v", om.createPodTracker.maxParallelRequests)
+	if om.createPodTracker.maxParallelRequests < expectedMinParallelRequests {
+		t.Errorf("want max parallelRequests requests >= %v, got %v", expectedMinParallelRequests, om.createPodTracker.maxParallelRequests)
 	}
 }
 
