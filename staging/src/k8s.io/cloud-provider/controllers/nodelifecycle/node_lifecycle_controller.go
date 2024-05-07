@@ -152,7 +152,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 
 		// At this point the node has NotReady status, we need to check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node
-		exists, err := ensureNodeExistsByProviderID(ctx, c.cloud, node)
+		exists, err := c.ensureNodeExistsByProviderID(ctx, node)
 		if err != nil {
 			klog.Errorf("error checking if node %s exists: %v", node.Name, err)
 			continue
@@ -180,7 +180,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 			// Node exists. We need to check this to get taint working in similar in all cloudproviders
 			// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
 			// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
-			shutdown, err := shutdownInCloudProvider(ctx, c.cloud, node)
+			shutdown, err := c.shutdownInCloudProvider(ctx, node)
 			if err != nil {
 				klog.Errorf("error checking if node %s is shutdown: %v", node.Name, err)
 			}
@@ -196,18 +196,49 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 	}
 }
 
+// getProviderID returns the provider ID for the node. If Node CR has no provider ID,
+// it will be the one from the cloud provider.
+func (c *CloudNodeLifecycleController) getProviderID(ctx context.Context, node *v1.Node) (string, error) {
+	if node.Spec.ProviderID != "" {
+		return node.Spec.ProviderID, nil
+	}
+
+	if instanceV2, ok := c.cloud.InstancesV2(); ok {
+		metadata, err := instanceV2.InstanceMetadata(ctx, node)
+		if err != nil {
+			return "", err
+		}
+		return metadata.ProviderID, nil
+	}
+
+	providerID, err := cloudprovider.GetInstanceProviderID(ctx, c.cloud, types.NodeName(node.Name))
+	if err != nil {
+		return "", err
+	}
+
+	return providerID, nil
+}
+
 // shutdownInCloudProvider returns true if the node is shutdown on the cloud provider
-func shutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
-	if instanceV2, ok := cloud.InstancesV2(); ok {
+func (c *CloudNodeLifecycleController) shutdownInCloudProvider(ctx context.Context, node *v1.Node) (bool, error) {
+	if instanceV2, ok := c.cloud.InstancesV2(); ok {
 		return instanceV2.InstanceShutdown(ctx, node)
 	}
 
-	instances, ok := cloud.Instances()
+	instances, ok := c.cloud.Instances()
 	if !ok {
 		return false, errors.New("cloud provider does not support instances")
 	}
 
-	shutdown, err := instances.InstanceShutdownByProviderID(ctx, node.Spec.ProviderID)
+	providerID, err := c.getProviderID(ctx, node)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+
+	shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
 	if err == cloudprovider.NotImplemented {
 		return false, nil
 	}
@@ -216,32 +247,22 @@ func shutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface,
 }
 
 // ensureNodeExistsByProviderID checks if the instance exists by the provider id,
-// If provider id in spec is empty it calls instanceId with node name to get provider id
-func ensureNodeExistsByProviderID(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
-	if instanceV2, ok := cloud.InstancesV2(); ok {
+func (c *CloudNodeLifecycleController) ensureNodeExistsByProviderID(ctx context.Context, node *v1.Node) (bool, error) {
+	if instanceV2, ok := c.cloud.InstancesV2(); ok {
 		return instanceV2.InstanceExists(ctx, node)
 	}
 
-	instances, ok := cloud.Instances()
+	instances, ok := c.cloud.Instances()
 	if !ok {
 		return false, errors.New("instances interface not supported in the cloud provider")
 	}
 
-	providerID := node.Spec.ProviderID
-	if providerID == "" {
-		var err error
-		providerID, err = instances.InstanceID(ctx, types.NodeName(node.Name))
-		if err != nil {
-			if err == cloudprovider.InstanceNotFound {
-				return false, nil
-			}
-			return false, err
-		}
-
-		if providerID == "" {
-			klog.Warningf("Cannot find valid providerID for node name %q, assuming non existence", node.Name)
+	providerID, err := c.getProviderID(ctx, node)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
 			return false, nil
 		}
+		return false, err
 	}
 
 	return instances.InstanceExistsByProviderID(ctx, providerID)
