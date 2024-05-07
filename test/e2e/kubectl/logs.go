@@ -278,23 +278,48 @@ var _ = SIGDescribe("Kubectl logs", func() {
 				e2ekubectl.RunKubectlOrDie(ns, "delete", "sts", stsName)
 			})
 
-			ginkgo.It("should get logs from all pods", func(ctx context.Context) {
+			ginkgo.It("should get logs from all pods based on default container", func(ctx context.Context) {
 				ginkgo.By("Waiting for StatefulSet pods to be running.")
 				e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, sts, int32(numberReplicas))
 
-				ginkgo.By("default container for each pod")
+				ginkgo.By("expecting logs from both pods in StatefulSet")
 				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods")
 				framework.Logf("got output %q", out)
-				gomega.Expect(out).NotTo(gomega.BeEmpty())
-				gomega.Expect(out).To(gomega.ContainSubstring("container-2"))
-				gomega.Expect(out).NotTo(gomega.ContainSubstring("container-1"))
+				logLines := strings.Split(out, "\n")
+				for _, line := range logLines {
+					var stsPod bool
+					if line != "" {
+						if strings.Contains(line, fmt.Sprintf("[pod/%s-0/container-2]", stsName)) || strings.Contains(line, fmt.Sprintf("[pod/%s-1/container-2]", stsName)) {
+							stsPod = true
+						}
+						gomega.Expect(stsPod).To(gomega.BeTrue())
+					}
 
-				ginkgo.By("all containers for each pod")
-				out = e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods", "--all-containers")
+				}
+			})
+
+			ginkgo.It("should get logs from both pods and all their containers in StatefulSet", func(ctx context.Context) {
+				ginkgo.By("Waiting for StatefulSet pods to be running.")
+				e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, sts, int32(numberReplicas))
+
+				ginkgo.By("all containers and all containers")
+				out := e2ekubectl.RunKubectlOrDie(ns, "logs", fmt.Sprintf("sts/%s", stsName), "--all-pods", "--all-containers")
 				framework.Logf("got output %q", out)
+				logLines := strings.Split(out, "\n")
+				for _, line := range logLines {
+					if line != "" {
+						var stsPodContainer bool
+						if strings.Contains(line, fmt.Sprintf("[pod/%s-0/container-1]", stsName)) || strings.Contains(line, fmt.Sprintf("[pod/%s-1/container-1]", stsName)) || strings.Contains(line, fmt.Sprintf("[pod/%s-0/container-2]", stsName)) || strings.Contains(line, fmt.Sprintf("[pod/%s-1/container-2]", stsName)) {
+							stsPodContainer = true
+						}
+						gomega.Expect(stsPodContainer).To(gomega.BeTrue())
+					}
+				}
+				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s-0/container-1]", stsName))).To(gomega.BeTrue())
+				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s-0/container-2]", stsName))).To(gomega.BeTrue())
+				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s-1/container-1]", stsName))).To(gomega.BeTrue())
+				gomega.Expect(strings.Contains(out, fmt.Sprintf("[pod/%s-1/container-2]", stsName))).To(gomega.BeTrue())
 				gomega.Expect(out).NotTo(gomega.BeEmpty())
-				gomega.Expect(out).To(gomega.ContainSubstring("container-2"))
-				gomega.Expect(out).To(gomega.ContainSubstring("container-1"))
 
 			})
 
