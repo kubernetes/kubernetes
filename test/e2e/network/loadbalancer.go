@@ -1,6 +1,3 @@
-//go:build !providerless
-// +build !providerless
-
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -42,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	e2eapps "k8s.io/kubernetes/test/e2e/apps"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -116,7 +114,7 @@ func getReadySchedulableWorkerNode(ctx context.Context, c clientset.Interface) (
 	return nil, fmt.Errorf("there are currently no ready, schedulable worker nodes in the cluster")
 }
 
-var _ = common.SIGDescribe("LoadBalancers", func() {
+var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	f := framework.NewDefaultFramework("loadbalancers")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -133,13 +131,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	f.It("should be able to change the type and ports of a TCP service", f.WithSlow(), func(ctx context.Context) {
-		// requires cloud load-balancer support
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
-
-		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
-		if framework.ProviderIs("aws") {
-			loadBalancerLagTimeout = e2eservice.LoadBalancerLagTimeoutAWS
-		}
+		// FIXME: need a better platform-independent timeout
+		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutAWS
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 
 		// This test is more monolithic than we'd like because LB turnup can be
@@ -276,8 +269,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	f.It("should be able to change the type and ports of a UDP service", f.WithSlow(), func(ctx context.Context) {
-		// requires cloud load-balancer support
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		// FIXME: some cloud providers do not support UDP LoadBalancers
 
 		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
@@ -428,9 +420,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	f.It("should only allow access from service loadbalancer source ranges", f.WithSlow(), func(ctx context.Context) {
-		// this feature currently supported only on GCE/GKE/AWS/AZURE
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "azure")
-
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 
 		namespace := f.Namespace.Name
@@ -513,8 +502,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 	// [LinuxOnly]: Windows does not support session affinity.
 	f.It("should have session affinity work for LoadBalancer service with ESIPP on", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
-		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-esipp")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -524,8 +512,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 	// [LinuxOnly]: Windows does not support session affinity.
 	f.It("should be able to switch session affinity for LoadBalancer service with ESIPP on", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
-		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-esipp-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -535,8 +522,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 	// [LinuxOnly]: Windows does not support session affinity.
 	f.It("should have session affinity work for LoadBalancer service with ESIPP off", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
-		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -546,8 +532,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 	// [LinuxOnly]: Windows does not support session affinity.
 	f.It("should be able to switch session affinity for LoadBalancer service with ESIPP off", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
-		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
-		e2eskipper.SkipIfProviderIs("aws")
+		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-transition")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -594,13 +579,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	f.It("should be able to create LoadBalancer Service without NodePort and change it", f.WithSlow(), func(ctx context.Context) {
-		// requires cloud load-balancer support
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
-
-		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
-		if framework.ProviderIs("aws") {
-			loadBalancerLagTimeout = e2eservice.LoadBalancerLagTimeoutAWS
-		}
+		// FIXME: need a better platform-independent timeout
+		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutAWS
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 
 		// This test is more monolithic than we'd like because LB turnup can be
@@ -664,8 +644,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes", func(ctx context.Context) {
-		// requires cloud load-balancer support
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "azure")
+		// FIXME: some cloud providers do not support UDP LoadBalancers
+
 		ns := f.Namespace.Name
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -796,8 +776,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes", func(ctx context.Context) {
-		// requires cloud load-balancer support
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "azure")
+		// FIXME: some cloud providers do not support UDP LoadBalancers
+
 		ns := f.Namespace.Name
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 1)
 		framework.ExpectNoError(err)
@@ -946,7 +926,12 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 })
 
-var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
+var _ = common.SIGDescribe("LoadBalancers ESIPP", feature.LoadBalancer, framework.WithSlow(), func() {
+	// FIXME: What are the expected semantics of requesting an
+	// "ExternalTrafficPolicy: Local" service from a cloud provider that does not
+	// support that? What are the expected semantics of "ExternalTrafficPolicy: Local"
+	// on `IPMode: Proxy`-type LoadBalancers?
+
 	f := framework.NewDefaultFramework("esipp")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var loadBalancerCreateTimeout time.Duration
@@ -956,9 +941,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP", framework.WithSlow(), func() {
 	var err error
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
-
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 		subnetPrefix, err = getSubnetPrefix(ctx, cs)
@@ -1415,10 +1397,8 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 	svcPort := int(service.Spec.Ports[0].Port)
 
 	ginkgo.By("Hitting the DaemonSet's pods through the service's load balancer")
-	timeout := e2eservice.LoadBalancerLagTimeoutDefault
-	if framework.ProviderIs("aws") {
-		timeout = e2eservice.LoadBalancerLagTimeoutAWS
-	}
+	// FIXME: need a better platform-independent timeout
+	timeout := e2eservice.LoadBalancerLagTimeoutAWS
 	e2eservice.TestReachableHTTP(ctx, lbNameOrAddress, svcPort, timeout)
 
 	ginkgo.By("Starting a goroutine to continuously hit the DaemonSet's pods through the service's load balancer")

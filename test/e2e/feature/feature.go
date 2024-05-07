@@ -175,6 +175,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LabelSelector = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
 
+	// Owner: sig-network
+	// Marks tests that require a cloud provider that implements LoadBalancer Services
+	LoadBalancer = framework.WithFeature(framework.ValidFeatures.Add("LoadBalancer"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LocalStorageCapacityIsolation = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolation"))
 
