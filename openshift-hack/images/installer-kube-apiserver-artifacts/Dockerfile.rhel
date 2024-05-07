@@ -34,11 +34,19 @@ ENV KUBE_BUILD_PLATFORMS=linux/arm64
 ENV KUBE_STATIC_OVERRIDES=kube-apiserver
 RUN make WHAT='cmd/kube-apiserver'
 
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16 AS builder
+ARG TAGS=""
+WORKDIR /go/src/k8s.io/kubernetes
+COPY . .
+ENV KUBE_STATIC_OVERRIDES=kube-apiserver
+RUN make WHAT='cmd/kube-apiserver'
+
 FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
 COPY --from=macbuilder /go/src/k8s.io/kubernetes/_output/local/bin/darwin/amd64/kube-apiserver /usr/share/openshift/darwin/amd64/kube-apiserver
 COPY --from=macarmbuilder /go/src/k8s.io/kubernetes/_output/local/bin/darwin/arm64/kube-apiserver /usr/share/openshift/darwin/arm64/kube-apiserver
 COPY --from=linuxbuilder /go/src/k8s.io/kubernetes/_output/local/bin/linux/amd64/kube-apiserver /usr/share/openshift/linux/amd64/kube-apiserver
 COPY --from=linuxarmbuilder /go/src/k8s.io/kubernetes/_output/local/bin/linux/arm64/kube-apiserver /usr/share/openshift/linux/arm64/kube-apiserver
+COPY --from=builder /go/src/k8s.io/kubernetes/_output/local/bin/ /usr/share/openshift/
 
 # This image is not an operator, it is only used as part of the build pipeline.
 LABEL io.openshift.release.operator=false
