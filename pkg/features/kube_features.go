@@ -1292,7 +1292,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	apiextensionsfeatures.CRDValidationRatcheting: {Default: true, PreRelease: featuregate.Beta},
 
-	apiextensionsfeatures.CustomResourceFieldSelectors: {Default: false, PreRelease: featuregate.Alpha},
+	apiextensionsfeatures.CustomResourceFieldSelectors: {Default: true, PreRelease: featuregate.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
