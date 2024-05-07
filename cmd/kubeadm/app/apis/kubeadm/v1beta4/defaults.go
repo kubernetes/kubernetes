@@ -108,6 +108,17 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.EncryptionAlgorithm = DefaultEncryptionAlgorithm
 	}
 
+	if obj.CertificateValidityPeriod == nil {
+		obj.CertificateValidityPeriod = &metav1.Duration{
+			Duration: constants.CertificateValidityPeriod,
+		}
+	}
+	if obj.CACertificateValidityPeriod == nil {
+		obj.CACertificateValidityPeriod = &metav1.Duration{
+			Duration: constants.CACertificateValidityPeriod,
+		}
+	}
+
 	SetDefaults_Etcd(obj)
 }
 

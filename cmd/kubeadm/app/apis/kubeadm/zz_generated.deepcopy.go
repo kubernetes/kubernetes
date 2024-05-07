@@ -133,6 +133,16 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	if in.CertificateValidityPeriod != nil {
+		in, out := &in.CertificateValidityPeriod, &out.CertificateValidityPeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.CACertificateValidityPeriod != nil {
+		in, out := &in.CACertificateValidityPeriod, &out.CACertificateValidityPeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 
