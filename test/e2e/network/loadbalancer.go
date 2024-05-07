@@ -209,6 +209,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		}
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
+		// FIXME: we change the NodePort but then connect via LB IP, but some LBs
+		// don't use the NodePort anyway.
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
@@ -246,6 +248,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		ginkgo.By("Scaling the pods to 1")
 		err = tcpJig.Scale(ctx, 1)
 		framework.ExpectNoError(err)
+
+		// FIXME: the UDP version below tests reachability via NodePort here as well
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
 		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
@@ -818,6 +822,13 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
 		e2epod.NewPodClient(f).CreateSync(ctx, serverPod2)
 
+		// FIXME: this test is supposed to ensure that "a LoadBalancer UDP service
+		// doesn't blackhole the traffic to the node when the pod backend is
+		// destroyed and the traffic has to fall back to another pod", but it's
+		// possible that a connection to backend 2 will succeed at this point
+		// before backend 1 is deleted, in which case no further successful
+		// connections are required to pass.
+
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(f).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
@@ -949,6 +960,13 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		// use the same node as previous pod
 		e2epod.SetNodeSelection(&serverPod2.Spec, nodeSelection)
 		e2epod.NewPodClient(f).CreateSync(ctx, serverPod2)
+
+		// FIXME: this test is supposed to ensure that "a LoadBalancer UDP service
+		// doesn't blackhole the traffic to the node when the pod backend is
+		// destroyed and the traffic has to fall back to another pod", but it's
+		// possible that a connection to backend 2 will succeed at this point
+		// before backend 1 is deleted, in which case no further successful
+		// connections are required to pass.
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
