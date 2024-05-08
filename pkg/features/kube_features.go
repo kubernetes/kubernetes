@@ -740,15 +740,6 @@ const (
 	// service account tokens bound to Pod objects.
 	ServiceAccountTokenPodNodeInfo featuregate.Feature = "ServiceAccountTokenPodNodeInfo"
 
-	// owner: @xuzhenglun
-	// kep: http://kep.k8s.io/3682
-	// alpha: v1.27
-	// beta: v1.28
-	// stable: v1.29
-	//
-	// Subdivide the NodePort range for dynamic and static port allocation.
-	ServiceNodePortStaticSubrange featuregate.Feature = "ServiceNodePortStaticSubrange"
-
 	// owner: @gauravkghildiyal @robscott
 	// kep: https://kep.k8s.io/4444
 	// alpha: v1.30
@@ -1170,8 +1161,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceAccountTokenNodeBinding: {Default: false, PreRelease: featuregate.Alpha},
 
 	ServiceAccountTokenNodeBindingValidation: {Default: true, PreRelease: featuregate.Beta},
-
-	ServiceNodePortStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.29; remove in 1.31
 
 	ServiceTrafficDistribution: {Default: false, PreRelease: featuregate.Alpha},
 
