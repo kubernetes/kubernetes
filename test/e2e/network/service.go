@@ -606,20 +606,6 @@ func testNotReachableUDP(ctx context.Context, host string, port int, timeout tim
 	}
 }
 
-// testRejectedUDP tests that the given host rejects a UDP request on the given port.
-func testRejectedUDP(ctx context.Context, host string, port int, timeout time.Duration) {
-	pollfn := func(ctx context.Context) (bool, error) {
-		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
-		if result.Status == UDPRefused {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
-		framework.Failf("UDP service %v:%v not rejected: %v", host, port, err)
-	}
-}
-
 // TestHTTPHealthCheckNodePort tests a HTTP connection by the given request to the given host and port.
 func TestHTTPHealthCheckNodePort(ctx context.Context, host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0

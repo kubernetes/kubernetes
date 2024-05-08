@@ -387,8 +387,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		err = udpJig.Scale(ctx, 0)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("looking for ICMP REJECT on the UDP service's LoadBalancer")
-		testRejectedUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		ginkgo.By("checking that the UDP service's LoadBalancer is not reachable")
+		testNotReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
 		err = udpJig.Scale(ctx, 1)
