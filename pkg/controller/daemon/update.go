@@ -411,34 +411,34 @@ func (dsc *DaemonSetsController) dedupCurHistories(ctx context.Context, ds *apps
 			maxRevision = cur.Revision
 		}
 	}
-	// Clean up duplicates and relabel pods
+	// Relabel pods before dedup
+	pods, err := dsc.getDaemonPods(ctx, ds)
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range pods {
+		if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
+			patchRaw := map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": map[string]interface{}{
+						apps.DefaultDaemonSetUniqueLabelKey: keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey],
+					},
+				},
+			}
+			patchJSON, err := json.Marshal(patchRaw)
+			if err != nil {
+				return nil, err
+			}
+			_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patchJSON, metav1.PatchOptions{})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	// Clean up duplicates
 	for _, cur := range curHistories {
 		if cur.Name == keepCur.Name {
 			continue
-		}
-		// Relabel pods before dedup
-		pods, err := dsc.getDaemonPods(ctx, ds)
-		if err != nil {
-			return nil, err
-		}
-		for _, pod := range pods {
-			if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
-				patchRaw := map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"labels": map[string]interface{}{
-							apps.DefaultDaemonSetUniqueLabelKey: keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey],
-						},
-					},
-				}
-				patchJson, err := json.Marshal(patchRaw)
-				if err != nil {
-					return nil, err
-				}
-				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patchJson, metav1.PatchOptions{})
-				if err != nil {
-					return nil, err
-				}
-			}
 		}
 		// Remove duplicates
 		err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(ctx, cur.Name, metav1.DeleteOptions{})
