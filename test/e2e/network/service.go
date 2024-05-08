@@ -2692,6 +2692,38 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
+	ginkgo.It("should support externalTrafficPolicy=Local for type=NodePort", func(ctx context.Context) {
+		namespace := f.Namespace.Name
+		serviceName := "external-local-nodeport"
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+
+		svc, err := jig.CreateOnlyLocalNodePortService(ctx, true)
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
+
+		endpointsNodeMap, err := getEndpointNodesWithInternalIP(ctx, jig)
+		framework.ExpectNoError(err)
+
+		dialCmd := "clientip"
+		config := e2enetwork.NewNetworkingTestConfig(ctx, f)
+
+		for nodeName, nodeIP := range endpointsNodeMap {
+			ginkgo.By(fmt.Sprintf("reading clientIP using the TCP service's NodePort, on node %v: %v:%v/%v", nodeName, nodeIP, tcpNodePort, dialCmd))
+			clientIP, err := GetHTTPContentFromTestContainer(ctx, config, nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout, dialCmd)
+			framework.ExpectNoError(err)
+			framework.Logf("ClientIP detected by target pod using NodePort is %s, the ip of test container is %s", clientIP, config.TestContainerPod.Status.PodIP)
+			// the clientIP returned by agnhost contains port
+			if !strings.HasPrefix(clientIP, config.TestContainerPod.Status.PodIP) {
+				framework.Failf("Source IP was NOT preserved")
+			}
+		}
+	})
+
 	ginkgo.It("should fail health check node port if there are only terminating endpoints", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
