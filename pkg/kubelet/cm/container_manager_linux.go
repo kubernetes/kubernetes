@@ -20,12 +20,10 @@ limitations under the License.
 package cm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
@@ -64,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/userns/inuserns"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/oom"
 )
@@ -204,25 +203,18 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	if failSwapOn {
-		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-		swapFile := "/proc/swaps"
-		swapData, err := os.ReadFile(swapFile)
-		if err != nil {
-			if os.IsNotExist(err) {
-				klog.InfoS("File does not exist, assuming that swap is disabled", "path", swapFile)
-			} else {
-				return nil, err
-			}
-		} else {
-			swapData = bytes.TrimSpace(swapData) // extra trailing \n
-			swapLines := strings.Split(string(swapData), "\n")
+	isSwapOn, err := swap.IsSwapOn()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine if swap is on: %w", err)
+	}
 
-			// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-			// error out unless --fail-swap-on is set to false.
-			if len(swapLines) > 1 {
-				return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
-			}
+	if isSwapOn {
+		if failSwapOn {
+			return nil, fmt.Errorf("running with swap on is not supported, please disable swap or set --fail-swap-on flag to false")
+		}
+
+		if !swap.IsTmpfsNoswapOptionSupported(mountUtil) {
+			klog.InfoS("tmpfs noswap option is not supported, hence memory-backed volumes (e.g. secrets, emptyDirs) might be swapped to disk")
 		}
 	}
 

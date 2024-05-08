@@ -32,6 +32,9 @@ import (
 var (
 	tmpfsNoswapOptionSupported        bool
 	tmpfsNoswapOptionAvailabilityOnce sync.Once
+	swapOn                            bool
+	swapOnErr                         error
+	swapOnOnce                        sync.Once
 )
 
 const TmpfsNoswapOption = "noswap"
@@ -95,4 +98,34 @@ func isSwapOnAccordingToProcSwaps(procSwapsContent []byte) bool {
 	// If there is more than one line (table headers) in /proc/swaps then swap is enabled
 	klog.InfoS("Swap is on", "/proc/swaps contents", procSwapsStr)
 	return len(procSwapsLines) > 1
+}
+
+// IsSwapOn detects whether swap in enabled on the system by inspecting
+// /proc/swaps. If the file does not exist, an os.NotFound error will be returned.
+// If running on windows, swap is assumed to always be false.
+func IsSwapOn() (bool, error) {
+	isSwapOnHelper := func() (bool, error) {
+		if sysruntime.GOOS == "windows" {
+			return false, nil
+		}
+
+		const swapFilePath = "/proc/swaps"
+		procSwapsContent, err := os.ReadFile(swapFilePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				klog.InfoS("File does not exist, assuming that swap is disabled", "path", swapFilePath)
+				return false, nil
+			}
+
+			return false, err
+		}
+
+		return isSwapOnAccordingToProcSwaps(procSwapsContent), nil
+	}
+
+	swapOnOnce.Do(func() {
+		swapOn, swapOnErr = isSwapOnHelper()
+	})
+
+	return swapOn, swapOnErr
 }
