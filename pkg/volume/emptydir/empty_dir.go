@@ -18,6 +18,7 @@ package emptydir
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"os"
 	"path/filepath"
 
@@ -327,11 +328,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	var options []string
-	// Linux system default is 50% of capacity.
-	if ed.sizeLimit != nil && ed.sizeLimit.Value() > 0 {
-		options = []string{fmt.Sprintf("size=%d", ed.sizeLimit.Value())}
-	}
+	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter))
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
@@ -554,4 +551,17 @@ func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {
 	}
 
 	return volumeSource, readOnly
+}
+
+func (ed *emptyDir) generateTmpfsMountOptions(noswapSupported bool) (options []string) {
+	// Linux system default is 50% of capacity.
+	if ed.sizeLimit != nil && ed.sizeLimit.Value() > 0 {
+		options = append(options, fmt.Sprintf("size=%d", ed.sizeLimit.Value()))
+	}
+
+	if noswapSupported {
+		options = append(options, swap.TmpfsNoswapOption)
+	}
+
+	return options
 }
