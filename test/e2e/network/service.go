@@ -2697,28 +2697,30 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "external-local-nodeport"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
+		ginkgo.By("creating the service")
 		svc, err := jig.CreateOnlyLocalNodePortService(ctx, true)
-		framework.ExpectNoError(err)
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
-		})
+		framework.ExpectNoError(err, "creating the service")
 
-		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
+		nodePort := int(svc.Spec.Ports[0].NodePort)
+		framework.Logf("NodePort is %d", nodePort)
 
 		endpointsNodeMap, err := getEndpointNodesWithInternalIP(ctx, jig)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "fetching endpoint node IPs")
+		framework.Logf("endpointsNodeMap is %v", endpointsNodeMap)
 
-		dialCmd := "clientip"
-		config := e2enetwork.NewNetworkingTestConfig(ctx, f)
+		ginkgo.By("creating a HostNetwork exec pod")
+		execPod := launchHostExecPod(ctx, cs, namespace, "hostexec")
+		execPod, err = cs.CoreV1().Pods(namespace).Get(ctx, execPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting podIP of execPod")
 
 		for nodeName, nodeIP := range endpointsNodeMap {
-			ginkgo.By(fmt.Sprintf("reading clientIP using the TCP service's NodePort, on node %v: %v:%v/%v", nodeName, nodeIP, tcpNodePort, dialCmd))
-			clientIP, err := GetHTTPContentFromTestContainer(ctx, config, nodeIP, tcpNodePort, e2eservice.KubeProxyLagTimeout, dialCmd)
-			framework.ExpectNoError(err)
-			framework.Logf("ClientIP detected by target pod using NodePort is %s, the ip of test container is %s", clientIP, config.TestContainerPod.Status.PodIP)
+			ginkgo.By(fmt.Sprintf("connecting to NodePort on %s (%s)", nodeName, nodeIP))
+			cmd := fmt.Sprintf("curl -g -q -s --connect-timeout %d http://%s:%d/clientip", int(e2eservice.KubeProxyEndpointLagTimeout.Seconds()), nodeIP, nodePort)
+			clientIP, err := e2eoutput.RunHostCmd(namespace, execPod.Name, cmd)
+			framework.ExpectNoError(err, "connecting to nodeport service")
+			framework.Logf("ClientIP detected by target pod using NodePort is %s, the ip of test container is %s", clientIP, execPod.Status.PodIP)
 			// the clientIP returned by agnhost contains port
-			if !strings.HasPrefix(clientIP, config.TestContainerPod.Status.PodIP) {
+			if !strings.HasPrefix(clientIP, execPod.Status.PodIP) {
 				framework.Failf("Source IP was NOT preserved")
 			}
 		}
