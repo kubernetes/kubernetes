@@ -108,15 +108,6 @@ const (
 	// Enables expression validation in Admission Control
 	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
 
-	// owner: @cici37
-	// kep: https://kep.k8s.io/2876
-	// alpha: v1.23
-	// beta: v1.25
-	// stable: v1.29
-	//
-	// Enables expression validation for Custom Resource
-	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
-
 	// alpha: v1.20
 	// beta: v1.21
 	// GA: v1.24
@@ -320,8 +311,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
 
 	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
