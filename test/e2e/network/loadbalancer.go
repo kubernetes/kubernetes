@@ -420,84 +420,145 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	f.It("should only allow access from service loadbalancer source ranges", f.WithSlow(), func(ctx context.Context) {
+		// FIXME: need a better platform-independent timeout
+		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutAWS
 		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 
 		namespace := f.Namespace.Name
 		serviceName := "lb-sourcerange"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		ginkgo.By("Prepare allow source ips")
-		// prepare the exec pods
-		// acceptPod are allowed to access the loadbalancer
-		acceptPod := e2epod.CreateExecPodOrFail(ctx, cs, namespace, "execpod-accept", nil)
-		dropPod := e2epod.CreateExecPodOrFail(ctx, cs, namespace, "execpod-drop", nil)
-
-		ginkgo.By("creating a pod to be part of the service " + serviceName)
-		// This container is an nginx container listening on port 80
-		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
-		_, err := jig.Run(ctx, nil)
-		framework.ExpectNoError(err)
-		// Make sure acceptPod is running. There are certain chances that pod might be terminated due to unexpected reasons.
-		acceptPod, err = cs.CoreV1().Pods(namespace).Get(ctx, acceptPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
-		gomega.Expect(acceptPod.Status.Phase).To(gomega.Equal(v1.PodRunning))
-		gomega.Expect(acceptPod.Status.PodIP).ToNot(gomega.BeEmpty())
-
-		// Create loadbalancer service with source range from node[0] and podAccept
+		ginkgo.By("creating a LoadBalancer Service (with no LoadBalancerSourceRanges)")
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-			svc.Spec.LoadBalancerSourceRanges = []string{acceptPod.Status.PodIP + "/32"}
 		})
-		framework.ExpectNoError(err)
-
+		framework.ExpectNoError(err, "creating LoadBalancer")
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(ctx, cs, svc.Namespace, svc.Name)
 		})
 
-		svc, err = jig.WaitForLoadBalancer(ctx, loadBalancerCreateTimeout)
-		framework.ExpectNoError(err)
+		// Provisioning the LB may take some time, so create pods while we wait.
 
-		ginkgo.By("check reachability from different sources")
-		svcIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-		// We should wait until service changes are actually propagated in the cloud-provider,
-		// as this may take significant amount of time, especially in large clusters.
-		// However, the information whether it was already programmed isn't achievable.
-		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
-		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(ctx, false, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
+		ginkgo.By("creating a pod to be part of the service " + serviceName)
+		_, err = jig.Run(ctx, nil)
+		framework.ExpectNoError(err, "creating service backend")
 
-		// Make sure dropPod is running. There are certain chances that the pod might be terminated due to unexpected reasons.
+		ginkgo.By("creating client pods on two different nodes")
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
+		framework.ExpectNoError(err, "getting list of nodes")
+		if len(nodes.Items) < 2 {
+			e2eskipper.Skipf(
+				"Test requires >= 2 Ready nodes, but there are only %d nodes",
+				len(nodes.Items))
+		}
+		acceptPod := e2epod.CreateExecPodOrFail(ctx, cs, namespace, "execpod-accept",
+			func(pod *v1.Pod) {
+				pod.Spec.NodeName = nodes.Items[0].Name
+			},
+		)
+		acceptPod, err = cs.CoreV1().Pods(namespace).Get(ctx, acceptPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting IP of acceptPod")
+
+		dropPod := e2epod.CreateExecPodOrFail(ctx, cs, namespace, "execpod-drop",
+			func(pod *v1.Pod) {
+				pod.Spec.NodeName = nodes.Items[1].Name
+			},
+		)
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(ctx, dropPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "Unable to get pod %s", dropPod.Name)
-		gomega.Expect(acceptPod.Status.Phase).To(gomega.Equal(v1.PodRunning))
-		gomega.Expect(acceptPod.Status.PodIP).ToNot(gomega.BeEmpty())
+		framework.ExpectNoError(err, "getting IP of dropPod")
 
-		ginkgo.By("Update service LoadBalancerSourceRange and check reachability")
+		ginkgo.By("waiting for the LoadBalancer to be provisioned")
+		svc, err = jig.WaitForLoadBalancer(ctx, loadBalancerCreateTimeout)
+		framework.ExpectNoError(err, "waiting for LoadBalancer to be provisioned")
+		ingress := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+		svcPort := int(svc.Spec.Ports[0].Port)
+		framework.Logf("Load balancer is at %s, port %d", ingress, svcPort)
+
+		ginkgo.By("checking reachability from outside the cluster when LoadBalancerSourceRanges is unset")
+		e2eservice.TestReachableHTTP(ctx, ingress, svcPort, loadBalancerLagTimeout)
+
+		ginkgo.By("checking reachability from pods when LoadBalancerSourceRanges is unset")
+		// We can use timeout 0 here since we know from above that the service is
+		// already running (and we aren't waiting for changes to it to propagate).
+		checkReachabilityFromPod(ctx, true, 0, namespace, acceptPod.Name, ingress)
+		checkReachabilityFromPod(ctx, true, 0, namespace, dropPod.Name, ingress)
+
+		// Create source ranges that allow acceptPod but not dropPod or
+		// cluster-external sources. We assume that the LBSR rules will either see
+		// the traffic unmasqueraded, or else see it masqueraded to the pod's node
+		// IP. (Since acceptPod and dropPod are on different nodes, this should
+		// still be unambiguous.)
+		sourceRanges := []string{
+			ipToSourceRange(acceptPod.Status.PodIP),
+			ipToSourceRange(acceptPod.Status.HostIP),
+		}
+		ginkgo.By(fmt.Sprintf("setting LoadBalancerSourceRanges to %v", sourceRanges))
 		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			// only allow access from dropPod
-			svc.Spec.LoadBalancerSourceRanges = []string{dropPod.Status.PodIP + "/32"}
+			svc.Spec.LoadBalancerSourceRanges = sourceRanges
 		})
 		framework.ExpectNoError(err)
 
-		// We should wait until service changes are actually propagates, as this may take
-		// significant amount of time, especially in large clusters.
-		// However, the information whether it was already programmed isn't achievable.
-		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
-		checkReachabilityFromPod(ctx, false, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
+		ginkgo.By("checking reachability from outside the cluster when LoadBalancerSourceRanges blocks it")
+		testNotReachableHTTP(ctx, ingress, svcPort, loadBalancerLagTimeout)
 
-		ginkgo.By("Delete LoadBalancerSourceRange field and check reachability")
+		ginkgo.By("checking reachability from pods when LoadBalancerSourceRanges only allows acceptPod")
+		checkReachabilityFromPod(ctx, true, e2eservice.KubeProxyEndpointLagTimeout, namespace, acceptPod.Name, ingress)
+		checkReachabilityFromPod(ctx, false, e2eservice.KubeProxyEndpointLagTimeout, namespace, dropPod.Name, ingress)
+
+		// "Allow all". (We should be able to set this dual-stack but maybe
+		// some IPv4-only cloud providers won't handle that.)
+		if netutils.IsIPv4String(acceptPod.Status.HostIP) {
+			sourceRanges = []string{"0.0.0.0/1", "128.0.0.0/1"}
+		} else {
+			sourceRanges = []string{"::/1", "8000::/1"}
+		}
+			
+		ginkgo.By(fmt.Sprintf("setting LoadBalancerSourceRanges to %v", sourceRanges))
+		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
+			svc.Spec.LoadBalancerSourceRanges = sourceRanges
+		})
+		framework.ExpectNoError(err, "updating LoadBalancerSourceRanges")
+
+		ginkgo.By("checking reachability from outside the cluster when LoadBalancerSourceRanges allows everything")
+		e2eservice.TestReachableHTTP(ctx, ingress, svcPort, loadBalancerLagTimeout)
+
+		ginkgo.By("checking reachability from pods when LoadBalancerSourceRanges allows everything")
+		checkReachabilityFromPod(ctx, true, e2eservice.KubeProxyEndpointLagTimeout, namespace, acceptPod.Name, ingress)
+		checkReachabilityFromPod(ctx, true, e2eservice.KubeProxyEndpointLagTimeout, namespace, dropPod.Name, ingress)
+
+		// "Deny all, essentially"
+		if netutils.IsIPv4String(acceptPod.Status.HostIP) {
+			sourceRanges = []string{"255.0.0.0/32"}
+		} else {
+			sourceRanges = []string{"ffff::/128"}
+		}
+			
+		ginkgo.By(fmt.Sprintf("setting LoadBalancerSourceRanges to %v", sourceRanges))
+		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
+			svc.Spec.LoadBalancerSourceRanges = sourceRanges
+		})
+		framework.ExpectNoError(err, "updating LoadBalancerSourceRanges")
+
+		ginkgo.By("checking reachability from outside the cluster when LoadBalancerSourceRanges blocks everything")
+		testNotReachableHTTP(ctx, ingress, svcPort, loadBalancerLagTimeout)
+
+		ginkgo.By("checking reachability from pods when LoadBalancerSourceRanges blocks everything")
+		checkReachabilityFromPod(ctx, false, e2eservice.KubeProxyEndpointLagTimeout, namespace, acceptPod.Name, ingress)
+		checkReachabilityFromPod(ctx, false, e2eservice.KubeProxyEndpointLagTimeout, namespace, dropPod.Name, ingress)
+
+		ginkgo.By("clearing LoadBalancerSourceRanges")
 		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 			svc.Spec.LoadBalancerSourceRanges = nil
 		})
-		framework.ExpectNoError(err)
-		// We should wait until service changes are actually propagates, as this may take
-		// significant amount of time, especially in large clusters.
-		// However, the information whether it was already programmed isn't achievable.
-		// So we're resolving it by using loadBalancerCreateTimeout that takes cluster size into account.
-		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
-		checkReachabilityFromPod(ctx, true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
+		framework.ExpectNoError(err, "updating LoadBalancerSourceRanges")
+
+		ginkgo.By("checking reachability from outside the cluster after LoadBalancerSourceRanges is cleared")
+		e2eservice.TestReachableHTTP(ctx, ingress, svcPort, loadBalancerLagTimeout)
+
+		ginkgo.By("checking reachability from pods after LoadBalancerSourceRanges is cleared")
+		checkReachabilityFromPod(ctx, true, e2eservice.KubeProxyEndpointLagTimeout, namespace, acceptPod.Name, ingress)
+		checkReachabilityFromPod(ctx, true, e2eservice.KubeProxyEndpointLagTimeout, namespace, dropPod.Name, ingress)
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
@@ -1356,6 +1417,13 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 		}
 	})
 })
+
+func ipToSourceRange(ip string) string {
+	if netutils.IsIPv6String(ip) {
+		return ip + "/128"
+	}
+	return ip + "/32"
+}
 
 func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework.Framework, externalTrafficPolicy v1.ServiceExternalTrafficPolicyType, minSuccessRate float64) {
 	cs := f.ClientSet
