@@ -148,14 +148,6 @@ const (
 	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
 	CSIMigrationRBD featuregate.Feature = "CSIMigrationRBD"
 
-	// owner: @humblec, @zhucan
-	// kep: https://kep.k8s.io/3171
-	// alpha: v1.25
-	// beta: v1.27
-	// GA: v1.29
-	// Enables SecretRef field in CSI NodeExpandVolume request.
-	CSINodeExpandSecret featuregate.Feature = "CSINodeExpandSecret"
-
 	// owner: @fengzixu
 	// alpha: v1.21
 	//
@@ -1005,8 +997,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
 
 	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Deprecated}, //  deprecated in 1.28, remove in 1.31
-
-	CSINodeExpandSecret: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
 
