@@ -935,6 +935,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 					node.Name: framework.NewStatus(framework.Unschedulable, nodeports.ErrReason).WithPlugin(nodeports.Name),
 				},
 				UnschedulablePlugins: sets.New(nodeports.Name),
+				EvaluatedNodes:       1,
 			},
 		}
 		if !reflect.DeepEqual(expectErr, err) {
@@ -1042,6 +1043,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			Diagnosis: framework.Diagnosis{
 				NodeToStatusMap:      failedNodeStatues,
 				UnschedulablePlugins: sets.New(noderesources.Name),
+				EvaluatedNodes:       100,
 			},
 		}
 		if len(fmt.Sprint(expectErr)) > 150 {
@@ -1829,6 +1831,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"node2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("FalseFilter"),
 					},
 					UnschedulablePlugins: sets.New("FalseFilter"),
+					EvaluatedNodes:       2,
 				},
 			},
 		},
@@ -1919,6 +1922,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"1": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("FalseFilter"),
 					},
 					UnschedulablePlugins: sets.New("FalseFilter"),
+					EvaluatedNodes:       3,
 				},
 			},
 		},
@@ -1945,6 +1949,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"2": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("NoPodsFilter"),
 					},
 					UnschedulablePlugins: sets.New("MatchFilter", "NoPodsFilter"),
+					EvaluatedNodes:       2,
 				},
 			},
 		},
@@ -2110,6 +2115,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithPlugin("FakeFilter"),
 					},
 					UnschedulablePlugins: sets.New("FakeFilter"),
+					EvaluatedNodes:       1,
 				},
 			},
 		},
@@ -2143,6 +2149,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithPlugin("FakeFilter"),
 					},
 					UnschedulablePlugins: sets.New("FakeFilter", framework.ExtenderName),
+					EvaluatedNodes:       3,
 				},
 			},
 		},
@@ -2168,6 +2175,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter").WithPlugin("FakeFilter"),
 					},
 					UnschedulablePlugins: sets.New("FakeFilter"),
+					EvaluatedNodes:       1,
 				},
 			},
 		},
@@ -2249,7 +2257,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2"),
-			wantEvaluatedNodes: ptr.To[int32](3),
+			wantEvaluatedNodes: ptr.To[int32](1),
 		},
 		{
 			name: "test prefilter plugin returning non-intersecting nodes",
@@ -2338,6 +2346,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"node2": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-prefilter").WithPlugin("FakeFilter"),
 					},
 					UnschedulablePlugins: sets.New("FakeFilter"),
+					EvaluatedNodes:       1,
 					PreFilterMsg:         "",
 				},
 			},
@@ -2416,10 +2425,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:              []string{"node1", "node2", "node3"},
-			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
-			wantNodes:          sets.New("node1", "node2"),
-			wantEvaluatedNodes: ptr.To[int32](2),
+			nodes:     []string{"node1", "node2", "node3"},
+			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wantNodes: sets.New("node1", "node2"),
+			// since this case has no score plugin, we'll only try to find one node in Filter stage
+			wantEvaluatedNodes: ptr.To[int32](1),
 		},
 	}
 	for _, test := range tests {
@@ -2483,7 +2493,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				if gotOK != wantOK {
 					t.Errorf("Expected err to be FitError: %v, but got %v (error: %v)", wantOK, gotOK, err)
 				} else if gotOK {
-					if diff := cmp.Diff(gotFitErr, wantFitErr); diff != "" {
+					if diff := cmp.Diff(wantFitErr, gotFitErr); diff != "" {
 						t.Errorf("Unexpected fitErr: (-want, +got): %s", diff)
 					}
 				}
@@ -2536,6 +2546,7 @@ func TestFindFitAllError(t *testing.T) {
 			"3": framework.NewStatus(framework.Unschedulable, tf.ErrReasonFake).WithPlugin("MatchFilter"),
 		},
 		UnschedulablePlugins: sets.New("MatchFilter"),
+		EvaluatedNodes:       3,
 	}
 	if diff := cmp.Diff(diagnosis, expected); diff != "" {
 		t.Errorf("Unexpected diagnosis: (-want, +got): %s", diff)

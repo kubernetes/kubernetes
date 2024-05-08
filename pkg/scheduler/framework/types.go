@@ -337,6 +337,9 @@ type Diagnosis struct {
 	PreFilterMsg string
 	// PostFilterMsg records the messages returned from PostFilter plugins.
 	PostFilterMsg string
+	// EvaluatedNodes records the number of nodes evaluated by Filter stage.
+	// It is used for debugging purposes only.
+	EvaluatedNodes int
 }
 
 // FitError describes a fit error of a pod.
