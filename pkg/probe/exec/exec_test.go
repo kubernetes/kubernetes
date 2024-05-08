@@ -21,11 +21,11 @@ import (
 	"io"
 	"strings"
 	"testing"
-	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -128,9 +128,9 @@ func TestExec(t *testing.T) {
 		// Unhealthy
 		{probe.Failure, false, true, "Fail", "", &fakeExitError{true, 1}},
 		// Timeout
-		{probe.Failure, false, true, "", "command testcmd timed out", NewTimeoutError(fmt.Errorf("command testcmd timed out"), time.Second)},
+		{probe.Failure, false, true, "", remote.ErrCommandTimedOut.Error() + ": command testcmd timed out", fmt.Errorf("%w: command testcmd timed out", remote.ErrCommandTimedOut)},
 		// ExecProbeTimeout
-		{probe.Unknown, true, false, "", "", NewTimeoutError(fmt.Errorf("command testcmd timed out"), time.Second)},
+		{probe.Unknown, true, false, "", "", fmt.Errorf("%w: command testcmd timed out", remote.ErrCommandTimedOut)},
 	}
 
 	for i, test := range tests {

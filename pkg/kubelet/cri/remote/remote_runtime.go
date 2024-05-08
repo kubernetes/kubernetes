@@ -37,7 +37,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/probe/exec"
 
 	utilexec "k8s.io/utils/exec"
 )
@@ -64,8 +63,13 @@ const (
 // versions.
 type CRIVersion string
 
-// ErrContainerStatusNil indicates that the returned container status is nil.
-var ErrContainerStatusNil = errors.New("container status is nil")
+var (
+	// ErrContainerStatusNil indicates that the returned container status is nil.
+	ErrContainerStatusNil = errors.New("container status is nil")
+
+	// ErrCommandTimedOut indicates that the exec sync command timed.
+	ErrCommandTimedOut = errors.New("command timed out")
+)
 
 const (
 	// CRIVersionV1 references the v1 CRI API.
@@ -494,9 +498,9 @@ func (r *remoteRuntimeService) execSyncV1(ctx context.Context, containerID strin
 	if err != nil {
 		klog.ErrorS(err, "ExecSync cmd from runtime service failed", "containerID", containerID, "cmd", cmd)
 
-		// interpret DeadlineExceeded gRPC errors as timedout probes
+		// interpret DeadlineExceeded gRPC errors as timedout errors
 		if status.Code(err) == codes.DeadlineExceeded {
-			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
+			err = fmt.Errorf("%w: %q timed out after %s", ErrCommandTimedOut, strings.Join(cmd, " "), timeout)
 		}
 
 		return nil, nil, err
