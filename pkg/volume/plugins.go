@@ -418,7 +418,7 @@ type VolumePluginMgr struct {
 	plugins                   map[string]VolumePlugin
 	prober                    DynamicPluginProber
 	probedPlugins             map[string]VolumePlugin
-	loggedDeprecationWarnings sets.String
+	loggedDeprecationWarnings sets.Set[string]
 	Host                      VolumeHost
 }
 
@@ -560,7 +560,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	defer pm.mutex.Unlock()
 
 	pm.Host = host
-	pm.loggedDeprecationWarnings = sets.NewString()
+	pm.loggedDeprecationWarnings = sets.New[string]()
 
 	if prober == nil {
 		// Use a dummy prober to prevent nil deference.
