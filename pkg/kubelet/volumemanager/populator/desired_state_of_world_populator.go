@@ -455,7 +455,7 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.String) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
+	podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.Set[string]) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
 	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
 	isEphemeral := pvcSource == nil && podVolume.VolumeSource.Ephemeral != nil
 	if isEphemeral {
