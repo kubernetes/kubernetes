@@ -905,7 +905,23 @@ func (c *Cacher) dispatchEvents() {
 	bookmarkTimer := c.clock.NewTimer(wait.Jitter(time.Second, 0.25))
 	defer bookmarkTimer.Stop()
 
+	// The internal informer populates the RV as soon as it conducts
+	// The first successful sync with the underlying store.
+	// The cache must wait until this first sync is completed to be deemed ready.
+	// Since we cannot send a bookmark when the lastProcessedResourceVersion is 0,
+	// we poll aggressively for the first RV before entering the dispatch loop.
 	lastProcessedResourceVersion := uint64(0)
+	if err := wait.PollUntilContextCancel(wait.ContextForChannel(c.stopCh), 10*time.Millisecond, true, func(_ context.Context) (bool, error) {
+		if rv := c.watchCache.getResourceVersion(); rv != 0 {
+			lastProcessedResourceVersion = rv
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		// given the function above never returns error,
+		// the non-empty error means that the stopCh was closed
+		return
+	}
 	for {
 		select {
 		case event, ok := <-c.incoming:
@@ -929,29 +945,6 @@ func (c *Cacher) dispatchEvents() {
 			metrics.EventsCounter.WithLabelValues(c.groupResource.String()).Inc()
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
-			// Never send a bookmark event if we did not see an event here, this is fine
-			// because we don't provide any guarantees on sending bookmarks.
-			//
-			// Just pop closed watchers and requeue others if needed.
-			//
-			// TODO(#115478): rework the following logic
-			//  in a way that would allow more
-			//  efficient cleanup of closed watchers
-			if lastProcessedResourceVersion == 0 {
-				func() {
-					c.Lock()
-					defer c.Unlock()
-					for _, watchers := range c.bookmarkWatchers.popExpiredWatchersThreadUnsafe() {
-						for _, watcher := range watchers {
-							if watcher.stopped {
-								continue
-							}
-							c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
-						}
-					}
-				}()
-				continue
-			}
 			bookmarkEvent := &watchCacheEvent{
 				Type:            watch.Bookmark,
 				Object:          c.newFunc(),
