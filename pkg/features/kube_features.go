@@ -207,6 +207,7 @@ const (
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
 	// alpha: v1.29
+	// beta: v1.31
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
@@ -1028,7 +1029,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DisableKubeletCloudCredentialProviders: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	DisableNodeKubeProxyVersion: {Default: false, PreRelease: featuregate.Alpha},
+	DisableNodeKubeProxyVersion: {Default: true, PreRelease: featuregate.Beta},
 
 	DevicePluginCDIDevices: {Default: true, PreRelease: featuregate.Beta},
 

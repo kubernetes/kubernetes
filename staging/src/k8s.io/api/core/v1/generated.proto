@@ -2816,7 +2816,7 @@ message NodeSystemInfo {
   // Kubelet Version reported by the node.
   optional string kubeletVersion = 7;
 
-  // KubeProxy Version reported by the node.
+  // Deprecated: KubeProxy Version reported by the node.
   optional string kubeProxyVersion = 8;
 
   // The Operating System reported by the node

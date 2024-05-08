@@ -24977,7 +24977,7 @@ func schema_k8sio_api_core_v1_NodeSystemInfo(ref common.ReferenceCallback) commo
 					},
 					"kubeProxyVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "KubeProxy Version reported by the node.",
+							Description: "Deprecated: KubeProxy Version reported by the node.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
