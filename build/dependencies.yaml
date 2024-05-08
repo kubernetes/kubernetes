@@ -11,7 +11,7 @@ dependencies:
   #
   # ref: https://github.com/kubernetes/kubernetes/pull/98845
   - name: "zeitgeist"
-    version: "v0.2.0"
+    version: "v0.5.3"
     refPaths:
     - path: hack/verify-external-dependencies-version.sh
       match: sigs.k8s.io/zeitgeist@v.*
