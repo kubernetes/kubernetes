@@ -2230,7 +2230,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 func (kl *Kubelet) getPodsToSync() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
 	podUIDs := kl.workQueue.GetWork()
-	podUIDSet := sets.NewString()
+	podUIDSet := sets.New[string]()
 	for _, podUID := range podUIDs {
 		podUIDSet.Insert(string(podUID))
 	}
