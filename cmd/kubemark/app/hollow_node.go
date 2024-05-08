@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 
@@ -247,14 +247,15 @@ func run(ctx context.Context, config *hollowNodeConfig) error {
 			return fmt.Errorf("Failed to start fake runtime, error: %w", err)
 		}
 		defer fakeRemoteRuntime.Stop()
-		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
+		logger := klog.Background()
+		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, noop.NewTracerProvider(), &logger)
 		if err != nil {
 			return fmt.Errorf("Failed to init runtime service, error: %w", err)
 		}
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
-			imageService, err = remote.NewRemoteImageService(c.ImageServiceEndpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
+			imageService, err = remote.NewRemoteImageService(c.ImageServiceEndpoint, 15*time.Second, noop.NewTracerProvider(), &logger)
 			if err != nil {
 				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}

@@ -26,20 +26,24 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 func createRemoteImageServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp)
+	logger := klog.Background()
+	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp, &logger)
 	require.NoError(t, err)
 
 	return runtimeService
 }
 
 func createRemoteImageServiceWithoutTracerProvider(endpoint string, t *testing.T) internalapi.ImageManagerService {
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, oteltrace.NewNoopTracerProvider())
+	logger := klog.Background()
+	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), &logger)
 	require.NoError(t, err)
 
 	return runtimeService
