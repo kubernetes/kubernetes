@@ -17,7 +17,6 @@ See [Quick&nbsp;Start](#quick-start) and [Releases](https://github.com/fxamacker
 [![CodeQL](https://github.com/fxamacker/cbor/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/fxamacker/cbor/actions/workflows/codeql-analysis.yml)
 [![](https://img.shields.io/badge/fuzzing-passing-44c010)](#fuzzing-and-code-coverage)
 [![Go Report Card](https://goreportcard.com/badge/github.com/fxamacker/cbor)](https://goreportcard.com/report/github.com/fxamacker/cbor)
-[![](https://img.shields.io/ossf-scorecard/github.com/fxamacker/cbor?label=openssf%20scorecard)](https://github.com/fxamacker/cbor#fuzzing-and-code-coverage) 
 
 `fxamacker/cbor` is a CBOR codec in full conformance with [IETF STD&nbsp;94 (RFC&nbsp;8949)](https://www.rfc-editor.org/info/std94). It also supports CBOR Sequences ([RFC&nbsp;8742](https://www.rfc-editor.org/rfc/rfc8742.html)) and Extended Diagnostic Notation ([Appendix G of RFC&nbsp;8610](https://www.rfc-editor.org/rfc/rfc8610.html#appendix-G)).
 
@@ -221,7 +220,7 @@ __Install__: `go get github.com/fxamacker/cbor/v2` and `import "github.com/fxama
 
 This library can encode and decode CBOR (RFC 8949) and CBOR Sequences (RFC 8742).
 
-- __CBOR data item__ is a single piece of CBOR data and its structure may contain zero, one, or more nested data items.
+- __CBOR data item__ is a single piece of CBOR data and its structure may contain 0 or more nested data items.
 - __CBOR sequence__ is a concatenation of 0 or more encoded CBOR data items.
 
 Configurable limits and options can be used to balance trade-offs.
