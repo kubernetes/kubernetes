@@ -647,7 +647,6 @@ func TestDecode(t *testing.T) {
 				name:          "tag 0 RFC3339 text string",
 				in:            hex("c074323030362d30312d30325431353a30343a30355a"), // 0("2006-01-02T15:04:05Z")
 				want:          "2006-01-02T15:04:05Z",
-				fixme:         "decoding RFC3339 text string tagged with 0 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
@@ -668,63 +667,54 @@ func TestDecode(t *testing.T) {
 				name:          "tag 1 timestamp unsigned integer",
 				in:            hex("c11a43b940e5"), // 1(1136214245)
 				want:          "2006-01-02T15:04:05Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
 				name:          "tag 1 with float16 value",
 				in:            hex("c1f93c00"), // 1(1.0_1)
 				want:          "1970-01-01T00:00:01Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
 				name:          "tag 1 with float32 value",
 				in:            hex("c1fa3f800000"), // 1(1.0_2)
 				want:          "1970-01-01T00:00:01Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
 				name:          "tag 1 with float64 value",
 				in:            hex("c1fb3ff0000000000000"), // 1(1.0_3)
 				want:          "1970-01-01T00:00:01Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
 				name:          "tag 1 with a five digit year",
 				in:            hex("c11b0000003afff44181"), // 1(253402300801)
 				want:          "10000-01-01T00:00:01Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
-				assertOnError: assertNilError,
+				assertOnError: assertErrorMessage("cbor: decoded time cannot be represented in RFC3339 format with sub-second precision: Time.MarshalText: year outside of range [0,9999]"),
 			},
 			{
 				name:          "tag 1 with a negative integer value",
 				in:            hex("c120"), // 1(-1)
 				want:          "1969-12-31T23:59:59Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
 				name:          "tag 1 with a negative float16 value",
 				in:            hex("c1f9bc00"), // 1(-1.0_1)
 				want:          "1969-12-31T23:59:59Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
 				name:          "tag 1 with a negative float32 value",
 				in:            hex("c1fabf800000"), // 1(-1.0_2)
 				want:          "1969-12-31T23:59:59Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
 				name:          "tag 1 with a negative float64 value",
 				in:            hex("c1fbbff0000000000000"), // 1(-1.0_3)
 				want:          "1969-12-31T23:59:59Z",
-				fixme:         "decoding cbor data tagged with 1 produces time.Time instead of RFC3339 timestamp string",
 				assertOnError: assertNilError,
 			},
 			{
