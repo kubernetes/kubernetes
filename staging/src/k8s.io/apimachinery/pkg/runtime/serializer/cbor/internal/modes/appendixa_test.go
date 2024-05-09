@@ -268,17 +268,15 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("c11a514b67b0"),
-			decoded: "2013-03-21T16:04:00Z",
-			encoded: hex("54323031332d30332d32315431363a30343a30305a"),
+			decoded: "2013-03-21T20:04:00Z",
+			encoded: hex("54323031332d30332d32315432303a30343a30305a"),
 			reasons: []string{
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("c1fb41d452d9ec200000"),
@@ -288,7 +286,6 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("d74401020304"),
