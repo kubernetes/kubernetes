@@ -248,7 +248,6 @@ replace (
 	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
 	k8s.io/kubelet => ./staging/src/k8s.io/kubelet
-	k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
 	k8s.io/metrics => ./staging/src/k8s.io/metrics
 	k8s.io/mount-utils => ./staging/src/k8s.io/mount-utils
 	k8s.io/pod-security-admission => ./staging/src/k8s.io/pod-security-admission
