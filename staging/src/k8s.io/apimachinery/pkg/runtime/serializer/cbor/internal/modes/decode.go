@@ -22,6 +22,28 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
+var simpleValues *cbor.SimpleValueRegistry = func() *cbor.SimpleValueRegistry {
+	var opts []func(*cbor.SimpleValueRegistry) error
+	for sv := 0; sv <= 255; sv++ {
+		// Reject simple values 0-19, 23, and 32-255. The simple values 24-31 are reserved
+		// and considered ill-formed by the CBOR specification. We only accept false (20),
+		// true (21), and null (22).
+		switch sv {
+		case 20: // false
+		case 21: // true
+		case 22: // null
+		case 24, 25, 26, 27, 28, 29, 30, 31: // reserved
+		default:
+			opts = append(opts, cbor.WithRejectedSimpleValue(cbor.SimpleValue(sv)))
+		}
+	}
+	simpleValues, err := cbor.NewSimpleValueRegistryFromDefaults(opts...)
+	if err != nil {
+		panic(err)
+	}
+	return simpleValues
+}()
+
 var Decode cbor.DecMode = func() cbor.DecMode {
 	decode, err := cbor.DecOptions{
 		// Maps with duplicate keys are well-formed but invalid according to the CBOR spec
@@ -100,6 +122,9 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// Reject the arbitrary-precision integer tags because they can't be faithfully
 		// roundtripped through the allowable Unstructured types.
 		BignumTag: cbor.BignumTagForbidden,
+
+		// Reject anything other than the simple values true, false, and null.
+		SimpleValues: simpleValues,
 	}.DecMode()
 	if err != nil {
 		panic(err)
