@@ -156,6 +156,33 @@ func TestEncode(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "unstructuredlist",
+			in: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v",
+					"kind":       "kList",
+				},
+				Items: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"foo": int64(1)}},
+					{Object: map[string]interface{}{"foo": int64(2)}},
+				},
+			},
+			assertOnWriter: func() (io.Writer, func(t *testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					// {'kind': 'kList', 'items': [{'foo': 1}, {'foo': 2}], 'apiVersion': 'v'}
+					if diff := cmp.Diff(b.Bytes(), []byte("\xd9\xd9\xf7\xa3\x44kind\x45kList\x45items\x82\xa1\x43foo\x01\xa1\x43foo\x02\x4aapiVersion\x41v")); diff != "" {
+						t.Errorf("unexpected diff:\n%s", diff)
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := NewSerializer(nil, nil)
@@ -411,6 +438,126 @@ func TestDecode(t *testing.T) {
 				"kind":       "k",
 			}},
 			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "k"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unstructuredlist missing kind",
+			data:        []byte("\xa1\x6aapiVersion\x61v"),
+			into:        &unstructured.UnstructuredList{},
+			expectedObj: nil,
+			expectedGVK: &schema.GroupVersionKind{Version: "v"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingKind(err) {
+					t.Errorf("expected MissingKind, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unstructuredlist missing version",
+			data:        []byte("\xa1\x64kind\x65kList"),
+			into:        &unstructured.UnstructuredList{},
+			expectedObj: nil,
+			expectedGVK: &schema.GroupVersionKind{Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingVersion(err) {
+					t.Errorf("expected MissingVersion, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "into unstructuredlist empty",
+			data: []byte("\xa2\x6aapiVersion\x61v\x64kind\x65kList"),
+			into: &unstructured.UnstructuredList{},
+			expectedObj: &unstructured.UnstructuredList{Object: map[string]interface{}{
+				"apiVersion": "v",
+				"kind":       "kList",
+			}},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "into unstructuredlist nonempty",
+			data: []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x82\xa1\x63foo\x01\xa1\x63foo\x02"), // {"apiVersion": "v", "kind": "kList", "items": [{"foo": 1}, {"foo": 2}]}
+			into: &unstructured.UnstructuredList{},
+			expectedObj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v",
+					"kind":       "kList",
+				},
+				Items: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"apiVersion": "v", "kind": "k", "foo": int64(1)}},
+					{Object: map[string]interface{}{"apiVersion": "v", "kind": "k", "foo": int64(2)}},
+				},
+			},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "into unstructuredlist item gvk present",
+			data: []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x81\xa2\x6aapiVersion\x62vv\x64kind\x62kk"), // {"apiVersion": "v", "kind": "kList", "items": [{"apiVersion": "vv", "kind": "kk"}]}
+			into: &unstructured.UnstructuredList{},
+			expectedObj: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "v",
+					"kind":       "kList",
+				},
+				Items: []unstructured.Unstructured{
+					{Object: map[string]interface{}{"apiVersion": "vv", "kind": "kk"}},
+				},
+			},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unstructuredlist item missing kind",
+			data:        []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x81\xa1\x6aapiVersion\x62vv"), // {"apiVersion": "v", "kind": "kList", "items": [{"apiVersion": "vv"}]}
+			metaFactory: &defaultMetaFactory{},
+			into:        &unstructured.UnstructuredList{},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingKind(err) {
+					t.Errorf("expected MissingVersion, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "into unstructuredlist item missing version",
+			data:        []byte("\xa3\x6aapiVersion\x61v\x64kind\x65kList\x65items\x81\xa1\x64kind\x62kk"), // {"apiVersion": "v", "kind": "kList", "items": [{"kind": "kk"}]}
+			metaFactory: &defaultMetaFactory{},
+			into:        &unstructured.UnstructuredList{},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
+			assertOnError: func(t *testing.T, err error) {
+				if !runtime.IsMissingVersion(err) {
+					t.Errorf("expected MissingVersion, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "using unstructuredlist creater",
+			data:        []byte("\xa2\x6aapiVersion\x61v\x64kind\x65kList"),
+			metaFactory: &defaultMetaFactory{},
+			creater:     stubCreater{obj: &unstructured.UnstructuredList{}},
+			expectedObj: &unstructured.UnstructuredList{Object: map[string]interface{}{
+				"apiVersion": "v",
+				"kind":       "kList",
+			}},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "kList"},
 			assertOnError: func(t *testing.T, err error) {
 				if err != nil {
 					t.Errorf("expected nil error, got: %v", err)
