@@ -32,12 +32,10 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		// encoding. Satisfies one of the "Core Deterministic Encoding Requirements".
 		ShortestFloat: cbor.ShortestFloat16,
 
-		// ShortestFloat doesn't apply to NaN or Inf values. Inf values are losslessly
-		// encoded to float16. RFC 8949 recommends choosing a single representation of NaN
-		// in applications that do not smuggle additional information inside NaN values, we
-		// use 0x7e00.
-		NaNConvert: cbor.NaNConvert7e00,
-		InfConvert: cbor.InfConvertFloat16,
+		// Error on attempt to encode NaN and infinite values. This is what the JSON
+		// serializer does.
+		NaNConvert: cbor.NaNConvertReject,
+		InfConvert: cbor.InfConvertReject,
 
 		// Prefer encoding math/big.Int to one of the 64-bit integer types if it fits. When
 		// later decoded into Unstructured, the set of allowable concrete numeric types is
