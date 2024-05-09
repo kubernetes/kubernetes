@@ -29,7 +29,6 @@ Repositories currently staged here:
 - [`k8s.io/kube-scheduler`](https://github.com/kubernetes/kube-scheduler)
 - [`k8s.io/kubectl`](https://github.com/kubernetes/kubectl)
 - [`k8s.io/kubelet`](https://github.com/kubernetes/kubelet)
-- [`k8s.io/legacy-cloud-providers`](https://github.com/kubernetes/legacy-cloud-providers)
 - [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
 - [`k8s.io/mount-utils`](https://github.com/kubernetes/mount-utils)
 - [`k8s.io/pod-security-admission`](https://github.com/kubernetes/pod-security-admission)
