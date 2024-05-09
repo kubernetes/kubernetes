@@ -108,6 +108,11 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 
 		// Reject anything other than the simple values true, false, and null.
 		SimpleValues: simpleValues,
+
+		// Reject NaN and infinite floating-point values since they don't have a JSON
+		// representation (RFC 8259 Section 6).
+		NaN: cbor.NaNDecodeForbidden,
+		Inf: cbor.InfDecodeForbidden,
 	}.DecMode()
 	if err != nil {
 		panic(err)
