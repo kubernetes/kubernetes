@@ -594,13 +594,11 @@ func TestDecode(t *testing.T) {
 		{
 			name: "simple value 23",
 			in:   hex("f7"), // undefined
-			assertOnError: func(t *testing.T, e error) {
-				// TODO: Once this can pass, make the assertion stronger.
-				if e == nil {
-					t.Error("expected non-nil error")
+			assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.UnacceptableDataItemError) {
+				if diff := cmp.Diff(&cbor.UnacceptableDataItemError{CBORType: "primitives", Message: "simple value 23 is not recognized"}, e); diff != "" {
+					t.Errorf("unexpected error diff:\n%s", diff)
 				}
-			},
-			fixme: "cbor simple value 23 (\"undefined\") should not be accepted",
+			}),
 		},
 	}, func() (generated []test) {
 		// Generate test cases for all simple values (0 to 255) because the number of possible simple values is fixed and small.
@@ -628,13 +626,11 @@ func TestDecode(t *testing.T) {
 				})
 			default:
 				// reject all unrecognized simple values
-				each.assertOnError = func(t *testing.T, e error) {
-					// TODO: Once this can pass, make the assertion stronger.
-					if e == nil {
-						t.Error("expected non-nil error")
+				each.assertOnError = assertOnConcreteError(func(t *testing.T, e *cbor.UnacceptableDataItemError) {
+					if diff := cmp.Diff(&cbor.UnacceptableDataItemError{CBORType: "primitives", Message: fmt.Sprintf("simple value %d is not recognized", i)}, e); diff != "" {
+						t.Errorf("unexpected error diff:\n%s", diff)
 					}
-				}
-				each.fixme = "unrecognized simple values should be rejected"
+				})
 			}
 			generated = append(generated, each)
 		}
