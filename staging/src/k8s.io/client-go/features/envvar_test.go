@@ -121,7 +121,7 @@ func TestEnvVarFeatureGates(t *testing.T) {
 			for k, v := range scenario.envVariables {
 				t.Setenv(k, v)
 			}
-			target := newEnvVarFeatureGates(scenario.features)
+			target := NewEnvVarFeatureGates(scenario.features)
 
 			for expectedFeature, expectedValue := range scenario.expectedFeaturesState {
 				actualValue := target.Enabled(expectedFeature)
@@ -143,12 +143,12 @@ func TestEnvVarFeatureGates(t *testing.T) {
 }
 
 func TestEnvVarFeatureGatesEnabledPanic(t *testing.T) {
-	target := newEnvVarFeatureGates(nil)
+	target := NewEnvVarFeatureGates(nil)
 	require.PanicsWithError(t, fmt.Errorf("feature %q is not registered in FeatureGates %q", "UnknownFeature", target.callSiteName).Error(), func() { target.Enabled("UnknownFeature") })
 }
 
 func TestHasAlreadyReadEnvVar(t *testing.T) {
-	target := newEnvVarFeatureGates(nil)
+	target := NewEnvVarFeatureGates(nil)
 	require.False(t, target.hasAlreadyReadEnvVar())
 
 	_ = target.getEnabledMapFromEnvVar()

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -34,7 +35,7 @@ var internalPackages = []string{"k8s.io/client-go/features/envvar.go"}
 
 var _ Gates = &envVarFeatureGates{}
 
-// newEnvVarFeatureGates creates a feature gate that allows for registration
+// NewEnvVarFeatureGates creates a feature gate that allows for registration
 // of features and checking if the features are enabled.
 //
 // On the first call to Enabled, the effective state of all known features is loaded from
@@ -47,7 +48,7 @@ var _ Gates = &envVarFeatureGates{}
 //
 // Please note that environmental variables can only be set to the boolean value.
 // Incorrect values will be ignored and logged.
-func newEnvVarFeatureGates(features map[Feature]FeatureSpec) *envVarFeatureGates {
+func NewEnvVarFeatureGates(features map[Feature]FeatureSpec) *envVarFeatureGates {
 	known := map[Feature]FeatureSpec{}
 	for name, spec := range features {
 		known[name] = spec
@@ -74,6 +75,8 @@ type envVarFeatureGates struct {
 	// known holds known feature gates
 	known map[Feature]FeatureSpec
 
+	lock sync.Mutex
+
 	// enabled holds a map[Feature]bool
 	// with values explicitly set via env var
 	enabled atomic.Value
@@ -92,6 +95,45 @@ func (f *envVarFeatureGates) Enabled(key Feature) bool {
 		return v.Default
 	}
 	panic(fmt.Errorf("feature %q is not registered in FeatureGates %q", key, f.callSiteName))
+}
+
+// Set parses a string of the form "key1=value1,key2=value2,..." into a
+// map[string]bool of known keys or returns an error.
+func (f *envVarFeatureGates) Set(value string) error {
+	for _, s := range strings.Split(value, ",") {
+		if len(s) == 0 {
+			continue
+		}
+		arr := strings.SplitN(s, "=", 2)
+		k := strings.TrimSpace(arr[0])
+		if len(arr) != 2 {
+			return fmt.Errorf("missing bool value for %s", k)
+		}
+		v := strings.TrimSpace(arr[1])
+		boolValue, err := strconv.ParseBool(v)
+		if err != nil {
+			return fmt.Errorf("invalid value of %s=%s, err: %v", k, v, err)
+		}
+
+		gateName := Feature(k)
+		featureSpec, ok := f.known[gateName]
+		if !ok {
+			return fmt.Errorf("unrecognized feature gate: %s", k)
+		}
+		if featureSpec.LockToDefault && featureSpec.Default != boolValue {
+			return fmt.Errorf("cannot set feature gate %v to %v, feature is locked to %v", k, v, featureSpec.Default)
+		}
+
+		func() {
+			f.lock.Lock()
+			defer f.lock.Unlock()
+			currGates := f.enabled.Load().(map[Feature]bool)
+			currGates[Feature(k)] = boolValue
+			f.enabled.Store(currGates)
+		}()
+	}
+
+	return nil
 }
 
 // getEnabledMapFromEnvVar will fill the enabled map on the first call.

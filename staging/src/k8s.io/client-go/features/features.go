@@ -57,6 +57,14 @@ type Gates interface {
 	Enabled(key Feature) bool
 }
 
+type MutableGates interface {
+	Gates
+
+	// Set parses and stores flag gates for known features
+	// from a string like feature1=true,feature2=false,...
+	Set(value string) error
+}
+
 // Registry represents an external feature gates registry.
 type Registry interface {
 	// Add adds existing feature gates to the provided registry.
@@ -122,7 +130,7 @@ func replaceFeatureGatesWithWarningIndicator(newFeatureGates Gates) bool {
 }
 
 func init() {
-	envVarGates := newEnvVarFeatureGates(defaultKubernetesFeatureGates)
+	envVarGates := NewEnvVarFeatureGates(defaultKubernetesFeatureGates)
 
 	wrappedFeatureGates := &featureGatesWrapper{envVarGates}
 	featureGates.Store(wrappedFeatureGates)
