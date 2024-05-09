@@ -14,42 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package leaderelection implements leader election of a set of endpoints.
-// It uses an annotation in the endpoints object to store the record of the
-// election state. This implementation does not guarantee that only one
-// client is acting as a leader (a.k.a. fencing).
+// Package leaderelection facilitates leader election within Kubernetes applications.
+// Leader election is crucial for distributed systems, allowing nodes to elect
+// a leader to coordinate operations. In Kubernetes, the leaderelection package
+// utilizes leases for this purpose, ensuring only one instance of an application
+// performs critical tasks.
 //
-// A client only acts on timestamps captured locally to infer the state of the
-// leader election. The client does not consider timestamps in the leader
-// election record to be accurate because these timestamps may not have been
-// produced by a local clock. The implemention does not depend on their
-// accuracy and only uses their change to indicate that another client has
-// renewed the leader lease. Thus the implementation is tolerant to arbitrary
-// clock skew, but is not tolerant to arbitrary clock skew rate.
+// Key features include:
 //
-// However the level of tolerance to skew rate can be configured by setting
-// RenewDeadline and LeaseDuration appropriately. The tolerance expressed as a
-// maximum tolerated ratio of time passed on the fastest node to time passed on
-// the slowest node can be approximately achieved with a configuration that sets
-// the same ratio of LeaseDuration to RenewDeadline. For example if a user wanted
-// to tolerate some nodes progressing forward in time twice as fast as other nodes,
-// the user could set LeaseDuration to 60 seconds and RenewDeadline to 30 seconds.
-//
-// While not required, some method of clock synchronization between nodes in the
-// cluster is highly recommended. It's important to keep in mind when configuring
-// this client that the tolerance to skew rate varies inversely to master
-// availability.
-//
-// Larger clusters often have a more lenient SLA for API latency. This should be
-// taken into account when configuring the client. The rate of leader transitions
-// should be monitored and RetryPeriod and LeaseDuration should be increased
-// until the rate is stable and acceptably low. It's important to keep in mind
-// when configuring this client that the tolerance to API latency varies inversely
-// to master availability.
-//
-// DISCLAIMER: this is an alpha API. This library will likely change significantly
-// or even be removed entirely in subsequent releases. Depend on this API at
-// your own risk.
+// Lease-Based Leader Election: Leases serve as the sole resource lock mechanism.
+// Automatic Leader Re-election: The package automatically triggers leader re-election if the leader fails.
+// Customizable Configuration: Users can customize lease duration and renewal parameters.
 package leaderelection
 
 import (
