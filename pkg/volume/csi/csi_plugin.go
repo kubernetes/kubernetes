@@ -876,7 +876,7 @@ func waitForAPIServerForever(client clientset.Interface, nodeName types.NodeName
 		// Get a CSINode from API server to make sure 1) kubelet can reach API server
 		// and 2) it has enough permissions. Kubelet may have restricted permissions
 		// when it's bootstrapping TLS.
-		// https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
+		// https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/
 		_, lastErr = client.StorageV1().CSINodes().Get(context.TODO(), string(nodeName), opts)
 		if lastErr == nil || apierrors.IsNotFound(lastErr) {
 			// API server contacted
