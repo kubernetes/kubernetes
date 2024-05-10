@@ -417,7 +417,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	if len(feasibleNodes) == 1 {
 		return ScheduleResult{
 			SuggestedHost:  feasibleNodes[0].Node().Name,
-			EvaluatedNodes: 1 + len(diagnosis.NodeToStatusMap),
+			EvaluatedNodes: diagnosis.EvaluatedNodes,
 			FeasibleNodes:  1,
 		}, nil
 	}
@@ -432,7 +432,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 	return ScheduleResult{
 		SuggestedHost:  host,
-		EvaluatedNodes: len(feasibleNodes) + len(diagnosis.NodeToStatusMap),
+		EvaluatedNodes: diagnosis.EvaluatedNodes,
 		FeasibleNodes:  len(feasibleNodes),
 	}, err
 }
@@ -594,6 +594,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		for i := range feasibleNodes {
 			feasibleNodes[i] = nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		}
+		diagnosis.EvaluatedNodes = int(numNodesToFind)
 		return feasibleNodes, nil
 	}
 
@@ -642,11 +643,13 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// are found.
 	fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
+	diagnosis.EvaluatedNodes = int(feasibleNodesLen)
 	for _, item := range result {
 		if item == nil {
 			continue
 		}
 		diagnosis.NodeToStatusMap[item.node] = item.status
+		diagnosis.EvaluatedNodes++
 		diagnosis.AddPluginStatus(item.status)
 	}
 	if err := errCh.ReceiveError(); err != nil {
