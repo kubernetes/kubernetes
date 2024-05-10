@@ -270,9 +270,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RegularResourceUsageTracking = framework.WithFeature(framework.ValidFeatures.Add("RegularResourceUsageTracking"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ScopeSelectors = framework.WithFeature(framework.ValidFeatures.Add("ScopeSelectors"))
-
 	// Owner: sig-network
 	// Marks tests that require a pod networking implementation that supports SCTP
 	// traffic between pods.
