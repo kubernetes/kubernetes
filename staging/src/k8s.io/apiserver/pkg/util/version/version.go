@@ -24,7 +24,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/version"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	baseversion "k8s.io/component-base/version"
 )
 
@@ -83,8 +82,6 @@ type EffectiveVersion interface {
 	BinaryVersion() *version.Version
 	EmulationVersion() *version.Version
 	MinCompatibilityVersion() *version.Version
-	// VersionInfo() stores full info about the binary version. Mainly used for /version endpoint.
-	VersionInfo() *apimachineryversion.Info
 	EqualTo(other EffectiveVersion) bool
 	String() string
 	Validate() []error
@@ -95,7 +92,6 @@ type MutableEffectiveVersion interface {
 	Set(binaryVersion, emulationVersion, minCompatibilityVersion *version.Version)
 	// AddFlags adds the "{prefix}-emulated-version" to the flagset.
 	AddFlags(fs *pflag.FlagSet, prefix string)
-	SetVersionInfo(versionInfo *apimachineryversion.Info)
 }
 
 type VersionVar struct {
@@ -135,7 +131,6 @@ type effectiveVersion struct {
 	emulationVersion VersionVar
 	// minCompatibilityVersion could only contain major and minor versions.
 	minCompatibilityVersion VersionVar
-	versionInfo             atomic.Pointer[apimachineryversion.Info]
 }
 
 func (m *effectiveVersion) BinaryVersion() *version.Version {
@@ -150,10 +145,6 @@ func (m *effectiveVersion) EmulationVersion() *version.Version {
 
 func (m *effectiveVersion) MinCompatibilityVersion() *version.Version {
 	return m.minCompatibilityVersion.val.Load()
-}
-
-func (m *effectiveVersion) VersionInfo() *apimachineryversion.Info {
-	return m.versionInfo.Load()
 }
 
 func (m *effectiveVersion) EqualTo(other EffectiveVersion) bool {
@@ -219,16 +210,11 @@ func (m *effectiveVersion) AddFlags(fs *pflag.FlagSet, prefix string) {
 		"Format could only be major.minor")
 }
 
-func (m *effectiveVersion) SetVersionInfo(versionInfo *apimachineryversion.Info) {
-	m.versionInfo.Store(versionInfo)
-}
-
 func NewEffectiveVersion(binaryVer string) MutableEffectiveVersion {
 	effective := &effectiveVersion{}
 	binaryVersion := version.MustParse(binaryVer)
 	compatVersion := binaryVersion.SubtractMinor(1)
 	effective.Set(binaryVersion, binaryVersion, compatVersion)
-	effective.SetVersionInfo(binaryVersion.VersionInfo())
 	return effective
 }
 
@@ -240,7 +226,6 @@ func DefaultBuildEffectiveVersion() MutableEffectiveVersion {
 	if ver.BinaryVersion().Major() == 0 && ver.BinaryVersion().Minor() == 0 {
 		ver = DefaultKubeEffectiveVersion()
 	}
-	ver.SetVersionInfo(&verInfo)
 	return ver
 }
 

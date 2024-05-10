@@ -239,8 +239,9 @@ type GenericAPIServer struct {
 	StorageVersionManager storageversion.Manager
 
 	// Version will enable the /version endpoint if non-nil
-	// Deprecated: Use EffectiveVersion instead
-	Version          *version.Info
+	Version *version.Info
+	// EffectiveVersion determines which apis and features are available
+	// based on when the api/feature lifecyle.
 	EffectiveVersion utilversion.EffectiveVersion
 	// FeatureGate is a way to plumb feature gate through if you have them.
 	FeatureGate featuregate.FeatureGate

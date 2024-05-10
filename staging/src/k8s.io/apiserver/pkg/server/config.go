@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
@@ -150,8 +151,9 @@ type Config struct {
 	PostStartHooks map[string]PostStartHookConfigEntry
 
 	// Version will enable the /version endpoint if non-nil
-	// Deprecated: Use EffectiveVersion instead
-	Version          *apimachineryversion.Info
+	Version *apimachineryversion.Info
+	// EffectiveVersion determines which apis and features are available
+	// based on when the api/feature lifecyle.
 	EffectiveVersion utilversion.EffectiveVersion
 	// FeatureGate is a way to plumb feature gate through if you have them.
 	FeatureGate featuregate.FeatureGate
@@ -591,7 +593,7 @@ func (c *Config) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
 	}
 }
 
-func completeOpenAPI(config *openapicommon.Config, version *apimachineryversion.Info) {
+func completeOpenAPI(config *openapicommon.Config, version *version.Version) {
 	if config == nil {
 		return
 	}
@@ -630,7 +632,7 @@ func completeOpenAPI(config *openapicommon.Config, version *apimachineryversion.
 	}
 }
 
-func completeOpenAPIV3(config *openapicommon.OpenAPIV3Config, version *apimachineryversion.Info) {
+func completeOpenAPIV3(config *openapicommon.OpenAPIV3Config, version *version.Version) {
 	if config == nil {
 		return
 	}
@@ -700,9 +702,9 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		}
 		c.ExternalAddress = net.JoinHostPort(c.ExternalAddress, strconv.Itoa(port))
 	}
-	var ver *apimachineryversion.Info
+	var ver *version.Version
 	if c.EffectiveVersion != nil {
-		ver = c.EffectiveVersion.EmulationVersion().VersionInfo()
+		ver = c.EffectiveVersion.EmulationVersion()
 	}
 	completeOpenAPI(c.OpenAPIConfig, ver)
 	completeOpenAPIV3(c.OpenAPIV3Config, ver)
@@ -832,6 +834,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		StorageVersionManager: c.StorageVersionManager,
 
 		EffectiveVersion: c.EffectiveVersion,
+		Version:          c.Version,
 		FeatureGate:      c.FeatureGate,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
@@ -1100,9 +1103,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		}
 	}
 
-	if c.EffectiveVersion != nil {
-		routes.Version{Version: c.EffectiveVersion.VersionInfo()}.Install(s.Handler.GoRestfulContainer)
-	}
+	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {

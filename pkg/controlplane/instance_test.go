@@ -58,6 +58,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	kubeversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	netutils "k8s.io/utils/net"
 
@@ -107,7 +108,9 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 		t.Fatal(err)
 	}
 
+	kubeVersion := kubeversion.Get()
 	config.ControlPlane.Generic.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	config.ControlPlane.Generic.Version = &kubeVersion
 	config.ControlPlane.StorageFactory = storageFactory
 	config.ControlPlane.Generic.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.ControlPlane.Generic.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
@@ -234,9 +237,9 @@ func TestVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expectedVersionInfo := utilversion.DefaultKubeEffectiveVersion().VersionInfo()
-	if !reflect.DeepEqual(*expectedVersionInfo, info) {
-		t.Errorf("Expected %#v, Got %#v", *expectedVersionInfo, info)
+
+	if !reflect.DeepEqual(kubeversion.Get(), info) {
+		t.Errorf("Expected %#v, Got %#v", kubeversion.Get(), info)
 	}
 }
 

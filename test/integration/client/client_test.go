@@ -42,13 +42,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 
+	"k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -65,8 +65,7 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedInfo := utilversion.DefaultKubeEffectiveVersion().VersionInfo()
-	if e, a := *expectedInfo, *info; !reflect.DeepEqual(e, a) {
+	if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 

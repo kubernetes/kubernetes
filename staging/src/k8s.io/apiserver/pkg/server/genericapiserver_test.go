@@ -459,7 +459,9 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableIndex = true
 	config.EnableProfiling = true
 
-	config.EffectiveVersion = utilversion.NewEffectiveVersion(fakeVersion().String())
+	kubeVersion := fakeVersion()
+	config.Version = &kubeVersion
+	config.EffectiveVersion = utilversion.NewEffectiveVersion(kubeVersion.String())
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {

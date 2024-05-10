@@ -23,8 +23,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 // Version is an opaque representation of a version number
@@ -315,22 +313,6 @@ func (v *Version) String() string {
 	}
 
 	return buffer.String()
-}
-
-func itoa(i uint) string {
-	if i == 0 {
-		return ""
-	}
-	return strconv.Itoa(int(i))
-}
-
-// VersionInfo converts Version into apimachineryversion.Info object using the major and minor.
-func (v *Version) VersionInfo() *apimachineryversion.Info {
-	return &apimachineryversion.Info{
-		Major:      itoa(v.Major()),
-		Minor:      itoa(v.Minor()),
-		GitVersion: v.String(),
-	}
 }
 
 // compareInternal returns -1 if v is less than other, 1 if it is greater than other, or 0
