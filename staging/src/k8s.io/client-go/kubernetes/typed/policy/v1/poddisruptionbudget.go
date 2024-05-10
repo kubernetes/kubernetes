@@ -20,20 +20,14 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	policyv1 "k8s.io/client-go/applyconfigurations/policy/v1"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
-	consistencydetector "k8s.io/client-go/util/consistencydetector"
-	watchlist "k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
 )
 
 // PodDisruptionBudgetsGetter has a method to return a PodDisruptionBudgetInterface.
@@ -46,6 +40,7 @@ type PodDisruptionBudgetsGetter interface {
 type PodDisruptionBudgetInterface interface {
 	Create(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.CreateOptions) (*v1.PodDisruptionBudget, error)
 	Update(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.UpdateOptions) (*v1.PodDisruptionBudget, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.UpdateOptions) (*v1.PodDisruptionBudget, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
@@ -54,242 +49,25 @@ type PodDisruptionBudgetInterface interface {
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodDisruptionBudget, err error)
 	Apply(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodDisruptionBudget, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
 
 // podDisruptionBudgets implements PodDisruptionBudgetInterface
 type podDisruptionBudgets struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1.PodDisruptionBudget, *v1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetApplyConfiguration]
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
 func newPodDisruptionBudgets(c *PolicyV1Client, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1.PodDisruptionBudget, *v1.PodDisruptionBudgetList, *policyv1.PodDisruptionBudgetApplyConfiguration](
+			"poddisruptionbudgets",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1.PodDisruptionBudget { return &v1.PodDisruptionBudget{} },
+			func() *v1.PodDisruptionBudgetList { return &v1.PodDisruptionBudgetList{} }),
 	}
-}
-
-// Get takes name of the podDisruptionBudget, and returns the corresponding podDisruptionBudget object, and an error if there is any.
-func (c *podDisruptionBudgets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PodDisruptionBudget, err error) {
-	result = &v1.PodDisruptionBudget{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *podDisruptionBudgets) List(ctx context.Context, opts metav1.ListOptions) (*v1.PodDisruptionBudgetList, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for poddisruptionbudgets, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := c.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for poddisruptionbudgets", c.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for poddisruptionbudgets ended with an error, falling back to the standard LIST semantics, err = %v", err)
-	}
-	result, err := c.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for poddisruptionbudgets", c.list, opts, result)
-	}
-	return result, err
-}
-
-// list takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *podDisruptionBudgets) list(ctx context.Context, opts metav1.ListOptions) (result *v1.PodDisruptionBudgetList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.PodDisruptionBudgetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// watchList establishes a watch stream with the server and returns the list of PodDisruptionBudgets
-func (c *podDisruptionBudgets) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.PodDisruptionBudgetList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.PodDisruptionBudgetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *podDisruptionBudgets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a podDisruptionBudget and creates it.  Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
-func (c *podDisruptionBudgets) Create(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.CreateOptions) (result *v1.PodDisruptionBudget, err error) {
-	result = &v1.PodDisruptionBudget{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(podDisruptionBudget).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a podDisruptionBudget and updates it. Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
-func (c *podDisruptionBudgets) Update(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.UpdateOptions) (result *v1.PodDisruptionBudget, err error) {
-	result = &v1.PodDisruptionBudget{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(podDisruptionBudget.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(podDisruptionBudget).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *podDisruptionBudgets) UpdateStatus(ctx context.Context, podDisruptionBudget *v1.PodDisruptionBudget, opts metav1.UpdateOptions) (result *v1.PodDisruptionBudget, err error) {
-	result = &v1.PodDisruptionBudget{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(podDisruptionBudget.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(podDisruptionBudget).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the podDisruptionBudget and deletes it. Returns an error if one occurs.
-func (c *podDisruptionBudgets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *podDisruptionBudgets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched podDisruptionBudget.
-func (c *podDisruptionBudgets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodDisruptionBudget, err error) {
-	result = &v1.PodDisruptionBudget{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied podDisruptionBudget.
-func (c *podDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodDisruptionBudget, err error) {
-	if podDisruptionBudget == nil {
-		return nil, fmt.Errorf("podDisruptionBudget provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(podDisruptionBudget)
-	if err != nil {
-		return nil, err
-	}
-	name := podDisruptionBudget.Name
-	if name == nil {
-		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
-	}
-	result = &v1.PodDisruptionBudget{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *podDisruptionBudgets) ApplyStatus(ctx context.Context, podDisruptionBudget *policyv1.PodDisruptionBudgetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodDisruptionBudget, err error) {
-	if podDisruptionBudget == nil {
-		return nil, fmt.Errorf("podDisruptionBudget provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(podDisruptionBudget)
-	if err != nil {
-		return nil, err
-	}
-
-	name := podDisruptionBudget.Name
-	if name == nil {
-		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
-	}
-
-	result = &v1.PodDisruptionBudget{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }
