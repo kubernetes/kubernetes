@@ -25,8 +25,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	// ensure the cloud providers are installed
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
