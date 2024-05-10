@@ -1,5 +1,5 @@
-# Do not edit, downloaded from https://github.com/kubernetes-csi/external-provisioner/raw/v3.1.0/deploy/kubernetes//rbac.yaml
-# for csi-driver-host-path v1.8.0
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-provisioner/raw/v4.0.0/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path release-1.13
 # by ./update-hostpath.sh
 #
 # This YAML file contains all RBAC objects that are necessary to run external
@@ -61,6 +61,13 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch"]
+  # (Alpha) Access to referencegrants is only needed when the CSI driver
+  # has the CrossNamespaceVolumeDataSource controller capability.
+  # In that case, external-provisioner requires "get", "list", "watch" 
+  # permissions  for "referencegrants" on "gateway.networking.k8s.io".
+  #- apiGroups: ["gateway.networking.k8s.io"]
+  #  resources: ["referencegrants"]
+  #  verbs: ["get", "list", "watch"]
 
 ---
 kind: ClusterRoleBinding
@@ -89,9 +96,6 @@ metadata:
 rules:
 # Only one of the following rules for endpoints or leases is required based on
 # what is set for `--leader-election-type`. Endpoints are deprecated in favor of Leases.
-- apiGroups: [""]
-  resources: ["endpoints"]
-  verbs: ["get", "watch", "list", "delete", "update", "create"]
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
   verbs: ["get", "watch", "list", "delete", "update", "create"]
