@@ -116,7 +116,7 @@ func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*m
 			// Don't log "empty response" as an error; it is a common response for metrics.
 			if _, emptyErr := err.(*emptyResponseError); emptyErr {
 				// Log at same verbosity as disk cache.
-				klog.V(3).Infof("%v", err)
+				klog.V(3).InfoS("Received empty response for GroupVersion", "groupVersion", groupVersion)
 			} else {
 				utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", groupVersion, err))
 			}
@@ -282,7 +282,7 @@ func (d *memCacheClient) refreshLocked() error {
 					// Don't log "empty response" as an error; it is a common response for metrics.
 					if _, emptyErr := err.(*emptyResponseError); emptyErr {
 						// Log at same verbosity as disk cache.
-						klog.V(3).Infof("%v", err)
+						klog.V(3).InfoS("Received empty response for GroupVersion", "groupVersion", gv)
 					} else {
 						utilruntime.HandleError(fmt.Errorf("couldn't get resource list for %v: %v", gv, err))
 					}
