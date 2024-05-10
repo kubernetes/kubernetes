@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +44,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
@@ -85,6 +87,8 @@ const (
 
 	kubeletUser = "kubelet"
 )
+
+const sysctlAllDisableIPv6 = "net/ipv6/conf/all/disable_ipv6"
 
 // parseGetSubIdsOutput parses the output from the `getsubids` tool, which is used to query subordinate user or group ID ranges for
 // a given user or group. getsubids produces a line for each mapping configured.
@@ -476,8 +480,13 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 			return err
 		}
 	} else {
+		isIPv6, err := isIPv6Supported()
+		if err != nil {
+			return err
+		}
+
 		// if Pod is not using host network, create a managed hosts file with Pod IP and other information.
-		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
+		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases, isIPv6)
 	}
 
 	hostsFilePerm := os.FileMode(0644)
@@ -502,15 +511,19 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 
 // managedHostsFileContent generates the content of the managed etc hosts based on Pod IPs and other
 // information.
-func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias) []byte {
+func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, hostAliases []v1.HostAlias, isIPv6 bool) []byte {
 	var buffer bytes.Buffer
 	buffer.WriteString(managedHostsHeader)
-	buffer.WriteString("127.0.0.1\tlocalhost\n")                      // ipv4 localhost
-	buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
-	buffer.WriteString("fe00::0\tip6-localnet\n")
-	buffer.WriteString("fe00::0\tip6-mcastprefix\n")
-	buffer.WriteString("fe00::1\tip6-allnodes\n")
-	buffer.WriteString("fe00::2\tip6-allrouters\n")
+	buffer.WriteString("127.0.0.1\tlocalhost\n") // ipv4 localhost
+
+	if isIPv6 {
+		buffer.WriteString("::1\tlocalhost ip6-localhost ip6-loopback\n") // ipv6 localhost
+		buffer.WriteString("fe00::0\tip6-localnet\n")
+		buffer.WriteString("fe00::0\tip6-mcastprefix\n")
+		buffer.WriteString("fe00::1\tip6-allnodes\n")
+		buffer.WriteString("fe00::2\tip6-allrouters\n")
+	}
+
 	if len(hostDomainName) > 0 {
 		// host entry generated for all IPs in podIPs
 		// podIPs field is populated for clusters even
@@ -525,6 +538,20 @@ func managedHostsFileContent(hostIPs []string, hostName, hostDomainName string, 
 	}
 	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
 	return buffer.Bytes()
+}
+
+// isIPv6Supported determines whether the host supports ipv6 by check the global ipv6 support sysctl.
+// We use it to determine whether the pod should support ipv6.
+// But there are going to be edge cases we don't get right,
+// e.g. the user may have IPv6 enabled in the host netns,
+// but for some reason disable IPv6 in the pod netns.
+// But because kubelet cannot actually know about the loopback interface of the pod,
+// we cannot do something completely correct,
+// so we can only do simple and basically correct things.
+func isIPv6Supported() (bool, error) {
+	// TODO This should be injected by the caller.
+	val, err := utilsysctl.New().GetSysctl(sysctlAllDisableIPv6)
+	return val == 0, err
 }
 
 func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
