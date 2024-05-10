@@ -56,6 +56,8 @@ const (
 	csiPodUnschedulableTimeout = 5 * time.Minute
 	csiResizeWaitPeriod        = 5 * time.Minute
 	csiVolumeAttachmentTimeout = 7 * time.Minute
+	// how long to wait for GetVolumeStats
+	csiNodeVolumeStatWaitPeriod = 1 * time.Minute
 	// how long to wait for Resizing Condition on PVC to appear
 	csiResizingConditionWait = 2 * time.Minute
 
@@ -96,6 +98,7 @@ type testParameters struct {
 	disableResizingOnDriver       bool
 	enableSnapshot                bool
 	enableVolumeMountGroup        bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
+	enableNodeVolumeStat          bool
 	hooks                         *drivers.Hooks
 	tokenRequests                 []storagev1.TokenRequest
 	requiresRepublish             *bool
@@ -168,6 +171,7 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 		DisableAttach:                 tp.disableAttach,
 		EnableResizing:                tp.enableResizing,
 		EnableNodeExpansion:           tp.enableNodeExpansion,
+		EnableNodeVolumeStat:          tp.enableNodeVolumeStat,
 		EnableSnapshot:                tp.enableSnapshot,
 		EnableVolumeMountGroup:        tp.enableVolumeMountGroup,
 		TokenRequests:                 tp.tokenRequests,
