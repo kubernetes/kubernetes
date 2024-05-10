@@ -60575,7 +60575,7 @@ func schema_kubectl_pkg_config_v1alpha1_PreferencesAliasOverride(ref common.Refe
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PreferencesAliasOverride stores the alias definitions. It is applied in a pre-defined order which is kubectl [ALIAS NAME] expands kubectl [COMMAND] [ARGUMENTS] [FLAGS]",
+				Description: "PreferencesAliasOverride stores the alias definitions. It is applied in a pre-defined order which is kubectl [ALIAS NAME] expands to kubectl [COMMAND] [ARGUMENTS]",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -60609,10 +60609,26 @@ func schema_kubectl_pkg_config_v1alpha1_PreferencesAliasOverride(ref common.Refe
 							},
 						},
 					},
+					"flags": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Flag is allocated to store the flag definitions of alias",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "command"},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1alpha1.PreferencesCommandOverrideFlag"},
 	}
 }
 

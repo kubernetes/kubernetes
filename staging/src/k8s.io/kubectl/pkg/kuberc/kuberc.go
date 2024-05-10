@@ -28,112 +28,221 @@ var (
 // PreferencesHandler is responsible for setting default flags
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
-	InjectOverrides(rootCmd *cobra.Command, args []string)
-	InjectAliases(rootCmd *cobra.Command, args []string)
+	AddFlags(flags *pflag.FlagSet)
+	ApplyOverrides(rootCmd *cobra.Command, args []string, errOut io.Writer) error
+	ApplyAliases(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
 // or file from set in flag or the default kuberc path.
 type Preferences struct {
-	KubeRC string
+	GetPreferencesFunc func(kuberc string) (*v1alpha1.Preferences, error)
+
+	aliases map[string]struct{}
 }
 
 // NewPreferences returns initialized Prefrences object.
-func NewPreferences() *Preferences {
-	return &Preferences{}
+func NewPreferences() PreferencesHandler {
+	return &Preferences{
+		GetPreferencesFunc: DefaultGetPreferences,
+		aliases:            make(map[string]struct{}),
+	}
 }
 
 // AddFlags adds kuberc related flags into the command.
 func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 	if util.KubeRC.IsEnabled() {
-		flags.StringVar(&p.KubeRC, "kuberc", p.KubeRC, "Path to the kuberc file to use for preferences.")
+		flags.String("kuberc", "", "Path to the kuberc file to use for preferences.")
 	}
 }
 
-// InjectOverrides injects the default flags defined in kuberc file.
-func (p *Preferences) InjectOverrides(rootCmd *cobra.Command, args []string, errOut io.Writer) {
-	kuberc, err := p.getPreferences()
+// ApplyOverrides injects the default flags defined in kuberc file.
+func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errOut io.Writer) error {
+	if len(args) <= 1 {
+		return nil
+	}
+
+	kubercPath := getExplicitKuberc(args)
+	kuberc, err := p.GetPreferencesFunc(kubercPath)
 	if err != nil {
-		fmt.Fprintf(errOut, "kuberc error %v\n", err)
-		return
+		return fmt.Errorf("kuberc error %v\n", err)
 	}
 
 	if kuberc == nil {
-		return
+		return nil
 	}
 
 	args = args[1:]
 	cmd, _, err := rootCmd.Find(args)
 	if err != nil {
-		fmt.Fprintf(errOut, "could not find command %q\n", args)
-		return
+		fmt.Fprintf(errOut, "command not found %v\n", err)
+		return nil
 	}
 
 	for _, c := range kuberc.Spec.Overrides {
-		if c.Command != cmd.Name() {
+		parsedCmds := strings.Split(c.Command, " ")
+		overrideCmd, _, err := rootCmd.Find(parsedCmds)
+		if err != nil {
+			// this may be referring to the alias command which is not initialized
+			// because the actual command is totally different.
+			return nil
+		}
+		if overrideCmd.Name() != cmd.Name() {
 			continue
 		}
 
-		for _, fl := range c.Flags {
-			err = cmd.Flags().Set(fmt.Sprintf("%s", fl.Name), fl.Default)
-			if err != nil {
-				fmt.Fprintf(errOut, "could not apply value %s to flag %s in command %s\n", fl.Default, fl.Name, c.Command)
-				return
-			}
+		if _, ok := p.aliases[cmd.Name()]; ok {
+			return fmt.Errorf("alias %s can not be overridden\n", cmd.Name())
 		}
 
-		// TODO do we really need to parse in here?
-		/*if err = cmd.Flags().Parse(args); err != nil {
-			// return without raising any error because
-			// real command execution will catch this invalid request
-			return
-		}*/
+		// In order to merge the persistent flags of the parents commands
+		// into this command. Otherwise, default flags would not find the persistent flags
+		// such as --namespaces, etc.
+		_ = cmd.InheritedFlags()
+
+		for _, fl := range c.Flags {
+			// explicit flag usage has higher precedence than the kuberc default flag value.
+			// We should set the default flag values in kuberc, unless there is any in args.
+			if explicitFlagUse(fl.Name, args) {
+				continue
+			}
+			err = cmd.Flags().Set(fmt.Sprintf("%s", fl.Name), fl.Default)
+			if err != nil {
+				return fmt.Errorf("could not apply value %s to flag %s in command %s err: %v\n", fl.Default, fl.Name, c.Command, err)
+			}
+		}
 	}
+
+	err = cmd.ValidateArgs(args)
+	if err != nil {
+		return nil
+	}
+
+	return nil
 }
 
-func (p *Preferences) InjectAliases(rootCmd *cobra.Command, args []string, errOut io.Writer) {
-	kuberc, err := p.getPreferences()
+// ApplyAliases sets all defined aliases in kuberc file first to their corresponding commands.
+// Since there may be several alias definitions belonging to the same command, it extracts the
+// alias that is currently executed from args. After that it sets the flag definitions in alias as default values
+// of the command. Lastly, others parameters (e.g. resources, etc.) that are passed as arguments
+// sets to the commands args.
+func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
+	if len(args) <= 1 {
+		return args, nil
+	}
+
+	_, _, err := rootCmd.Find(args[1:])
+	if err == nil {
+		// Command is found, no need to continue for aliasing
+		return args, nil
+	}
+
+	kubercPath := getExplicitKuberc(args)
+	kuberc, err := p.GetPreferencesFunc(kubercPath)
 	if err != nil {
-		fmt.Fprintf(errOut, "kuberc error %v\n", err)
-		return
+		return args, fmt.Errorf("kuberc error %v\n", err)
 	}
 
 	if kuberc == nil {
-		return
+		return args, nil
 	}
 
+	aliasArgsMap := make(map[string]struct {
+		args    []string
+		flags   []v1alpha1.PreferencesCommandOverrideFlag
+		command *cobra.Command
+	})
+
 	for _, alias := range kuberc.Spec.Aliases {
-		commands := strings.Split(alias.Command, " ")
-		cmd, flags, err := rootCmd.Find(commands)
-		if err != nil {
-			fmt.Fprintf(errOut, "Command %q not found to set alias %q: %v\n", alias.Command, alias.Name, flags)
-			continue
-		}
 		// do not allow shadowing built-ins
 		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
 			fmt.Fprintf(errOut, "Setting alias %q to a built-in command is not supported\n", alias.Name)
 			continue
 		}
-		cmd.Aliases = append(cmd.Aliases, alias.Name)
-		cmd.Flags().Parse(alias.Arguments)
+
+		if _, ok := aliasArgsMap[alias.Name]; ok {
+			fmt.Fprintf(errOut, "alias %s is already set, skipping...\n", alias.Name)
+			continue
+		}
+
+		commands := strings.Split(alias.Command, " ")
+		existingCmd, flags, err := rootCmd.Find(commands)
+		if err != nil {
+			fmt.Fprintf(errOut, "command %q not found to set alias %q: %v\n", alias.Command, alias.Name, flags)
+			continue
+		}
+
+		newCmd := *existingCmd
+		newCmd.Use = alias.Name
+		aliasCmd := &newCmd
+
+		aliasArgsMap[alias.Name] = struct {
+			args    []string
+			flags   []v1alpha1.PreferencesCommandOverrideFlag
+			command *cobra.Command
+		}{
+			args:    alias.Arguments,
+			flags:   alias.Flags,
+			command: aliasCmd,
+		}
 	}
+
+	// It is verified that all the aliases are valid. So that, now we
+	// can define them in to the root command.
+	for key, val := range aliasArgsMap {
+		p.aliases[key] = struct{}{}
+		rootCmd.AddCommand(val.command)
+	}
+
+	aliasName := args[1]
+
+	foundAliasCmd, _, err := rootCmd.Find([]string{aliasName})
+	if err != nil {
+		return args, nil
+	}
+
+	aliasArgs, ok := aliasArgsMap[aliasName]
+	if !ok {
+		return args, nil
+	}
+
+	// In order to merge the persistent flags of the parents commands
+	// into this command. Otherwise, default flags would not find the persistent flags
+	// such as --namespaces, etc.
+	_ = foundAliasCmd.InheritedFlags()
+
+	for _, fl := range aliasArgs.flags {
+		// explicit flag usage has higher precedence than the kuberc default flag value.
+		// We should set the default flag values in kuberc, unless there is any in args.
+		if explicitFlagUse(fl.Name, args) {
+			continue
+		}
+		err = foundAliasCmd.Flags().Set(fmt.Sprintf("%s", fl.Name), fl.Default)
+		if err != nil {
+			fmt.Fprintf(errOut, "could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
+			return args, nil
+		}
+	}
+
+	// all args defined in kuberc should be appended to actual args.
+	args = append(args, aliasArgs.args...)
+	return args, nil
 }
 
-// getPreferences returns v1alpha1.KubeRCConfiguration.
+// DefaultGetPreferences returns v1alpha1.KubeRCConfiguration.
 // If users sets kuberc file explicitly in --kuberc flag, it has the highest
 // priority. If not specified, it looks for in KUBERC environment variable.
 // If KUBERC is also not set, it falls back to default .kuberc file at the same location
 // where kubeconfig's defaults are residing in.
-func (p *Preferences) getPreferences() (*v1alpha1.Preferences, error) {
+func DefaultGetPreferences(kuberc string) (*v1alpha1.Preferences, error) {
 	if !util.KubeRC.IsEnabled() {
 		return nil, nil
 	}
 
 	kubeRCFile := RecommendedKubeRCFile
 	explicitly := false
-	if p.KubeRC != "" {
-		// TODO not working. Parseflags and get explicit kuberc path
-		kubeRCFile = p.KubeRC
+	if kuberc != "" {
+		kubeRCFile = kuberc
 		explicitly = true
 	}
 
@@ -155,5 +264,37 @@ func (p *Preferences) getPreferences() (*v1alpha1.Preferences, error) {
 		return nil, err
 	}
 	return decoded.(*v1alpha1.Preferences), nil
+}
 
+func getExplicitKuberc(args []string) string {
+	var kubercPath string
+	for i, arg := range args {
+		if arg == "--kuberc" {
+			if i+1 < len(args) {
+				kubercPath = args[i+1]
+				break
+			}
+		} else if strings.Contains(arg, "--kuberc=") {
+			parg := strings.Split(arg, "=")
+			if len(parg) > 1 {
+				kubercPath = parg[1]
+				break
+			}
+		}
+	}
+
+	if kubercPath == "" {
+		return ""
+	}
+
+	return kubercPath
+}
+
+func explicitFlagUse(flagName string, args []string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, fmt.Sprintf("--%s", flagName)) || strings.HasPrefix(arg, fmt.Sprintf("--%s=", flagName)) {
+			return true
+		}
+	}
+	return false
 }

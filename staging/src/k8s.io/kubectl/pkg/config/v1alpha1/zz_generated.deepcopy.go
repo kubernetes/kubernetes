@@ -59,6 +59,11 @@ func (in *PreferencesAliasOverride) DeepCopyInto(out *PreferencesAliasOverride) 
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Flags != nil {
+		in, out := &in.Flags, &out.Flags
+		*out = make([]PreferencesCommandOverrideFlag, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

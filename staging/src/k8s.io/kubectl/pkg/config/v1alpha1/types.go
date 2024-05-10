@@ -48,6 +48,8 @@ type PreferencesAliasOverride struct {
 	Command string `json:"command"`
 	// Arguments is allocated for the arguments such as resource names, etc.
 	Arguments []string `json:"args,omitempty"`
+	// Flag is allocated to store the flag definitions of alias
+	Flags []PreferencesCommandOverrideFlag `json:"flags,omitempty"`
 }
 
 // PreferencesSpec stores the overrides
