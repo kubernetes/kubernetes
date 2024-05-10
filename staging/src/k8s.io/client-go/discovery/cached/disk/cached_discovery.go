@@ -74,23 +74,23 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 	if err == nil {
 		cachedResources := &metav1.APIResourceList{}
 		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
-			klog.V(10).Infof("returning cached discovery info from %v", filename)
+			klog.V(10).InfoS("Returned cached discovery info from disk", "path", filename)
 			return cachedResources, nil
 		}
 	}
 
 	liveResources, err := d.delegate.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
-		klog.V(3).Infof("skipped caching discovery info due to %v", err)
+		klog.V(3).InfoS("Skipped caching discovery info due to errors", "err", err)
 		return liveResources, err
 	}
 	if liveResources == nil || len(liveResources.APIResources) == 0 {
-		klog.V(3).Infof("skipped caching discovery info, no resources found")
+		klog.V(3).InfoS("Skipped caching discovery info, no resources found")
 		return liveResources, err
 	}
 
 	if err := d.writeCachedFile(filename, liveResources); err != nil {
-		klog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
+		klog.V(1).InfoS("Failed to write cache to disk", "path", filename, "err", err)
 	}
 
 	return liveResources, nil
@@ -110,23 +110,23 @@ func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	if err == nil {
 		cachedGroups := &metav1.APIGroupList{}
 		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
-			klog.V(10).Infof("returning cached discovery info from %v", filename)
+			klog.V(10).InfoS("Returned cached discovery info from disk", "path", filename)
 			return cachedGroups, nil
 		}
 	}
 
 	liveGroups, err := d.delegate.ServerGroups()
 	if err != nil {
-		klog.V(3).Infof("skipped caching discovery info due to %v", err)
+		klog.V(3).InfoS("Skipped caching discovery info due to errors", "err", err)
 		return liveGroups, err
 	}
 	if liveGroups == nil || len(liveGroups.Groups) == 0 {
-		klog.V(3).Infof("skipped caching discovery info, no groups found")
+		klog.V(3).InfoS("Skipped caching discovery info, no groups found")
 		return liveGroups, err
 	}
 
 	if err := d.writeCachedFile(filename, liveGroups); err != nil {
-		klog.V(1).Infof("failed to write cache to %v due to %v", filename, err)
+		klog.V(1).InfoS("Failed to write cache to disk", "path", filename, "err", err)
 	}
 
 	return liveGroups, nil
