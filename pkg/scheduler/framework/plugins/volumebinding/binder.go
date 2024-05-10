@@ -1100,8 +1100,6 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 		return true
 	case csiplugins.PortworxVolumePluginName:
 		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
-	case csiplugins.RBDVolumePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 	}
 	return false
 }
