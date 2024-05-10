@@ -2157,7 +2157,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+			if err := waitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 				t.Errorf("Pod %v got scheduled: %v", pod.Name, err)
 			}
 			if err := tt.update(testCtx.ClientSet, testCtx.NS.Name); err != nil {
