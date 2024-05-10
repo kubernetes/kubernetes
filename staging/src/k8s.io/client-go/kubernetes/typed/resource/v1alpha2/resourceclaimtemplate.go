@@ -20,20 +20,14 @@ package v1alpha2
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
-	consistencydetector "k8s.io/client-go/util/consistencydetector"
-	watchlist "k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
 )
 
 // ResourceClaimTemplatesGetter has a method to return a ResourceClaimTemplateInterface.
@@ -58,190 +52,18 @@ type ResourceClaimTemplateInterface interface {
 
 // resourceClaimTemplates implements ResourceClaimTemplateInterface
 type resourceClaimTemplates struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1alpha2.ResourceClaimTemplate, *v1alpha2.ResourceClaimTemplateList, *resourcev1alpha2.ResourceClaimTemplateApplyConfiguration]
 }
 
 // newResourceClaimTemplates returns a ResourceClaimTemplates
 func newResourceClaimTemplates(c *ResourceV1alpha2Client, namespace string) *resourceClaimTemplates {
 	return &resourceClaimTemplates{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1alpha2.ResourceClaimTemplate, *v1alpha2.ResourceClaimTemplateList, *resourcev1alpha2.ResourceClaimTemplateApplyConfiguration](
+			"resourceclaimtemplates",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1alpha2.ResourceClaimTemplate { return &v1alpha2.ResourceClaimTemplate{} },
+			func() *v1alpha2.ResourceClaimTemplateList { return &v1alpha2.ResourceClaimTemplateList{} }),
 	}
-}
-
-// Get takes name of the resourceClaimTemplate, and returns the corresponding resourceClaimTemplate object, and an error if there is any.
-func (c *resourceClaimTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceClaimTemplate, err error) {
-	result = &v1alpha2.ResourceClaimTemplate{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ResourceClaimTemplates that match those selectors.
-func (c *resourceClaimTemplates) List(ctx context.Context, opts v1.ListOptions) (*v1alpha2.ResourceClaimTemplateList, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for resourceclaimtemplates, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := c.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for resourceclaimtemplates", c.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for resourceclaimtemplates ended with an error, falling back to the standard LIST semantics, err = %v", err)
-	}
-	result, err := c.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for resourceclaimtemplates", c.list, opts, result)
-	}
-	return result, err
-}
-
-// list takes label and field selectors, and returns the list of ResourceClaimTemplates that match those selectors.
-func (c *resourceClaimTemplates) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClaimTemplateList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha2.ResourceClaimTemplateList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// watchList establishes a watch stream with the server and returns the list of ResourceClaimTemplates
-func (c *resourceClaimTemplates) watchList(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClaimTemplateList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha2.ResourceClaimTemplateList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested resourceClaimTemplates.
-func (c *resourceClaimTemplates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a resourceClaimTemplate and creates it.  Returns the server's representation of the resourceClaimTemplate, and an error, if there is any.
-func (c *resourceClaimTemplates) Create(ctx context.Context, resourceClaimTemplate *v1alpha2.ResourceClaimTemplate, opts v1.CreateOptions) (result *v1alpha2.ResourceClaimTemplate, err error) {
-	result = &v1alpha2.ResourceClaimTemplate{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(resourceClaimTemplate).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a resourceClaimTemplate and updates it. Returns the server's representation of the resourceClaimTemplate, and an error, if there is any.
-func (c *resourceClaimTemplates) Update(ctx context.Context, resourceClaimTemplate *v1alpha2.ResourceClaimTemplate, opts v1.UpdateOptions) (result *v1alpha2.ResourceClaimTemplate, err error) {
-	result = &v1alpha2.ResourceClaimTemplate{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		Name(resourceClaimTemplate.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(resourceClaimTemplate).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the resourceClaimTemplate and deletes it. Returns an error if one occurs.
-func (c *resourceClaimTemplates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *resourceClaimTemplates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched resourceClaimTemplate.
-func (c *resourceClaimTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClaimTemplate, err error) {
-	result = &v1alpha2.ResourceClaimTemplate{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied resourceClaimTemplate.
-func (c *resourceClaimTemplates) Apply(ctx context.Context, resourceClaimTemplate *resourcev1alpha2.ResourceClaimTemplateApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha2.ResourceClaimTemplate, err error) {
-	if resourceClaimTemplate == nil {
-		return nil, fmt.Errorf("resourceClaimTemplate provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(resourceClaimTemplate)
-	if err != nil {
-		return nil, err
-	}
-	name := resourceClaimTemplate.Name
-	if name == nil {
-		return nil, fmt.Errorf("resourceClaimTemplate.Name must be provided to Apply")
-	}
-	result = &v1alpha2.ResourceClaimTemplate{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("resourceclaimtemplates").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }
