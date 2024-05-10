@@ -64,7 +64,6 @@ type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
 	VolumePlugins             []vol.VolumePlugin
-	ClusterName               string
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
 	ClassInformer             storageinformers.StorageClassInformer
@@ -86,7 +85,6 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
 		enableDynamicProvisioning:     p.EnableDynamicProvisioning,
-		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
 		claimQueue:                    workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "claims"}),
