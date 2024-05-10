@@ -93,7 +93,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 		},
 	}
 
-	config.ControlPlane.Generic.EffectiveVersion = utilversion.TestEffectiveVersion()
+	config.ControlPlane.Generic.EffectiveVersion = utilversion.DefaultKubeEffectiveVersion()
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
 	storageFactoryConfig.DefaultResourceEncoding.SetEffectiveVersion(config.ControlPlane.Generic.EffectiveVersion)
 	storageConfig.StorageObjectCountTracker = config.ControlPlane.Generic.StorageObjectCountTracker
@@ -234,7 +234,7 @@ func TestVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expectedVersionInfo := utilversion.TestEffectiveVersion().VersionInfo()
+	expectedVersionInfo := utilversion.DefaultKubeEffectiveVersion().VersionInfo()
 	if !reflect.DeepEqual(*expectedVersionInfo, info) {
 		t.Errorf("Expected %#v, Got %#v", *expectedVersionInfo, info)
 	}

@@ -232,21 +232,21 @@ func NewEffectiveVersion(binaryVer string) MutableEffectiveVersion {
 	return effective
 }
 
-// K8sDefaultEffectiveVersion returns the MutableEffectiveVersion based on the
-// current kubernetes binary version.
-func K8sDefaultEffectiveVersion() MutableEffectiveVersion {
+// DefaultBuildEffectiveVersion returns the MutableEffectiveVersion based on the
+// current build information.
+func DefaultBuildEffectiveVersion() MutableEffectiveVersion {
 	verInfo := baseversion.Get()
 	ver := NewEffectiveVersion(verInfo.String())
 	if ver.BinaryVersion().Major() == 0 && ver.BinaryVersion().Minor() == 0 {
-		ver = TestEffectiveVersion()
+		ver = DefaultKubeEffectiveVersion()
 	}
 	ver.SetVersionInfo(&verInfo)
 	return ver
 }
 
-// TestEffectiveVersion should only be used for tests.
-// It returns the MutableEffectiveVersion based on a
-// manually set binary version instead of the "0.0" returned by baseversion.Get() in tests.
-func TestEffectiveVersion() MutableEffectiveVersion {
+// DefaultKubeEffectiveVersion returns the MutableEffectiveVersion based on the
+// latest K8s release.
+// Should update for each minor release!
+func DefaultKubeEffectiveVersion() MutableEffectiveVersion {
 	return NewEffectiveVersion("1.31")
 }

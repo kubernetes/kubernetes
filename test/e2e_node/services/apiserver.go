@@ -67,7 +67,7 @@ func (a *APIServer) Start(ctx context.Context) error {
 
 	featureGate := utilfeature.DefaultFeatureGate
 	effectiveVersion := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.K8sDefaultEffectiveVersion())
+		utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion())
 	o := options.NewServerRunOptions(featureGate, effectiveVersion)
 	o.Etcd.StorageConfig = a.storageConfig
 	_, ipnet, err := netutils.ParseCIDRSloppy(clusterIPRange)

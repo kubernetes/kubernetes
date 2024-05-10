@@ -124,7 +124,7 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	featureGate := utilfeature.DefaultMutableFeatureGate
 	effectiveVersion := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.K8sDefaultEffectiveVersion())
+		utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion())
 	featureGate.DeferErrorsToValidation(true)
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr, featureGate, effectiveVersion)
 

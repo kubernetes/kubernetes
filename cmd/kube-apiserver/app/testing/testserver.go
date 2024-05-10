@@ -183,7 +183,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	featureGate := utilfeature.DefaultMutableFeatureGate
 	featureGate.DeferErrorsToValidation(true)
-	binaryVersion := utilversion.TestEffectiveVersion().BinaryVersion().String()
+	binaryVersion := utilversion.DefaultKubeEffectiveVersion().BinaryVersion().String()
 	if instanceOptions.BinaryVersion != "" {
 		binaryVersion = instanceOptions.BinaryVersion
 	}

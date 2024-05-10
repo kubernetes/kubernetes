@@ -67,7 +67,7 @@ func NewAPIServerCommand() *cobra.Command {
 	featureGate := utilfeature.DefaultMutableFeatureGate
 	featureGate.DeferErrorsToValidation(true)
 	effectiveVersion := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.K8sDefaultEffectiveVersion())
+		utilversion.ComponentGenericAPIServer, utilversion.DefaultBuildEffectiveVersion())
 	s := options.NewServerRunOptions(featureGate, effectiveVersion)
 
 	cmd := &cobra.Command{

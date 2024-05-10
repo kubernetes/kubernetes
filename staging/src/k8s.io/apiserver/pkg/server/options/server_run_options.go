@@ -365,7 +365,7 @@ func (s *ServerRunOptions) Complete() error {
 	}
 	if s.EffectiveVersion == nil {
 		s.EffectiveVersion = utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrRegister(
-			utilversion.ComponentGenericAPIServer, utilversion.K8sDefaultEffectiveVersion())
+			utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion())
 	}
 	return nil
 }

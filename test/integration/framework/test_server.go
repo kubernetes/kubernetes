@@ -138,7 +138,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	}
 
 	featureGate := utilfeature.DefaultFeatureGate
-	effectiveVersion := utilversion.TestEffectiveVersion()
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	opts := options.NewServerRunOptions(featureGate, effectiveVersion)
 	opts.SecureServing.Listener = listener
 	opts.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")

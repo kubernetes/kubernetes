@@ -30,8 +30,11 @@ import (
 
 func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command {
 	featureGate := utilfeature.DefaultMutableFeatureGate
+	// effectiveVersion is used to set what apis and feature gates the generic api server is compatible with.
+	// You can also have the flag setting the effectiveVersion of the apiextensions apiserver, and
+	// having a mapping from the apiextensions apiserver version to generic apiserver version.
 	effectiveVersion := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.K8sDefaultEffectiveVersion())
+		utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion())
 	featureGate.DeferErrorsToValidation(true)
 	o := options.NewCustomResourceDefinitionsServerOptions(out, errOut, featureGate, effectiveVersion)
 

@@ -35,7 +35,7 @@ import (
 
 func TestBuildGenericConfig(t *testing.T) {
 	featureGate := featuregate.NewFeatureGate()
-	effectiveVersion := utilversion.TestEffectiveVersion()
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	opts := options.NewOptions(featureGate, effectiveVersion)
 	s := (&apiserveroptions.SecureServingOptions{
 		BindAddress: netutils.ParseIPSloppy("127.0.0.1"),

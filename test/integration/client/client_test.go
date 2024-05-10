@@ -65,7 +65,7 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expectedInfo := utilversion.TestEffectiveVersion().VersionInfo()
+	expectedInfo := utilversion.DefaultKubeEffectiveVersion().VersionInfo()
 	if e, a := *expectedInfo, *info; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}

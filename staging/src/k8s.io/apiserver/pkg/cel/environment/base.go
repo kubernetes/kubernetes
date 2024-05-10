@@ -45,12 +45,8 @@ import (
 // of Kubernetes versions.
 func DefaultCompatibilityVersion() *version.Version {
 	ver := utilversion.DefaultEffectiveVersionRegistry.EffectiveVersionForOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.K8sDefaultEffectiveVersion(),
+		utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion(),
 	).MinCompatibilityVersion()
-	// if MinCompatibilityVersion is not set for tests
-	if ver.Major() == 0 && ver.Minor() == 0 {
-		return utilversion.TestEffectiveVersion().MinCompatibilityVersion()
-	}
 	return ver
 }
 
