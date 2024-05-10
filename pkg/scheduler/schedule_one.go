@@ -386,14 +386,17 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
 func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
-	diagnosis := framework.Diagnosis{
-		NodeToStatusMap:      make(framework.NodeToStatusMap),
-		UnschedulablePlugins: sets.NewString(),
-	}
-
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
-		return nil, diagnosis, err
+		return nil, framework.Diagnosis{
+			NodeToStatusMap:      make(framework.NodeToStatusMap),
+			UnschedulablePlugins: sets.NewString(),
+		}, err
+	}
+
+	diagnosis := framework.Diagnosis{
+		NodeToStatusMap:      make(framework.NodeToStatusMap, len(allNodes)),
+		UnschedulablePlugins: sets.NewString(),
 	}
 	// Run "prefilter" plugins.
 	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
@@ -434,12 +437,14 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 	nodes := allNodes
 	if !preRes.AllNodes() {
 		nodes = make([]*framework.NodeInfo, 0, len(preRes.NodeNames))
-		for n := range preRes.NodeNames {
-			nInfo, err := sched.nodeInfoSnapshot.NodeInfos().Get(n)
-			if err != nil {
-				return nil, diagnosis, err
+		for _, n := range allNodes {
+			if !preRes.NodeNames.Has(n.Node().Name) {
+				// We consider Nodes that are filtered out by PreFilterResult as rejected via UnschedulableAndUnresolvable.
+				// We have to record them in NodeToStatusMap so that they won't be considered as candidates in the preemption.
+				diagnosis.NodeToStatusMap[n.Node().Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result")
+				continue
 			}
-			nodes = append(nodes, nInfo)
+			nodes = append(nodes, n)
 		}
 	}
 	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, nodes)
