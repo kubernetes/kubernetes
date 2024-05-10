@@ -163,6 +163,7 @@ linters-settings: # please keep this alphabetized
           -structured .*
           
           # Now enable it again for migrated packages.
+          structured k8s.io/client-go/discovery/.*
           structured k8s.io/kubernetes/cmd/kubelet/.*
           structured k8s.io/kubernetes/pkg/kubelet/.*
           structured k8s.io/kubernetes/pkg/proxy/.*
