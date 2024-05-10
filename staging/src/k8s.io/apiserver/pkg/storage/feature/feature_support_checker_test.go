@@ -76,20 +76,17 @@ func TestSupports(t *testing.T) {
 		testName       string
 		featureName    string
 		expectedResult bool
-		expectedError  error
 	}{
 		{
-			testName:      "Error with unknown feature",
-			featureName:   "some unknown feature",
-			expectedError: fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", "some unknown feature"),
+			testName:    "Disabled - with unknown feature",
+			featureName: "some unknown feature",
 		},
 		{
-			testName:      "Error with empty feature",
-			featureName:   "",
-			expectedError: fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", ""),
+			testName:    "Disabled - with empty feature",
+			featureName: "",
 		},
 		{
-			testName:       "No error but disabled by default",
+			testName:       "Disabled - default",
 			featureName:    storage.RequestWatchProgress,
 			expectedResult: false,
 		},
@@ -99,10 +96,9 @@ func TestSupports(t *testing.T) {
 		t.Run(tt.testName, func(t *testing.T) {
 			var testFeatureSupportChecker FeatureSupportChecker = newDefaultFeatureSupportChecker()
 
-			supported, err := testFeatureSupportChecker.Supports(tt.featureName)
+			supported := testFeatureSupportChecker.Supports(tt.featureName)
 
 			assert.Equal(t, tt.expectedResult, supported)
-			assert.Equal(t, tt.expectedError, err)
 		})
 	}
 }
@@ -254,18 +250,19 @@ func TestSupportsRequestWatchProgress(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.testName, func(t *testing.T) {
-			var testFeatureSupportChecker FeatureSupportChecker = newDefaultFeatureSupportChecker()
+			var testFeatureSupportChecker = newDefaultFeatureSupportChecker()
 			for _, round := range tt.rounds {
 				// Mock Etcd client
 				mockClient := &MockEtcdClient{EndpointVersion: round.endpointsVersion}
 				ctx := context.Background()
 
-				err := testFeatureSupportChecker.CheckClient(ctx, mockClient, storage.RequestWatchProgress)
-				assert.Equal(t, err, round.expectedError)
+				for _, ep := range mockClient.Endpoints() {
+					err := testFeatureSupportChecker.clientSupportsRequestWatchProgress(ctx, mockClient, ep)
+					assert.Equal(t, round.expectedError, err)
+				}
 
-				// Error of Supports already tested in TestSupports.
-				supported, _ := testFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-				assert.Equal(t, supported, round.expectedResult)
+				supported := testFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+				assert.Equal(t, round.expectedResult, supported)
 			}
 		})
 	}

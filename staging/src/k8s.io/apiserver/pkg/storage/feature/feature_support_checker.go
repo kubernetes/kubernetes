@@ -20,9 +20,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -43,84 +46,98 @@ type FeatureSupportChecker interface {
 	// Supports check if the feature is supported or not by checking internal cache.
 	// By default all calls to this function before calling CheckClient returns false.
 	// Returns true if all endpoints in etcd clients are supporting the feature.
-	Supports(feature storage.Feature) (bool, error)
+	// If client A supports and client B doesn't support the feature, the `Supports` will
+	// first return true at client A initializtion and then return false on client B
+	// initialzation, it can flip the support at runtime.
+	Supports(feature storage.Feature) bool
 	// CheckClient works with etcd client to recalcualte feature support and cache it internally.
 	// All etcd clients should support feature to cause `Supports` return true.
 	// If client A supports and client B doesn't support the feature, the `Supports` will
 	// first return true at client A initializtion and then return false on client B
 	// initialzation, it can flip the support at runtime.
-	CheckClient(ctx context.Context, c client, feature storage.Feature) error
+	CheckClient(ctx context.Context, c client, feature storage.Feature)
 }
 
 type defaultFeatureSupportChecker struct {
-	lock                       sync.Mutex
-	progressNotifySupported    *bool
-	progresNotifyEndpointCache map[string]bool
+	lock                    sync.Mutex
+	progressNotifySupported *bool
+	checkingEndpoint        map[string]struct{}
 }
 
 func newDefaultFeatureSupportChecker() *defaultFeatureSupportChecker {
 	return &defaultFeatureSupportChecker{
-		progresNotifyEndpointCache: make(map[string]bool),
+		checkingEndpoint: make(map[string]struct{}),
 	}
 }
 
 // Supports can check the featue from anywhere without storage if it was cached before.
-func (f *defaultFeatureSupportChecker) Supports(feature storage.Feature) (bool, error) {
+func (f *defaultFeatureSupportChecker) Supports(feature storage.Feature) bool {
 	switch feature {
 	case storage.RequestWatchProgress:
 		f.lock.Lock()
 		defer f.lock.Unlock()
 
-		return ptr.Deref(f.progressNotifySupported, false), nil
+		return ptr.Deref(f.progressNotifySupported, false)
 	default:
-		return false, fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", feature)
+		runtime.HandleError(fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", feature))
+		return false
 	}
 }
 
 // CheckClient accepts client and calculate the support per endpoint and caches it.
-// It will return at any point if error happens or one endpoint is not supported.
-func (f *defaultFeatureSupportChecker) CheckClient(ctx context.Context, c client, feature storage.Feature) error {
+func (f *defaultFeatureSupportChecker) CheckClient(ctx context.Context, c client, feature storage.Feature) {
 	switch feature {
 	case storage.RequestWatchProgress:
-		return f.clientSupportsRequestWatchProgress(ctx, c)
+		f.checkClient(ctx, c)
 	default:
-		return fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", feature)
-
+		runtime.HandleError(fmt.Errorf("feature %q is not implemented in DefaultFeatureSupportChecker", feature))
 	}
 }
 
-func (f *defaultFeatureSupportChecker) clientSupportsRequestWatchProgress(ctx context.Context, c client) error {
+func (f *defaultFeatureSupportChecker) checkClient(ctx context.Context, c client) {
+	// start with 10 ms, multiply by 2 each step, until 15 s and stays on 15 seconds.
+	delayFunc := wait.Backoff{
+		Duration: 10 * time.Millisecond,
+		Cap:      15 * time.Second,
+		Factor:   2.0,
+		Steps:    11}.DelayFunc()
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	for _, ep := range c.Endpoints() {
+		if _, found := f.checkingEndpoint[ep]; found {
+			continue
+		}
+		f.checkingEndpoint[ep] = struct{}{}
+		go func(ep string) {
+			defer runtime.HandleCrash()
+			err := delayFunc.Until(ctx, true, true, func(ctx context.Context) (done bool, err error) {
+				internalErr := f.clientSupportsRequestWatchProgress(ctx, c, ep)
+				return internalErr == nil, nil
+			})
+			if err != nil {
+				klog.ErrorS(err, "Failed to check if RequestWatchProgress is supported by etcd after retrying")
+			}
+		}(ep)
+	}
+}
+
+func (f *defaultFeatureSupportChecker) clientSupportsRequestWatchProgress(ctx context.Context, c client, ep string) error {
+	supported, err := endpointSupportsRequestWatchProgress(ctx, c, ep)
+	if err != nil {
+		return err
+	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	for _, ep := range c.Endpoints() {
-		supported, err := f.supportsProgressNotifyEndpointLocked(ctx, c, ep)
-		if err != nil {
-			return err
-		}
-		if !supported {
-			f.progressNotifySupported = ptr.To(false)
-			return nil
-		}
+	if !supported {
+		klog.Infof("RequestWatchProgress feature is not supported by %q endpoint", ep)
+		f.progressNotifySupported = ptr.To(false)
+		return nil
 	}
-	if f.progressNotifySupported == nil && len(c.Endpoints()) > 0 {
+	if f.progressNotifySupported == nil {
 		f.progressNotifySupported = ptr.To(true)
 	}
 	return nil
-}
-
-func (f *defaultFeatureSupportChecker) supportsProgressNotifyEndpointLocked(ctx context.Context, c client, ep string) (bool, error) {
-	if supported, ok := f.progresNotifyEndpointCache[ep]; ok {
-		return supported, nil
-	}
-
-	supported, err := endpointSupportsRequestWatchProgress(ctx, c, ep)
-	if err != nil {
-		return false, err
-	}
-
-	f.progresNotifyEndpointCache[ep] = supported
-	return supported, nil
 }
 
 // Sub interface of etcd client.
