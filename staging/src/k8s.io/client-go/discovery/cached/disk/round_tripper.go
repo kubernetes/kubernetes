@@ -60,7 +60,7 @@ func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
 	if cr, ok := rt.rt.Transport.(canceler); ok {
 		cr.CancelRequest(req)
 	} else {
-		klog.Errorf("CancelRequest not implemented by %T", rt.rt.Transport)
+		klog.ErrorS(nil, "Could not cancel request, not supported by transport", "transport", rt.rt.Transport)
 	}
 }
 
