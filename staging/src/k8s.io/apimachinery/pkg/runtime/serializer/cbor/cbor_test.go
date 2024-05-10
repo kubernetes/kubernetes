@@ -182,6 +182,24 @@ func TestDecode(t *testing.T) {
 		assertOnError func(*testing.T, error)
 	}{
 		{
+			name:        "self-described cbor tag accepted",
+			data:        []byte("\xd9\xd9\xf7\xa3\x4aapiVersion\x41v\x44kind\x41k\x48metadata\xa1\x44name\x43foo"), // 55799({'apiVersion': 'v', 'kind': 'k', 'metadata': {'name': 'foo'}})
+			gvk:         &schema.GroupVersionKind{},
+			metaFactory: &defaultMetaFactory{},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Version: "v", Kind: "k"}}},
+			into:        &metav1.PartialObjectMetadata{},
+			expectedObj: &metav1.PartialObjectMetadata{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "v", Kind: "k"},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "k"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
 			name:        "error determining gvk",
 			metaFactory: stubMetaFactory{err: errors.New("test")},
 			assertOnError: func(t *testing.T, err error) {
