@@ -20,11 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/tools/cache"
@@ -102,38 +99,4 @@ func nodeNameIndexFunc(obj interface{}) ([]string, error) {
 		return nil, fmt.Errorf("not a ResourceSlice")
 	}
 	return []string{slice.NodeName}, nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	slice, ok := obj.(*resource.ResourceSlice)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a ResourceSlice")
-	}
-	return labels.Set(slice.ObjectMeta.Labels), toSelectableFields(slice), nil
-}
-
-// Match returns a generic matcher for a given label and field selector.
-func Match(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:       label,
-		Field:       field,
-		GetAttrs:    GetAttrs,
-		IndexFields: []string{"nodeName"},
-	}
-}
-
-// toSelectableFields returns a field set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
-	// The purpose of allocation with a given number of elements is to reduce
-	// amount of allocations needed to create the fields.Set. If you add any
-	// field here or the number of object-meta related fields changes, this should
-	// be adjusted.
-	fields := make(fields.Set, 3)
-	fields["nodeName"] = slice.NodeName
-	fields["driverName"] = slice.DriverName
-
-	// Adds one field.
-	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
 }

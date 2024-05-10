@@ -26,6 +26,10 @@ import (
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 )
 
+func init() {
+	localSchemeBuilder.Register(addDefaultingFuncs)
+}
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }

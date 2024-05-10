@@ -43,7 +43,6 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &apiregistration.APIService{} },
 		NewListFunc:               func() runtime.Object { return &apiregistration.APIServiceList{} },
-		PredicateFunc:             apiservice.MatchAPIService,
 		DefaultQualifiedResource:  apiregistration.Resource("apiservices"),
 		SingularQualifiedResource: apiregistration.Resource("apiservice"),
 
@@ -55,7 +54,7 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 		// TODO: define table converter that exposes more than name/creation timestamp
 		TableConvertor: rest.NewDefaultTableConvertor(apiregistration.Resource("apiservices")),
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: apiservice.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

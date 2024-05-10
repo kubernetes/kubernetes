@@ -19,22 +19,17 @@ package job
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/job"
@@ -413,33 +408,4 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 // WarningsOnUpdate returns warnings for the given update.
 func (jobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-// JobSelectableFields returns a field set that represents the object for matching purposes.
-func JobToSelectableFields(job *batch.Job) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&job.ObjectMeta, true)
-	specificFieldsSet := fields.Set{
-		"status.successful": strconv.Itoa(int(job.Status.Succeeded)),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	job, ok := obj.(*batch.Job)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a job.")
-	}
-	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
-}
-
-// MatchJob is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }

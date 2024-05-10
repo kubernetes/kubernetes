@@ -107,6 +107,21 @@ func Accessor(obj interface{}) (metav1.Object, error) {
 	}
 }
 
+// Selectable takes an arbitrary object pointer and returns runtime.SelectableObject.
+// obj must be a pointer to an API type. An error is returned if the minimum
+// required fields are missing.
+func Selectable(obj interface{}) (runtime.SelectableObjectMeta, error) {
+	switch t := obj.(type) {
+	case runtime.SelectableObjectMeta:
+		return t, nil
+	case metav1.ObjectMetaAccessor:
+		if m := t.GetObjectMeta(); m != nil {
+			return m, nil
+		}
+	}
+	return nil, errNotObject
+}
+
 // AsPartialObjectMetadata takes the metav1 interface and returns a partial object.
 // TODO: consider making this solely a conversion action.
 func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {

@@ -62,11 +62,12 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			attrFunc := runtime.DefaultAttrFunc
 			pod, ok := obj.(*example.Pod)
 			if !ok {
-				return storage.DefaultNamespaceScopedAttr(obj)
+				return attrFunc(obj)
 			}
-			labelsSet, fieldsSet, err := storage.DefaultNamespaceScopedAttr(obj)
+			labelsSet, fieldsSet, err := attrFunc(obj)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -1395,12 +1396,20 @@ func TestCachingDeleteEvents(t *testing.T) {
 	}
 
 	fooPredicate := storage.SelectionPredicate{
-		Label: labels.SelectorFromSet(map[string]string{"foo": "true"}),
-		Field: fields.Everything(),
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.SelectorFromSet(map[string]string{"foo": "true"}),
+				Fields: fields.Everything(),
+			},
+		},
 	}
 	barPredicate := storage.SelectionPredicate{
-		Label: labels.SelectorFromSet(map[string]string{"bar": "true"}),
-		Field: fields.Everything(),
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.SelectorFromSet(map[string]string{"bar": "true"}),
+				Fields: fields.Everything(),
+			},
+		},
 	}
 
 	createWatch := func(pred storage.SelectionPredicate) watch.Interface {
@@ -1878,8 +1887,12 @@ func BenchmarkCacher_GetList(b *testing.B) {
 					b.Fatalf("parse selector: %v", err)
 				}
 				pred := storage.SelectionPredicate{
-					Label: labels.Everything(),
-					Field: parsedField,
+					SelectionPredicate: runtime.SelectionPredicate{
+						Selectors: runtime.Selectors{
+							Labels: labels.Everything(),
+							Fields: parsedField,
+						},
+					},
 				}
 
 				// now we start benchmarking

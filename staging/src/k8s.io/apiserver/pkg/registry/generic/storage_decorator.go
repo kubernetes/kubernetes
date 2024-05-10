@@ -32,7 +32,7 @@ type StorageDecorator func(
 	keyFunc func(obj runtime.Object) (string, error),
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
-	getAttrsFunc storage.AttrFunc,
+	getAttrsFunc runtime.AttrFunc,
 	trigger storage.IndexerFuncs,
 	indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error)
 
@@ -44,7 +44,7 @@ func UndecoratedStorage(
 	keyFunc func(obj runtime.Object) (string, error),
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
-	getAttrsFunc storage.AttrFunc,
+	getAttrsFunc runtime.AttrFunc,
 	trigger storage.IndexerFuncs,
 	indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
 	return NewRawStorage(config, newFunc, newListFunc, resourcePrefix)

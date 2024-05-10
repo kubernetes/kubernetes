@@ -157,7 +157,7 @@ type watchCache struct {
 	keyFunc func(runtime.Object) (string, error)
 
 	// getAttrsFunc is used to get labels and fields of an object.
-	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
+	getAttrsFunc runtime.AttrFunc
 
 	// cache is used a cyclic buffer - the "current" contents of it are
 	// stored in [start_index%capacity, end_index%capacity) - so the
@@ -208,7 +208,7 @@ type watchCache struct {
 func newWatchCache(
 	keyFunc func(runtime.Object) (string, error),
 	eventHandler func(*watchCacheEvent),
-	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
+	getAttrsFunc runtime.AttrFunc,
 	versioner storage.Versioner,
 	indexers *cache.Indexers,
 	clock clock.WithTicker,

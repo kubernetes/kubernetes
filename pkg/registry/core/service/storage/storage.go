@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -88,7 +89,7 @@ func NewREST(
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Service{} },
 		NewListFunc:               func() runtime.Object { return &api.ServiceList{} },
-		PredicateFunc:             svcreg.Matcher,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(api.ServiceMatcher),
 		DefaultQualifiedResource:  api.Resource("services"),
 		SingularQualifiedResource: api.Resource("service"),
 		ReturnDeletedObject:       true,
@@ -100,10 +101,7 @@ func NewREST(
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{
-		RESTOptions: optsGetter,
-		AttrFunc:    svcreg.GetAttrs,
-	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: api.ServiceGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, nil, err
 	}

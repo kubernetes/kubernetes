@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -97,7 +98,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Node{} },
 		NewListFunc:               func() runtime.Object { return &api.NodeList{} },
-		PredicateFunc:             node.MatchNode,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(api.NodeMatcher),
 		DefaultQualifiedResource:  api.Resource("nodes"),
 		SingularQualifiedResource: api.Resource("node"),
 
@@ -108,10 +109,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{
-		RESTOptions: optsGetter,
-		AttrFunc:    node.GetAttrs,
-	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: api.NodeGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}

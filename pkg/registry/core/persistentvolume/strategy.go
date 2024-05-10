@@ -18,18 +18,13 @@ package persistentvolume
 
 import (
 	"context"
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
@@ -171,32 +166,4 @@ func (persistentvolumeStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 // WarningsOnUpdate returns warnings for the given update.
 func (persistentvolumeStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	persistentvolumeObj, ok := obj.(*api.PersistentVolume)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a persistentvolume")
-	}
-	return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), nil
-}
-
-// MatchPersistentVolume returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumes(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// PersistentVolumeToSelectableFields returns a field set that represents the object
-func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&persistentvolume.ObjectMeta, false)
-	specificFieldsSet := fields.Set{
-		// This is a bug, but we need to support it for backward compatibility.
-		"name": persistentvolume.Name,
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

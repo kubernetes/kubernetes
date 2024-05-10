@@ -42,7 +42,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.ResourceClaim{} },
 		NewListFunc:               func() runtime.Object { return &resource.ResourceClaimList{} },
-		PredicateFunc:             resourceclaim.Match,
 		DefaultQualifiedResource:  resource.Resource("resourceclaims"),
 		SingularQualifiedResource: resource.Resource("resourceclaim"),
 
@@ -54,7 +53,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: resourceclaim.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}

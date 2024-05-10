@@ -31,21 +31,46 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	if err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("StatefulSet"),
+func init() {
+	localSchemeBuilder.Register(addFieldLabelConversionFuncs)
+}
+
+func addFieldLabelConversionFuncs(scheme *runtime.Scheme) error {
+	if err := AddFieldLabelConversionsForReplicaSet(scheme); err != nil {
+		return err
+	}
+	if err := AddFieldLabelConversionsForStatefulSet(scheme); err != nil {
+		return err
+	}
+	return nil
+}
+
+func AddFieldLabelConversionsForReplicaSet(scheme *runtime.Scheme) error {
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("ReplicaSet"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name", "metadata.namespace", "status.successful":
+			case "metadata.name",
+				"metadata.namespace",
+				"status.replicas":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+}
+
+func AddFieldLabelConversionsForStatefulSet(scheme *runtime.Scheme) error {
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("StatefulSet"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name",
+				"metadata.namespace",
+				"status.successful": // TODO: This field doesn't appear to exist
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported for appsv1beta2.StatefulSet: %s", label)
 			}
-		}); err != nil {
-		return err
-	}
-
-	return nil
+		})
 }
 
 func Convert_autoscaling_ScaleStatus_To_v1beta2_ScaleStatus(in *autoscaling.ScaleStatus, out *appsv1beta2.ScaleStatus, s conversion.Scope) error {

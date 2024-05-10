@@ -18,17 +18,12 @@ package event
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -89,47 +84,6 @@ func (eventStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Obje
 
 func (eventStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, nil, fmt.Errorf("not an event")
-	}
-	return labels.Set(event.Labels), ToSelectableFields(event), nil
-}
-
-// Matcher returns a selection predicate for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// ToSelectableFields returns a field set that represents the object.
-func ToSelectableFields(event *api.Event) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&event.ObjectMeta, true)
-	source := event.Source.Component
-	if source == "" {
-		source = event.ReportingController
-	}
-	specificFieldsSet := fields.Set{
-		"involvedObject.kind":            event.InvolvedObject.Kind,
-		"involvedObject.namespace":       event.InvolvedObject.Namespace,
-		"involvedObject.name":            event.InvolvedObject.Name,
-		"involvedObject.uid":             string(event.InvolvedObject.UID),
-		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
-		"involvedObject.resourceVersion": event.InvolvedObject.ResourceVersion,
-		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
-		"reason":                         event.Reason,
-		"reportingComponent":             event.ReportingController, // use the core/v1 field name
-		"source":                         source,
-		"type":                           event.Type,
-	}
-	return generic.MergeFieldsSets(specificFieldsSet, objectMetaFieldsSet)
 }
 
 // requestGroupVersion returns the group/version associated with the given context, or a zero-value group/version.

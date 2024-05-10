@@ -864,16 +864,20 @@ func BenchmarkStore_GetList(b *testing.B) {
 
 			// prepare result and pred
 			pred := storage.SelectionPredicate{
-				Label: tc.selector,
-				Field: fields.Everything(),
-				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-					pod, ok := obj.(*examplev1.Pod)
-					if !ok {
-						return nil, nil, fmt.Errorf("not a pod")
-					}
-					return pod.ObjectMeta.Labels, fields.Set{
-						"metadata.name": pod.Name,
-					}, nil
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Labels: tc.selector,
+						Fields: fields.Everything(),
+					},
+					GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+						pod, ok := obj.(*examplev1.Pod)
+						if !ok {
+							return nil, nil, fmt.Errorf("not a pod")
+						}
+						return pod.ObjectMeta.Labels, fields.Set{
+							"metadata.name": pod.Name,
+						}, nil
+					},
 				},
 			}
 

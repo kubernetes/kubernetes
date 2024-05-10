@@ -677,8 +677,12 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "rejects resource version and continue token",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Label:    labels.Everything(),
-				Field:    fields.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Labels: labels.Everything(),
+						Fields: fields.Everything(),
+					},
+				},
 				Limit:    1,
 				Continue: secondContinuation,
 			},
@@ -779,8 +783,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with pod name matching",
 			prefix: "/pods/first/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.ParseSelectorOrDie("metadata.name!=bar"),
+					},
+				},
 			},
 			expectedOut: []example.Pod{},
 		},
@@ -788,8 +795,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with pod name matching with resource version set to current resource version, match=NotOlderThan",
 			prefix: "/pods/first/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.ParseSelectorOrDie("metadata.name!=bar"),
+					},
+				},
 			},
 			expectedOut: []example.Pod{},
 			rv:          list.ResourceVersion,
@@ -799,8 +809,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with limit",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
 				Limit: 1,
 			},
 			expectedOut:                []example.Pod{*preset[1]},
@@ -811,8 +819,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with limit at current resource version",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
 				Limit: 1,
 			},
 			expectedOut:                []example.Pod{*preset[1]},
@@ -825,8 +831,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with limit at current resource version and match=Exact",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
 				Limit: 1,
 			},
 			expectedOut:                []example.Pod{*preset[1]},
@@ -840,8 +844,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with limit at current resource version and match=NotOlderThan",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
 				Limit: 1,
 			},
 			expectedOut:                []example.Pod{*preset[1]},
@@ -855,8 +857,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with limit at resource version 0",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
 				Limit: 1,
 			},
 			// TODO(#108003): As of now, watchcache is deliberately ignoring
@@ -874,8 +874,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with limit at resource version 0 match=NotOlderThan",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
 				Limit: 1,
 			},
 			// TODO(#108003): As of now, watchcache is deliberately ignoring
@@ -894,8 +892,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with limit at resource version before first write and match=Exact",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label: labels.Everything(),
-				Field: fields.Everything(),
 				Limit: 1,
 			},
 			expectedOut:    []example.Pod{},
@@ -908,8 +904,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with pregenerated continue token",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label:    labels.Everything(),
-				Field:    fields.Everything(),
 				Limit:    1,
 				Continue: secondContinuation,
 			},
@@ -919,8 +913,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "ignores resource version 0 for List with pregenerated continue token",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
-				Label:    labels.Everything(),
-				Field:    fields.Everything(),
 				Limit:    1,
 				Continue: secondContinuation,
 			},
@@ -945,8 +937,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with filter returning only one item, ensure only a single page returned",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "barfoo"),
+					},
+				},
 				Limit: 1,
 			},
 			expectedOut:    []example.Pod{*preset[3]},
@@ -956,8 +951,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with filter returning only one item, ensure only a single page returned with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "barfoo"),
+					},
+				},
 				Limit: 1,
 			},
 			rv:             list.ResourceVersion,
@@ -969,8 +967,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with filter returning only one item, covers the entire list",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "barfoo"),
+					},
+				},
 				Limit: 2,
 			},
 			expectedOut:    []example.Pod{*preset[3]},
@@ -980,8 +981,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with filter returning only one item, covers the entire list with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "barfoo"),
+					},
+				},
 				Limit: 2,
 			},
 			rv:             list.ResourceVersion,
@@ -993,8 +997,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with filter returning only one item, covers the entire list, with resource version 0",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "barfoo"),
+					},
+				},
 				Limit: 2,
 			},
 			rv:                   "0",
@@ -1005,8 +1012,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with filter returning two items, more pages possible",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "bar"),
+					},
+				},
 				Limit: 2,
 			},
 			expectContinue: true,
@@ -1016,8 +1026,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "test List with filter returning two items, more pages possible with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "bar"),
+					},
+				},
 				Limit: 2,
 			},
 			rv:             list.ResourceVersion,
@@ -1029,8 +1042,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns two items split across multiple pages",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "foo"),
+					},
+				},
 				Limit: 2,
 			},
 			expectedOut: []example.Pod{*preset[2], *preset[4]},
@@ -1039,8 +1055,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns two items split across multiple pages with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "foo"),
+					},
+				},
 				Limit: 2,
 			},
 			rv:          list.ResourceVersion,
@@ -1051,8 +1070,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns one item for last page, ends on last item, not full",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
-				Label:    labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "foo"),
+					},
+				},
 				Limit:    2,
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
@@ -1062,8 +1084,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns one item for last page, starts on last item, full",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
-				Label:    labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "foo"),
+					},
+				},
 				Limit:    1,
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
@@ -1073,8 +1098,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns one item for last page, starts on last item, partial page",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
-				Label:    labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "foo"),
+					},
+				},
 				Limit:    2,
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
@@ -1084,8 +1112,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns two items, page size equal to total list size",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "foo"),
+					},
+				},
 				Limit: 5,
 			},
 			expectedOut: []example.Pod{*preset[2], *preset[4]},
@@ -1094,8 +1125,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns two items, page size equal to total list size with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "foo"),
+					},
+				},
 				Limit: 5,
 			},
 			rv:          list.ResourceVersion,
@@ -1106,8 +1140,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns one item, page size equal to total list size",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "barfoo"),
+					},
+				},
 				Limit: 5,
 			},
 			expectedOut: []example.Pod{*preset[3]},
@@ -1116,8 +1153,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "barfoo"),
+					},
+				},
 				Limit: 5,
 			},
 			rv:          list.ResourceVersion,
@@ -1142,8 +1182,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "verify list returns updated version of object; filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("spec.nodeName", "fakeNode"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("spec.nodeName", "fakeNode"),
+					},
+				},
 				Limit: 5,
 			},
 			rv:          list.ResourceVersion,
@@ -1154,8 +1197,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:   "verify list does not return deleted object; filter for deleted object, page size equal to total list size with current resource version and match=NotOlderThan",
 			prefix: "/pods",
 			pred: storage.SelectionPredicate{
-				Field: fields.OneTermEqualSelector("metadata.name", "baz"),
-				Label: labels.Everything(),
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: runtime.Selectors{
+						Fields: fields.OneTermEqualSelector("metadata.name", "baz"),
+					},
+				},
 				Limit: 5,
 			},
 			rv:          list.ResourceVersion,
@@ -1506,11 +1552,14 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Co
 		name: "with matching pod name",
 		key:  "/non-existing",
 		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			SelectionPredicate: runtime.SelectionPredicate{
+				Selectors: runtime.Selectors{
+					Fields: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
+				},
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod := obj.(*example.Pod)
+					return nil, fields.Set{"metadata.name": pod.Name}, nil
+				},
 			},
 		},
 		expectedOut: []example.Pod{},
@@ -1518,11 +1567,14 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Co
 		name: "existing key, resourceVersion=current, with not matching pod name",
 		key:  key,
 		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			SelectionPredicate: runtime.SelectionPredicate{
+				Selectors: runtime.Selectors{
+					Fields: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
+				},
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod := obj.(*example.Pod)
+					return nil, fields.Set{"metadata.name": pod.Name}, nil
+				},
 			},
 		},
 		expectedOut: []example.Pod{},
@@ -1622,11 +1674,11 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		return storage.SelectionPredicate{
 			Limit:    limit,
 			Continue: continueValue,
-			Label:    labels.Everything(),
-			Field:    fields.Everything(),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			SelectionPredicate: runtime.SelectionPredicate{
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod := obj.(*example.Pod)
+					return nil, fields.Set{"metadata.name": pod.Name}, nil
+				},
 			},
 		}
 	}
@@ -1741,11 +1793,14 @@ func RunTestListPaginationRareObject(ctx context.Context, t *testing.T, store st
 	options := storage.ListOptions{
 		Predicate: storage.SelectionPredicate{
 			Limit: 1,
-			Label: labels.Everything(),
-			Field: fields.OneTermEqualSelector("metadata.name", "pod-999"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			SelectionPredicate: runtime.SelectionPredicate{
+				Selectors: runtime.Selectors{
+					Fields: fields.OneTermEqualSelector("metadata.name", "pod-999"),
+				},
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod := obj.(*example.Pod)
+					return nil, fields.Set{"metadata.name": pod.Name}, nil
+				},
 			},
 		},
 		Recursive: true,
@@ -1811,11 +1866,14 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		return storage.SelectionPredicate{
 			Limit:    limit,
 			Continue: continueValue,
-			Label:    labels.Everything(),
-			Field:    fields.OneTermNotEqualSelector("metadata.name", "bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			SelectionPredicate: runtime.SelectionPredicate{
+				Selectors: runtime.Selectors{
+					Fields: fields.OneTermNotEqualSelector("metadata.name", "bar"),
+				},
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod := obj.(*example.Pod)
+					return nil, fields.Set{"metadata.name": pod.Name}, nil
+				},
 			},
 		}
 	}
@@ -1920,11 +1978,11 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		return storage.SelectionPredicate{
 			Limit:    limit,
 			Continue: continueValue,
-			Label:    labels.Everything(),
-			Field:    fields.Everything(),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			SelectionPredicate: runtime.SelectionPredicate{
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod := obj.(*example.Pod)
+					return nil, fields.Set{"metadata.name": pod.Name}, nil
+				},
 			},
 		}
 	}
@@ -2072,9 +2130,13 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 		return labels.Set(pod.Labels), nil, nil
 	}
 	predicate := storage.SelectionPredicate{
-		Label:    labels.Set{"even": "true"}.AsSelector(),
-		GetAttrs: getAttrs,
-		Limit:    4,
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.Set{"even": "true"}.AsSelector(),
+			},
+			GetAttrs: getAttrs,
+		},
+		Limit: 4,
 	}
 
 	result1 := example.PodList{}

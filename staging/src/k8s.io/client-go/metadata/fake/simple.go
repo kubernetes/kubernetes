@@ -67,16 +67,7 @@ func NewSimpleMetadataClient(scheme *runtime.Scheme, objects ...runtime.Object) 
 
 	cs := &FakeMetadataClient{scheme: scheme, tracker: o}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
-	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, watch, nil
-	})
-
+	cs.AddWatchReactor("*", testing.ObjectWatchReaction(o))
 	return cs
 }
 

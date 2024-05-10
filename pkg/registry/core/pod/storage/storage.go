@@ -73,7 +73,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Pod{} },
 		NewListFunc:               func() runtime.Object { return &api.PodList{} },
-		PredicateFunc:             registrypod.MatchPod,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(api.PodMatcher),
 		DefaultQualifiedResource:  api.Resource("pods"),
 		SingularQualifiedResource: api.Resource("pod"),
 
@@ -87,7 +87,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
-		AttrFunc:    registrypod.GetAttrs,
+		AttrFunc:    api.PodGetAttrs,
 		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
 		Indexers:    registrypod.Indexers(),
 	}

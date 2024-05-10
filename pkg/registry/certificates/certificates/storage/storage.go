@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -42,6 +43,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &certificates.CertificateSigningRequest{} },
 		NewListFunc:               func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(certificates.CertificateSigningRequestMatcher),
 		DefaultQualifiedResource:  certificates.Resource("certificatesigningrequests"),
 		SingularQualifiedResource: certificates.Resource("certificatesigningrequest"),
 
@@ -52,7 +54,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: csrregistry.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: certificates.CertificateSigningRequestGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, nil, err
 	}

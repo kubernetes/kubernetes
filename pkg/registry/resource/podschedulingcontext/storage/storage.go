@@ -42,7 +42,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.PodSchedulingContext{} },
 		NewListFunc:               func() runtime.Object { return &resource.PodSchedulingContextList{} },
-		PredicateFunc:             podschedulingcontext.Match,
 		DefaultQualifiedResource:  resource.Resource("podschedulingcontexts"),
 		SingularQualifiedResource: resource.Resource("podschedulingcontext"),
 
@@ -54,7 +53,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: podschedulingcontext.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}

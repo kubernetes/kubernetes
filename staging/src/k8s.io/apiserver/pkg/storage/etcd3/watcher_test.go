@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
@@ -218,8 +219,12 @@ func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
 		SendInitialEvents: ptr.To(true),
 		Recursive:         true,
 		Predicate: storage.SelectionPredicate{
-			Field:               fields.Everything(),
-			Label:               labels.Everything(),
+			SelectionPredicate: runtime.SelectionPredicate{
+				Selectors: runtime.Selectors{
+					Fields: fields.Everything(),
+					Labels: labels.Everything(),
+				},
+			},
 			AllowWatchBookmarks: true,
 		},
 	}

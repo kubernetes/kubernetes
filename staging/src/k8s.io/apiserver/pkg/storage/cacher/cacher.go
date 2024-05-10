@@ -86,7 +86,7 @@ type Config struct {
 	KeyFunc func(runtime.Object) (string, error)
 
 	// GetAttrsFunc is used to get object labels, fields
-	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, err error)
+	GetAttrsFunc runtime.AttrFunc
 
 	// IndexerFuncs is used for optimizing amount of watchers that
 	// needs to process an incoming event.
@@ -541,22 +541,28 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	scope := namespacedName{}
 	if requestNamespace, ok := request.NamespaceFrom(ctx); ok && len(requestNamespace) > 0 {
 		scope.namespace = requestNamespace
-	} else if selectorNamespace, ok := pred.Field.RequiresExactMatch("metadata.namespace"); ok {
-		scope.namespace = selectorNamespace
+	} else if pred.Selectors.Fields != nil {
+		if selectorNamespace, ok := pred.Selectors.Fields.RequiresExactMatch("metadata.namespace"); ok {
+			scope.namespace = selectorNamespace
+		}
 	}
 	if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil && len(requestInfo.Name) > 0 {
 		scope.name = requestInfo.Name
-	} else if selectorName, ok := pred.Field.RequiresExactMatch("metadata.name"); ok {
-		scope.name = selectorName
+	} else if pred.Selectors.Fields != nil {
+		if selectorName, ok := pred.Selectors.Fields.RequiresExactMatch("metadata.name"); ok {
+			scope.name = selectorName
+		}
 	}
 
 	triggerValue, triggerSupported := "", false
 	if c.indexedTrigger != nil {
 		for _, field := range pred.IndexFields {
 			if field == c.indexedTrigger.indexName {
-				if value, ok := pred.Field.RequiresExactMatch(field); ok {
-					triggerValue, triggerSupported = value, true
-					break
+				if pred.Selectors.Fields != nil {
+					if value, ok := pred.Selectors.Fields.RequiresExactMatch(field); ok {
+						triggerValue, triggerSupported = value, true
+						break
+					}
 				}
 			}
 		}
@@ -584,7 +590,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// Determine watch timeout('0' means deadline is not set, ignore checking)
 	deadline, _ := ctx.Deadline()
 
-	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Label, pred.Field)
+	identifier := fmt.Sprintf("key: %q, labels: %q, fields: %q", key, pred.Selectors.Labels, pred.Selectors.Fields)
 
 	// Create a watcher here to reduce memory allocations under lock,
 	// given that memory allocation may trigger GC and block the thread.

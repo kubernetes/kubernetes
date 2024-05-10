@@ -21,21 +21,16 @@ package replicaset
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
@@ -178,35 +173,6 @@ func (rsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 
 func (rsStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// ToSelectableFields returns a field set that represents the object.
-func ToSelectableFields(rs *apps.ReplicaSet) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&rs.ObjectMeta, true)
-	rsSpecificFieldsSet := fields.Set{
-		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, rsSpecificFieldsSet)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	rs, ok := obj.(*apps.ReplicaSet)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a ReplicaSet")
-	}
-	return labels.Set(rs.ObjectMeta.Labels), ToSelectableFields(rs), nil
-}
-
-// MatchReplicaSet is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchReplicaSet(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type rsStatusStrategy struct {

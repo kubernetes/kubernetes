@@ -17,15 +17,12 @@ limitations under the License.
 package storage
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	api "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -44,10 +41,11 @@ var _ genericregistry.GenericStore = &REST{}
 // NewREST returns a RESTStorage object for ClusterTrustBundle objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &api.ClusterTrustBundle{} },
-		NewListFunc:               func() runtime.Object { return &api.ClusterTrustBundleList{} },
-		DefaultQualifiedResource:  api.Resource("clustertrustbundles"),
-		SingularQualifiedResource: api.Resource("clustertrustbundle"),
+		NewFunc:                   func() runtime.Object { return &certificates.ClusterTrustBundle{} },
+		NewListFunc:               func() runtime.Object { return &certificates.ClusterTrustBundleList{} },
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(certificates.ClusterTrustBundleMatcher),
+		DefaultQualifiedResource:  certificates.Resource("clustertrustbundles"),
+		SingularQualifiedResource: certificates.Resource("clustertrustbundle"),
 
 		CreateStrategy: clustertrustbundle.Strategy,
 		UpdateStrategy: clustertrustbundle.Strategy,
@@ -55,25 +53,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{
-		RESTOptions: optsGetter,
-		AttrFunc:    getAttrs,
-	}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: certificates.ClusterTrustBundleGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}
 	return &REST{store}, nil
-}
-
-func getAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	bundle, ok := obj.(*api.ClusterTrustBundle)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a clustertrustbundle")
-	}
-
-	selectableFields := generic.MergeFieldsSets(generic.ObjectMetaFieldsSet(&bundle.ObjectMeta, false), fields.Set{
-		"spec.signerName": bundle.Spec.SignerName,
-	})
-
-	return labels.Set(bundle.Labels), selectableFields, nil
 }

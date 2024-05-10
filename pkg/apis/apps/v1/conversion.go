@@ -23,9 +23,35 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
+
+func init() {
+	localSchemeBuilder.Register(addFieldLabelConversionFuncs)
+}
+
+func addFieldLabelConversionFuncs(scheme *runtime.Scheme) error {
+	if err := AddFieldLabelConversionsForReplicaSet(scheme); err != nil {
+		return err
+	}
+	return nil
+}
+
+func AddFieldLabelConversionsForReplicaSet(scheme *runtime.Scheme) error {
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("ReplicaSet"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name",
+				"metadata.namespace",
+				"status.replicas":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+}
 
 // Convert_apps_DeploymentSpec_To_v1_DeploymentSpec is defined here, because public
 // conversion is not auto-generated due to existing warnings.

@@ -18,15 +18,10 @@ package apiservice
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -169,28 +164,4 @@ func (apiServerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runt
 // WarningsOnUpdate returns warnings for the given update.
 func (apiServerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-// GetAttrs returns the labels and fields of an API server for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	apiserver, ok := obj.(*apiregistration.APIService)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a APIService")
-	}
-	return labels.Set(apiserver.ObjectMeta.Labels), ToSelectableFields(apiserver), nil
-}
-
-// MatchAPIService is the filter used by the generic etcd backend to watch events
-// from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchAPIService(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// ToSelectableFields returns a field set that represents the object.
-func ToSelectableFields(obj *apiregistration.APIService) fields.Set {
-	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
 }

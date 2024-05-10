@@ -18,14 +18,9 @@ package resourceclassparameters
 
 import (
 	"context"
-	"errors"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -76,28 +71,4 @@ func (resourceClassParametersStrategy) WarningsOnUpdate(ctx context.Context, obj
 
 func (resourceClassParametersStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// Match returns a generic matcher for a given label and field selector.
-func Match(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	parameters, ok := obj.(*resource.ResourceClassParameters)
-	if !ok {
-		return nil, nil, errors.New("not a resourceclassparameters")
-	}
-	return labels.Set(parameters.Labels), toSelectableFields(parameters), nil
-}
-
-// toSelectableFields returns a field set that represents the object
-func toSelectableFields(class *resource.ResourceClassParameters) fields.Set {
-	fields := generic.ObjectMetaFieldsSet(&class.ObjectMeta, true)
-	return fields
 }

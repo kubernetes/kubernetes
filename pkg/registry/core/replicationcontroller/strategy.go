@@ -21,21 +21,16 @@ package replicationcontroller
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
@@ -190,35 +185,6 @@ func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 
 func (rcStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// ControllerToSelectableFields returns a field set that represents the object.
-func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&controller.ObjectMeta, true)
-	controllerSpecificFieldsSet := fields.Set{
-		"status.replicas": strconv.Itoa(int(controller.Status.Replicas)),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, controllerSpecificFieldsSet)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	rc, ok := obj.(*api.ReplicationController)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a replication controller")
-	}
-	return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), nil
-}
-
-// MatchController is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchController(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
-	return apistorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type rcStatusStrategy struct {

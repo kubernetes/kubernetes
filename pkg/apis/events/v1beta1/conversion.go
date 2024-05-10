@@ -26,6 +26,17 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
+func init() {
+	localSchemeBuilder.Register(addFieldLabelConversionFuncs)
+}
+
+func addFieldLabelConversionFuncs(scheme *runtime.Scheme) error {
+	if err := AddFieldLabelConversionsForEvent(scheme); err != nil {
+		return err
+	}
+	return nil
+}
+
 func Convert_v1beta1_Event_To_core_Event(in *v1beta1.Event, out *k8s_api.Event, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_Event_To_core_Event(in, out, s); err != nil {
 		return err
@@ -71,6 +82,7 @@ func AddFieldLabelConversionsForEvent(scheme *runtime.Scheme) error {
 		"regarding.resourceVersion": "involvedObject.resourceVersion", // map events.k8s.io field to fieldset returned by ToSelectableFields
 		"regarding.fieldPath":       "involvedObject.fieldPath",       // map events.k8s.io field to fieldset returned by ToSelectableFields
 		"reportingController":       "reportingComponent",             // map events.k8s.io field to fieldset returned by ToSelectableFields
+		"source":                    "source",                         // TODO: Do we still need to support selection by source? There's no source field any more.
 		"type":                      "type",
 		"metadata.namespace":        "metadata.namespace",
 		"metadata.name":             "metadata.name",

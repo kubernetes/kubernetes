@@ -52,8 +52,12 @@ func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListF
 func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error) {
 	list := lw.newListFunc()
 	pred := storage.SelectionPredicate{
-		Label:    labels.Everything(),
-		Field:    fields.Everything(),
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.Everything(),
+				Fields: fields.Everything(),
+			},
+		},
 		Limit:    options.Limit,
 		Continue: options.Continue,
 	}

@@ -74,20 +74,22 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		name       string
 		namespace  string
 		key        string
-		pred       storage.SelectionPredicate
+		pred       runtime.SelectionPredicate
 		watchTests []*testWatchStruct
 	}{{
 		name:       "create a key",
 		namespace:  fmt.Sprintf("test-ns-1-%t", recursive),
 		watchTests: []*testWatchStruct{{basePod, true, watch.Added}},
-		pred:       storage.Everything,
+		pred:       storage.Everything.SelectionPredicate,
 	}, {
 		name:       "key updated to match predicate",
 		namespace:  fmt.Sprintf("test-ns-2-%t", recursive),
 		watchTests: []*testWatchStruct{{basePod, false, ""}, {basePodAssigned, true, watch.Added}},
-		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("spec.nodeName=bar"),
+		pred: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.Everything(),
+				Fields: fields.ParseSelectorOrDie("spec.nodeName=bar"),
+			},
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
 				return nil, fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
@@ -97,14 +99,16 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		name:       "update",
 		namespace:  fmt.Sprintf("test-ns-3-%t", recursive),
 		watchTests: []*testWatchStruct{{basePod, true, watch.Added}, {basePodAssigned, true, watch.Modified}},
-		pred:       storage.Everything,
+		pred:       storage.Everything.SelectionPredicate,
 	}, {
 		name:       "delete because of being filtered",
 		namespace:  fmt.Sprintf("test-ns-4-%t", recursive),
 		watchTests: []*testWatchStruct{{basePod, true, watch.Added}, {basePodAssigned, true, watch.Deleted}},
-		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("spec.nodeName!=bar"),
+		pred: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.Everything(),
+				Fields: fields.ParseSelectorOrDie("spec.nodeName!=bar"),
+			},
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
 				return nil, fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
@@ -120,9 +124,11 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 			{selectedPod(basePodAssigned), true, watch.Modified},
 			{nil, true, watch.Deleted},
 		},
-		pred: storage.SelectionPredicate{
-			Label: labels.SelectorFromSet(labels.Set{"select": "true"}),
-			Field: fields.Everything(),
+		pred: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.SelectorFromSet(labels.Set{"select": "true"}),
+				Fields: fields.Everything(),
+			},
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
 				return labels.Set(pod.Labels), nil, nil
@@ -137,13 +143,17 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 				watchKey = key
 			}
 
+			pred := storage.SelectionPredicate{
+				SelectionPredicate: tt.pred,
+			}
+
 			// Get the current RV from which we can start watching.
 			out := &example.PodList{}
-			if err := store.GetList(ctx, watchKey, storage.ListOptions{ResourceVersion: "", Predicate: tt.pred, Recursive: recursive}, out); err != nil {
+			if err := store.GetList(ctx, watchKey, storage.ListOptions{ResourceVersion: "", Predicate: pred, Recursive: recursive}, out); err != nil {
 				t.Fatalf("List failed: %v", err)
 			}
 
-			w, err := store.Watch(ctx, watchKey, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: tt.pred, Recursive: recursive})
+			w, err := store.Watch(ctx, watchKey, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: pred, Recursive: recursive})
 			if err != nil {
 				t.Fatalf("Watch failed: %v", err)
 			}
@@ -585,9 +595,18 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 		watchTests    []*testWatchStruct
 	}{
 		{
-			name:          "cluster-wide watch, request without name, without field selector",
+			name:          "cluster-wide watch, request without name, with everything field selector",
 			recursive:     true,
 			fieldSelector: fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{basePod("t0-foo1"), true, watch.Added},
+				{basePodUpdated("t0-foo1"), true, watch.Modified},
+				{basePodAssigned("t0-foo2", "t0-bar1"), true, watch.Added},
+			},
+		},
+		{
+			name:      "cluster-wide watch, request without name, with nil field selector",
+			recursive: true,
 			watchTests: []*testWatchStruct{
 				{basePod("t1-foo1"), true, watch.Added},
 				{basePodUpdated("t1-foo1"), true, watch.Modified},
@@ -673,7 +692,7 @@ func RunTestClusterScopedWatch(ctx context.Context, t *testing.T, store storage.
 				watchKey += "/" + tt.requestedName
 			}
 
-			predicate := createPodPredicate(tt.fieldSelector, false, tt.indexFields)
+			predicate := podPredicateFunc(tt.fieldSelector, tt.indexFields)
 
 			list := &example.PodList{}
 			opts := storage.ListOptions{
@@ -740,9 +759,19 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 		watchTests         []*testWatchStruct
 	}{
 		{
-			name:          "namespaced watch, request without name, request without namespace, without field selector",
+			name:          "namespaced watch, request without name, request without namespace, with everything field selector",
 			recursive:     true,
 			fieldSelector: fields.Everything(),
+			watchTests: []*testWatchStruct{
+				{baseNamespacedPod("t0-foo1", "t0-ns1"), true, watch.Added},
+				{baseNamespacedPod("t0-foo2", "t0-ns2"), true, watch.Added},
+				{baseNamespacedPodUpdated("t0-foo1", "t0-ns1"), true, watch.Modified},
+				{baseNamespacedPodUpdated("t0-foo2", "t0-ns2"), true, watch.Modified},
+			},
+		},
+		{
+			name:      "namespaced watch, request without name, request without namespace, with nil field selector",
+			recursive: true,
 			watchTests: []*testWatchStruct{
 				{baseNamespacedPod("t1-foo1", "t1-ns1"), true, watch.Added},
 				{baseNamespacedPod("t1-foo2", "t1-ns2"), true, watch.Added},
@@ -987,7 +1016,7 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 				}
 			}
 
-			predicate := createPodPredicate(tt.fieldSelector, true, tt.indexFields)
+			predicate := podPredicateFunc(tt.fieldSelector, tt.indexFields)
 
 			list := &example.PodList{}
 			opts := storage.ListOptions{
@@ -1564,42 +1593,31 @@ type testWatchStruct struct {
 	watchType   watch.EventType
 }
 
-func createPodPredicate(field fields.Selector, namespaceScoped bool, indexField []string) storage.SelectionPredicate {
+func podPredicateFunc(field fields.Selector, indexField []string) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label:       labels.Everything(),
-		Field:       field,
-		GetAttrs:    determinePodGetAttrFunc(namespaceScoped, indexField),
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Fields: field,
+			},
+			GetAttrs: determinePodAttrFunc(indexField),
+		},
 		IndexFields: indexField,
 	}
 }
 
-func determinePodGetAttrFunc(namespaceScoped bool, indexField []string) storage.AttrFunc {
+func determinePodAttrFunc(indexField []string) runtime.AttrFunc {
 	if indexField != nil {
-		if namespaceScoped {
-			return namespacedScopedNodeNameAttrFunc
-		}
-		return clusterScopedNodeNameAttrFunc
+		return podAttrFunc
 	}
-	if namespaceScoped {
-		return storage.DefaultNamespaceScopedAttr
-	}
-	return storage.DefaultClusterScopedAttr
+	return runtime.DefaultAttrFunc
 }
 
-func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+func podAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod := obj.(*example.Pod)
 	return nil, fields.Set{
 		"spec.nodeName":      pod.Spec.NodeName,
 		"metadata.name":      pod.ObjectMeta.Name,
 		"metadata.namespace": pod.ObjectMeta.Namespace,
-	}, nil
-}
-
-func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod := obj.(*example.Pod)
-	return nil, fields.Set{
-		"spec.nodeName": pod.Spec.NodeName,
-		"metadata.name": pod.ObjectMeta.Name,
 	}, nil
 }
 

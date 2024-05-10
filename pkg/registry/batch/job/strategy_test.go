@@ -23,14 +23,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -3427,92 +3425,6 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestJobStrategy_GetAttrs(t *testing.T) {
-	validSelector := &metav1.LabelSelector{
-		MatchLabels: map[string]string{"a": "b"},
-	}
-	validPodTemplateSpec := api.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: validSelector.MatchLabels,
-		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyOnFailure,
-			DNSPolicy:     api.DNSClusterFirst,
-			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
-		},
-	}
-
-	cases := map[string]struct {
-		job          *batch.Job
-		wantErr      string
-		nonJobObject *api.Pod
-	}{
-		"valid job with no labels": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: ptr.To(true),
-					Parallelism:    ptr.To[int32](1),
-				},
-			},
-		},
-		"valid job with a label": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Labels:          map[string]string{"a": "b"},
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: ptr.To(true),
-					Parallelism:    ptr.To[int32](1),
-				},
-			},
-		},
-		"pod instead": {
-			job:          nil,
-			nonJobObject: &api.Pod{},
-			wantErr:      "given object is not a job.",
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			if tc.job == nil {
-				_, _, err := GetAttrs(tc.nonJobObject)
-				if diff := cmp.Diff(tc.wantErr, err.Error()); diff != "" {
-					t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
-				}
-			} else {
-				gotLabels, _, err := GetAttrs(tc.job)
-				if err != nil {
-					t.Errorf("Error %s supposed to be nil", err.Error())
-				}
-				if diff := cmp.Diff(labels.Set(tc.job.ObjectMeta.Labels), gotLabels); diff != "" {
-					t.Errorf("Unexpected attrs (-want,+got):\n%s", diff)
-				}
-			}
-		})
-	}
-}
-
-func TestJobToSelectiableFields(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		"batch/v1",
-		"Job",
-		JobToSelectableFields(&batch.Job{}),
-		nil,
-	)
 }
 
 func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {

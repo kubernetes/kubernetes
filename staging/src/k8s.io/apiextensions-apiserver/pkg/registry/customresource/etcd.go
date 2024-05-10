@@ -56,7 +56,7 @@ func NewStorage(resource schema.GroupResource, singularResource schema.GroupReso
 			ret.SetGroupVersionKind(listKind)
 			return ret
 		},
-		PredicateFunc:             strategy.MatchCustomResourceDefinitionStorage,
+		PredicateFunc:             strategy.Matcher,
 		DefaultQualifiedResource:  resource,
 		SingularQualifiedResource: singularResource,
 

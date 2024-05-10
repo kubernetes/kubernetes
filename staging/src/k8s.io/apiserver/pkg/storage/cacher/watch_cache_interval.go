@@ -21,8 +21,6 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
@@ -100,7 +98,6 @@ type watchCacheInterval struct {
 	lock sync.Locker
 }
 
-type attrFunc func(runtime.Object) (labels.Set, fields.Set, error)
 type indexerFunc func(int) *watchCacheEvent
 type indexValidator func(int) bool
 
@@ -133,7 +130,7 @@ func (s sortableWatchCacheEvents) Swap(i, j int) {
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getAttrsFunc attrFunc) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getAttrsFunc runtime.AttrFunc) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	allItems := store.List()
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))

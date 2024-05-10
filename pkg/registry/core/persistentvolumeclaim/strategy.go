@@ -18,14 +18,9 @@ package persistentvolumeclaim
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
@@ -171,32 +166,4 @@ func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx context.Context, o
 // WarningsOnUpdate returns warnings for the given update.
 func (persistentvolumeclaimStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a persistentvolumeclaim")
-	}
-	return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), nil
-}
-
-// MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// PersistentVolumeClaimToSelectableFields returns a field set that represents the object
-func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&persistentvolumeclaim.ObjectMeta, true)
-	specificFieldsSet := fields.Set{
-		// This is a bug, but we need to support it for backward compatibility.
-		"name": persistentvolumeclaim.Name,
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

@@ -31,7 +31,11 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
+func init() {
+	localSchemeBuilder.Register(addFieldLabelConversionFuncs)
+}
+
+func addFieldLabelConversionFuncs(scheme *runtime.Scheme) error {
 	// Add field conversion funcs.
 	err := scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Pod"),
 		func(label, value string) (string, string, error) {
@@ -62,9 +66,9 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	err = scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Node"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name":
-				return label, value, nil
-			case "spec.unschedulable":
+			case "metadata.name",
+				"metadata.namespace", // selection is allowed on namespace, even if not namespaced
+				"spec.unschedulable":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
@@ -468,8 +472,9 @@ func AddFieldLabelConversionsForNamespace(scheme *runtime.Scheme) error {
 	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Namespace"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "status.phase",
-				"metadata.name":
+			case "metadata.name",
+				"metadata.namespace", // selection is allowed on namespace, even if not namespaced
+				"status.phase":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
@@ -481,9 +486,9 @@ func AddFieldLabelConversionsForSecret(scheme *runtime.Scheme) error {
 	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Secret"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "type",
+			case "metadata.name",
 				"metadata.namespace",
-				"metadata.name":
+				"type":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
@@ -495,8 +500,8 @@ func AddFieldLabelConversionsForService(scheme *runtime.Scheme) error {
 	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Service"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.namespace",
-				"metadata.name",
+			case "metadata.name",
+				"metadata.namespace",
 				"spec.clusterIP",
 				"spec.type":
 				return label, value, nil

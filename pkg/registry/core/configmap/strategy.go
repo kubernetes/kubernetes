@@ -18,15 +18,10 @@ package configmap
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -95,27 +90,4 @@ func dropDisabledFields(configMap *api.ConfigMap, oldConfigMap *api.ConfigMap) {
 
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	configMap, ok := obj.(*api.ConfigMap)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a configmap")
-	}
-	return labels.Set(configMap.Labels), SelectableFields(configMap), nil
-}
-
-// Matcher returns a selection predicate for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
-	return pkgstorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// SelectableFields returns a field set that can be used for filter selection
-func SelectableFields(obj *api.ConfigMap) fields.Set {
-	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
 }

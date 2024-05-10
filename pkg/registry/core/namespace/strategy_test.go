@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// ensure types are installed
@@ -150,13 +149,4 @@ func TestNamespaceFinalizeStrategy(t *testing.T) {
 	if namespace.ResourceVersion != "9" {
 		t.Errorf("Incoming resource version on update should not be mutated")
 	}
-}
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		"v1",
-		"Namespace",
-		NamespaceToSelectableFields(&api.Namespace{}),
-		map[string]string{"name": "metadata.name"},
-	)
 }

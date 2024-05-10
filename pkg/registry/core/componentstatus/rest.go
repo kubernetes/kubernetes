@@ -21,9 +21,6 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -99,7 +96,11 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 		// ComponentStatus resources currently (v1.14) do not support labeling, however the filtering is executed
 		// nonetheless in case the request contains Label or Field selectors (which will effectively filter out
 		// all of the results and return an empty response).
-		if matched := matchesPredicate(status, &pred); matched {
+		matches, err := pred.Matches(&status)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
 			reply = append(reply, status)
 		}
 	}
@@ -107,29 +108,12 @@ func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptio
 }
 
 func componentStatusPredicate(options *metainternalversion.ListOptions) storage.SelectionPredicate {
-	pred := storage.SelectionPredicate{
-		Label:    labels.Everything(),
-		Field:    fields.Everything(),
-		GetAttrs: nil,
-	}
+	s := runtime.Selectors{}
 	if options != nil {
-		if options.LabelSelector != nil {
-			pred.Label = options.LabelSelector
-		}
-		if options.FieldSelector != nil {
-			pred.Field = options.FieldSelector
-		}
+		s.Labels = options.LabelSelector
+		s.Fields = options.FieldSelector
 	}
-	return pred
-}
-
-func matchesPredicate(status api.ComponentStatus, pred *storage.SelectionPredicate) bool {
-	// currently no fields except the generic meta fields are supported for predicate matching
-	fieldsSet := generic.AddObjectMetaFieldsSet(make(fields.Set, 2), &status.ObjectMeta, true)
-	return pred.MatchesObjectAttributes(
-		status.ObjectMeta.Labels,
-		fieldsSet,
-	)
+	return storage.DefaultPredicateFunc(s)
 }
 
 func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {

@@ -30,14 +30,11 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -281,29 +278,6 @@ func (podEphemeralContainersStrategy) WarningsOnUpdate(ctx context.Context, obj,
 	return nil
 }
 
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
-	}
-	return labels.Set(pod.ObjectMeta.Labels), ToSelectableFields(pod), nil
-}
-
-// MatchPod returns a generic matcher for a given label and field selector.
-func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	var indexFields = []string{"spec.nodeName"}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
-		indexFields = append(indexFields, "metadata.namespace")
-	}
-	return storage.SelectionPredicate{
-		Label:       label,
-		Field:       field,
-		GetAttrs:    GetAttrs,
-		IndexFields: indexFields,
-	}
-}
-
 // NodeNameTriggerFunc returns value spec.nodename of given object.
 func NodeNameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Pod).Spec.NodeName
@@ -336,35 +310,6 @@ func Indexers() *cache.Indexers {
 		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
 	}
 	return &indexers
-}
-
-// ToSelectableFields returns a field set that represents the object
-// TODO: fields are not labels, and the validation rules for them do not apply.
-func ToSelectableFields(pod *api.Pod) fields.Set {
-	// The purpose of allocation with a given number of elements is to reduce
-	// amount of allocations needed to create the fields.Set. If you add any
-	// field here or the number of object-meta related fields changes, this should
-	// be adjusted.
-	podSpecificFieldsSet := make(fields.Set, 10)
-	podSpecificFieldsSet["spec.nodeName"] = pod.Spec.NodeName
-	podSpecificFieldsSet["spec.restartPolicy"] = string(pod.Spec.RestartPolicy)
-	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
-	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
-	if pod.Spec.SecurityContext != nil {
-		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(pod.Spec.SecurityContext.HostNetwork)
-	} else {
-		// default to false
-		podSpecificFieldsSet["spec.hostNetwork"] = strconv.FormatBool(false)
-	}
-	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
-	// TODO: add podIPs as a downward API value(s) with proper format
-	podIP := ""
-	if len(pod.Status.PodIPs) > 0 {
-		podIP = string(pod.Status.PodIPs[0].IP)
-	}
-	podSpecificFieldsSet["status.podIP"] = podIP
-	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
-	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.

@@ -18,15 +18,10 @@ package podschedulingcontext
 
 import (
 	"context"
-	"errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -138,28 +133,4 @@ func (podSchedulingStatusStrategy) ValidateUpdate(ctx context.Context, obj, old 
 // WarningsOnUpdate returns warnings for the given update.
 func (podSchedulingStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-// Match returns a generic matcher for a given label and field selector.
-func Match(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	scheduling, ok := obj.(*resource.PodSchedulingContext)
-	if !ok {
-		return nil, nil, errors.New("not a PodSchedulingContext")
-	}
-	return labels.Set(scheduling.Labels), toSelectableFields(scheduling), nil
-}
-
-// toSelectableFields returns a field set that represents the object
-func toSelectableFields(scheduling *resource.PodSchedulingContext) fields.Set {
-	fields := generic.ObjectMetaFieldsSet(&scheduling.ObjectMeta, true)
-	return fields
 }

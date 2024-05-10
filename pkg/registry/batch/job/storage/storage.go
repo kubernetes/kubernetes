@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/printers"
@@ -66,7 +67,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &batch.Job{} },
 		NewListFunc:               func() runtime.Object { return &batch.JobList{} },
-		PredicateFunc:             job.MatchJob,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(batch.JobMatcher),
 		DefaultQualifiedResource:  batch.Resource("jobs"),
 		SingularQualifiedResource: batch.Resource("job"),
 
@@ -77,7 +78,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: job.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: batch.JobGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}

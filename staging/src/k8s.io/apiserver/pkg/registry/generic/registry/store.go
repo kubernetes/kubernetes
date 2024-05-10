@@ -146,7 +146,7 @@ type Store struct {
 	// PredicateFunc returns a matcher corresponding to the provided labels
 	// and fields. The SelectionPredicate returned should return true if the
 	// object matches the given field and label selectors.
-	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionPredicate
+	PredicateFunc storage.PredicateFunc
 
 	// EnableGarbageCollection affects the handling of Update and Delete
 	// requests. Enabling garbage collection allows finalizers to do work to
@@ -342,7 +342,8 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
-	out, err := e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
+	selector := runtime.Selectors{Labels: label, Fields: field}
+	out, err := e.ListPredicate(ctx, e.PredicateFunc(selector), options)
 	if err != nil {
 		return nil, err
 	}
@@ -1389,7 +1390,8 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
-	predicate := e.PredicateFunc(label, field)
+	selector := runtime.Selectors{Labels: label, Fields: field}
+	predicate := e.PredicateFunc(selector)
 
 	resourceVersion := ""
 	if options != nil {
@@ -1497,18 +1499,15 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 
 	attrFunc := options.AttrFunc
 	if attrFunc == nil {
-		if isNamespaced {
-			attrFunc = storage.DefaultNamespaceScopedAttr
-		} else {
-			attrFunc = storage.DefaultClusterScopedAttr
-		}
+		attrFunc = runtime.DefaultAttrFunc
 	}
 	if e.PredicateFunc == nil {
-		e.PredicateFunc = func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+		e.PredicateFunc = func(selector runtime.Selectors) storage.SelectionPredicate {
 			return storage.SelectionPredicate{
-				Label:    label,
-				Field:    field,
-				GetAttrs: attrFunc,
+				SelectionPredicate: runtime.SelectionPredicate{
+					Selectors: selector,
+					GetAttrs:  attrFunc,
+				},
 			}
 		}
 	}

@@ -5890,6 +5890,7 @@ func TestDescribeNode(t *testing.T) {
 				Kind: "Pod",
 			},
 			Spec: corev1.PodSpec{
+				NodeName: "bar",
 				Containers: []corev1.Container{
 					{
 						Name:  "cpu-mem",
@@ -5971,7 +5972,7 @@ func TestDescribeNode(t *testing.T) {
 		`Node bar status is now: NodeReady`}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
-			t.Errorf("expected to find %q in output: %q", expected, out)
+			t.Errorf("describe output does not contain expected output:\n%s", cmp.Diff(expected, out))
 		}
 	}
 }
@@ -6024,6 +6025,7 @@ func TestDescribeNodeWithSidecar(t *testing.T) {
 				Kind: "Pod",
 			},
 			Spec: corev1.PodSpec{
+				NodeName: "bar",
 				InitContainers: []corev1.Container{
 					// sidecar, should sum into the total resources
 					{

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
@@ -88,7 +89,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &apps.ReplicaSet{} },
 		NewListFunc:               func() runtime.Object { return &apps.ReplicaSetList{} },
-		PredicateFunc:             replicaset.MatchReplicaSet,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(apps.ReplicaSetMatcher),
 		DefaultQualifiedResource:  apps.Resource("replicasets"),
 		SingularQualifiedResource: apps.Resource("replicaset"),
 
@@ -99,7 +100,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicaset.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: apps.ReplicaSetGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}

@@ -25,14 +25,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
-	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -204,33 +200,6 @@ func (nodeStatusStrategy) Canonicalize(obj runtime.Object) {
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
 type ResourceGetter interface {
 	Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error)
-}
-
-// NodeToSelectableFields returns a field set that represents the object.
-func NodeToSelectableFields(node *api.Node) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&node.ObjectMeta, false)
-	specificFieldsSet := fields.Set{
-		"spec.unschedulable": fmt.Sprint(node.Spec.Unschedulable),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	nodeObj, ok := obj.(*api.Node)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a node")
-	}
-	return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
-}
-
-// MatchNode returns a generic matcher for a given label and field selector.
-func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
-	return pkgstorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.

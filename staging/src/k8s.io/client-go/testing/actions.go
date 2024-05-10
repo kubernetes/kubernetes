@@ -75,7 +75,8 @@ func NewRootListAction(resource schema.GroupVersionResource, kind schema.GroupVe
 	action.Resource = resource
 	action.Kind = kind
 	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+	action.ListRestrictions = ListRestrictions{Selectors: selectors}
 
 	return action
 }
@@ -87,7 +88,8 @@ func NewListAction(resource schema.GroupVersionResource, kind schema.GroupVersio
 	action.Kind = kind
 	action.Namespace = namespace
 	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+	action.ListRestrictions = ListRestrictions{Selectors: selectors}
 
 	return action
 }
@@ -276,7 +278,8 @@ func NewRootDeleteCollectionAction(resource schema.GroupVersionResource, opts in
 	action.Verb = "delete-collection"
 	action.Resource = resource
 	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+	action.ListRestrictions = ListRestrictions{Selectors: selectors}
 
 	return action
 }
@@ -287,7 +290,8 @@ func NewDeleteCollectionAction(resource schema.GroupVersionResource, namespace s
 	action.Resource = resource
 	action.Namespace = namespace
 	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+	action.ListRestrictions = ListRestrictions{Selectors: selectors}
 
 	return action
 }
@@ -297,7 +301,8 @@ func NewRootWatchAction(resource schema.GroupVersionResource, opts interface{}) 
 	action.Verb = "watch"
 	action.Resource = resource
 	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
+	selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+	action.WatchRestrictions = WatchRestrictions{Selectors: selectors, ResourceVersion: resourceVersion}
 
 	return action
 }
@@ -333,7 +338,8 @@ func NewWatchAction(resource schema.GroupVersionResource, namespace string, opts
 	action.Resource = resource
 	action.Namespace = namespace
 	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
+	selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+	action.WatchRestrictions = WatchRestrictions{Selectors: selectors, ResourceVersion: resourceVersion}
 
 	return action
 }
@@ -352,12 +358,10 @@ func NewProxyGetAction(resource schema.GroupVersionResource, namespace, scheme, 
 }
 
 type ListRestrictions struct {
-	Labels labels.Selector
-	Fields fields.Selector
+	runtime.Selectors
 }
 type WatchRestrictions struct {
-	Labels          labels.Selector
-	Fields          fields.Selector
+	runtime.Selectors
 	ResourceVersion string
 }
 
@@ -522,8 +526,7 @@ func (a ListActionImpl) DeepCopy() Action {
 		Kind:       a.Kind,
 		Name:       a.Name,
 		ListRestrictions: ListRestrictions{
-			Labels: a.ListRestrictions.Labels.DeepCopySelector(),
-			Fields: a.ListRestrictions.Fields.DeepCopySelector(),
+			Selectors: a.ListRestrictions.Selectors.DeepCopySelectors(),
 		},
 	}
 }
@@ -627,8 +630,7 @@ func (a DeleteCollectionActionImpl) DeepCopy() Action {
 	return DeleteCollectionActionImpl{
 		ActionImpl: a.ActionImpl.DeepCopy().(ActionImpl),
 		ListRestrictions: ListRestrictions{
-			Labels: a.ListRestrictions.Labels.DeepCopySelector(),
-			Fields: a.ListRestrictions.Fields.DeepCopySelector(),
+			Selectors: a.ListRestrictions.Selectors.DeepCopySelectors(),
 		},
 	}
 }
@@ -646,8 +648,7 @@ func (a WatchActionImpl) DeepCopy() Action {
 	return WatchActionImpl{
 		ActionImpl: a.ActionImpl.DeepCopy().(ActionImpl),
 		WatchRestrictions: WatchRestrictions{
-			Labels:          a.WatchRestrictions.Labels.DeepCopySelector(),
-			Fields:          a.WatchRestrictions.Fields.DeepCopySelector(),
+			Selectors:       a.WatchRestrictions.Selectors.DeepCopySelectors(),
 			ResourceVersion: a.WatchRestrictions.ResourceVersion,
 		},
 	}

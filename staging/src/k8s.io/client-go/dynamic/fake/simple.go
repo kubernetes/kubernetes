@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -113,16 +112,7 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 
 	cs := &FakeDynamicClient{scheme: scheme, gvrToListKind: completeGVRToListKind, tracker: o}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
-	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, watch, nil
-	})
-
+	cs.AddWatchReactor("*", testing.ObjectWatchReaction(o))
 	return cs
 }
 
@@ -372,11 +362,6 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-
 	retUnstructured := &unstructured.Unstructured{}
 	if err := c.client.scheme.Convert(obj, retUnstructured, nil); err != nil {
 		return nil, err
@@ -392,14 +377,9 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 	list.SetContinue(entireList.GetContinue())
 	list.GetObjectKind().SetGroupVersionKind(listGVK)
 	for i := range entireList.Items {
-		item := &entireList.Items[i]
-		metadata, err := meta.Accessor(item)
-		if err != nil {
-			return nil, err
-		}
-		if label.Matches(labels.Set(metadata.GetLabels())) {
-			list.Items = append(list.Items, *item)
-		}
+		// testing.ObjectTracker handles namespace and selector filtering.
+		// So we don't need to re-filter here.
+		list.Items = append(list.Items, entireList.Items[i])
 	}
 	return list, nil
 }

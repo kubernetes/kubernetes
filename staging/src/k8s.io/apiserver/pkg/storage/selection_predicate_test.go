@@ -92,11 +92,13 @@ func TestSelectionPredicate(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		sp := &SelectionPredicate{
-			Label: parsedLabel,
-			Field: parsedField,
-			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, err error) {
-				return item.labels, item.fields, item.err
+		selector := runtime.Selectors{Labels: parsedLabel, Fields: parsedField}
+		sp := SelectionPredicate{
+			SelectionPredicate: runtime.SelectionPredicate{
+				Selectors: selector,
+				GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, err error) {
+					return item.labels, item.fields, item.err
+				},
 			},
 		}
 		got, err := sp.Matches(&Ignored{})
@@ -265,10 +267,11 @@ func TestSelectionPredicateMatcherIndex(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-
+		selector := runtime.Selectors{Labels: parsedLabel, Fields: parsedField}
 		sp := &SelectionPredicate{
-			Label:       parsedLabel,
-			Field:       parsedField,
+			SelectionPredicate: runtime.SelectionPredicate{
+				Selectors: selector,
+			},
 			IndexLabels: testCase.indexLabels,
 			IndexFields: testCase.indexFields,
 		}

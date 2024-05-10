@@ -22,12 +22,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) error {
+func init() {
+	localSchemeBuilder.Register(addFieldLabelConversionFuncs)
+}
+
+func addFieldLabelConversionFuncs(scheme *runtime.Scheme) error {
 	return scheme.AddFieldLabelConversionFunc(
 		SchemeGroupVersion.WithKind("ClusterTrustBundle"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name", "spec.signerName":
+			case "metadata.name",
+				"metadata.namespace",
+				"spec.signerName":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)

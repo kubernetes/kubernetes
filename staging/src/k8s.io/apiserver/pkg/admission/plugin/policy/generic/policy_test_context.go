@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -153,10 +155,28 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	policyInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return policiesAndBindingsTracker.List(fakePolicyGVR, fakePolicyGVK, "")
+				labelSelector, err := labels.Parse(options.LabelSelector)
+				if err != nil {
+					return nil, err
+				}
+				fieldSelector, err := fields.ParseSelector(options.FieldSelector)
+				if err != nil {
+					return nil, err
+				}
+				selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+				return policiesAndBindingsTracker.List(fakePolicyGVR, fakePolicyGVK, "", selectors)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return policiesAndBindingsTracker.Watch(fakePolicyGVR, "")
+				labelSelector, err := labels.Parse(options.LabelSelector)
+				if err != nil {
+					return nil, err
+				}
+				fieldSelector, err := fields.ParseSelector(options.FieldSelector)
+				if err != nil {
+					return nil, err
+				}
+				selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+				return policiesAndBindingsTracker.Watch(fakePolicyGVR, "", selectors)
 			},
 		},
 		Pexample,
@@ -166,10 +186,28 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	bindingInformer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return policiesAndBindingsTracker.List(fakeBindingGVR, fakeBindingGVK, "")
+				labelSelector, err := labels.Parse(options.LabelSelector)
+				if err != nil {
+					return nil, err
+				}
+				fieldSelector, err := fields.ParseSelector(options.FieldSelector)
+				if err != nil {
+					return nil, err
+				}
+				selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+				return policiesAndBindingsTracker.List(fakeBindingGVR, fakeBindingGVK, "", selectors)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return policiesAndBindingsTracker.Watch(fakeBindingGVR, "")
+				labelSelector, err := labels.Parse(options.LabelSelector)
+				if err != nil {
+					return nil, err
+				}
+				fieldSelector, err := fields.ParseSelector(options.FieldSelector)
+				if err != nil {
+					return nil, err
+				}
+				selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+				return policiesAndBindingsTracker.Watch(fakeBindingGVR, "", selectors)
 			},
 		},
 		Bexample,

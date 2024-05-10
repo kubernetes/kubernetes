@@ -40,15 +40,10 @@ func TestFakeClient(t *testing.T) {
 	// Create the fake client.
 	client := fake.NewSimpleClientset()
 	// A catch-all watch reactor that allows us to inject the watcherStarted channel.
+	watchReaction := clienttesting.ObjectWatchReaction(client.Tracker())
 	client.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		watch, err := client.Tracker().Watch(gvr, ns)
-		if err != nil {
-			return false, nil, err
-		}
 		close(watcherStarted)
-		return true, watch, nil
+		return watchReaction(action)
 	})
 
 	// We will create an informer that writes added pods to a channel.

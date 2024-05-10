@@ -28,11 +28,9 @@ import (
 // NewREST returns a RESTStorage object that will work against API services.
 func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*registry.REST, error) {
 	strategy := NewStrategy(scheme)
-
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &wardle.Fischer{} },
 		NewListFunc:               func() runtime.Object { return &wardle.FischerList{} },
-		PredicateFunc:             MatchFischer,
 		DefaultQualifiedResource:  wardle.Resource("fischers"),
 		SingularQualifiedResource: wardle.Resource("fischer"),
 
@@ -43,7 +41,7 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*reg
 		// TODO: define table converter that exposes more than name/creation timestamp
 		TableConvertor: rest.NewDefaultTableConvertor(wardle.Resource("fischers")),
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}

@@ -25,22 +25,12 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		"v1",
-		"PersistentVolumeClaim",
-		PersistentVolumeClaimToSelectableFields(&api.PersistentVolumeClaim{}),
-		map[string]string{"name": "metadata.name"},
-	)
-}
 
 func TestDropConditions(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()

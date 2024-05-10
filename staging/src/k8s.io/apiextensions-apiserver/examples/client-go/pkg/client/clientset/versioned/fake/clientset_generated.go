@@ -23,7 +23,6 @@ import (
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1"
 	fakecrv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
@@ -44,16 +43,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	cs := &Clientset{tracker: o}
 	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
-	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, watch, nil
-	})
-
+	cs.AddWatchReactor("*", testing.ObjectWatchReaction(o))
 	return cs
 }
 

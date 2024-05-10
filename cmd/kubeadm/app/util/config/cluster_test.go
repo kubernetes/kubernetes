@@ -364,6 +364,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			name:     "valid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
+				NodeName:  nodeName,
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234",
@@ -375,6 +376,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			name:     "invalid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
+				NodeName:  nodeName,
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3::1234",
@@ -386,6 +388,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			name:     "invalid negative port with ipv4 address in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
+				NodeName:  nodeName,
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:-1234",
@@ -397,6 +400,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			name:     "invalid high port with ipv4 address in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
+				NodeName:  nodeName,
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:65536",
@@ -408,6 +412,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			name:     "valid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
+				NodeName:  nodeName,
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:1234",
@@ -419,6 +424,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			name:     "invalid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
+				NodeName:  nodeName,
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1:1234",
@@ -434,6 +440,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:-1234",
 				},
+				NodeName: nodeName,
 			},
 			expectedErr: true,
 		},
@@ -441,6 +448,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			name:     "invalid high port with ipv6 address in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
+				NodeName:  nodeName,
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:65536",

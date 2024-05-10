@@ -33,38 +33,37 @@ type FilterFunc func(in Event) (out Event, keep bool)
 // Type field (Add/Modified/Deleted) to reflect items beginning to pass the
 // filter when they previously didn't.
 func Filter(w Interface, f FilterFunc) Interface {
-	fw := &filteredWatch{
-		incoming: w,
-		result:   make(chan Event),
-		f:        f,
+	inCh := w.ResultChan()
+	outCh := make(chan Event)
+	go filter(inCh, outCh, f)
+	return &filteredWatch{
+		delegate: w,
+		resultCh: outCh,
 	}
-	go fw.loop()
-	return fw
 }
 
 type filteredWatch struct {
-	incoming Interface
-	result   chan Event
-	f        FilterFunc
+	delegate Interface
+	resultCh chan Event
 }
 
 // ResultChan returns a channel which will receive filtered events.
 func (fw *filteredWatch) ResultChan() <-chan Event {
-	return fw.result
+	return fw.resultCh
 }
 
 // Stop stops the upstream watch, which will eventually stop this watch.
 func (fw *filteredWatch) Stop() {
-	fw.incoming.Stop()
+	fw.delegate.Stop()
 }
 
-// loop waits for new values, filters them, and resends them.
-func (fw *filteredWatch) loop() {
-	defer close(fw.result)
-	for event := range fw.incoming.ResultChan() {
-		filtered, keep := fw.f(event)
+// filter waits for new values, filters them, and resends them.
+func filter(inCh <-chan Event, outCh chan<- Event, f FilterFunc) {
+	defer close(outCh)
+	for event := range inCh {
+		filtered, keep := f(event)
 		if keep {
-			fw.result <- filtered
+			outCh <- filtered
 		}
 	}
 }

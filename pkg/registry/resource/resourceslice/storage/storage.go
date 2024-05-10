@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -37,7 +38,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.ResourceSlice{} },
 		NewListFunc:               func() runtime.Object { return &resource.ResourceSliceList{} },
-		PredicateFunc:             resourceslice.Match,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(resource.ResourceSliceMatcher),
 		DefaultQualifiedResource:  resource.Resource("resourceslices"),
 		SingularQualifiedResource: resource.Resource("resourceslice"),
 
@@ -50,7 +51,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
-		AttrFunc:    resourceslice.GetAttrs,
+		AttrFunc:    resource.ResourceSliceGetAttrs,
 		TriggerFunc: resourceslice.TriggerFunc,
 		Indexers:    resourceslice.Indexers(),
 	}

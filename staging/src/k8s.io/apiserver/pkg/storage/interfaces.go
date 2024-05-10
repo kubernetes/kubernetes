@@ -22,8 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -89,10 +87,7 @@ type IndexerFunc func(obj runtime.Object) string
 type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
-var Everything = SelectionPredicate{
-	Label: labels.Everything(),
-	Field: fields.Everything(),
-}
+var Everything = SelectionPredicate{}
 
 // MatchValue defines a pair (`<index name>`, `<value for that index>`).
 type MatchValue struct {

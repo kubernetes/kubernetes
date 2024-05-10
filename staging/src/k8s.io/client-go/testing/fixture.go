@@ -18,6 +18,7 @@ package testing
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -56,7 +57,7 @@ type ObjectTracker interface {
 
 	// List retrieves all objects of a given kind in the given
 	// namespace. Only non-List kinds are accepted.
-	List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string) (runtime.Object, error)
+	List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, selectors runtime.Selectors) (runtime.Object, error)
 
 	// Delete deletes an existing object from the tracker. If object
 	// didn't exist in the tracker prior to deletion, Delete returns
@@ -65,13 +66,14 @@ type ObjectTracker interface {
 
 	// Watch watches objects from the tracker. Watch returns a channel
 	// which will push added / modified / deleted object.
-	Watch(gvr schema.GroupVersionResource, ns string) (watch.Interface, error)
+	Watch(gvr schema.GroupVersionResource, ns string, selectors runtime.Selectors) (watch.Interface, error)
 }
 
 // ObjectScheme abstracts the implementation of common operations on objects.
 type ObjectScheme interface {
 	runtime.ObjectCreater
 	runtime.ObjectTyper
+	runtime.ObjectSelector
 }
 
 // ObjectReaction returns a ReactionFunc that applies core.Action to
@@ -87,7 +89,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 		switch action := action.(type) {
 
 		case ListActionImpl:
-			obj, err := tracker.List(gvr, action.GetKind(), ns)
+			obj, err := tracker.List(gvr, action.GetKind(), ns, action.ListRestrictions.Selectors)
 			return true, obj, err
 
 		case GetActionImpl:
@@ -205,6 +207,24 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 	}
 }
 
+// ObjectReaction returns a WatchReactionFunc that applies core.Action to
+// the given tracker.
+func ObjectWatchReaction(tracker ObjectTracker) WatchReactionFunc {
+	return func(action Action) (handled bool, ret watch.Interface, err error) {
+		watchAction, ok := action.(WatchAction)
+		if !ok {
+			return false, nil, fmt.Errorf("no watch reaction implemented for %s", action)
+		}
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := tracker.Watch(gvr, ns, watchAction.GetWatchRestrictions().Selectors)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, watch, nil
+	}
+}
+
 type tracker struct {
 	scheme  ObjectScheme
 	decoder runtime.Decoder
@@ -231,7 +251,7 @@ func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracke
 	}
 }
 
-func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string) (runtime.Object, error) {
+func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, selectors runtime.Selectors) (runtime.Object, error) {
 	// Heuristic for list kind: original kind + List suffix. Might
 	// not always be true but this tracker has a pretty limited
 	// understanding of the actual API model.
@@ -260,7 +280,7 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 		return list, nil
 	}
 
-	matchingObjs, err := filterByNamespace(objs, ns)
+	matchingObjs, err := filterObjects(objs, ns, selectors, t.scheme)
 	if err != nil {
 		return nil, err
 	}
@@ -270,17 +290,49 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	return list.DeepCopyObject(), nil
 }
 
-func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string) (watch.Interface, error) {
+func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, selectors runtime.Selectors) (watch.Interface, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	fakewatcher := watch.NewRaceFreeFake()
+	watcher := watch.NewRaceFreeFake()
+	// Wrap the RaceFreeFakeWatcher with watch.Filter to filter events by namespace and selectors
+	matchFunc := func(obj runtime.Object) (bool, error) {
+		objMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return false, err
+		}
+		if ns != "" && objMeta.GetNamespace() != ns {
+			return false, nil
+		}
+		if !selectors.Empty() {
+			matches, err := t.scheme.Matches(obj, selectors)
+			if err != nil {
+				return false, err
+			}
+			if !matches {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+	// Use a reporter to wrap match errors as objects with the 500 error code
+	reporter := errors.NewClientErrorReporter(http.StatusInternalServerError, "WATCH", "ClientWatchFiltering")
+	filteredWatcher := watch.Filter(watcher, func(e watch.Event) (watch.Event, bool) {
+		matched, err := matchFunc(e.Object)
+		if err != nil {
+			// replace event with error event
+			gvk := e.Object.GetObjectKind().GroupVersionKind()
+			err := fmt.Errorf("filtering %s watch event for resource %s: %w", e.Type, gvk, err)
+			return watch.Event{Type: watch.Error, Object: reporter.AsObject(err)}, true
+		}
+		return e, matched
+	})
 
 	if _, exists := t.watchers[gvr]; !exists {
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
 	}
-	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], fakewatcher)
-	return fakewatcher, nil
+	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], watcher)
+	return filteredWatcher, nil
 }
 
 func (t *tracker) Get(gvr schema.GroupVersionResource, ns, name string) (runtime.Object, error) {
@@ -473,10 +525,9 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string) error
 	return nil
 }
 
-// filterByNamespace returns all objects in the collection that
-// match provided namespace. Empty namespace matches
-// non-namespaced objects.
-func filterByNamespace(objs map[types.NamespacedName]runtime.Object, ns string) ([]runtime.Object, error) {
+// filterObjects returns all objects in the collection that match the specified
+// provided namespace and selectors. Empty namespace matches non-namespaced objects.
+func filterObjects(objs map[types.NamespacedName]runtime.Object, ns string, selectors runtime.Selectors, scheme ObjectScheme) ([]runtime.Object, error) {
 	var res []runtime.Object
 
 	for _, obj := range objs {
@@ -487,7 +538,13 @@ func filterByNamespace(objs map[types.NamespacedName]runtime.Object, ns string) 
 		if ns != "" && acc.GetNamespace() != ns {
 			continue
 		}
-		res = append(res, obj)
+		matches, err := scheme.Matches(obj, selectors)
+		if err != nil {
+			return nil, err
+		}
+		if matches {
+			res = append(res, obj)
+		}
 	}
 
 	// Sort res to get deterministic order.

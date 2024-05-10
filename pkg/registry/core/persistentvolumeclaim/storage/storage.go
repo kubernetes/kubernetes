@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -43,7 +45,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.PersistentVolumeClaim{} },
 		NewListFunc:               func() runtime.Object { return &api.PersistentVolumeClaimList{} },
-		PredicateFunc:             persistentvolumeclaim.MatchPersistentVolumeClaim,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(api.PersistentVolumeClaimMatcher),
 		DefaultQualifiedResource:  api.Resource("persistentvolumeclaims"),
 		SingularQualifiedResource: api.Resource("persistentvolumeclaim"),
 
@@ -55,7 +57,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: persistentvolumeclaim.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: api.PersistentVolumeClaimGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, err
 	}

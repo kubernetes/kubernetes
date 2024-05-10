@@ -50,7 +50,6 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
@@ -159,18 +158,26 @@ func matchPodName(names ...string) storage.SelectionPredicate {
 		panic("Labels requirement must validate successfully")
 	}
 	return storage.SelectionPredicate{
-		Label:    labels.Everything().Add(*l),
-		Field:    fields.Everything(),
-		GetAttrs: getPodAttrs,
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.Everything().Add(*l),
+				Fields: fields.Everything(),
+			},
+			GetAttrs: getPodAttrs,
+		},
 	}
 }
 
 func matchEverything() storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label: labels.Everything(),
-		Field: fields.Everything(),
-		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
-			return nil, nil, nil
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: runtime.Selectors{
+				Labels: labels.Everything(),
+				Fields: fields.Everything(),
+			},
+			GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+				return nil, nil, nil
+			},
 		},
 	}
 }
@@ -2472,20 +2479,8 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
-		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-			return storage.SelectionPredicate{
-				Label: label,
-				Field: field,
-				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-					pod, ok := obj.(*example.Pod)
-					if !ok {
-						return nil, nil, fmt.Errorf("not a pod")
-					}
-					return labels.Set(pod.ObjectMeta.Labels), generic.ObjectMetaFieldsSet(&pod.ObjectMeta, true), nil
-				},
-			}
-		},
-		Storage: DryRunnableStorage{Storage: s},
+		PredicateFunc:  storage.DefaultPredicateFunc,
+		Storage:        DryRunnableStorage{Storage: s},
 	}
 }
 

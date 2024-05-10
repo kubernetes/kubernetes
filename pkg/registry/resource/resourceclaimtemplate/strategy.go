@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -89,6 +88,6 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // toSelectableFields returns a field set that represents the object
 func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
-	fields := generic.ObjectMetaFieldsSet(&template.ObjectMeta, true)
+	fields := runtime.DefaultSelectableFields(template)
 	return fields
 }

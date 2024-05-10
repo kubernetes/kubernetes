@@ -401,16 +401,16 @@ func Test_getLocalDetectors(t *testing.T) {
 	}
 }
 
-func makeNodeWithPodCIDRs(cidrs ...string) *v1.Node {
-	if len(cidrs) == 0 {
-		return &v1.Node{}
-	}
-	return &v1.Node{
-		Spec: v1.NodeSpec{
+func makeNodeWithPodCIDRs(nodeName string, cidrs ...string) *v1.Node {
+	node := &v1.Node{}
+	node.SetName(nodeName)
+	if len(cidrs) > 0 {
+		node.Spec = v1.NodeSpec{
 			PodCIDR:  cidrs[0],
 			PodCIDRs: cidrs,
-		},
+		}
 	}
+	return node
 }
 
 func TestConfigChange(t *testing.T) {
@@ -628,6 +628,7 @@ func TestGetConntrackMax(t *testing.T) {
 }
 
 func TestProxyServer_platformSetup(t *testing.T) {
+	nodeName := "nodename"
 	tests := []struct {
 		name         string
 		node         *v1.Node
@@ -636,19 +637,19 @@ func TestProxyServer_platformSetup(t *testing.T) {
 	}{
 		{
 			name:         "LocalModeNodeCIDR store the node PodCIDRs obtained",
-			node:         makeNodeWithPodCIDRs("10.0.0.0/24"),
+			node:         makeNodeWithPodCIDRs(nodeName, "10.0.0.0/24"),
 			config:       &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR},
 			wantPodCIDRs: []string{"10.0.0.0/24"},
 		},
 		{
 			name:         "LocalModeNodeCIDR store the node PodCIDRs obtained dual stack",
-			node:         makeNodeWithPodCIDRs("10.0.0.0/24", "2001:db2:1/64"),
+			node:         makeNodeWithPodCIDRs(nodeName, "10.0.0.0/24", "2001:db2:1/64"),
 			config:       &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR},
 			wantPodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
 		},
 		{
 			name:   "LocalModeClusterCIDR does not get the node PodCIDRs",
-			node:   makeNodeWithPodCIDRs("10.0.0.0/24", "2001:db2:1/64"),
+			node:   makeNodeWithPodCIDRs(nodeName, "10.0.0.0/24", "2001:db2:1/64"),
 			config: &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR},
 		},
 	}
@@ -659,7 +660,7 @@ func TestProxyServer_platformSetup(t *testing.T) {
 			s := &ProxyServer{
 				Config:   tt.config,
 				Client:   client,
-				Hostname: "nodename",
+				Hostname: nodeName,
 				NodeIPs: map[v1.IPFamily]net.IP{
 					v1.IPv4Protocol: netutils.ParseIPSloppy("127.0.0.1"),
 					v1.IPv6Protocol: net.IPv6zero,

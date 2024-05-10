@@ -32,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -43,7 +41,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ptr "k8s.io/utils/ptr"
 
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -51,200 +48,6 @@ import (
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
-
-func TestMatchPod(t *testing.T) {
-	testCases := []struct {
-		in            *api.Pod
-		fieldSelector fields.Selector
-		expectMatch   bool
-	}{
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{NodeName: "nodeA"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=nodeA"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{NodeName: "nodeB"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.nodeName=nodeA"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{RestartPolicy: api.RestartPolicyAlways},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.restartPolicy=Always"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{RestartPolicy: api.RestartPolicyAlways},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.restartPolicy=Never"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{SchedulerName: "scheduler1"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.schedulerName=scheduler1"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{SchedulerName: "scheduler1"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.schedulerName=scheduler2"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{ServiceAccountName: "serviceAccount1"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.serviceAccountName=serviceAccount1"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{SchedulerName: "serviceAccount1"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.serviceAccountName=serviceAccount2"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{Phase: api.PodRunning},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.phase=Running"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{Phase: api.PodRunning},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.phase=Pending"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{
-					PodIPs: []api.PodIP{
-						{IP: "1.2.3.4"},
-					},
-				},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.podIP=1.2.3.4"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{
-					PodIPs: []api.PodIP{
-						{IP: "1.2.3.4"},
-					},
-				},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.podIP=4.3.2.1"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{NominatedNodeName: "node1"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node1"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{NominatedNodeName: "node1"},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.nominatedNodeName=node2"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{
-					PodIPs: []api.PodIP{
-						{IP: "2001:db8::"},
-					},
-				},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.podIP=2001:db8::"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Status: api.PodStatus{
-					PodIPs: []api.PodIP{
-						{IP: "2001:db8::"},
-					},
-				},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("status.podIP=2001:db7::"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: true,
-					},
-				},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=true"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: true,
-					},
-				},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),
-			expectMatch:   false,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						HostNetwork: false,
-					},
-				},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),
-			expectMatch:   true,
-		},
-		{
-			in: &api.Pod{
-				Spec: api.PodSpec{},
-			},
-			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=true"),
-			expectMatch:   false,
-		},
-	}
-	for _, testCase := range testCases {
-		m := MatchPod(labels.Everything(), testCase.fieldSelector)
-		result, err := m.Matches(testCase.in)
-		if err != nil {
-			t.Errorf("Unexpected error %v", err)
-		}
-		if result != testCase.expectMatch {
-			t.Errorf("Result %v, Expected %v, Selector: %v, Pod: %v", result, testCase.expectMatch, testCase.fieldSelector.String(), testCase.in)
-		}
-	}
-}
 
 func getResourceList(cpu, memory string) api.ResourceList {
 	res := api.ResourceList{}
@@ -616,15 +419,6 @@ func TestCheckLogLocation(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		"v1",
-		"Pod",
-		ToSelectableFields(&api.Pod{}),
-		nil,
-	)
 }
 
 type mockConnectionInfoGetter struct {

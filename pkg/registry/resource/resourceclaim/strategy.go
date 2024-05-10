@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -141,11 +140,12 @@ func (resourceclaimStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, ol
 }
 
 // Match returns a generic matcher for a given label and field selector.
-func Match(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func Match(selector runtime.Selectors) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: selector,
+			GetAttrs:  GetAttrs,
+		},
 	}
 }
 
@@ -160,6 +160,6 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // toSelectableFields returns a field set that represents the object
 func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
-	fields := generic.ObjectMetaFieldsSet(&claim.ObjectMeta, true)
+	fields := runtime.DefaultSelectableFields(claim)
 	return fields
 }

@@ -164,6 +164,7 @@ func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
 
 // RaceFreeFakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type RaceFreeFakeWatcher struct {
+	// selectors runtime.Selectors
 	result  chan Event
 	Stopped bool
 	sync.Mutex

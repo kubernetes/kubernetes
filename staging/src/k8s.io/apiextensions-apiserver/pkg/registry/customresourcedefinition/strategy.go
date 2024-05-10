@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -215,17 +214,18 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // MatchCustomResourceDefinition is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchCustomResourceDefinition(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchCustomResourceDefinition(selector runtime.Selectors) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: selector,
+			GetAttrs:  GetAttrs,
+		},
 	}
 }
 
 // CustomResourceDefinitionToSelectableFields returns a field set that represents the object.
 func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourceDefinition) fields.Set {
-	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
+	return runtime.DefaultSelectableFields(obj)
 }
 
 // dropDisabledFields drops disabled fields that are not used if their associated feature gates

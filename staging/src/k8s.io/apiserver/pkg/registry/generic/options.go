@@ -19,6 +19,7 @@ package generic
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -51,6 +52,6 @@ type RESTOptionsGetter interface {
 type StoreOptions struct {
 	RESTOptions RESTOptionsGetter
 	TriggerFunc storage.IndexerFuncs
-	AttrFunc    storage.AttrFunc
+	AttrFunc    runtime.AttrFunc
 	Indexers    *cache.Indexers
 }

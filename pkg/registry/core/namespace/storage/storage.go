@@ -61,7 +61,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Namespace{} },
 		NewListFunc:               func() runtime.Object { return &api.NamespaceList{} },
-		PredicateFunc:             namespace.MatchNamespace,
+		PredicateFunc:             storage.PredicateFuncFromMatcherFunc(api.NamespaceMatcher),
 		DefaultQualifiedResource:  api.Resource("namespaces"),
 		SingularQualifiedResource: api.Resource("namespace"),
 
@@ -75,7 +75,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: namespace.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: api.NamespaceGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, nil, err
 	}

@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -92,8 +90,6 @@ func GetCurrentResourceVersionFromStorage(ctx context.Context, storage Interface
 	}
 	emptyList := newListFunc()
 	pred := SelectionPredicate{
-		Label: labels.Everything(),
-		Field: fields.Everything(),
 		Limit: 1, // just in case we actually hit something
 	}
 

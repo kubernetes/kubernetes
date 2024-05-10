@@ -282,6 +282,11 @@ type ObjectCreater interface {
 	New(kind schema.GroupVersionKind) (out Object, err error)
 }
 
+// ObjectSelector contains methods for selecting an object by labels and fields.
+type ObjectSelector interface {
+	Matches(Object, Selectors) (bool, error)
+}
+
 // EquivalentResourceMapper provides information about resources that address the same underlying data as a specified resource
 type EquivalentResourceMapper interface {
 	// EquivalentResourcesFor returns a list of resources that address the same underlying data as resource.

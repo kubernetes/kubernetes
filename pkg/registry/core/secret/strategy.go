@@ -19,15 +19,10 @@ package secret
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -99,33 +94,6 @@ func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
 
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	secret, ok := obj.(*api.Secret)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a secret")
-	}
-	return labels.Set(secret.Labels), SelectableFields(secret), nil
-}
-
-// Matcher returns a selection predicate for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
-	return pkgstorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// SelectableFields returns a field set that can be used for filter selection
-func SelectableFields(obj *api.Secret) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
-	secretSpecificFieldsSet := fields.Set{
-		"type": string(obj.Type),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, secretSpecificFieldsSet)
 }
 
 func warningsForSecret(secret *api.Secret) []string {

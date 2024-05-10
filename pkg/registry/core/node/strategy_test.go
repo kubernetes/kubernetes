@@ -25,44 +25,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
-
-func TestMatchNode(t *testing.T) {
-	testFieldMap := map[bool][]fields.Set{
-		true: {
-			{"metadata.name": "foo"},
-		},
-		false: {
-			{"foo": "bar"},
-		},
-	}
-
-	for expectedResult, fieldSet := range testFieldMap {
-		for _, field := range fieldSet {
-			m := MatchNode(labels.Everything(), field.AsSelector())
-			_, matchesSingle := m.MatchesSingle()
-			if e, a := expectedResult, matchesSingle; e != a {
-				t.Errorf("%+v: expected %v, got %v", fieldSet, e, a)
-			}
-		}
-	}
-}
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		"v1",
-		"Node",
-		NodeToSelectableFields(&api.Node{}),
-		nil,
-	)
-}
 
 // helper creates a NodeNode with a set of PodCIDRs, Spec.ConfigSource, Status.Config
 func makeNode(podCIDRs []string, addSpecDynamicConfig bool, addStatusDynamicConfig bool) *api.Node {

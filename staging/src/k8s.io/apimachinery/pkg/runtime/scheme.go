@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 )
 
 // Scheme defines methods for serializing and deserializing API objects, a type
@@ -64,6 +65,9 @@ type Scheme struct {
 	// resource field labels in that version to internal version.
 	fieldLabelConversionFuncs map[schema.GroupVersionKind]FieldLabelConversionFunc
 
+	// Map from version and resource to the corresponding selector func.
+	selectorFuncs map[schema.GroupVersionKind]SelectorFunc
+
 	// defaulterFuncs is a map to funcs to be called with an object to provide defaulting
 	// the provided object must be a pointer.
 	defaulterFuncs map[reflect.Type]func(interface{})
@@ -95,6 +99,7 @@ func NewScheme() *Scheme {
 		unversionedTypes:          map[reflect.Type]schema.GroupVersionKind{},
 		unversionedKinds:          map[string]reflect.Type{},
 		fieldLabelConversionFuncs: map[schema.GroupVersionKind]FieldLabelConversionFunc{},
+		selectorFuncs:             map[schema.GroupVersionKind]SelectorFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 		versionPriority:           map[string][]string{},
 		schemeName:                naming.GetNameFromCallsite(internalPackages...),
@@ -331,6 +336,12 @@ func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conver
 	return nil
 }
 
+// AddSelectorFunc adds a function that can determine if an object matches the
+// specified field and label selectors.
+func (s *Scheme) AddSelectorFunc(gvk schema.GroupVersionKind, selectorFunc SelectorFunc) {
+	s.selectorFuncs[gvk] = selectorFunc
+}
+
 // AddTypeDefaultingFunc registers a function that is passed a pointer to an
 // object and can default fields on the object. These functions will be invoked
 // when Default() is called. The function will never be called unless the
@@ -427,6 +438,22 @@ func (s *Scheme) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value str
 		return DefaultMetaV1FieldSelectorConversion(label, value)
 	}
 	return conversionFunc(label, value)
+}
+
+// Matches returns true if the object is matched by the specified selectors.
+func (s *Scheme) Matches(obj Object, selectors Selectors) (bool, error) {
+	gvks, _, err := s.ObjectKinds(obj)
+	if err != nil {
+		return false, err
+	}
+	gvk := gvks[0]
+	selectorFunc, found := s.selectorFuncs[gvk]
+	if found {
+		klog.Infof("Scheme.Matches running selectorFunc for %s on %T", gvk, obj)
+		return selectorFunc(obj, selectors)
+	}
+	klog.Infof("Scheme.Matches running default selectorFunc for %s on %T", gvk, obj)
+	return DefaultSelectorFunc(obj, selectors)
 }
 
 // ConvertToVersion attempts to convert an input object to its matching Kind in another

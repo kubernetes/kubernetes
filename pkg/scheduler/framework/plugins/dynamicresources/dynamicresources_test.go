@@ -34,7 +34,6 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1434,11 +1433,15 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 
 func createListReactor(tracker cgotesting.ObjectTracker, kind string) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
 	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
-		// listAction := action.(cgotesting.ListAction)
+		listAction, ok := action.(cgotesting.ListAction)
+		if !ok {
+			return false, nil, fmt.Errorf("received invalid watch action: %#v", action)
+		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
 		gvr.Resource += "es"
-		list, err := tracker.List(gvr, schema.GroupVersionKind{Group: gvr.Group, Version: gvr.Version, Kind: kind}, ns)
+		gvk := gvr.GroupVersion().WithKind(kind)
+		list, err := tracker.List(gvr, gvk, ns, listAction.GetListRestrictions().Selectors)
 		return true, list, err
 	}
 }

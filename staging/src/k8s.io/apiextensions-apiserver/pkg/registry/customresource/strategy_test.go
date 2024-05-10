@@ -285,7 +285,7 @@ func TestSelectableFields(t *testing.T) {
 					},
 				},
 			},
-			expectFields: map[string]string{"spec.foo": "x", "metadata.name": "example"},
+			expectFields: map[string]string{"spec.foo": "x", "metadata.name": "example", "metadata.namespace": ""},
 		},
 		{
 			name: "missing value",
@@ -302,7 +302,7 @@ func TestSelectableFields(t *testing.T) {
 					"spec": map[string]interface{}{},
 				},
 			},
-			expectFields: map[string]string{"spec.foo": "", "metadata.name": "example"},
+			expectFields: map[string]string{"spec.foo": "", "metadata.name": "example", "metadata.namespace": ""},
 		},
 	}
 

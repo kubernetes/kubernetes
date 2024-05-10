@@ -32,6 +32,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -115,10 +116,28 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 	// and mock policy bindings
 	informer = &testInformer{SharedIndexInformer: cache.NewSharedIndexInformer(&cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return tracker.List(fakeGVR, fakeGVK, "")
+			labelSelector, err := labels.Parse(options.LabelSelector)
+			if err != nil {
+				return nil, err
+			}
+			fieldSelector, err := fields.ParseSelector(options.FieldSelector)
+			if err != nil {
+				return nil, err
+			}
+			selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+			return tracker.List(fakeGVR, fakeGVK, "", selectors)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tracker.Watch(fakeGVR, "")
+			labelSelector, err := labels.Parse(options.LabelSelector)
+			if err != nil {
+				return nil, err
+			}
+			fieldSelector, err := fields.ParseSelector(options.FieldSelector)
+			if err != nil {
+				return nil, err
+			}
+			selectors := runtime.Selectors{Labels: labelSelector, Fields: fieldSelector}
+			return tracker.Watch(fakeGVR, "", selectors)
 		},
 	}, &unstructured.Unstructured{}, 30*time.Second, nil)}
 

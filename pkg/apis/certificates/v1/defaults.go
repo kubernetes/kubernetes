@@ -20,6 +20,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+func init() {
+	localSchemeBuilder.Register(addDefaultingFuncs)
+}
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }

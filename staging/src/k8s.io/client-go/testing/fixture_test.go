@@ -63,7 +63,7 @@ func TestWatchCallNonNamespace(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
-	watch, err := o.Watch(testResource, ns)
+	watch, err := o.Watch(testResource, ns, runtime.Selectors{})
 	if err != nil {
 		t.Fatalf("test resource watch failed in %s: %v ", ns, err)
 	}
@@ -88,11 +88,11 @@ func TestWatchCallAllNamespace(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
-	w, err := o.Watch(testResource, "test_namespace")
+	w, err := o.Watch(testResource, "test_namespace", runtime.Selectors{})
 	if err != nil {
 		t.Fatalf("test resource watch failed in test_namespace: %v", err)
 	}
-	wAll, err := o.Watch(testResource, "")
+	wAll, err := o.Watch(testResource, "", runtime.Selectors{})
 	if err != nil {
 		t.Fatalf("test resource watch failed in all namespaces: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	for idx, watchNamespace := range watchNamespaces {
 		i := idx
 		watchNamespace := watchNamespace
-		w, err := o.Watch(testResource, watchNamespace)
+		w, err := o.Watch(testResource, watchNamespace, runtime.Selectors{})
 		if err != nil {
 			t.Fatalf("test resource watch failed in %s: %v", watchNamespace, err)
 		}
@@ -242,7 +242,7 @@ func TestWatchAddAfterStop(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
-	watch, err := o.Watch(testResource, ns)
+	watch, err := o.Watch(testResource, ns, runtime.Selectors{})
 	if err != nil {
 		t.Errorf("watch creation failed: %v", err)
 	}

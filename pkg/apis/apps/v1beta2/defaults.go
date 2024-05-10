@@ -25,6 +25,10 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+func init() {
+	localSchemeBuilder.Register(addDefaultingFuncs)
+}
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }

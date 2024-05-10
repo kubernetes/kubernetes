@@ -21,6 +21,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -38,7 +39,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:       func() runtime.Object { return &api.Event{} },
 		NewListFunc:   func() runtime.Object { return &api.EventList{} },
-		PredicateFunc: event.Matcher,
+		PredicateFunc: storage.PredicateFuncFromMatcherFunc(api.EventMatcher),
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},
@@ -51,7 +52,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) (*REST, error) {
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: event.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: api.EventGetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}

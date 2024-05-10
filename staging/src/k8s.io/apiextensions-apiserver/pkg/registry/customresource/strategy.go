@@ -34,7 +34,6 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,7 +44,6 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/generic"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -328,79 +326,58 @@ func (a customResourceStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func (a customResourceStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	accessor, err := meta.Accessor(obj)
+	uObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, nil, fmt.Errorf("unexpected error casting a custom resource to unstructured")
+	}
+	sFields, err := a.selectableFields(uObj)
 	if err != nil {
 		return nil, nil, err
 	}
-	sFields, err := a.selectableFields(obj, accessor)
-	if err != nil {
-		return nil, nil, err
-	}
-	return accessor.GetLabels(), sFields, nil
+	return uObj.GetLabels(), sFields, nil
 }
 
 // selectableFields returns a field set that can be used for filter selection.
-// This includes metadata.name, metadata.namespace and all custom selectable fields.
-func (a customResourceStrategy) selectableFields(obj runtime.Object, objectMeta metav1.Object) (fields.Set, error) {
-	objectMetaFields := objectMetaFieldsSet(objectMeta, a.namespaceScoped)
-	var selectableFieldsSet fields.Set
-
-	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && len(a.selectableFieldSet) > 0 {
-		us, ok := obj.(runtime.Unstructured)
-		if !ok {
-			return nil, fmt.Errorf("unexpected error casting a custom resource to unstructured")
+func (a customResourceStrategy) selectableFields(obj *unstructured.Unstructured) (fields.Set, error) {
+	fieldSet := runtime.DefaultSelectableFields(obj)
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) || len(a.selectableFieldSet) == 0 {
+		return fieldSet, nil
+	}
+	uc := obj.UnstructuredContent()
+	for _, sf := range a.selectableFieldSet {
+		if sf.err != nil {
+			return nil, fmt.Errorf("unexpected error parsing jsonPath: %w", sf.err)
 		}
-		uc := us.UnstructuredContent()
+		results, err := sf.fieldPath.FindResults(uc)
+		if err != nil {
+			return nil, fmt.Errorf("unexpected error finding value with jsonPath: %w", err)
+		}
+		var value any
 
-		selectableFieldsSet = fields.Set{}
-		for _, sf := range a.selectableFieldSet {
-			if sf.err != nil {
-				return nil, fmt.Errorf("unexpected error parsing jsonPath: %w", sf.err)
+		if len(results) > 0 && len(results[0]) > 0 {
+			if len(results) > 1 || len(results[0]) > 1 {
+				return nil, fmt.Errorf("unexpectedly received more than one JSON path result")
 			}
-			results, err := sf.fieldPath.FindResults(uc)
-			if err != nil {
-				return nil, fmt.Errorf("unexpected error finding value with jsonPath: %w", err)
-			}
-			var value any
+			value = results[0][0].Interface()
+		}
 
-			if len(results) > 0 && len(results[0]) > 0 {
-				if len(results) > 1 || len(results[0]) > 1 {
-					return nil, fmt.Errorf("unexpectedly received more than one JSON path result")
-				}
-				value = results[0][0].Interface()
-			}
-
-			if value != nil {
-				selectableFieldsSet[sf.name] = fmt.Sprint(value)
-			} else {
-				selectableFieldsSet[sf.name] = ""
-			}
+		if value != nil {
+			fieldSet[sf.name] = fmt.Sprint(value)
+		} else {
+			fieldSet[sf.name] = ""
 		}
 	}
-	return generic.MergeFieldsSets(objectMetaFields, selectableFieldsSet), nil
+	return fieldSet, nil
 }
 
-// objectMetaFieldsSet returns a fields that represent the ObjectMeta.
-func objectMetaFieldsSet(objectMeta metav1.Object, namespaceScoped bool) fields.Set {
-	if namespaceScoped {
-		return fields.Set{
-			"metadata.name":      objectMeta.GetName(),
-			"metadata.namespace": objectMeta.GetNamespace(),
-		}
-	}
-	return fields.Set{
-		"metadata.name": objectMeta.GetName(),
-	}
-}
-
-// MatchCustomResourceDefinitionStorage is the filter used by the generic etcd backend to route
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label labels.Selector, field fields.Selector) apiserverstorage.SelectionPredicate {
+// Matcher is the filter used by the generic etcd backend to route watch events
+// from etcd to clients of the apiserver only interested in specific labels/fields.
+func (a customResourceStrategy) Matcher(selector runtime.Selectors) apiserverstorage.SelectionPredicate {
 	return apiserverstorage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: a.GetAttrs,
+		SelectionPredicate: runtime.SelectionPredicate{
+			Selectors: selector,
+			GetAttrs:  a.GetAttrs,
+		},
 	}
 }
 

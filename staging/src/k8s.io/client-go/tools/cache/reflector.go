@@ -739,6 +739,8 @@ func watchHandler(start time.Time,
 		// made it positive
 		*exitOnInitialEventsEndBookmark = false
 	}
+	// Avoid returning a new result channel on every loop iteration
+	resultCh := w.ResultChan()
 
 loop:
 	for {
@@ -747,7 +749,7 @@ loop:
 			return errorStopRequested
 		case err := <-errc:
 			return err
-		case event, ok := <-w.ResultChan():
+		case event, ok := <-resultCh:
 			if !ok {
 				break loop
 			}

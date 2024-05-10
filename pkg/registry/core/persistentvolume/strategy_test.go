@@ -19,29 +19,20 @@ package persistentvolume
 import (
 	"context"
 
-	"github.com/google/go-cmp/cmp"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
+
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
-
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		"v1",
-		"PersistentVolume",
-		PersistentVolumeToSelectableFields(&api.PersistentVolume{}),
-		map[string]string{"name": "metadata.name"},
-	)
-}
 
 func TestStatusUpdate(t *testing.T) {
 	now := metav1.Now()
