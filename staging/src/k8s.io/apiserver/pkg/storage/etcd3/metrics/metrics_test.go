@@ -199,7 +199,7 @@ func TestStorageSizeCollector(t *testing.T) {
 			err: nil,
 			want: `# HELP apiserver_storage_size_bytes [ALPHA] Size of the storage database file physically allocated in bytes.
 			# TYPE apiserver_storage_size_bytes gauge
-			apiserver_storage_size_bytes{cluster="etcd-0"} 1e+09
+			apiserver_storage_size_bytes{storage_cluster_id="etcd-0"} 1e+09
 			`,
 		},
 		{

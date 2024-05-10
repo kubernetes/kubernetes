@@ -1066,7 +1066,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 	<ul>
 	<li><label class="metric_detail">Stability Level:</label><span class="metric_stability_level">ALPHA</span></li>
 	<li data-type="custom"><label class="metric_detail">Type:</label> <span class="metric_type">Custom</span></li>
-	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">cluster</span></li></ul>
+	<li class="metric_labels_varying"><label class="metric_detail">Labels:</label><span class="metric_label">storage_cluster_id</span></li></ul>
 	</div><div class="metric" data-stability="alpha">
 	<div class="metric_name">apiserver_storage_transformation_duration_seconds</div>
 	<div class="metric_help">Latencies in seconds of value transformation operations.</div>
