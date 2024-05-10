@@ -1029,7 +1029,7 @@ Alpha metrics do not have any API guarantees. These metrics must be used at your
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="custom">Custom</td>
 <td class="metric_description">Size of the storage database file physically allocated in bytes.</td>
-<td class="metric_labels_varying"><div class="metric_label">cluster</div></td>
+<td class="metric_labels_varying"><div class="metric_label">storage_cluster_id</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_transformation_duration_seconds</td>
