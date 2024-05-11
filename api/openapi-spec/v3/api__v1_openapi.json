@@ -1595,6 +1595,14 @@
             "default": {},
             "description": "State holds details about the container's current condition."
           },
+          "user": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerUser"
+              }
+            ],
+            "description": "User represents user identitiy information of the first process in the container"
+          },
           "volumeMounts": {
             "description": "Status of volume mounts.",
             "items": {
@@ -1621,6 +1629,20 @@
           "image",
           "imageID"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ContainerUser": {
+        "description": "ContainerUser represents user identity information",
+        "properties": {
+          "linux": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.LinuxContainerUser"
+              }
+            ],
+            "description": "Linux holds user identity information of the first process of the containers in Linux. Note that this field cannot be set when spec.os.name is windows."
+          }
+        },
         "type": "object"
       },
       "io.k8s.api.core.v1.DaemonEndpoint": {
@@ -3199,6 +3221,38 @@
         },
         "required": [
           "limits"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.LinuxContainerUser": {
+        "description": "LinuxContainerUser represents user identity information in Linux containers",
+        "properties": {
+          "gid": {
+            "default": 0,
+            "description": "GID is the primary gid of the first process in the container",
+            "format": "int64",
+            "type": "integer"
+          },
+          "supplementalGroups": {
+            "description": "SupplementalGroups are the supplemental groups attached to the first process in the container",
+            "items": {
+              "default": 0,
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "uid": {
+            "default": 0,
+            "description": "UID is the primary uid of the first process in the container",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "uid",
+          "gid"
         ],
         "type": "object"
       },
@@ -5304,7 +5358,7 @@
             "description": "The seccomp options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows."
           },
           "supplementalGroups": {
-            "description": "A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. Note that this field cannot be set when spec.os.name is windows.",
+            "description": "A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. If SupplementalGroupsPolicy feature gate was enabled, you can control how the groups are calculated. Note that this field cannot be set when spec.os.name is windows.",
             "items": {
               "default": 0,
               "format": "int64",
@@ -5312,6 +5366,10 @@
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
+          },
+          "supplementalGroupsPolicy": {
+            "description": "Defines how supplemental groups of the first container processes are calculated. Valid values are \"Merge\" and \"Strict\". If not specified, \"Merge\" is used. (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled and the container runtime must implement support for this feature.",
+            "type": "string"
           },
           "sysctls": {
             "description": "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported sysctls (by the container runtime) might fail to launch. Note that this field cannot be set when spec.os.name is windows.",
@@ -5502,7 +5560,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodOS"
               }
             ],
-            "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
+            "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.securityContext.supplementalGroupsPolicy - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
           },
           "overhead": {
             "additionalProperties": {

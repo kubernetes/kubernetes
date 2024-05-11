@@ -3030,6 +3030,33 @@ type ContainerStatus struct {
 	// +listMapKey=mountPath
 	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,12,rep,name=volumeMounts"`
+	// User represents user identitiy information of the first process in the container
+	// +featureGate=SupplementalGroupsPolicy
+	// +optional
+	User *ContainerUser `json:"user,omitempty" protobuf:"bytes,13,opt,name=user,casttype=ContainerUser"`
+}
+
+// ContainerUser represents user identity information
+type ContainerUser struct {
+	// Linux holds user identity information of the first process of the containers in Linux.
+	// Note that this field cannot be set when spec.os.name is windows.
+	Linux *LinuxContainerUser `json:"linux,omitempty" protobuf:"bytes,1,opt,name=linux,casttype=LinuxContainerUser"`
+
+	// Windows holds user identity information of the first process of the containers in Windows
+	// This is just reserved for future use.
+	// Windows *WindowsContainerUser
+}
+
+// LinuxContainerUser represents user identity information in Linux containers
+type LinuxContainerUser struct {
+	// UID is the primary uid of the first process in the container
+	UID int64 `json:"uid" protobuf:"varint,1,name=uid"`
+	// GID is the primary gid of the first process in the container
+	GID int64 `json:"gid" protobuf:"varint,2,name=gid"`
+	// SupplementalGroups are the supplemental groups attached to the first process in the container
+	// +optional
+	// +listType=atomic
+	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,3,rep,name=supplementalGroups"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -3830,6 +3857,7 @@ type PodSpec struct {
 	// - spec.securityContext.runAsUser
 	// - spec.securityContext.runAsGroup
 	// - spec.securityContext.supplementalGroups
+	// - spec.securityContext.supplementalGroupsPolicy
 	// - spec.containers[*].securityContext.appArmorProfile
 	// - spec.containers[*].securityContext.seLinuxOptions
 	// - spec.containers[*].securityContext.seccompProfile
@@ -4141,6 +4169,25 @@ const (
 	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
 )
 
+// SupplementalGroupsPolicy defines how supplemental groups
+// of the first container processes are calculated.
+// +enum
+type SupplementalGroupsPolicy string
+
+const (
+	// Merge policy always merges the provided SupplementalGroups (including FsGroup)
+	// specified in SecurityContext with groups of the primary user from the container
+	// image(`/etc/group`).
+	// Note: The primary user is specified with RunAsUser.
+	//       If not specified, the user from the image config is used.
+	//       Otherwise, the runtime default is used.
+	SupplementalGroupsPolicyMerge SupplementalGroupsPolicy = "Merge"
+	// Strict policy uses only the provided SupplementalGroups(including FsGroup)
+	// in SecurityContext as supplemental groups for the first container process.
+	// No groups extracted from the container image.
+	SupplementalGroupsPolicyStrict SupplementalGroupsPolicy = "Strict"
+)
+
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
@@ -4189,10 +4236,18 @@ type PodSecurityContext struct {
 	// no additional groups are added to any container. Note that group memberships
 	// defined in the container image for the uid of the container process are still effective,
 	// even if they are not included in this list.
+	// If SupplementalGroupsPolicy feature gate was enabled, you can control how the groups are calculated.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	// +listType=atomic
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,4,rep,name=supplementalGroups"`
+	// Defines how supplemental groups of the first container processes are calculated.
+	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
+	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
+	// and the container runtime must implement support for this feature.
+	// +featureGate=SupplementalGroupsPolicy
+	// +optional
+	SupplementalGroupsPolicy *SupplementalGroupsPolicy `json:"supplementalGroupsPolicy,omitempty" protobuf:"bytes,12,opt,name=supplementalGroupsPolicy"`
 	// A special supplemental group that applies to all containers in a pod.
 	// Some volume types allow the Kubelet to change the ownership of that volume
 	// to be owned by the pod:

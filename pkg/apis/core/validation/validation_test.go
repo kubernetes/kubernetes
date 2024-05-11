@@ -22554,6 +22554,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.SeccompProfile",
 		"SecurityContext.ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
+		"SecurityContext.SupplementalGroupsPolicy",
 		"SecurityContext.Sysctls",
 		"SecurityContext.WindowsOptions",
 	)

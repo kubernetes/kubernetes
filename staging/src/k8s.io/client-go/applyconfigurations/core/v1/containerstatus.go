@@ -37,6 +37,7 @@ type ContainerStatusApplyConfiguration struct {
 	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
 	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	VolumeMounts         []VolumeMountStatusApplyConfiguration   `json:"volumeMounts,omitempty"`
+	User                 *ContainerUserApplyConfiguration        `json:"user,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with
@@ -143,5 +144,13 @@ func (b *ContainerStatusApplyConfiguration) WithVolumeMounts(values ...*VolumeMo
 		}
 		b.VolumeMounts = append(b.VolumeMounts, *values[i])
 	}
+	return b
+}
+
+// WithUser sets the User field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the User field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithUser(value *ContainerUserApplyConfiguration) *ContainerStatusApplyConfiguration {
+	b.User = value
 	return b
 }

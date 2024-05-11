@@ -1109,6 +1109,18 @@ message ContainerStatus {
   // +listMapKey=mountPath
   // +featureGate=RecursiveReadOnlyMounts
   repeated VolumeMountStatus volumeMounts = 12;
+
+  // User represents user identitiy information of the first process in the container
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional ContainerUser user = 13;
+}
+
+// ContainerUser represents user identity information
+message ContainerUser {
+  // Linux holds user identity information of the first process of the containers in Linux.
+  // Note that this field cannot be set when spec.os.name is windows.
+  optional LinuxContainerUser linux = 1;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -2253,6 +2265,20 @@ message LimitRangeSpec {
   // Limits is the list of LimitRangeItem objects that are enforced.
   // +listType=atomic
   repeated LimitRangeItem limits = 1;
+}
+
+// LinuxContainerUser represents user identity information in Linux containers
+message LinuxContainerUser {
+  // UID is the primary uid of the first process in the container
+  optional int64 uid = 1;
+
+  // GID is the primary gid of the first process in the container
+  optional int64 gid = 2;
+
+  // SupplementalGroups are the supplemental groups attached to the first process in the container
+  // +optional
+  // +listType=atomic
+  repeated int64 supplementalGroups = 3;
 }
 
 // List holds a list of objects, which may not be known by the server.
@@ -3890,10 +3916,19 @@ message PodSecurityContext {
   // no additional groups are added to any container. Note that group memberships
   // defined in the container image for the uid of the container process are still effective,
   // even if they are not included in this list.
+  // If SupplementalGroupsPolicy feature gate was enabled, you can control how the groups are calculated.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   // +listType=atomic
   repeated int64 supplementalGroups = 4;
+
+  // Defines how supplemental groups of the first container processes are calculated.
+  // Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
+  // (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
+  // and the container runtime must implement support for this feature.
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional string supplementalGroupsPolicy = 12;
 
   // A special supplemental group that applies to all containers in a pod.
   // Some volume types allow the Kubelet to change the ownership of that volume
@@ -4234,6 +4269,7 @@ message PodSpec {
   // - spec.securityContext.runAsUser
   // - spec.securityContext.runAsGroup
   // - spec.securityContext.supplementalGroups
+  // - spec.securityContext.supplementalGroupsPolicy
   // - spec.containers[*].securityContext.appArmorProfile
   // - spec.containers[*].securityContext.seLinuxOptions
   // - spec.containers[*].securityContext.seccompProfile

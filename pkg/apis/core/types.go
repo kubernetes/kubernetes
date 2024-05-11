@@ -2741,6 +2741,31 @@ type ContainerStatus struct {
 	// +optional
 	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus
+	// User represents user identitiy information of the first process in the container
+	// +featureGate=SupplementalGroupsPolicy
+	// +optional
+	User *ContainerUser
+}
+
+// ContainerUser represents user identity information
+type ContainerUser struct {
+	// Linux holds user identity information of the first process of the containers in Linux.
+	// Note that this field cannot be set when spec.os.name is windows.
+	Linux *LinuxContainerUser
+
+	// Windows holds user identity information of the first process of the containers in Windows
+	// This is just reserved for future use.
+	// Windows *WindowsContainerUser
+}
+
+// LinuxContainerUser represents user identity information in Linux containers
+type LinuxContainerUser struct {
+	// UID is the primary uid of the first process in the container
+	UID int64
+	// GID is the primary gid of the first process in the container
+	GID int64
+	// SupplementalGroups are the supplemental groups attached to the first process in the container
+	SupplementalGroups []int64
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -3405,6 +3430,7 @@ type PodSpec struct {
 	// - spec.securityContext.runAsUser
 	// - spec.securityContext.runAsGroup
 	// - spec.securityContext.supplementalGroups
+	// - spec.securityContext.supplementalGroupsPolicy
 	// - spec.containers[*].securityContext.appArmorProfile
 	// - spec.containers[*].securityContext.seLinuxOptions
 	// - spec.containers[*].securityContext.seccompProfile
@@ -3549,6 +3575,24 @@ const (
 	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
 )
 
+// SupplementalGroupsPolicy defines how supplemental groups
+// of the first container processes are calculated.
+type SupplementalGroupsPolicy string
+
+const (
+	// Merge policy always merges the provided SupplementalGroups (including FsGroup)
+	// specified in SecurityContext with groups of the primary user from the container
+	// image(`/etc/group`).
+	// Note: The primary user is specified with RunAsUser.
+	//       If not specified, the user from the image config is used.
+	//       Otherwise, the runtime default is used.
+	SupplementalGroupsPolicyMerge SupplementalGroupsPolicy = "Merge"
+	// Strict policy uses only the provided SupplementalGroups(including FsGroup)
+	// in SecurityContext as supplemental groups for the first container process.
+	// No groups extracted from the container image.
+	SupplementalGroupsPolicyStrict SupplementalGroupsPolicy = "Strict"
+)
+
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
@@ -3637,9 +3681,17 @@ type PodSecurityContext struct {
 	// no additional groups are added to any container. Note that group memberships
 	// defined in the container image for the uid of the container process are still effective,
 	// even if they are not included in this list.
+	// If SupplementalGroupsPolicy feature was enabled, you can control how the groups are calculated.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SupplementalGroups []int64
+	// Defines how supplemental groups of the first container processes are calculated.
+	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
+	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
+	// and the container runtime must implement support for this feature.
+	// +featureGate=SupplementalGroupsPolicy
+	// +optional
+	SupplementalGroupsPolicy *SupplementalGroupsPolicy
 	// A special supplemental group that applies to all containers in a pod.
 	// Some volume types allow the Kubelet to change the ownership of that volume
 	// to be owned by the pod:
