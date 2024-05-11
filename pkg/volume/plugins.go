@@ -169,11 +169,6 @@ type VolumePlugin interface {
 	// user specified mount options will result in error creating persistent volumes
 	SupportsMountOption() bool
 
-	// SupportsBulkVolumeVerification checks if volume plugin type is capable
-	// of enabling bulk polling of all nodes. This can speed up verification of
-	// attached volumes by quite a bit, but underlying pluging must support it.
-	SupportsBulkVolumeVerification() bool
-
 	// SupportsSELinuxContextMount returns true if volume plugins supports
 	// mount -o context=XYZ for a given volume.
 	SupportsSELinuxContextMount(spec *Spec) (bool, error)

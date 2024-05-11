@@ -85,10 +85,6 @@ func (plugin *gitRepoPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *gitRepoPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *gitRepoPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }
