@@ -444,9 +444,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
-		return nil, framework.Diagnosis{
-			NodeToStatusMap: make(framework.NodeToStatusMap),
-		}, err
+		return nil, framework.Diagnosis{}, err
 	}
 
 	diagnosis := framework.Diagnosis{
