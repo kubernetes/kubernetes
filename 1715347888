@@ -1,0 +1,65 @@
+Collecting CPU usage data for node 'worker' and metrics-server every 1 second(s) for 60 seconds...
+[2024-05-10 22:31:28] Node 'worker': 108% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:29] Node 'worker': 108% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:30] Node 'worker': 108% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:31] Node 'worker': 108% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:32] Node 'worker': 108% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:34] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:35] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:36] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:37] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:38] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:39] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:41] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:42] Node 'worker': 939% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:43] Node 'worker': 157% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:44] Node 'worker': 157% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:45] Node 'worker': 157% CPU, Metrics-server: 8% CPU
+[2024-05-10 22:31:46] Node 'worker': 157% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:48] Node 'worker': 157% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:49] Node 'worker': 157% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:50] Node 'worker': 157% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:51] Node 'worker': 157% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:52] Node 'worker': 157% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:53] Node 'worker': 169% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:55] Node 'worker': 169% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:56] Node 'worker': 169% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:57] Node 'worker': 169% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:58] Node 'worker': 169% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:31:59] Node 'worker': 169% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:01] Node 'worker': 169% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:02] Node 'worker': 169% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:03] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:04] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:05] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:06] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:08] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:09] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:10] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:11] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:12] Node 'worker': 179% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:13] Node 'worker': 177% CPU, Metrics-server: 11% CPU
+[2024-05-10 22:32:15] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:16] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:17] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:18] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:19] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:20] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:22] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:23] Node 'worker': 177% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:24] Node 'worker': 161% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:25] Node 'worker': 161% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:26] Node 'worker': 161% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:28] Node 'worker': 161% CPU, Metrics-server: 10% CPU
+[2024-05-10 22:32:29] Node 'worker': 161% CPU, Metrics-server: 13% CPU
+[2024-05-10 22:32:30] Node 'worker': 161% CPU, Metrics-server: 13% CPU
+[2024-05-10 22:32:31] Node 'worker': 161% CPU, Metrics-server: 13% CPU
+[2024-05-10 22:32:32] Node 'worker': 161% CPU, Metrics-server: 13% CPU
+[2024-05-10 22:32:33] Node 'worker': 171% CPU, Metrics-server: 13% CPU
+[2024-05-10 22:32:35] Node 'worker': 171% CPU, Metrics-server: 13% CPU
+[2024-05-10 22:32:36] Node 'worker': 171% CPU, Metrics-server: 13% CPU
+[2024-05-10 22:32:37] Node 'worker': 171% CPU, Metrics-server: 13% CPU
+
+Final Averages:
+Node 'worker' Average CPU Usage: 266.55
+Metrics-server Average CPU Usage: 10.11

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    labels:
+        app: simple-server
+    name: simple-server
+spec:
+    replicas: 20
+    selector:
+        matchLabels:
+            app: simple-server
+    template:
+        metadata:
+            labels:
+                app: simple-server
+        spec:
+            containers:
+                - image: rtsp/lighttpd:1.4.73
+                  imagePullPolicy: IfNotPresent
+                  name: simple-server-container
+                  ports:
+                      - containerPort: 8080
+                  readinessProbe:
+                      failureThreshold: 10
+                      httpGet:
+                          path: /healthz
+                          port: 8080
+                      initialDelaySeconds: 1
+                      periodSeconds: 5
