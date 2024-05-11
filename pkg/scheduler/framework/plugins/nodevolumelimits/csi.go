@@ -96,7 +96,13 @@ func (pl *CSILimits) isSchedulableAfterPVCAdded(logger klog.Logger, pod *v1.Pod,
 		return framework.QueueSkip, nil
 	}
 
-	return framework.Queue, nil
+	for _, volumes := range pod.Spec.Volumes {
+		if volumes.PersistentVolumeClaim != nil && volumes.PersistentVolumeClaim.ClaimName == addedPvc.Name {
+			return framework.Queue, nil
+		}
+	}
+
+	return framework.QueueSkip, nil
 }
 
 // PreFilter invoked at the prefilter extension point

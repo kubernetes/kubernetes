@@ -643,10 +643,11 @@ func TestCSILimits(t *testing.T) {
 
 func TestCSILimitsAddedPVCQHint(t *testing.T) {
 	tests := []struct {
-		test      string
-		newPod    *v1.Pod
-		addedPvc  *v1.PersistentVolumeClaim
-		wantQHint framework.QueueingHint
+		test        string
+		newPod      *v1.Pod
+		attachedPvc *v1.PersistentVolumeClaim
+		addedPvc    *v1.PersistentVolumeClaim
+		wantQHint   framework.QueueingHint
 	}{
 		{
 			test:      "the pod isn't in the same namespace as the added PVC",
@@ -655,10 +656,11 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 			wantQHint: framework.QueueSkip,
 		},
 		{
-			test:      "the pod is in the same namespace as the added PVC",
-			newPod:    st.MakePod().Namespace("ns1").Obj(),
-			addedPvc:  st.MakePersistentVolumeClaim().Namespace("ns1").Obj(),
-			wantQHint: framework.Queue,
+			test:        "the pod is in the same namespace as the added PVC",
+			newPod:      st.MakePod().Namespace("ns1").Obj(),
+			attachedPvc: st.MakePersistentVolumeClaim().Name("pvc").Namespace("ns1").Obj(),
+			addedPvc:    st.MakePersistentVolumeClaim().Name("pvc").Namespace("ns1").Obj(),
+			wantQHint:   framework.Queue,
 		},
 	}
 
@@ -666,9 +668,20 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 		t.Run(test.test, func(t *testing.T) {
 			p := &CSILimits{}
 			logger, _ := ktesting.NewTestContext(t)
+
+			if test.attachedPvc != nil {
+				test.newPod.Spec.Volumes = append(test.newPod.Spec.Volumes, v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: test.attachedPvc.Name,
+						},
+					},
+				})
+			}
+
 			qhint, err := p.isSchedulableAfterPVCAdded(logger, test.newPod, nil, test.addedPvc)
 			if err != nil {
-				t.Errorf("isSchedulableAfterPodDeleted failed: %v", err)
+				t.Errorf("isSchedulableAfterPVCAdded failed: %v", err)
 			}
 			if qhint != test.wantQHint {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
