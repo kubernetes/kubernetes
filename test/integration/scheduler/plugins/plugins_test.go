@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -80,9 +81,10 @@ type PreEnqueuePlugin struct {
 }
 
 type PreFilterPlugin struct {
-	numPreFilterCalled int
-	failPreFilter      bool
-	rejectPreFilter    bool
+	numPreFilterCalled   int
+	failPreFilter        bool
+	rejectPreFilter      bool
+	preFilterResultNodes sets.Set[string]
 }
 
 type ScorePlugin struct {
@@ -524,6 +526,9 @@ func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state *framework.Cycle
 	if pp.rejectPreFilter {
 		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
+	if len(pp.preFilterResultNodes) != 0 {
+		return &framework.PreFilterResult{NodeNames: pp.preFilterResultNodes}, nil
+	}
 	return nil, nil
 }
 
@@ -627,9 +632,10 @@ func TestPreFilterPlugin(t *testing.T) {
 	testContext := testutils.InitTestAPIServer(t, "prefilter-plugin", nil)
 
 	tests := []struct {
-		name   string
-		fail   bool
-		reject bool
+		name                 string
+		fail                 bool
+		reject               bool
+		preFilterResultNodes sets.Set[string]
 	}{
 		{
 			name:   "disable fail and reject flags",
@@ -646,6 +652,18 @@ func TestPreFilterPlugin(t *testing.T) {
 			fail:   false,
 			reject: true,
 		},
+		{
+			name:                 "inject legal node names in PreFilterResult",
+			fail:                 false,
+			reject:               false,
+			preFilterResultNodes: sets.New[string]("test-node-0", "test-node-1"),
+		},
+		{
+			name:                 "inject legal and illegal node names in PreFilterResult",
+			fail:                 false,
+			reject:               false,
+			preFilterResultNodes: sets.New[string]("test-node-0", "non-existent-node"),
+		},
 	}
 
 	for _, test := range tests {
@@ -661,6 +679,7 @@ func TestPreFilterPlugin(t *testing.T) {
 
 			preFilterPlugin.failPreFilter = test.fail
 			preFilterPlugin.rejectPreFilter = test.reject
+			preFilterPlugin.preFilterResultNodes = test.preFilterResultNodes
 			// Create a best effort pod.
 			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
 				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
