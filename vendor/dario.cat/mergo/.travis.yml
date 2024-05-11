@@ -1,0 +1,12 @@
+language: go
+arch:
+    - amd64
+    - ppc64le
+install:
+  - go get -t
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/mattn/goveralls
+script:
+  - go test -race -v ./...
+after_script:
+  - $HOME/gopath/bin/goveralls -service=travis-ci -repotoken $COVERALLS_TOKEN

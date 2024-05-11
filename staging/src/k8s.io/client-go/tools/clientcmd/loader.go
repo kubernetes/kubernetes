@@ -24,7 +24,7 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/imdario/mergo"
+	"dario.cat/mergo"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"

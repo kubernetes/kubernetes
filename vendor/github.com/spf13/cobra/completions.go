@@ -145,6 +145,20 @@ func (c *Command) RegisterFlagCompletionFunc(flagName string, f func(cmd *Comman
 	return nil
 }
 
+// GetFlagCompletionFunc returns the completion function for the given flag of the command, if available.
+func (c *Command) GetFlagCompletionFunc(flagName string) (func(*Command, []string, string) ([]string, ShellCompDirective), bool) {
+	flag := c.Flag(flagName)
+	if flag == nil {
+		return nil, false
+	}
+
+	flagCompletionMutex.RLock()
+	defer flagCompletionMutex.RUnlock()
+
+	completionFunc, exists := flagCompletionFunctions[flag]
+	return completionFunc, exists
+}
+
 // Returns a string listing the different directive enabled in the specified parameter
 func (d ShellCompDirective) string() string {
 	var directives []string
@@ -283,9 +297,13 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 
 	// These flags are normally added when `execute()` is called on `finalCmd`,
 	// however, when doing completion, we don't call `finalCmd.execute()`.
-	// Let's add the --help and --version flag ourselves.
-	finalCmd.InitDefaultHelpFlag()
-	finalCmd.InitDefaultVersionFlag()
+	// Let's add the --help and --version flag ourselves but only if the finalCmd
+	// has not disabled flag parsing; if flag parsing is disabled, it is up to the
+	// finalCmd itself to handle the completion of *all* flags.
+	if !finalCmd.DisableFlagParsing {
+		finalCmd.InitDefaultHelpFlag()
+		finalCmd.InitDefaultVersionFlag()
+	}
 
 	// Check if we are doing flag value completion before parsing the flags.
 	// This is important because if we are completing a flag value, we need to also
@@ -389,6 +407,11 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 			finalCmd.InheritedFlags().VisitAll(func(flag *pflag.Flag) {
 				doCompleteFlags(flag)
 			})
+			// Try to complete non-inherited flags even if DisableFlagParsing==true.
+			// This allows programs to tell Cobra about flags for completion even
+			// if the actual parsing of flags is not done by Cobra.
+			// For instance, Helm uses this to provide flag name completion for
+			// some of its plugins.
 			finalCmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
 				doCompleteFlags(flag)
 			})

@@ -1,6 +1,7 @@
 package md2man
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -34,10 +35,10 @@ const (
 	hruleTag         = "\n.ti 0\n\\l'\\n(.lu'\n"
 	linkTag          = "\n\\[la]"
 	linkCloseTag     = "\\[ra]"
-	codespanTag      = "\\fB\\fC"
+	codespanTag      = "\\fB"
 	codespanCloseTag = "\\fR"
-	codeTag          = "\n.PP\n.RS\n\n.nf\n"
-	codeCloseTag     = "\n.fi\n.RE\n"
+	codeTag          = "\n.EX\n"
+	codeCloseTag     = "\n.EE\n"
 	quoteTag         = "\n.PP\n.RS\n"
 	quoteCloseTag    = "\n.RE\n"
 	listTag          = "\n.RS\n"
@@ -86,8 +87,7 @@ func (r *roffRenderer) RenderFooter(w io.Writer, ast *blackfriday.Node) {
 // RenderNode is called for each node in a markdown document; based on the node
 // type the equivalent roff output is sent to the writer
 func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
-
-	var walkAction = blackfriday.GoToNext
+	walkAction := blackfriday.GoToNext
 
 	switch node.Type {
 	case blackfriday.Text:
@@ -109,9 +109,16 @@ func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering 
 			out(w, strongCloseTag)
 		}
 	case blackfriday.Link:
-		if !entering {
-			out(w, linkTag+string(node.LinkData.Destination)+linkCloseTag)
+		// Don't render the link text for automatic links, because this
+		// will only duplicate the URL in the roff output.
+		// See https://daringfireball.net/projects/markdown/syntax#autolink
+		if !bytes.Equal(node.LinkData.Destination, node.FirstChild.Literal) {
+			out(w, string(node.FirstChild.Literal))
 		}
+		// Hyphens in a link must be escaped to avoid word-wrap in the rendered man page.
+		escapedLink := strings.ReplaceAll(string(node.LinkData.Destination), "-", "\\-")
+		out(w, linkTag+escapedLink+linkCloseTag)
+		walkAction = blackfriday.SkipChildren
 	case blackfriday.Image:
 		// ignore images
 		walkAction = blackfriday.SkipChildren
@@ -160,6 +167,11 @@ func (r *roffRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering 
 		r.handleTableCell(w, node, entering)
 	case blackfriday.HTMLSpan:
 		// ignore other HTML tags
+	case blackfriday.HTMLBlock:
+		if bytes.HasPrefix(node.Literal, []byte("<!--")) {
+			break // ignore comments, no warning
+		}
+		fmt.Fprintln(os.Stderr, "WARNING: go-md2man does not handle node type "+node.Type.String())
 	default:
 		fmt.Fprintln(os.Stderr, "WARNING: go-md2man does not handle node type "+node.Type.String())
 	}
@@ -254,7 +266,7 @@ func (r *roffRenderer) handleTableCell(w io.Writer, node *blackfriday.Node, ente
 			start = "\t"
 		}
 		if node.IsHeader {
-			start += codespanTag
+			start += strongTag
 		} else if nodeLiteralSize(node) > 30 {
 			start += tableCellStart
 		}
@@ -262,7 +274,7 @@ func (r *roffRenderer) handleTableCell(w io.Writer, node *blackfriday.Node, ente
 	} else {
 		var end string
 		if node.IsHeader {
-			end = codespanCloseTag
+			end = strongCloseTag
 		} else if nodeLiteralSize(node) > 30 {
 			end = tableCellEnd
 		}
