@@ -658,9 +658,16 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 		{
 			test:        "the pod is in the same namespace as the added PVC",
 			newPod:      st.MakePod().Namespace("ns1").Obj(),
-			attachedPvc: st.MakePersistentVolumeClaim().Name("pvc").Namespace("ns1").Obj(),
-			addedPvc:    st.MakePersistentVolumeClaim().Name("pvc").Namespace("ns1").Obj(),
+			attachedPvc: st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").Obj(),
+			addedPvc:    st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").Obj(),
 			wantQHint:   framework.Queue,
+		},
+		{
+			test:        "the pod doesn't have the same PVC as the added PVC",
+			newPod:      st.MakePod().Namespace("ns1").Obj(),
+			attachedPvc: st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").Obj(),
+			addedPvc:    st.MakePersistentVolumeClaim().Name("pvc2").Namespace("ns1").Obj(),
+			wantQHint:   framework.QueueSkip,
 		},
 	}
 
