@@ -207,3 +207,27 @@ func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string
 	}
 	return obj.(*v1.Pod), err
 }
+
+// GetResize takes name of the pod, and returns the corresponding resize object, and an error if there is any.
+func (c *FakePods) GetResize(ctx context.Context, podName string, options metav1.GetOptions) (result *v1.Resize, err error) {
+	emptyResult := &v1.Resize{}
+	obj, err := c.Fake.
+		Invokes(testing.NewGetSubresourceActionWithOptions(podsResource, c.ns, "resize", podName, options), emptyResult)
+
+	if obj == nil {
+		return emptyResult, err
+	}
+	return obj.(*v1.Resize), err
+}
+
+// UpdateResize takes the representation of a resize and updates it. Returns the server's representation of the resize, and an error, if there is any.
+func (c *FakePods) UpdateResize(ctx context.Context, podName string, resize *v1.Resize, opts metav1.UpdateOptions) (result *v1.Resize, err error) {
+	emptyResult := &v1.Resize{}
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(podsResource, "resize", c.ns, resize, opts), &v1.Resize{})
+
+	if obj == nil {
+		return emptyResult, err
+	}
+	return obj.(*v1.Resize), err
+}
