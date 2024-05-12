@@ -2103,6 +2103,30 @@ func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerStatus
 }
 
+var map_Resize = map[string]string{
+	"": "Resize is the query options to a Pod's resize call",
+}
+
+func (Resize) SwaggerDoc() map[string]string {
+	return map_Resize
+}
+
+var map_ResizeOptionsSpec = map[string]string{
+	"resize": "Container name to resources. Not all containers need to be specified.",
+}
+
+func (ResizeOptionsSpec) SwaggerDoc() map[string]string {
+	return map_ResizeOptionsSpec
+}
+
+var map_ResizeOptionsStatus = map[string]string{
+	"current": "Container name to resources",
+}
+
+func (ResizeOptionsStatus) SwaggerDoc() map[string]string {
+	return map_ResizeOptionsStatus
+}
+
 var map_ResourceClaim = map[string]string{
 	"":        "ResourceClaim references one entry in PodSpec.ResourceClaims.",
 	"name":    "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
