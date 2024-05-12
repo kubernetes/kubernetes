@@ -236,83 +236,171 @@ func TestWarnings(t *testing.T) {
 			expected: []string{`spec.volumes[0].rbd: deprecated in v1.28, non-functional in v1.31+`},
 		},
 		{
-			name: "duplicated path in projected volumes - secret and service account token",
+			name: "overlapping paths in a configmap volume",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				Volumes: []api.Volume{
 					{
-						Name: "t",
 						VolumeSource: api.VolumeSource{
-							Projected: &api.ProjectedVolumeSource{
-								Sources: []api.VolumeProjection{
-									{Secret: &api.SecretProjection{Items: []api.KeyToPath{{Path: "/test-path", Key: "test"}}}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
-								}},
+							ConfigMap: &api.ConfigMapVolumeSource{
+								LocalObjectReference: api.LocalObjectReference{Name: "foo"},
+								Items: []api.KeyToPath{
+									{Key: "foo", Path: "test"},
+									{Key: "bar", Path: "test"},
+								},
+							},
 						},
 					},
 				},
 			}},
 			expected: []string{
-				"spec.volumes[0].projected.sources.secrets[0]: has duplicated path with ServiceAccountToken \"/test-path\"",
+				"config map: \"foo\" - conflicting duplicate paths",
 			},
 		},
 		{
-			name: "duplicated path in projected volumes - configMap and service account token",
+			name: "overlapping paths in a secret volume",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				Volumes: []api.Volume{
 					{
-						Name: "t",
 						VolumeSource: api.VolumeSource{
-							Projected: &api.ProjectedVolumeSource{
-								Sources: []api.VolumeProjection{
-									{ConfigMap: &api.ConfigMapProjection{Items: []api.KeyToPath{{Path: "/test-path", Key: "test"}}}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
-								}},
+							Secret: &api.SecretVolumeSource{
+								SecretName: "foo",
+								Items: []api.KeyToPath{
+									{Key: "foo", Path: "test"},
+									{Key: "bar", Path: "test"},
+								},
+							},
 						},
 					},
 				},
 			}},
 			expected: []string{
-				"spec.volumes[0].projected.sources.configMap[0]: has duplicated path with ServiceAccountToken \"/test-path\"",
+				"secret: \"foo\" - conflicting duplicate paths",
 			},
 		},
 		{
-			name: "duplicated path in projected volumes - downwardAPI and service account token",
+			name: "overlapping paths in a downward api volume",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				Volumes: []api.Volume{
 					{
-						Name: "t",
 						VolumeSource: api.VolumeSource{
-							Projected: &api.ProjectedVolumeSource{
-								Sources: []api.VolumeProjection{
-									{DownwardAPI: &api.DownwardAPIProjection{Items: []api.DownwardAPIVolumeFile{{Path: "/test-path"}}}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
-								}},
+							DownwardAPI: &api.DownwardAPIVolumeSource{
+								Items: []api.DownwardAPIVolumeFile{
+									{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name\n"}, Path: "test"},
+									{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.labels\n"}, Path: "test"},
+								},
+							},
 						},
 					},
 				},
 			}},
 			expected: []string{
-				"spec.volumes[0].projected.sources.downwardAPI[0]: has duplicated path with ServiceAccountToken \"/test-path\"",
+				"downward api - conflicting duplicate paths",
 			},
 		},
 		{
-			name: "duplicated path in projected volumes - ClusterTrustBundle and service account token",
+			name: "overlapping paths in projected volume volume - service account and config",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				Volumes: []api.Volume{
 					{
-						Name: "t",
+						Name: "foo",
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{ClusterTrustBundle: &api.ClusterTrustBundleProjection{Path: "/test-path"}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{Path: "/test-path"}},
-								}},
+									{ConfigMap: &api.ConfigMapProjection{
+										Items: []api.KeyToPath{
+											{Key: "foo", Path: "test"},
+										},
+									}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
+										Path: "test",
+									}},
+								},
+							},
 						},
 					},
 				},
 			}},
 			expected: []string{
-				"spec.volumes[0].projected.sources.ClusterTrustBundle: has duplicated path with ServiceAccountToken \"/test-path\"",
+				"projected volume: \"foo\" - conflicting duplicate paths",
+			},
+		},
+		{
+			name: "overlapping paths in projected volume volume - service account and secret",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{Secret: &api.SecretProjection{
+										Items: []api.KeyToPath{
+											{Key: "foo", Path: "test"},
+										},
+									}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
+										Path: "test",
+									}},
+								},
+							},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				"projected volume: \"foo\" - conflicting duplicate paths",
+			},
+		},
+		{
+			name: "overlapping paths in projected volume volume - service account and downward api",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{DownwardAPI: &api.DownwardAPIProjection{
+										Items: []api.DownwardAPIVolumeFile{
+											{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name\n"}, Path: "test"},
+										},
+									}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
+										Path: "test",
+									}},
+								},
+							},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				"projected volume: \"foo\" - conflicting duplicate paths",
+			},
+		},
+		{
+			name: "overlapping paths in projected volume volume - service account and cluster trust bundle",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{ClusterTrustBundle: &api.ClusterTrustBundleProjection{
+										Path: "test",
+									}},
+									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
+										Path: "test",
+									}},
+								},
+							},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				"projected volume: \"foo\" - conflicting duplicate paths",
 			},
 		},
 		{
