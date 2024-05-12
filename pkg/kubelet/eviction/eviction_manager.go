@@ -105,8 +105,8 @@ type managerImpl struct {
 	thresholdsLastUpdated time.Time
 	// whether can support local storage capacity isolation
 	localStorageCapacityIsolation bool
-	// softEvictionSemaphore prevents more than 1 pod from being soft evicted at once
-	softEvictionSemaphore chan bool
+	// softEvictionLock prevents more than 1 pod from being soft evicted at once
+	softEvictionLock *sync.Mutex
 }
 
 // ensure it implements the required interface
@@ -139,7 +139,7 @@ func NewManager(
 		splitContainerImageFs:         nil,
 		thresholdNotifiers:            []ThresholdNotifier{},
 		localStorageCapacityIsolation: localStorageCapacityIsolation,
-		softEvictionSemaphore:         make(chan bool, 1),
+		softEvictionLock:              &sync.Mutex{},
 	}
 	return manager, manager
 }
@@ -412,14 +412,13 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	for i := range activePods {
 		pod := activePods[i]
 		gracePeriodOverride := int64(immediateEvictionGracePeriodSeconds)
-		var semaphore chan bool
+		var lock *sync.Mutex
 		if !isHardEvictionThreshold(thresholdToReclaim) {
-			semaphore = m.softEvictionSemaphore
-			if len(m.softEvictionSemaphore) != 0 {
+			lock = m.softEvictionLock
+			if !m.softEvictionLock.TryLock() {
 				klog.InfoS("Eviction manager: soft eviction already in progress, will not soft evict another pod")
 				return nil, nil
 			}
-			m.softEvictionSemaphore <- true
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
@@ -432,7 +431,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 				Message: message,
 			}
 		}
-		if m.evictPod(pod, gracePeriodOverride, message, annotations, condition, semaphore) {
+		if m.evictPod(pod, gracePeriodOverride, message, annotations, condition, lock) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
 			return []*v1.Pod{pod}, nil
 		}
@@ -603,7 +602,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 	return false
 }
 
-func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition, semaphore chan bool) bool {
+func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition, lock *sync.Mutex) bool {
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
@@ -615,7 +614,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a non-blocking call, it will return right away, semaphore (if non-nil) will be released once the pod is actually killed
 	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
-	err := m.killPodFunc(pod, true, &gracePeriodOverride, semaphore, func(status *v1.PodStatus) {
+	err := m.killPodFunc(pod, true, &gracePeriodOverride, lock, func(status *v1.PodStatus) {
 		status.Phase = v1.PodFailed
 		status.Reason = Reason
 		status.Message = evictMsg

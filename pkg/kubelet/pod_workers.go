@@ -1647,9 +1647,9 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID, status *podSyncStatus
 
 // killPodNowAsync returns a KillPodFunc that can be used to kill a pod.
 // It is intended to be injected into other modules that need to kill a pod.
-// The kill will happen async, and once it is complete, the semaphore will be drained
+// The kill will happen async, and once it is complete, the lock will be unlocked
 func killPodNowAsync(podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFuncAsync {
-	return func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, semaphore chan bool, statusFn func(*v1.PodStatus)) error {
+	return func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, lock *sync.Mutex, statusFn func(*v1.PodStatus)) error {
 		go func() {
 			ch := make(chan struct{}, 1)
 			podWorkers.UpdatePod(UpdatePodOptions{
@@ -1663,13 +1663,11 @@ func killPodNowAsync(podWorkers PodWorkers, recorder record.EventRecorder) evict
 				},
 			})
 
-			if semaphore == nil {
+			if lock == nil {
 				return
 			}
-			select {
-			case <-ch:
-				<-semaphore
-			}
+			<-ch
+			lock.Unlock()
 		}()
 		return nil
 	}

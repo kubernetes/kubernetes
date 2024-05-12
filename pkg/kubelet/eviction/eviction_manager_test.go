@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/utils/clock"
+	"sync"
 	"testing"
 	"time"
 
@@ -59,16 +60,16 @@ type mockPodKiller struct {
 }
 
 // killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, semaphore chan bool, statusFn func(*v1.PodStatus)) error {
-	m.killPodNowNoSemaphoreRelease(pod, evict, gracePeriodOverride, semaphore, statusFn)
-	if semaphore != nil {
-		<-semaphore
+func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, lock *sync.Mutex, statusFn func(*v1.PodStatus)) error {
+	_ = m.killPodNowLongShutdown(pod, evict, gracePeriodOverride, lock, statusFn)
+	if lock != nil {
+		lock.Unlock()
 	}
 	return nil
 }
 
-// killPodNowNoSemaphoreRelease records the pod that was killed, and does not release the semaphore, simulating a long pod shutdown
-func (m *mockPodKiller) killPodNowNoSemaphoreRelease(pod *v1.Pod, evict bool, gracePeriodOverride *int64, semaphore chan bool, statusFn func(*v1.PodStatus)) error {
+// killPodNowLongShutdown records the pod that was killed, and does not unlock the lock, simulating a long pod shutdown
+func (m *mockPodKiller) killPodNowLongShutdown(pod *v1.Pod, evict bool, gracePeriodOverride *int64, lock *sync.Mutex, statusFn func(*v1.PodStatus)) error {
 	m.pod = pod
 	m.statusFn = statusFn
 	m.evict = evict
@@ -3027,7 +3028,7 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("600Mi", podStats)}
 	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
-	manager.killPodFunc = podKiller.killPodNowNoSemaphoreRelease
+	manager.killPodFunc = podKiller.killPodNowLongShutdown
 	fakeClock.Step(1 * time.Minute)
 
 	// first run doesn't meet the grace period
@@ -3086,7 +3087,7 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
 	observedGracePeriod = *podKiller.gracePeriodOverride
-	if observedGracePeriod != int64(0) {
+	if observedGracePeriod != int64(1) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
 	}
 }
@@ -3104,6 +3105,6 @@ func newManagerImpl(clock clock.WithTicker, killPodFunc KillPodFuncAsync, config
 		containerGC:                  diskGC,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		softEvictionSemaphore:        make(chan bool, 1),
+		softEvictionLock:             &sync.Mutex{},
 	}
 }

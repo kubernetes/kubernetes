@@ -19,6 +19,7 @@ package eviction
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -107,8 +108,8 @@ type KillPodFunc func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, f
 // pod - the pod to kill
 // status - the desired status to associate with the pod (i.e. why its killed)
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-// semaphore - if non-nil, will be released once the kill is completed
-type KillPodFuncAsync func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, semaphore chan bool, fn func(*v1.PodStatus)) error
+// lock - if non-nil, will be released once the kill is completed
+type KillPodFuncAsync func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, lock *sync.Mutex, fn func(*v1.PodStatus)) error
 
 // MirrorPodFunc returns the mirror pod for the given static pod and
 // whether it was known to the pod manager.
