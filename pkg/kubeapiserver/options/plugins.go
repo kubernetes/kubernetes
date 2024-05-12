@@ -141,8 +141,8 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
-func DefaultOffAdmissionPlugins() sets.String {
-	defaultOnPlugins := sets.NewString(
+func DefaultOffAdmissionPlugins() sets.Set[string] {
+	defaultOnPlugins := sets.New(
 		lifecycle.PluginName,                    // NamespaceLifecycle
 		limitranger.PluginName,                  // LimitRanger
 		serviceaccount.PluginName,               // ServiceAccount
@@ -165,5 +165,5 @@ func DefaultOffAdmissionPlugins() sets.String {
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 	)
 
-	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
+	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)
 }
