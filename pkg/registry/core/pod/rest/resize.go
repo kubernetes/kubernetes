@@ -32,7 +32,7 @@ import (
 
 // PortForwardREST implements the portforward subresource for a Pod
 type ResizeREST struct {
-	podStore *genericregistry.Store
+	PodStore *genericregistry.Store
 }
 
 var _ = rest.GroupVersionKindProvider(&ResizeREST{})
@@ -53,7 +53,7 @@ func (r *ResizeREST) Destroy() {
 }
 
 func (r *ResizeREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	obj, err := r.podStore.Get(ctx, name, options)
+	obj, err := r.PodStore.Get(ctx, name, options)
 	if err != nil {
 		return nil, errors.NewNotFound(core.Resource("resize"), name)
 	}
@@ -62,7 +62,7 @@ func (r *ResizeREST) Get(ctx context.Context, name string, options *metav1.GetOp
 }
 
 func (r *ResizeREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, _ bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	obj, _, err := r.podStore.Update(
+	obj, _, err := r.PodStore.Update(
 		ctx,
 		name,
 		&resizeUpdatedObjectInfo{name, objInfo},
