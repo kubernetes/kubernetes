@@ -44,12 +44,21 @@ import (
 const (
 	deleteNodeEvent       = "DeletingNode"
 	deleteNodeFailedEvent = "DeletingNodeFailed"
+
+	uninitializedNodeDelay = time.Minute
 )
 
-var ShutdownTaint = &v1.Taint{
-	Key:    cloudproviderapi.TaintNodeShutdown,
-	Effect: v1.TaintEffectNoSchedule,
-}
+var (
+	UninitializedTaint = &v1.Taint{
+		Key:    cloudproviderapi.TaintExternalCloudProvider,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	ShutdownTaint = &v1.Taint{
+		Key:    cloudproviderapi.TaintNodeShutdown,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+)
 
 // CloudNodeLifecycleController is responsible for deleting/updating kubernetes
 // nodes that have been deleted/shutdown on the cloud provider
@@ -147,6 +156,25 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 				klog.Errorf("error patching node taints: %v", err)
 			}
 			continue
+		}
+
+		// Wait unknown uninitialized node
+		if node.Spec.ProviderID == "" {
+			uninitialized := false
+
+			for _, taint := range node.Spec.Taints {
+				if taint.MatchTaint(UninitializedTaint) {
+					uninitialized = true
+				}
+			}
+
+			if uninitialized {
+				delay := time.Since(node.ObjectMeta.CreationTimestamp.Time)
+				if delay < time.Duration(uninitializedNodeDelay) {
+					klog.V(2).Infof("wait uninitialized node %s for %s", node.Name, delay.String())
+					continue
+				}
+			}
 		}
 
 		// At this point the node has NotReady status, we need to check if the node has been removed
