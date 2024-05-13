@@ -91,7 +91,7 @@ var _ = common.SIGDescribe("DNS", func() {
 	})
 
 	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
-	framework.ConformanceIt("should resolve DNS of partial qualified names for the cluster", func(ctx context.Context) {
+	framework.ConformanceIt("should resolve DNS of partial qualified names for the cluster [LinuxOnly]", func(ctx context.Context) {
 		// All the names we need to be able to resolve.
 		namesToResolve := []string{
 			"kubernetes.default",
@@ -190,7 +190,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		Description: Create a headless service and normal service. Both the services MUST be able to resolve partial qualified DNS entries of their service endpoints by serving A records and SRV records.
 		[LinuxOnly]: As Windows currently does not support resolving PQDNs.
 	*/
-	framework.ConformanceIt("should resolve DNS of partial qualified names for services", func(ctx context.Context) {
+	framework.ConformanceIt("should resolve DNS of partial qualified names for services [LinuxOnly]", func(ctx context.Context) {
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{

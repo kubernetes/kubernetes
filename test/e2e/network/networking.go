@@ -91,7 +91,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			checkConnectivityToHost(ctx, f, "", "connectivity-test", "8.8.8.8", 53, 30))
 	})
 
-	framework.ConformanceIt("should provide Internet connection for containers", feature.NetworkingIPv6, "[Experimental]", func(ctx context.Context) {
+	f.It("should provide Internet connection for containers", feature.NetworkingIPv6, "[Experimental][LinuxOnly]", func(ctx context.Context) {
 		// IPv6 is not supported on Windows.
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
@@ -412,7 +412,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		framework.ConformanceIt("should function for client IP based session affinity: http", func(ctx context.Context) {
+		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterHTTPPort))
 
@@ -430,7 +430,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		framework.ConformanceIt("should function for client IP based session affinity: udp", func(ctx context.Context) {
+		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, e2enetwork.ClusterUDPPort))
 

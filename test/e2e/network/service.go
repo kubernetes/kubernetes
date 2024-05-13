@@ -2162,7 +2162,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should have session affinity work for service with type clusterIP", func(ctx context.Context) {
+	framework.ConformanceIt("should have session affinity work for service with type clusterIP [LinuxOnly]", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-clusterip")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBService(ctx, f, cs, svc)
@@ -2702,8 +2702,9 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	framework.ConformanceIt("should fail health check node port if there are only terminating endpoints", func(ctx context.Context) {
+	ginkgo.It("should fail health check node port if there are only terminating endpoints", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
