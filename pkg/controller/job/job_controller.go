@@ -648,6 +648,10 @@ func (jm *Controller) syncOrphanPod(ctx context.Context, key string) error {
 	}
 	// Make sure the pod is still orphaned.
 	if controllerRef := metav1.GetControllerOf(sharedPod); controllerRef != nil {
+		if controllerRef.Kind != controllerKind.Kind || controllerRef.APIVersion != batch.SchemeGroupVersion.String() {
+			// The pod is controlled by an owner that is not a batch/v1 Job. Do not remove finalizer.
+			return nil
+		}
 		job := jm.resolveControllerRef(sharedPod.Namespace, controllerRef)
 		if job != nil {
 			// Skip cleanup of finalizers for pods owned by a job managed by an external controller
