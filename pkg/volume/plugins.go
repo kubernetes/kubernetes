@@ -632,9 +632,9 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.RLock()
-	defer pm.mutex.RUnlock()
 
 	if spec == nil {
+		pm.mutex.RUnlock()
 		return nil, fmt.Errorf("could not find plugin because volume spec is nil")
 	}
 
@@ -646,8 +646,12 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 			matchedPluginNames = append(matchedPluginNames, v.GetPluginName())
 		}
 	}
+	pm.mutex.RUnlock()
 
 	pm.refreshProbedPlugins()
+
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
 			match = plugin
@@ -667,15 +671,18 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 
 // FindPluginByName fetches a plugin by name. If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
-	pm.mutex.RLock()
-	defer pm.mutex.RUnlock()
-
 	var match VolumePlugin
+	pm.mutex.RLock()
 	if v, found := pm.plugins[name]; found {
 		match = v
 	}
+	pm.mutex.RUnlock()
 
 	pm.refreshProbedPlugins()
+
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
 	if plugin, found := pm.probedPlugins[name]; found {
 		if match != nil {
 			return nil, fmt.Errorf("multiple volume plugins matched: %s and %s", match.GetPluginName(), plugin.GetPluginName())
@@ -691,7 +698,11 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 
 // Check if probedPlugin cache update is required.
 // If it is, initialize all probed plugins and replace the cache with them.
+// Note: This method takes an exclusive lock on pm.mutex
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
 	events, err := pm.prober.Probe()
 
 	if err != nil {
