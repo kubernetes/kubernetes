@@ -698,18 +698,6 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 					Verbs:     []string{"get", "list"},
 				})
 			}
-			if m.enableHonorPVReclaimPolicy && strings.HasPrefix(item.Name, "external-provisioner-runner") {
-				// The update verb is needed for testing the HonorPVReclaimPolicy feature gate.
-				// The feature gate is an alpha stage and is not enabled by default, so the verb
-				// is not added to the default rbac manifest.
-				// TODO: Remove this when the feature gate is promoted to beta or stable, and the
-				// verb is added to the default rbac manifest in the external-provisioner.
-				item.Rules = append(item.Rules, rbacv1.PolicyRule{
-					APIGroups: []string{""},
-					Resources: []string{"persistentvolumes"},
-					Verbs:     []string{"update"},
-				})
-			}
 		}
 
 		return nil
