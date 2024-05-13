@@ -30,7 +30,6 @@ import (
 var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitISCSIDriver,
-	drivers.InitCephFSDriver,
 	drivers.InitHostPathDriver,
 	drivers.InitHostPathSymlinkDriver,
 	drivers.InitEmptydirDriver,
