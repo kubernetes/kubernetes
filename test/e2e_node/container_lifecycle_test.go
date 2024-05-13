@@ -245,7 +245,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							// to complete.
 							// Note that we've observed approximately a 2s
 							// delay before the postStart hook is called.
-							// 10s > 1s + 2s(estimated maximum delay) + other possible delays
+							// 10s > 1s + 1s + 2s(estimated maximum delay) + other possible delays
 							Delay:    10,
 							ExitCode: 0,
 						}),
@@ -253,6 +253,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							PostStart: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PostStartPrefix, regular1), execCommand{
+										StartDelay:    1,
 										Delay:         1,
 										ExitCode:      0,
 										ContainerName: regular1,
@@ -279,7 +280,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		results := parseOutput(context.TODO(), f, podSpec)
 
 		ginkgo.By("Analyzing results")
-		// init container should start and exit with an error, and the regular container should never start
+		// init container should start and exit before poststart
 		framework.ExpectNoError(results.StartsBefore(init1, prefixedName(PostStartPrefix, regular1)))
 		framework.ExpectNoError(results.ExitsBefore(init1, prefixedName(PostStartPrefix, regular1)))
 
