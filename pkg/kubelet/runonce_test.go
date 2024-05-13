@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -133,7 +134,7 @@ func TestRunOnce(t *testing.T) {
 		UID:       types.UID(kb.nodeName),
 		Namespace: "",
 	}
-	fakeKillPodFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, semaphore chan bool, fn func(*v1.PodStatus)) error {
+	fakeKillPodFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, lock *sync.Mutex, fn func(*v1.PodStatus)) error {
 		return nil
 	}
 	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock, kb.supportLocalStorageCapacityIsolation())

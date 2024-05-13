@@ -834,9 +834,15 @@ func (a byEvictionPriority) Len() int      { return len(a) }
 func (a byEvictionPriority) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // Less ranks memory before all other resources, and ranks thresholds with no resource to reclaim last
+// Will rank hard evictions (grace period being 0) over soft
 func (a byEvictionPriority) Less(i, j int) bool {
+	_, iSignalHasResource := signalToResource[a[j].Signal]
 	_, jSignalHasResource := signalToResource[a[j].Signal]
-	return a[i].Signal == evictionapi.SignalMemoryAvailable || a[i].Signal == evictionapi.SignalAllocatableMemoryAvailable || !jSignalHasResource
+	iHasMemorySignal := a[i].Signal == evictionapi.SignalMemoryAvailable || a[i].Signal == evictionapi.SignalAllocatableMemoryAvailable
+	jHasMemorySignal := a[j].Signal == evictionapi.SignalMemoryAvailable || a[j].Signal == evictionapi.SignalAllocatableMemoryAvailable
+	iIsHardThreshold := a[i].GracePeriod == 0
+	jIsHardThreshold := a[j].GracePeriod == 0
+	return (iHasMemorySignal && !jHasMemorySignal) || (iSignalHasResource && !jSignalHasResource) || (iIsHardThreshold && !jIsHardThreshold)
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
