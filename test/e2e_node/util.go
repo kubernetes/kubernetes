@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -319,9 +319,10 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.
 func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
+	logger := klog.Background()
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, oteltrace.NewNoopTracerProvider())
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -331,7 +332,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, oteltrace.NewNoopTracerProvider())
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
 	if err != nil {
 		return nil, nil, err
 	}

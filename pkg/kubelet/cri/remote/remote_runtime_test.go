@@ -25,11 +25,13 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/klog/v2"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
@@ -52,7 +54,8 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 }
 
 func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, oteltrace.NewNoopTracerProvider())
+	logger := klog.Background()
+	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), &logger)
 
 	require.NoError(t, err)
 
@@ -60,7 +63,8 @@ func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.Runti
 }
 
 func createRemoteRuntimeServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, tp)
+	logger := klog.Background()
+	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, tp, &logger)
 	require.NoError(t, err)
 
 	return runtimeService
