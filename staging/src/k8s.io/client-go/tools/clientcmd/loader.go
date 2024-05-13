@@ -24,7 +24,6 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"dario.cat/mergo"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -245,25 +244,72 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	}
 
 	// first merge all of our maps
-	mapConfig := clientcmdapi.NewConfig()
+	var config *clientcmdapi.Config
 
 	for _, kubeconfig := range kubeconfigs {
-		mergo.Merge(mapConfig, kubeconfig, mergo.WithOverride)
+		if config == nil {
+			config = kubeconfig.DeepCopy()
+			continue
+		}
+
+		// Merge struct fields. Last non-empty wins.
+		if len(kubeconfig.APIVersion) > 0 || len(kubeconfig.Kind) > 0 {
+			config.APIVersion = kubeconfig.APIVersion
+			config.Kind = kubeconfig.Kind
+		}
+		if len(kubeconfig.CurrentContext) > 0 {
+			config.CurrentContext = kubeconfig.CurrentContext
+		}
+		if kubeconfig.Preferences.Colors {
+			config.Preferences.Colors = kubeconfig.Preferences.Colors
+		}
+
+		// Merge map fields. First wins.
+		for k, v := range kubeconfig.Clusters {
+			if _, exists := config.Clusters[k]; !exists {
+				if config.Clusters == nil {
+					config.Clusters = map[string]*clientcmdapi.Cluster{}
+				}
+				config.Clusters[k] = v
+			}
+		}
+		for k, v := range kubeconfig.Contexts {
+			if _, exists := config.Contexts[k]; !exists {
+				if config.Contexts == nil {
+					config.Contexts = map[string]*clientcmdapi.Context{}
+				}
+				config.Contexts[k] = v
+			}
+		}
+		for k, v := range kubeconfig.AuthInfos {
+			if _, exists := config.AuthInfos[k]; !exists {
+				if config.AuthInfos == nil {
+					config.AuthInfos = map[string]*clientcmdapi.AuthInfo{}
+				}
+				config.AuthInfos[k] = v
+			}
+		}
+		for k, v := range kubeconfig.Extensions {
+			if _, exists := config.Extensions[k]; !exists {
+				if config.Extensions == nil {
+					config.Extensions = map[string]runtime.Object{}
+				}
+				config.Extensions[k] = v
+			}
+		}
+		for k, v := range kubeconfig.Preferences.Extensions {
+			if _, exists := config.Preferences.Extensions[k]; !exists {
+				if config.Preferences.Extensions == nil {
+					config.Preferences.Extensions = map[string]runtime.Object{}
+				}
+				config.Preferences.Extensions[k] = v
+			}
+		}
 	}
 
-	// merge all of the struct values in the reverse order so that priority is given correctly
-	// errors are not added to the list the second time
-	nonMapConfig := clientcmdapi.NewConfig()
-	for i := len(kubeconfigs) - 1; i >= 0; i-- {
-		kubeconfig := kubeconfigs[i]
-		mergo.Merge(nonMapConfig, kubeconfig, mergo.WithOverride)
+	if config == nil {
+		config = clientcmdapi.NewConfig()
 	}
-
-	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
-	// get the values we expect.
-	config := clientcmdapi.NewConfig()
-	mergo.Merge(config, mapConfig, mergo.WithOverride)
-	mergo.Merge(config, nonMapConfig, mergo.WithOverride)
 
 	if rules.ResolvePaths() {
 		if err := ResolveLocalPaths(config); err != nil {

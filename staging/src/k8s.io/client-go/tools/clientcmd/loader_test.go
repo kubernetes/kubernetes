@@ -82,6 +82,37 @@ var (
 	}
 )
 
+func TestLoadConfigStructure(t *testing.T) {
+	var config clientcmdapi.Config
+	val := reflect.ValueOf(config)
+	typ := val.Type()
+
+	fieldsInConfigStruct := []string{
+		"Kind",
+		"APIVersion",
+		"Preferences",
+		"Clusters",
+		"AuthInfos",
+		"Contexts",
+		"CurrentContext",
+		"Extensions",
+	}
+	if val.NumField() != len(fieldsInConfigStruct) {
+		// if this fails, please update Load() method in loader.go and then update the list of fields above
+		t.Fatalf("unexpected error matching count of fields in struct Config - want: %d found : %d",
+			len(fieldsInConfigStruct), val.NumField())
+	}
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+
+		if field.Name != fieldsInConfigStruct[i] {
+			// if this fails, please update Load() method in loader.go and then update the list of fields above
+			t.Fatalf("unexpected error matching field names in struct Config - want: %s found : %s",
+				fieldsInConfigStruct[i], field.Name)
+		}
+	}
+}
+
 func TestNilOutMap(t *testing.T) {
 	var fakeKubeconfigData = `apiVersion: v1
 kind: Config
