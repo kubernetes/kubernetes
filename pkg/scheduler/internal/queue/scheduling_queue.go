@@ -1143,6 +1143,11 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) {
 	activated := false
 	for _, pInfo := range podInfoList {
+		// Since there may be many gated pods and they will not move from the
+		// unschedulable pool, we skip calling the expensive isPodWorthRequeueing.
+		if pInfo.Gated {
+			continue
+		}
 		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
 		if schedulingHint == queueSkip {
 			// QueueingHintFn determined that this Pod isn't worth putting to activeQ or backoffQ by this event.
