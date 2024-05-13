@@ -686,8 +686,8 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 		stdout, err := e2eoutput.RunHostCmd(testAgnhostPod.Namespace, testAgnhostPod.Name, "hostname")
 		framework.ExpectNoError(err, "failed to run command hostname: %s", stdout)
 		hostname := strings.TrimSpace(stdout)
-		if node.Name != hostname {
-			framework.Failf("expected hostname: %s, got: %s", node.Name, hostname)
+		if dnsTestPodHostName == hostname {
+			framework.Failf("https://issues.k8s.io/67019 expected spec.Hostname %s to be ignored", hostname)
 		}
 	})
 
