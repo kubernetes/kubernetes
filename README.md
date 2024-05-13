@@ -60,7 +60,7 @@ For the full story, head over to the [developer's documentation].
 
 ## Support
 
-If you need support, start with the [troubleshooting guide],
+If you need support, start with the [troubleshooting guide]
 and work your way through the process that we've outlined.
 
 That said, if you have questions, reach out to us
