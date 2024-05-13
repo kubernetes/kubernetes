@@ -635,7 +635,7 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalkdir
-# github.com/openshift/api v0.0.0-20240405095747-3e50337fcaea
+# github.com/openshift/api v0.0.0-20240424142232-29a704bf5aa2
 ## explicit; go 1.21
 github.com/openshift/api/apiserver/v1
 github.com/openshift/api/apps/v1
@@ -643,6 +643,7 @@ github.com/openshift/api/authorization/v1
 github.com/openshift/api/build/v1
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1alpha1
+github.com/openshift/api/features
 github.com/openshift/api/image/docker10
 github.com/openshift/api/image/dockerpre012
 github.com/openshift/api/image/v1
@@ -825,7 +826,7 @@ github.com/openshift/client-go/user/informers/externalversions/internalinterface
 github.com/openshift/client-go/user/informers/externalversions/user
 github.com/openshift/client-go/user/informers/externalversions/user/v1
 github.com/openshift/client-go/user/listers/user/v1
-# github.com/openshift/library-go v0.0.0-20240411091851-558ed29cc1dd
+# github.com/openshift/library-go v0.0.0-20240513090140-e22d25af5587
 ## explicit; go 1.21
 github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
 github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig

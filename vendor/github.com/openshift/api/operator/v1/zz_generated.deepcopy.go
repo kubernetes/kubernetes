@@ -2268,6 +2268,11 @@ func (in *IngressControllerTuningOptions) DeepCopyInto(out *IngressControllerTun
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.ConnectTimeout != nil {
+		in, out := &in.ConnectTimeout, &out.ConnectTimeout
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	if in.TLSInspectDelay != nil {
 		in, out := &in.TLSInspectDelay, &out.TLSInspectDelay
 		*out = new(metav1.Duration)
@@ -5005,6 +5010,21 @@ func (in *VSphereCSIDriverConfigSpec) DeepCopyInto(out *VSphereCSIDriverConfigSp
 		in, out := &in.TopologyCategories, &out.TopologyCategories
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.GlobalMaxSnapshotsPerBlockVolume != nil {
+		in, out := &in.GlobalMaxSnapshotsPerBlockVolume, &out.GlobalMaxSnapshotsPerBlockVolume
+		*out = new(uint32)
+		**out = **in
+	}
+	if in.GranularMaxSnapshotsPerBlockVolumeInVSAN != nil {
+		in, out := &in.GranularMaxSnapshotsPerBlockVolumeInVSAN, &out.GranularMaxSnapshotsPerBlockVolumeInVSAN
+		*out = new(uint32)
+		**out = **in
+	}
+	if in.GranularMaxSnapshotsPerBlockVolumeInVVOL != nil {
+		in, out := &in.GranularMaxSnapshotsPerBlockVolumeInVVOL, &out.GranularMaxSnapshotsPerBlockVolumeInVVOL
+		*out = new(uint32)
+		**out = **in
 	}
 	return
 }

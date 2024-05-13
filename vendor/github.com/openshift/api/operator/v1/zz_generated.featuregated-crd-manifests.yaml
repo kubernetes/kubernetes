@@ -68,7 +68,8 @@ clustercsidrivers.operator.openshift.io:
   CRDName: clustercsidrivers.operator.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - VSphereDriverConfiguration
   FilenameOperatorName: csi-driver
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_90"

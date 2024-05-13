@@ -824,7 +824,7 @@ type BareMetalPlatformSpec struct {
 	// Once set, the list cannot be completely removed (but its second entry can).
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:XValidation:rule="size(self) == 2 ? self.exists_one(x, x.contains(':')) : true",message="apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 2 && isIP(self[0]) && isIP(self[1]) ? ip(self[0]).family() != ip(self[1]).family() : true",message="apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
 	// +listType=set
 	// +optional
 	APIServerInternalIPs []IP `json:"apiServerInternalIPs"`
@@ -839,7 +839,7 @@ type BareMetalPlatformSpec struct {
 	// Once set, the list cannot be completely removed (but its second entry can).
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:XValidation:rule="size(self) == 2 ? self.exists_one(x, x.contains(':')) : true",message="ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 2 && isIP(self[0]) && isIP(self[1]) ? ip(self[0]).family() != ip(self[1]).family() : true",message="ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
 	// +listType=set
 	// +optional
 	IngressIPs []IP `json:"ingressIPs"`
@@ -951,7 +951,7 @@ type OpenStackPlatformSpec struct {
 	// Once set, the list cannot be completely removed (but its second entry can).
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:XValidation:rule="size(self) == 2 ? self.exists_one(x, x.contains(':')) : true",message="apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 2 && isIP(self[0]) && isIP(self[1]) ? ip(self[0]).family() != ip(self[1]).family() : true",message="apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
 	// +listType=set
 	// +optional
 	APIServerInternalIPs []IP `json:"apiServerInternalIPs"`
@@ -966,7 +966,7 @@ type OpenStackPlatformSpec struct {
 	// Once set, the list cannot be completely removed (but its second entry can).
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:XValidation:rule="size(self) == 2 ? self.exists_one(x, x.contains(':')) : true",message="ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 2 && isIP(self[0]) && isIP(self[1]) ? ip(self[0]).family() != ip(self[1]).family() : true",message="ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
 	// +listType=set
 	// +optional
 	IngressIPs []IP `json:"ingressIPs"`
@@ -1365,7 +1365,7 @@ type VSpherePlatformSpec struct {
 	// Once set, the list cannot be completely removed (but its second entry can).
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:XValidation:rule="size(self) == 2 ? self.exists_one(x, x.contains(':')) : true",message="apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 2 && isIP(self[0]) && isIP(self[1]) ? ip(self[0]).family() != ip(self[1]).family() : true",message="apiServerInternalIPs must contain at most one IPv4 address and at most one IPv6 address"
 	// +listType=set
 	// +optional
 	APIServerInternalIPs []IP `json:"apiServerInternalIPs"`
@@ -1380,7 +1380,7 @@ type VSpherePlatformSpec struct {
 	// Once set, the list cannot be completely removed (but its second entry can).
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:XValidation:rule="size(self) == 2 ? self.exists_one(x, x.contains(':')) : true",message="ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 2 && isIP(self[0]) && isIP(self[1]) ? ip(self[0]).family() != ip(self[1]).family() : true",message="ingressIPs must contain at most one IPv4 address and at most one IPv6 address"
 	// +listType=set
 	// +optional
 	IngressIPs []IP `json:"ingressIPs"`
@@ -1857,17 +1857,13 @@ type InfrastructureList struct {
 }
 
 // IP is an IP address (for example, "10.0.0.0" or "fd00::").
-// +kubebuilder:validation:Pattern=`(^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$)|(^s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:)))(%.+)?s*)`
-// + ---
-// + The regex for the IPv4 and IPv6 address was taken from
-// + https://blog.markhatton.co.uk/2011/03/15/regular-expressions-for-ip-addresses-cidr-ranges-and-hostnames/
-// + The resulting regex is an OR of both regexes.
+// +kubebuilder:validation:XValidation:rule="isIP(self)",message="value must be a valid IP address"
+// +kubebuilder:validation:MaxLength:=39
+// +kubebuilder:validation:MinLength:=1
 type IP string
 
 // CIDR is an IP address range in CIDR notation (for example, "10.0.0.0/8" or "fd00::/8").
-// +kubebuilder:validation:Pattern=`(^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(3[0-2]|[1-2][0-9]|[0-9]))$)|(^s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:)))(%.+)?s*(\/(12[0-8]|1[0-1][0-9]|[1-9][0-9]|[0-9]))$)`
-// + ---
-// + The regex for the IPv4 and IPv6 CIDR range was taken from
-// + https://blog.markhatton.co.uk/2011/03/15/regular-expressions-for-ip-addresses-cidr-ranges-and-hostnames/
-// + The resulting regex is an OR of both regexes.
+// +kubebuilder:validation:XValidation:rule="isCIDR(self)",message="value must be a valid CIDR network address"
+// +kubebuilder:validation:MaxLength:=43
+// +kubebuilder:validation:MinLength:=1
 type CIDR string
