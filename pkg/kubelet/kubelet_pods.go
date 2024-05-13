@@ -139,9 +139,8 @@ func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
 				features.UserNamespacesSupport, err)
 		}
 		if kernelVersion != nil && !kernelVersion.AtLeast(version.MustParseGeneric(utilkernel.UserNamespacesSupportKernelVersion)) {
-			return 0, 0, fmt.Errorf(
-				"the kernel version (%s) is incompatible with the %s feature gate, which needs %s as a minimum kernel version",
-				kernelVersion, features.UserNamespacesSupport, utilkernel.UserNamespacesSupportKernelVersion)
+			klog.InfoS("WARNING: the kernel version is incompatible with the feature gate, which needs as a minimum kernel version",
+				"kernelVersion", kernelVersion, "feature", features.UserNamespacesSupport, "minKernelVersion", utilkernel.UserNamespacesSupportKernelVersion)
 		}
 	}
 
