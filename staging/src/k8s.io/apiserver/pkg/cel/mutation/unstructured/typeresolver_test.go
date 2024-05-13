@@ -140,7 +140,7 @@ func TestTypeProvider(t *testing.T) {
 	}
 }
 func mustCreateEnv(t testing.TB, envOptions ...cel.EnvOption) *cel.Env {
-	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).
+	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).
 		Extend(environment.VersionedOptions{
 			IntroducedVersion: version.MajorMinor(1, 30),
 			EnvOptions:        envOptions,

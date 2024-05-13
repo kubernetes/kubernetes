@@ -90,7 +90,8 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 // exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
-	compiledRules, err := Compile(s, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()), StoredExpressionsEnvLoader())
+	// strictCost is always true to enforce cost limits.
+	compiledRules, err := Compile(s, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true), StoredExpressionsEnvLoader())
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
 	if s.Items != nil {

@@ -92,7 +92,8 @@ func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.Cu
 		requirePrunedDefaults:                    true,
 		requireAtomicSetType:                     true,
 		requireMapListKeysMapSetValidation:       true,
-		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+		// strictCost is always true to enforce cost limits.
+		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -231,7 +232,8 @@ func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *ap
 		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
 		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
-		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+		// strictCost is always true to enforce cost limits.
+		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
 }

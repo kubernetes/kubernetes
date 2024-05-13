@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -43,13 +44,21 @@ const (
 )
 
 var (
-	compositionEnvTemplate *cel.CompositionEnv = func() *cel.CompositionEnv {
-		compositionEnvTemplate, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compositionEnvTemplateWithStrictCost *cel.CompositionEnv = func() *cel.CompositionEnv {
+		compositionEnvTemplateWithStrictCost, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 		if err != nil {
 			panic(err)
 		}
 
-		return compositionEnvTemplate
+		return compositionEnvTemplateWithStrictCost
+	}()
+	compositionEnvTemplateWithoutStrictCost *cel.CompositionEnv = func() *cel.CompositionEnv {
+		compositionEnvTemplateWithoutStrictCost, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
+		if err != nil {
+			panic(err)
+		}
+
+		return compositionEnvTemplateWithoutStrictCost
 	}()
 )
 
@@ -114,12 +123,18 @@ func compilePolicy(policy *Policy) Validator {
 	if policy.Spec.ParamKind != nil {
 		hasParam = true
 	}
-	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
-	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
+	strictCost := utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)
+	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true, StrictCost: strictCost}
+	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false, StrictCost: strictCost}
 	failurePolicy := policy.Spec.FailurePolicy
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
-
+	var compositionEnvTemplate *cel.CompositionEnv
+	if strictCost {
+		compositionEnvTemplate = compositionEnvTemplateWithStrictCost
+	} else {
+		compositionEnvTemplate = compositionEnvTemplateWithoutStrictCost
+	}
 	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
 	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 
