@@ -100,7 +100,7 @@ func isSystemCannotAccessErr(err error) bool {
 }
 
 // GetFileType checks for sockets/block/character devices
-func (hu *(HostUtil)) GetFileType(pathname string) (FileType, error) {
+func (hu *HostUtil) GetFileType(pathname string) (FileType, error) {
 	filetype, err := getFileType(pathname)
 
 	// os.Stat will return a 1920 error (windows.ERROR_CANT_ACCESS_FILE) if we use it on a Unix Socket
