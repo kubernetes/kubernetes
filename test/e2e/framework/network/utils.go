@@ -342,6 +342,26 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 				}
 				framework.Logf("Dump network information for node %s:\n%s", node.Name, result)
 			}
+			// Dump the node iptables rules and conntrack flows for troubleshooting #123760
+			podList, _ := config.f.ClientSet.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{
+				LabelSelector: "k8s-app=kube-proxy",
+			})
+			for _, pod := range podList.Items {
+				if pod.Spec.Hostname == config.TestContainerPod.Spec.Hostname {
+					output, _, _ := e2epod.ExecWithOptions(config.f, e2epod.ExecOptions{
+						Namespace:          "kube-system",
+						PodName:            pod.Name,
+						ContainerName:      "kube-proxy",
+						Command:            []string{"sh", "-c", fmt.Sprintf(`echo "IPTables Dump: " && iptables-save | grep "%s/%s:http" && echo "Conntrack flows: " && conntrack -Ln -p tcp | grep %d`, config.Namespace, config.NodePortService.Name, EndpointHTTPPort)},
+						Stdin:              nil,
+						CaptureStdout:      true,
+						CaptureStderr:      true,
+						PreserveWhitespace: false,
+					})
+					framework.Logf("Dump iptables and connntrack flows for node %s:\n%s", pod.Spec.Hostname, output)
+					break
+				}
+			}
 			return returnMsg
 		}
 
