@@ -261,6 +261,10 @@ func (g *GenericPLEG) Relist() {
 
 		// get cachePodStatus and runtimePodStatus to help distinguish the resized pod.
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if !g.cacheEnabled() {
+				klog.ErrorS(err, "GenericPLEG: Cache is not enabled")
+				return
+			}
 			cachePodStatus, err = g.cache.Get(pid)
 			if err != nil {
 				klog.ErrorS(err, "GenericPLEG: Unable to retrieve pods", "pid", pid)
