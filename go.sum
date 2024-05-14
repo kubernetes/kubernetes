@@ -686,8 +686,8 @@ github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78 h1:R
 github.com/opencontainers/runtime-spec v1.0.3-0.20220909204839-494a5a6aca78/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/selinux v1.11.0 h1:+5Zbo97w3Lbmb3PeqQtpmTkMwsW5nRI3YaLpt7tQ7oU=
 github.com/opencontainers/selinux v1.11.0/go.mod h1:E5dMC3VPuVvVHDYmi78qvhJp8+M586T4DlDRYpFkyec=
-github.com/openshift/api v0.0.0-20240405095747-3e50337fcaea h1:cjCo7sUIjL+Q2ZGMfLXzFb70K+77R52GVjh10fRhA1M=
-github.com/openshift/api v0.0.0-20240405095747-3e50337fcaea/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
+github.com/openshift/api v0.0.0-20240424142232-29a704bf5aa2 h1:U1BsjJoTsvYjymeMseC8apZnvCgExIIRolpc/xJ7jhM=
+github.com/openshift/api v0.0.0-20240424142232-29a704bf5aa2/go.mod h1:CxgbWAlvu2iQB0UmKTtRu1YfepRg1/vJ64n2DlIEVz4=
 github.com/openshift/apiserver-library-go v0.0.0-20240313131158-facc40cc7688 h1:E7U+i+BKXjzH1bZsB5a9ueSxF/8QeLxA9ZncCb0vecs=
 github.com/openshift/apiserver-library-go v0.0.0-20240313131158-facc40cc7688/go.mod h1:a6meSr6htNKfmmZ8ixLmnim/JL7NkgW7rX7J2vczMp4=
 github.com/openshift/build-machinery-go v0.0.0-20231128094528-1e9b1b0595c8/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
@@ -695,8 +695,8 @@ github.com/openshift/client-go v0.0.0-20240405120947-c67c8325cdd8 h1:HGfbllzRcrJ
 github.com/openshift/client-go v0.0.0-20240405120947-c67c8325cdd8/go.mod h1:+VvvaMSTUhOt+rBq7NwRLSNxq06hTeRCBqm0j0PQEq8=
 github.com/openshift/ginkgo/v2 v2.6.1-0.20231031162821-c5e24be53ea7 h1:jUM9Fdf+fT0LTccN58jrypOyzcfQUs1v2UH6f8vdBTA=
 github.com/openshift/ginkgo/v2 v2.6.1-0.20231031162821-c5e24be53ea7/go.mod h1:TE309ZR8s5FsKKpuB1YAQYBzCaAfUgatB/xlT/ETL/o=
-github.com/openshift/library-go v0.0.0-20240411091851-558ed29cc1dd h1:svnVGaIsBgNRW/6FRRxIWOyYmpL7jL7LkkRYiYS8OFk=
-github.com/openshift/library-go v0.0.0-20240411091851-558ed29cc1dd/go.mod h1:m/HsttSi90vSixwoy5mPUBHcZid2YRw/QbsLErLxF9s=
+github.com/openshift/library-go v0.0.0-20240513090140-e22d25af5587 h1:eZ79/F6bhtqoY78KRRxp5G5yITTgVatMnj5J/cYDumI=
+github.com/openshift/library-go v0.0.0-20240513090140-e22d25af5587/go.mod h1:lFwyRj0XjUf25Da3Q00y+KuaxCWTJ6YzYPDX1+96nco=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=

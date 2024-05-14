@@ -351,7 +351,7 @@ type NodeDisruptionPolicyStatusSSHKey struct {
 // +union
 type NodeDisruptionPolicySpecAction struct {
 	// type represents the commands that will be carried out if this NodeDisruptionPolicySpecActionType is executed
-	// Valid value are Reboot, Drain, Reload, Restart, DaemonReload, None and Special
+	// Valid values are Reboot, Drain, Reload, Restart, DaemonReload and None.
 	// reload/restart requires a corresponding service target specified in the reload/restart field.
 	// Other values require no further configuration
 	// +unionDiscriminator
@@ -370,7 +370,7 @@ type NodeDisruptionPolicySpecAction struct {
 // +union
 type NodeDisruptionPolicyStatusAction struct {
 	// type represents the commands that will be carried out if this NodeDisruptionPolicyStatusActionType is executed
-	// Valid value are Reboot, Drain, Reload, Restart, DaemonReload, None and Special
+	// Valid values are Reboot, Drain, Reload, Restart, DaemonReload, None and Special.
 	// reload/restart requires a corresponding service target specified in the reload/restart field.
 	// Other values require no further configuration
 	// +unionDiscriminator
