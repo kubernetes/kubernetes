@@ -20,15 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -257,7 +256,7 @@ nodePortAddresses:
 
 		config, err := options.loadConfig([]byte(yaml))
 
-		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+		require.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 
 		if diff := cmp.Diff(config, expected); diff != "" {
 			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff)
@@ -322,13 +321,11 @@ func TestLoadConfigFailures(t *testing.T) {
 			config := fmt.Sprintf("%s\n%s", version, tc.config)
 			_, err := options.loadConfig([]byte(config))
 
-			if assert.Error(t, err, tc.name) {
-				if tc.expErr != "" {
-					assert.Contains(t, err.Error(), tc.expErr)
-				}
-				if tc.checkFn != nil {
-					assert.True(t, tc.checkFn(err), tc.name)
-				}
+			require.Error(t, err, tc.name)
+			require.Contains(t, err.Error(), tc.expErr)
+
+			if tc.checkFn != nil {
+				require.True(t, tc.checkFn(err), tc.name)
 			}
 		})
 	}
@@ -375,7 +372,7 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 					t.Fatalf("should error for this case %s", tc.name)
 				}
 			} else {
-				assert.NoError(t, err, "unexpected error %v", err)
+				require.NoError(t, err, "unexpected error %v", err)
 				if tc.expectedHostname != options.config.HostnameOverride {
 					t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
 				}
@@ -500,12 +497,12 @@ kind: KubeProxyConfiguration
 			if len(tc.config) > 0 {
 				tmp := t.TempDir()
 				configFile := path.Join(tmp, "kube-proxy.conf")
-				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
+				require.NoError(t, os.WriteFile(configFile, []byte(tc.config), 0666))
 				flags = append(flags, "--config", configFile)
 			}
 			require.NoError(t, fs.Parse(flags))
 			require.NoError(t, options.Complete(fs))
-			assert.Equal(t, tc.expected, options.config)
+			require.Equal(t, tc.expected, options.config)
 		})
 	}
 }

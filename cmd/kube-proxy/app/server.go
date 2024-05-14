@@ -270,7 +270,7 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		// command line flags have priority). Otherwise `--config
 		// ... -v=5` doesn't work (config resets verbosity even
 		// when it contains no logging settings).
-		copyLogsFromFlags(fs, &c.Logging)
+		_ = copyLogsFromFlags(fs, &c.Logging)
 		o.config = c
 
 		if err := o.initWatcher(); err != nil {
@@ -312,7 +312,7 @@ func copyLogsFromFlags(from *pflag.FlagSet, to *logsapi.LoggingConfiguration) er
 			return
 		}
 		if setErr := f.Value.Set(fsFlag.Value.String()); setErr != nil {
-			err = fmt.Errorf("copying flag %s value: %v", f.Name, setErr)
+			err = fmt.Errorf("copying flag %s value: %w", f.Name, setErr)
 			return
 		}
 	})
@@ -464,10 +464,10 @@ func addressFromDeprecatedFlags(addr string, port int32) string {
 func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
 	lenientScheme := runtime.NewScheme()
 	if err := kubeproxyconfig.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add kube-proxy config API to lenient scheme: %v", err)
+		return nil, nil, fmt.Errorf("failed to add kube-proxy config API to lenient scheme: %w", err)
 	}
 	if err := kubeproxyconfigv1alpha1.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add kube-proxy config v1alpha1 API to lenient scheme: %v", err)
+		return nil, nil, fmt.Errorf("failed to add kube-proxy config v1alpha1 API to lenient scheme: %w", err)
 	}
 	lenientCodecs := serializer.NewCodecFactory(lenientScheme, serializer.DisableStrict)
 	return lenientScheme, &lenientCodecs, nil
@@ -505,7 +505,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 		if lenientErr != nil {
 			// Lenient decoding failed with the current version, return the
 			// original strict error.
-			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+			return nil, fmt.Errorf("failed lenient decoding: %w", err)
 		}
 
 		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
@@ -545,7 +545,7 @@ with the apiserver API to configure the proxy.`,
 
 			logs.InitLogs()
 			if err := logsapi.ValidateAndApplyAsField(&opts.config.Logging, utilfeature.DefaultFeatureGate, field.NewPath("logging")); err != nil {
-				return fmt.Errorf("initialize logging: %v", err)
+				return fmt.Errorf("initialize logging: %w", err)
 			}
 
 			cliflag.PrintFlags(cmd.Flags())
@@ -680,7 +680,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	err, fatal := checkBadIPConfig(s, dualStackSupported)
 	if err != nil {
 		if fatal {
-			return nil, fmt.Errorf("kube-proxy configuration is incorrect: %v", err)
+			return nil, fmt.Errorf("kube-proxy configuration is incorrect: %w", err)
 		}
 		logger.Error(err, "Kube-proxy configuration may be incomplete or incorrect")
 	}
@@ -859,7 +859,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxierHealthServer, errC
 		if err != nil {
 			logger.Error(err, "Healthz server failed")
 			if errCh != nil {
-				errCh <- fmt.Errorf("healthz server failed: %v", err)
+				errCh <- fmt.Errorf("healthz server failed: %w", err)
 				// if in hardfail mode, never retry again
 				blockCh := make(chan error)
 				<-blockCh
@@ -898,7 +898,7 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 	fn := func() {
 		err := http.ListenAndServe(bindAddress, proxyMux)
 		if err != nil {
-			err = fmt.Errorf("starting metrics server failed: %v", err)
+			err = fmt.Errorf("starting metrics server failed: %w", err)
 			utilruntime.HandleError(err)
 			if errCh != nil {
 				errCh <- err
