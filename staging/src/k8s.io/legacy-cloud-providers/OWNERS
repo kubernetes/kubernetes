@@ -1,0 +1,22 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+# We are no longer accepting features into k8s.io/legacy-cloud-providers.
+# Any kind/feature PRs must be approved by SIG Cloud Provider going forward.
+options:
+  no_parent_owners: true
+approvers:
+  - bridgetkromhout # SIG Cloud Provider chair, for approving bug fixes only
+  - elmiko # SIG Cloud Provider chair, for approving bug fixes only
+  - andrewsykim # SIG Cloud Provider TL, for approving bug fixes only
+  - nckturner # SIG Cloud Provider TL, for approving bug fixes only
+  - cheftako # SIG Cloud Provider TL, for approving bug fixes only
+  - dims # For code organization / dependency updates only
+  - liggitt # For code organization / dependency updates only
+reviewers:
+  - andrewsykim
+  - cheftako
+emeritus_approvers:
+  - mikedanese
+  - mcrute
+labels:
+  - sig/cloud-provider
+  - area/cloudprovider
