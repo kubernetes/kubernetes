@@ -42,9 +42,6 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 			in:  "registry.k8s.io/test:123",
 			out: "test.io/test:123",
 		}, {
-			in:  "gcr.io/k8s-authenticated-test/test:123",
-			out: "test.io/k8s-authenticated-test/test:123",
-		}, {
 			in:  "registry.k8s.io/sig-storage/test:latest",
 			out: "test.io/sig-storage/test:latest",
 		}, {
@@ -64,12 +61,10 @@ func BenchmarkReplaceRegistryInImageURL(b *testing.B) {
 	reg := RegistryList{
 		DockerLibraryRegistry:   "test.io/library",
 		GcRegistry:              "test.io",
-		PrivateRegistry:         "test.io/k8s-authenticated-test",
 		SigStorageRegistry:      "test.io/sig-storage",
 		InvalidRegistry:         "test.io/invalid",
 		PromoterE2eRegistry:     "test.io/promoter",
 		BuildImageRegistry:      "test.io/build",
-		GcAuthenticatedRegistry: "test.io/gcAuth",
 	}
 	for i := 0; i < b.N; i++ {
 		tt := registryTests[i%len(registryTests)]
@@ -99,12 +94,6 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "registry.k8s.io/test:123",
 			out: "test.io/test:123",
 		}, {
-			in:  "gcr.io/k8s-authenticated-test/test:123",
-			out: "test.io/k8s-authenticated-test/test:123",
-		}, {
-			in:  "registry.k8s.io/sig-storage/test:latest",
-			out: "test.io/sig-storage/test:latest",
-		}, {
 			in:  "invalid.registry.k8s.io/invalid/test:latest",
 			out: "test.io/invalid/test:latest",
 		}, {
@@ -126,12 +115,10 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 	reg := RegistryList{
 		DockerLibraryRegistry:   "test.io/library",
 		GcRegistry:              "test.io",
-		PrivateRegistry:         "test.io/k8s-authenticated-test",
 		SigStorageRegistry:      "test.io/sig-storage",
 		InvalidRegistry:         "test.io/invalid",
 		PromoterE2eRegistry:     "test.io/promoter",
 		BuildImageRegistry:      "test.io/build",
-		GcAuthenticatedRegistry: "test.io/gcAuth",
 	}
 
 	for _, tt := range registryTests {

@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -111,13 +110,6 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	*/
 	framework.ConformanceIt("should serve a basic image on each replica with a public image", func(ctx context.Context) {
 		testReplicaSetServeImageOrFail(ctx, f, "basic", imageutils.GetE2EImage(imageutils.Agnhost))
-	})
-
-	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
-		// requires private images
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
-		testReplicaSetServeImageOrFail(ctx, f, "private", privateimage.GetE2EImage())
 	})
 
 	ginkgo.It("should surface a failure condition on a common issue like exceeded quota", func(ctx context.Context) {

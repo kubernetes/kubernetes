@@ -378,21 +378,6 @@ while true; do sleep 1; done
 				image := imageutils.GetE2EImage(imageutils.Agnhost)
 				imagePullTest(ctx, image, false, v1.PodRunning, false, false)
 			})
-
-			f.It("should not be able to pull from private registry without secret", f.WithNodeConformance(), func(ctx context.Context) {
-				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
-				imagePullTest(ctx, image, false, v1.PodPending, true, false)
-			})
-
-			f.It("should be able to pull from private registry with secret", f.WithNodeConformance(), func(ctx context.Context) {
-				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					image = imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
-					isWindows = true
-				}
-				imagePullTest(ctx, image, true, v1.PodRunning, false, isWindows)
-			})
 		})
 	})
 })

@@ -33,14 +33,12 @@ import (
 
 // RegistryList holds public and private image registries
 type RegistryList struct {
-	GcAuthenticatedRegistry  string `yaml:"gcAuthenticatedRegistry"`
 	PromoterE2eRegistry      string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry       string `yaml:"buildImageRegistry"`
 	InvalidRegistry          string `yaml:"invalidRegistry"`
 	GcEtcdRegistry           string `yaml:"gcEtcdRegistry"`
 	GcRegistry               string `yaml:"gcRegistry"`
 	SigStorageRegistry       string `yaml:"sigStorageRegistry"`
-	PrivateRegistry          string `yaml:"privateRegistry"`
 	DockerLibraryRegistry    string `yaml:"dockerLibraryRegistry"`
 	CloudProviderGcpRegistry string `yaml:"cloudProviderGcpRegistry"`
 }
@@ -129,14 +127,12 @@ func readFromURL(url string, writer io.Writer) error {
 
 var (
 	initRegistry = RegistryList{
-		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
 		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
 		BuildImageRegistry:       "registry.k8s.io/build-image",
 		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
 		GcEtcdRegistry:           "registry.k8s.io",
 		GcRegistry:               "registry.k8s.io",
 		SigStorageRegistry:       "registry.k8s.io/sig-storage",
-		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
 		DockerLibraryRegistry:    "docker.io/library",
 		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
@@ -151,16 +147,10 @@ const (
 	None ImageID = iota
 	// Agnhost image
 	Agnhost
-	// AgnhostPrivate image
-	AgnhostPrivate
 	// APIServer image
 	APIServer
 	// AppArmorLoader image
 	AppArmorLoader
-	// AuthenticatedAlpine image
-	AuthenticatedAlpine
-	// AuthenticatedWindowsNanoServer image
-	AuthenticatedWindowsNanoServer
 	// BusyBox image
 	BusyBox
 	// CudaVectorAdd image
@@ -227,9 +217,6 @@ const (
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
 	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.52"}
-	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
-	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
-	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.36.1-1"}
@@ -284,8 +271,7 @@ func GetMappedImageConfigs(originalImageConfigs map[ImageID]Config, repo string)
 	configs := make(map[ImageID]Config)
 	for i, config := range originalImageConfigs {
 		switch i {
-		case InvalidRegistryImage, AuthenticatedAlpine,
-			AuthenticatedWindowsNanoServer, AgnhostPrivate:
+		case InvalidRegistryImage:
 			// These images are special and can't be run out of the cloud - some because they
 			// are authenticated, and others because they are not real images. Tests that depend
 			// on these images can't be run without access to the public internet.
@@ -408,16 +394,12 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		registryAndUser = reg.GcRegistry
 	case initRegistry.SigStorageRegistry:
 		registryAndUser = reg.SigStorageRegistry
-	case initRegistry.PrivateRegistry:
-		registryAndUser = reg.PrivateRegistry
 	case initRegistry.InvalidRegistry:
 		registryAndUser = reg.InvalidRegistry
 	case initRegistry.PromoterE2eRegistry:
 		registryAndUser = reg.PromoterE2eRegistry
 	case initRegistry.BuildImageRegistry:
 		registryAndUser = reg.BuildImageRegistry
-	case initRegistry.GcAuthenticatedRegistry:
-		registryAndUser = reg.GcAuthenticatedRegistry
 	case initRegistry.DockerLibraryRegistry:
 		registryAndUser = reg.DockerLibraryRegistry
 	case initRegistry.CloudProviderGcpRegistry:
