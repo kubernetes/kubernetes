@@ -43,6 +43,7 @@ import (
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	utilnet "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
@@ -209,10 +210,10 @@ type endpointController struct {
 	endpointsStore cache.Store
 }
 
-func newController(url string, batchPeriod time.Duration) *endpointController {
+func newController(ctx context.Context, url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
-	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
+	endpoints := NewEndpointController(ctx, informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
 	endpoints.podsSynced = alwaysReady
 	endpoints.servicesSynced = alwaysReady
@@ -225,11 +226,12 @@ func newController(url string, batchPeriod time.Duration) *endpointController {
 	}
 }
 
-func newFakeController(batchPeriod time.Duration) (*fake.Clientset, *endpointController) {
+func newFakeController(ctx context.Context, batchPeriod time.Duration) (*fake.Clientset, *endpointController) {
 	client := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
 
 	eController := NewEndpointController(
+		ctx,
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(),
@@ -252,7 +254,9 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -268,7 +272,10 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 80}}},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -276,7 +283,9 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -292,7 +301,10 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -300,7 +312,9 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -316,7 +330,10 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -326,7 +343,8 @@ func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
 	defer testServer.Close()
 	pod0 := testPod(ns, 0, 1, true, ipv4only)
 	pod1 := testPod(ns, 1, 1, false, ipv4only)
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -362,7 +380,11 @@ func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
 	pod1.ResourceVersion = "4"
 	endpoints.podStore.Add(pod0)
 	endpoints.podStore.Add(pod1)
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
+
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -370,7 +392,8 @@ func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -378,7 +401,10 @@ func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	endpointsHandler.ValidateRequestCount(t, 1)
 }
 
@@ -386,7 +412,9 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, _ := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -412,7 +440,8 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -432,7 +461,10 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -456,7 +488,8 @@ func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -475,7 +508,11 @@ func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
+
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -534,12 +571,13 @@ func TestSyncServiceExternalNameType(t *testing.T) {
 			testServer, endpointsHandler := makeTestServer(t, namespace)
 
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, 0*time.Second)
+			tCtx := ktesting.Init(t)
+			endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 			err := endpoints.serviceStore.Add(tc.service)
 			if err != nil {
 				t.Fatalf("Error adding service to service store: %v", err)
 			}
-			err = endpoints.syncService(context.TODO(), namespace+"/"+serviceName)
+			err = endpoints.syncService(tCtx, namespace+"/"+serviceName)
 			if err != nil {
 				t.Fatalf("Error syncing service: %v", err)
 			}
@@ -552,7 +590,8 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -572,7 +611,10 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "UDP"}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -596,7 +638,8 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -616,7 +659,10 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "SCTP"}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -640,7 +686,8 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -657,7 +704,10 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -680,7 +730,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -697,7 +749,10 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -720,7 +775,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -737,7 +794,10 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -761,7 +821,8 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -781,7 +842,10 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -804,7 +868,8 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "1",
@@ -824,7 +889,10 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
@@ -832,7 +900,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	addPods(endpoints.podStore, ns, 3, 2, 0, ipv4only)
 	addPods(endpoints.podStore, "blah", 5, 2, 0, ipv4only) // make sure these aren't found!
 
@@ -846,7 +915,10 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		},
 	})
-	endpoints.syncService(context.TODO(), "other/foo")
+	err := endpoints.syncService(tCtx, "other/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	expectedSubsets := []v1.EndpointSubset{{
 		Addresses: []v1.EndpointAddress{
@@ -877,7 +949,8 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	addPods(endpoints.podStore, ns, 3, 2, 0, ipv4only)
 	serviceLabels := map[string]string{"foo": "bar"}
 	endpoints.serviceStore.Add(&v1.Service{
@@ -894,7 +967,10 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 			},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	expectedSubsets := []v1.EndpointSubset{{
 		Addresses: []v1.EndpointAddress{
@@ -925,7 +1001,8 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -953,7 +1030,10 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	serviceLabels[v1.IsHeadlessService] = ""
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -989,7 +1069,8 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			ns := "other"
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, 0*time.Second)
+			tCtx := ktesting.Init(t)
+			endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 			addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
 
 			service := &v1.Service{
@@ -1005,9 +1086,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			endpoints.servicesSynced = test.servicesSynced
 			endpoints.endpointsSynced = test.endpointsSynced
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			go endpoints.Run(context.TODO(), 1)
+			go endpoints.Run(tCtx, 1)
 
 			// cache.WaitForNamedCacheSync has a 100ms poll period, and the endpoints worker has a 10ms period.
 			// To ensure we get all updates, including unexpected ones, we need to wait at least as long as
@@ -1030,7 +1109,8 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 	ns := "headless"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1053,7 +1133,10 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 	}
 	originalService := service.DeepCopy()
 	endpoints.serviceStore.Add(service)
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1080,7 +1163,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1100,7 +1185,10 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1119,7 +1207,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1139,7 +1229,10 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1158,7 +1251,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1178,7 +1273,11 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
+
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1197,7 +1296,8 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -1207,7 +1307,11 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 		},
 	})
 	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
-	endpoints.syncService(context.TODO(), ns+"/foo")
+
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1429,7 +1533,9 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1449,7 +1555,10 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -1476,7 +1585,9 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1499,7 +1610,10 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -1526,7 +1640,9 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0*time.Second)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0*time.Second)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1550,7 +1666,10 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 
 	endpointsHandler.ValidateRequestCount(t, 1)
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
@@ -1671,15 +1790,15 @@ func TestPodUpdatesBatching(t *testing.T) {
 			resourceVersion := 1
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, tc.batchPeriod)
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+
+			tCtx := ktesting.Init(t)
+			endpoints := newController(tCtx, testServer.URL, tc.batchPeriod)
 			endpoints.podsSynced = alwaysReady
 			endpoints.servicesSynced = alwaysReady
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
-			go endpoints.Run(context.TODO(), 1)
+			go endpoints.Run(tCtx, 1)
 
 			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
 
@@ -1794,15 +1913,15 @@ func TestPodAddsBatching(t *testing.T) {
 			ns := "other"
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, tc.batchPeriod)
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+
+			tCtx := ktesting.Init(t)
+			endpoints := newController(tCtx, testServer.URL, tc.batchPeriod)
 			endpoints.podsSynced = alwaysReady
 			endpoints.servicesSynced = alwaysReady
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
-			go endpoints.Run(context.TODO(), 1)
+			go endpoints.Run(tCtx, 1)
 
 			endpoints.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -1916,15 +2035,15 @@ func TestPodDeleteBatching(t *testing.T) {
 			ns := "other"
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints := newController(testServer.URL, tc.batchPeriod)
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+
+			tCtx := ktesting.Init(t)
+			endpoints := newController(tCtx, testServer.URL, tc.batchPeriod)
 			endpoints.podsSynced = alwaysReady
 			endpoints.servicesSynced = alwaysReady
 			endpoints.endpointsSynced = alwaysReady
 			endpoints.workerLoopPeriod = 10 * time.Millisecond
 
-			go endpoints.Run(context.TODO(), 1)
+			go endpoints.Run(tCtx, 1)
 
 			addPods(endpoints.podStore, ns, tc.podsCount, 1, 0, ipv4only)
 
@@ -1960,7 +2079,9 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL, 0)
+
+	tCtx := ktesting.Init(t)
+	endpoints := newController(tCtx, testServer.URL, 0)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1968,7 +2089,10 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 			ResourceVersion: "1",
 		},
 	})
-	endpoints.syncService(context.TODO(), ns+"/foo")
+	err := endpoints.syncService(tCtx, ns+"/foo")
+	if err != nil {
+		t.Errorf("Unexpected error syncing service %v", err)
+	}
 	endpointsHandler.ValidateRequestCount(t, 1)
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "DELETE", nil)
 }
@@ -2058,8 +2182,9 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			ns := "test"
-			client, c := newFakeController(0 * time.Second)
+			client, c := newFakeController(tCtx, 0*time.Second)
 
 			addPods(c.podStore, ns, tc.numDesired, 1, tc.numDesiredNotReady, ipv4only)
 			pods := c.podStore.List()
@@ -2092,11 +2217,17 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 				endpoints.Annotations[v1.EndpointsOverCapacity] = *tc.startingAnnotation
 			}
 			c.endpointsStore.Add(endpoints)
-			client.CoreV1().Endpoints(ns).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+			_, err := client.CoreV1().Endpoints(ns).Create(tCtx, endpoints, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating endpoints: %v", err)
+			}
 
-			c.syncService(context.TODO(), fmt.Sprintf("%s/%s", ns, svc.Name))
+			err = c.syncService(tCtx, fmt.Sprintf("%s/%s", ns, svc.Name))
+			if err != nil {
+				t.Errorf("Unexpected error syncing service %v", err)
+			}
 
-			actualEndpoints, err := client.CoreV1().Endpoints(ns).Get(context.TODO(), endpoints.Name, metav1.GetOptions{})
+			actualEndpoints, err := client.CoreV1().Endpoints(ns).Get(tCtx, endpoints.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error getting endpoints: %v", err)
 			}
@@ -2250,10 +2381,11 @@ func TestMultipleServiceChanges(t *testing.T) {
 	testServer := makeBlockingEndpointDeleteTestServer(t, controller, endpoint, blockDelete, blockNextAction, ns)
 	defer testServer.Close()
 
-	*controller = *newController(testServer.URL, 0*time.Second)
+	tCtx := ktesting.Init(t)
+	*controller = *newController(tCtx, testServer.URL, 0*time.Second)
 	addPods(controller.podStore, ns, 1, 1, 0, ipv4only)
 
-	go func() { controller.Run(context.TODO(), 1) }()
+	go func() { controller.Run(tCtx, 1) }()
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -2481,8 +2613,10 @@ func TestSyncServiceAddresses(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
 			ns := tc.service.Namespace
-			client, c := newFakeController(0 * time.Second)
+			client, c := newFakeController(tCtx, 0*time.Second)
 
 			err := c.podStore.Add(tc.pod)
 			if err != nil {
@@ -2492,12 +2626,12 @@ func TestSyncServiceAddresses(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unexpected error adding service %v", err)
 			}
-			err = c.syncService(context.TODO(), fmt.Sprintf("%s/%s", ns, tc.service.Name))
+			err = c.syncService(tCtx, fmt.Sprintf("%s/%s", ns, tc.service.Name))
 			if err != nil {
 				t.Errorf("Unexpected error syncing service %v", err)
 			}
 
-			endpoints, err := client.CoreV1().Endpoints(ns).Get(context.TODO(), tc.service.Name, metav1.GetOptions{})
+			endpoints, err := client.CoreV1().Endpoints(ns).Get(tCtx, tc.service.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
@@ -2524,7 +2658,9 @@ func TestEndpointsDeletionEvents(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, _ := makeTestServer(t, ns)
 	defer testServer.Close()
-	controller := newController(testServer.URL, 0)
+
+	tCtx := ktesting.Init(t)
+	controller := newController(tCtx, testServer.URL, 0)
 	store := controller.endpointsStore
 	ep1 := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{

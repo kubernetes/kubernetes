@@ -548,5 +548,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.Service = &empty
 			}
 		},
+		func(j *core.LoadBalancerStatus, c fuzz.Continue) {
+			ipMode := core.LoadBalancerIPModeVIP
+			for i := range j.Ingress {
+				if j.Ingress[i].IPMode == nil {
+					j.Ingress[i].IPMode = &ipMode
+				}
+			}
+		},
 	}
 }

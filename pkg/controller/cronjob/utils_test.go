@@ -25,7 +25,7 @@ import (
 
 	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -47,7 +47,7 @@ func TestGetJobFromTemplate2(t *testing.T) {
 		scheduledTime   = *topOfTheHour()
 	)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CronJobsScheduledAnnotation, true)
 
 	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{

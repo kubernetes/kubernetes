@@ -117,7 +117,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 	for _, tcase := range testCases {
 		t.Run(tcase.description, func(t *testing.T) {
 			if tcase.featureGate != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tcase.featureGate, tcase.featureGateEnable)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tcase.featureGate, tcase.featureGateEnable)
 			}
 			opts, err := NewPolicyOptions(tcase.policyOptions)
 			if tcase.expectedErr != nil {
@@ -185,7 +185,7 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, testCase.featureGate, testCase.featureGateEnable)
 			err := CheckPolicyOptionAvailable(testCase.option)
 			isEnabled := (err == nil)
 			if isEnabled != testCase.expectedAvailable {

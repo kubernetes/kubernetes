@@ -18,10 +18,7 @@ package validation
 
 import (
 	"fmt"
-	"net"
 	"reflect"
-	"strconv"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -68,32 +65,6 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 		}
 		errs = append(errs, validateCommonQueueSort(profilesPath, cc.Profiles)...)
 	}
-	if len(cc.HealthzBindAddress) > 0 {
-		host, port, err := splitHostIntPort(cc.HealthzBindAddress)
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, err.Error()))
-		} else {
-			if errMsgs := validation.IsValidIP(host); errMsgs != nil {
-				errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, strings.Join(errMsgs, ",")))
-			}
-			if port != 0 {
-				errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, "must be empty or with an explicit 0 port"))
-			}
-		}
-	}
-	if len(cc.MetricsBindAddress) > 0 {
-		host, port, err := splitHostIntPort(cc.MetricsBindAddress)
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, err.Error()))
-		} else {
-			if errMsgs := validation.IsValidIP(host); errMsgs != nil {
-				errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, strings.Join(errMsgs, ",")))
-			}
-			if port != 0 {
-				errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, "must be empty or with an explicit 0 port"))
-			}
-		}
-	}
 
 	errs = append(errs, validatePercentageOfNodesToScore(field.NewPath("percentageOfNodesToScore"), cc.PercentageOfNodesToScore))
 
@@ -108,18 +79,6 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 
 	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
-}
-
-func splitHostIntPort(s string) (string, int, error) {
-	host, port, err := net.SplitHostPort(s)
-	if err != nil {
-		return "", 0, err
-	}
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		return "", 0, err
-	}
-	return host, portInt, err
 }
 
 func validatePercentageOfNodesToScore(path *field.Path, percentageOfNodesToScore *int32) error {
@@ -142,7 +101,12 @@ type invalidPlugins struct {
 var invalidPluginsByVersion = []invalidPlugins{
 	{
 		schemeGroupVersion: v1.SchemeGroupVersion.String(),
-		plugins:            []string{},
+		plugins: []string{
+			"AzureDiskLimits",
+			"CinderLimits",
+			"EBSLimits",
+			"GCEPDLimits",
+		},
 	},
 }
 

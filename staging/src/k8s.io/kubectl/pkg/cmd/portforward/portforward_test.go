@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -101,6 +102,8 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 			}
 
 			opts := &PortForwardOptions{}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			cmd := NewCmdPortForward(tf, genericiooptions.NewTestIOStreamsDiscard())
 			cmd.Run = func(cmd *cobra.Command, args []string) {
 				if err = opts.Complete(tf, cmd, args); err != nil {
@@ -110,7 +113,7 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 				if err = opts.Validate(); err != nil {
 					return
 				}
-				err = opts.RunPortForward()
+				err = opts.RunPortForwardContext(ctx)
 			}
 
 			for name, value := range flags {

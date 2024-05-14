@@ -215,7 +215,7 @@ func TestMounterSetUp(t *testing.T) {
 	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.enableSELinuxFeatureGate)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.enableSELinuxFeatureGate)
 
 			modes := []storage.VolumeLifecycleMode{
 				storage.VolumeLifecyclePersistent,

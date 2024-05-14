@@ -43,20 +43,22 @@ var runtimeclassesKind = v1beta1.SchemeGroupVersion.WithKind("RuntimeClass")
 
 // Get takes name of the runtimeClass, and returns the corresponding runtimeClass object, and an error if there is any.
 func (c *FakeRuntimeClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.RuntimeClass, err error) {
+	emptyResult := &v1beta1.RuntimeClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(runtimeclassesResource, name), &v1beta1.RuntimeClass{})
+		Invokes(testing.NewRootGetAction(runtimeclassesResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.RuntimeClass), err
 }
 
 // List takes label and field selectors, and returns the list of RuntimeClasses that match those selectors.
 func (c *FakeRuntimeClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RuntimeClassList, err error) {
+	emptyResult := &v1beta1.RuntimeClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(runtimeclassesResource, runtimeclassesKind, opts), &v1beta1.RuntimeClassList{})
+		Invokes(testing.NewRootListAction(runtimeclassesResource, runtimeclassesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,20 +82,22 @@ func (c *FakeRuntimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (wa
 
 // Create takes the representation of a runtimeClass and creates it.  Returns the server's representation of the runtimeClass, and an error, if there is any.
 func (c *FakeRuntimeClasses) Create(ctx context.Context, runtimeClass *v1beta1.RuntimeClass, opts v1.CreateOptions) (result *v1beta1.RuntimeClass, err error) {
+	emptyResult := &v1beta1.RuntimeClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(runtimeclassesResource, runtimeClass), &v1beta1.RuntimeClass{})
+		Invokes(testing.NewRootCreateAction(runtimeclassesResource, runtimeClass), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.RuntimeClass), err
 }
 
 // Update takes the representation of a runtimeClass and updates it. Returns the server's representation of the runtimeClass, and an error, if there is any.
 func (c *FakeRuntimeClasses) Update(ctx context.Context, runtimeClass *v1beta1.RuntimeClass, opts v1.UpdateOptions) (result *v1beta1.RuntimeClass, err error) {
+	emptyResult := &v1beta1.RuntimeClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(runtimeclassesResource, runtimeClass), &v1beta1.RuntimeClass{})
+		Invokes(testing.NewRootUpdateAction(runtimeclassesResource, runtimeClass), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.RuntimeClass), err
 }
@@ -115,10 +119,11 @@ func (c *FakeRuntimeClasses) DeleteCollection(ctx context.Context, opts v1.Delet
 
 // Patch applies the patch and returns the patched runtimeClass.
 func (c *FakeRuntimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.RuntimeClass, err error) {
+	emptyResult := &v1beta1.RuntimeClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, pt, data, subresources...), &v1beta1.RuntimeClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.RuntimeClass), err
 }
@@ -136,10 +141,11 @@ func (c *FakeRuntimeClasses) Apply(ctx context.Context, runtimeClass *nodev1beta
 	if name == nil {
 		return nil, fmt.Errorf("runtimeClass.Name must be provided to Apply")
 	}
+	emptyResult := &v1beta1.RuntimeClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, *name, types.ApplyPatchType, data), &v1beta1.RuntimeClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1beta1.RuntimeClass), err
 }

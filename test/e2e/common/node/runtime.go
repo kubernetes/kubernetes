@@ -53,7 +53,7 @@ var _ = SIGDescribe("Container Runtime", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
 				testContainer := v1.Container{
-					Image: framework.BusyBoxImage,
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							MountPath: restartCountVolumePath,
@@ -173,7 +173,7 @@ while true; do sleep 1; done
 
 			f.It("should report termination message if TerminationMessagePath is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                  framework.BusyBoxImage,
+					Image:                  imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
 					TerminationMessagePath: "/dev/termination-log",
@@ -194,7 +194,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message if TerminationMessagePath is set as non-root user and at a non-default path", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                  framework.BusyBoxImage,
+					Image:                  imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                []string{"/bin/sh", "-c"},
 					Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 					TerminationMessagePath: "/dev/termination-custom-log",
@@ -215,7 +215,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n DONE; /bin/false"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -231,7 +231,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n DONE; /bin/true"},
 					TerminationMessagePath:   "/dev/termination-log",
@@ -247,7 +247,7 @@ while true; do sleep 1; done
 			*/
 			framework.ConformanceIt("should report termination message from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set", f.WithNodeConformance(), func(ctx context.Context) {
 				container := v1.Container{
-					Image:                    framework.BusyBoxImage,
+					Image:                    imageutils.GetE2EImage(imageutils.BusyBox),
 					Command:                  []string{"/bin/sh", "-c"},
 					Args:                     []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
 					TerminationMessagePath:   "/dev/termination-log",

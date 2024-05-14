@@ -39,6 +39,6 @@ fi
 
 # Running locally.
 for ((i=0; i < ${#ARGS[@]}; i++)); do
-  ARGS[$i]="$(echo "${ARGS[$i]}" | sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g' )"
+  ARGS[i]="$(echo "${ARGS[$i]}" | sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g' )"
 done
 "${KUBE_ROOT}/hack/ginkgo-e2e.sh" "--e2e-verify-service-account=false" "--dump-logs-on-failure=false" "${ARGS[@]}"

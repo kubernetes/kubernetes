@@ -94,6 +94,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.LegacyServiceAccountTokenCleanerController,
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,
+		names.StorageVersionMigratorController,
 	)
 
 	for _, name := range KnownControllers() {
@@ -108,13 +109,13 @@ func TestNewControllerDescriptorsShouldNotPanic(t *testing.T) {
 }
 
 func TestNewControllerDescriptorsAlwaysReturnsDescriptorsForAllControllers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", false)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", false)
 
 	controllersWithoutFeatureGates := KnownControllers()
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
 
 	controllersWithFeatureGates := KnownControllers()
 
@@ -146,8 +147,8 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 			continue
 		}
 
-		// DO NOT ADD any new controllers here. These two controllers are an exception, because they were added before this test was introduced
-		if name == names.LegacyServiceAccountTokenCleanerController || name == names.ResourceClaimController {
+		// DO NOT ADD any new controllers here. one controller is an exception, because it was added before this test was introduced
+		if name == names.ResourceClaimController {
 			continue
 		}
 
@@ -187,7 +188,7 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateTaintEvictionController, test.enableFeatureGate)
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

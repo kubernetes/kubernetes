@@ -57,13 +57,12 @@ const (
 	CertificateBlockType = "CERTIFICATE"
 	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
 	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
-	rsaKeySize             = 2048
 )
 
 // CertConfig is a wrapper around certutil.Config extending it with EncryptionAlgorithm.
 type CertConfig struct {
 	certutil.Config
-	NotAfter            *time.Time
+	NotAfter            time.Time
 	EncryptionAlgorithm kubeadmapi.EncryptionAlgorithmType
 }
 
@@ -73,10 +72,7 @@ func NewCertificateAuthority(config *CertConfig) (*x509.Certificate, crypto.Sign
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key while generating CA certificate")
 	}
-
-	// backdate CA certificate to allow small time jumps
-	config.Config.NotBefore = time.Now().Add(-kubeadmconstants.CertificateBackdate)
-	cert, err := certutil.NewSelfSignedCACert(config.Config, key)
+	cert, err := NewSelfSignedCACert(config, key)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create self-signed CA certificate")
 	}
@@ -608,12 +604,32 @@ func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 // NewPrivateKey returns a new private key.
 var NewPrivateKey = GeneratePrivateKey
 
+// rsaKeySizeFromAlgorithmType takes a known RSA algorithm defined in the kubeadm API
+// an returns its key size. For unknown types it returns 0. For an empty type it returns
+// the default size of 2048.
+func rsaKeySizeFromAlgorithmType(keyType kubeadmapi.EncryptionAlgorithmType) int {
+	switch keyType {
+	case kubeadmapi.EncryptionAlgorithmRSA2048, "":
+		return 2048
+	case kubeadmapi.EncryptionAlgorithmRSA3072:
+		return 3072
+	case kubeadmapi.EncryptionAlgorithmRSA4096:
+		return 4096
+	default:
+		return 0
+	}
+}
+
 // GeneratePrivateKey is the default function for generating private keys.
 func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, error) {
-	if keyType == kubeadmapi.EncryptionAlgorithmECDSA {
+	if keyType == kubeadmapi.EncryptionAlgorithmECDSAP256 {
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	}
 
+	rsaKeySize := rsaKeySizeFromAlgorithmType(keyType)
+	if rsaKeySize == 0 {
+		return nil, errors.Errorf("cannot obtain key size from unknown RSA algorithm: %q", keyType)
+	}
 	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 }
 
@@ -636,9 +652,14 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 
 	RemoveDuplicateAltNames(&cfg.AltNames)
 
-	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
-	if cfg.NotAfter != nil {
-		notAfter = *cfg.NotAfter
+	notBefore := caCert.NotBefore
+	if !cfg.NotBefore.IsZero() {
+		notBefore = cfg.NotBefore
+	}
+
+	notAfter := notBefore.Add(kubeadmconstants.CertificateValidityPeriod)
+	if !cfg.NotAfter.IsZero() {
+		notAfter = cfg.NotAfter
 	}
 
 	certTmpl := x509.Certificate{
@@ -649,7 +670,7 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		DNSNames:              cfg.AltNames.DNSNames,
 		IPAddresses:           cfg.AltNames.IPs,
 		SerialNumber:          serial,
-		NotBefore:             caCert.NotBefore,
+		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              keyUsage,
 		ExtKeyUsage:           cfg.Usages,
@@ -657,6 +678,48 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		IsCA:                  isCA,
 	}
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDERBytes)
+}
+
+// NewSelfSignedCACert creates a new self-signed CA certificate
+func NewSelfSignedCACert(cfg *CertConfig, key crypto.Signer) (*x509.Certificate, error) {
+	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
+	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
+	if err != nil {
+		return nil, err
+	}
+	serial = new(big.Int).Add(serial, big.NewInt(1))
+
+	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+
+	notBefore := time.Now().UTC()
+	if !cfg.NotBefore.IsZero() {
+		notBefore = cfg.NotBefore
+	}
+
+	notAfter := notBefore.Add(kubeadmconstants.CACertificateValidityPeriod)
+	if !cfg.NotAfter.IsZero() {
+		notAfter = cfg.NotAfter
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName:   cfg.CommonName,
+			Organization: cfg.Organization,
+		},
+		DNSNames:              []string{cfg.CommonName},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              keyUsage,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &tmpl, &tmpl, key.Public(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +751,7 @@ func RemoveDuplicateAltNames(altNames *certutil.AltNames) {
 // (+/- offset)
 func ValidateCertPeriod(cert *x509.Certificate, offset time.Duration) error {
 	period := fmt.Sprintf("NotBefore: %v, NotAfter: %v", cert.NotBefore, cert.NotAfter)
-	now := time.Now().Add(offset)
+	now := time.Now().Add(offset).UTC()
 	if now.Before(cert.NotBefore) {
 		return errors.Errorf("the certificate is not valid yet: %s", period)
 	}

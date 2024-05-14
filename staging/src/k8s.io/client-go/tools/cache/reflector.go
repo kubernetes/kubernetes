@@ -43,10 +43,17 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/trace"
 )
 
 const defaultExpectedTypeName = "<unspecified>"
+
+var (
+	// We try to spread the load on apiserver by setting timeouts for
+	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+	defaultMinWatchTimeout = 5 * time.Minute
+)
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
@@ -71,6 +78,8 @@ type Reflector struct {
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
 	resyncPeriod   time.Duration
+	// minWatchTimeout defines the minimum timeout for watch requests.
+	minWatchTimeout time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
@@ -107,7 +116,9 @@ type Reflector struct {
 	// might result in an increased memory consumption of the APIServer.
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
-	UseWatchList bool
+	//
+	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
+	UseWatchList *bool
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to
@@ -148,12 +159,6 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 	}
 }
 
-var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	minWatchTimeout = 5 * time.Minute
-)
-
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
 // The indexer is configured to key on namespace
 func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
@@ -191,6 +196,10 @@ type ReflectorOptions struct {
 	// (do not resync).
 	ResyncPeriod time.Duration
 
+	// MinWatchTimeout, if non-zero, defines the minimum timeout for watch requests send to kube-apiserver.
+	// However, values lower than 5m will not be honored to avoid negative performance impact on controlplane.
+	MinWatchTimeout time.Duration
+
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
 }
@@ -210,9 +219,14 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	if reflectorClock == nil {
 		reflectorClock = clock.RealClock{}
 	}
+	minWatchTimeout := defaultMinWatchTimeout
+	if options.MinWatchTimeout > defaultMinWatchTimeout {
+		minWatchTimeout = options.MinWatchTimeout
+	}
 	r := &Reflector{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
+		minWatchTimeout: minWatchTimeout,
 		typeDescription: options.TypeDescription,
 		listerWatcher:   lw,
 		store:           store,
@@ -237,8 +251,12 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
 	}
 
-	if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
-		r.UseWatchList = true
+	// don't overwrite UseWatchList if already set
+	// because the higher layers (e.g. storage/cacher) disabled it on purpose
+	if r.UseWatchList == nil {
+		if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
+			r.UseWatchList = ptr.To(true)
+		}
 	}
 
 	return r
@@ -325,9 +343,10 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	klog.V(3).Infof("Listing and watching %v from %s", r.typeDescription, r.name)
 	var err error
 	var w watch.Interface
-	fallbackToList := !r.UseWatchList
+	useWatchList := ptr.Deref(r.UseWatchList, false)
+	fallbackToList := !useWatchList
 
-	if r.UseWatchList {
+	if useWatchList {
 		w, err = r.watchList(stopCh)
 		if w == nil && err == nil {
 			// stopCh was closed
@@ -407,7 +426,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		start := r.clock.Now()
 
 		if w == nil {
-			timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+			timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 			options := metav1.ListOptions{
 				ResourceVersion: r.LastSyncResourceVersion(),
 				// We want to avoid situations of hanging watchers. Stop any watchers that do not
@@ -634,7 +653,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
-		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+		timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 		options := metav1.ListOptions{
 			ResourceVersion:      lastKnownRV,
 			AllowWatchBookmarks:  true,
@@ -772,7 +791,7 @@ loop:
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
-				if meta.GetAnnotations()["k8s.io/initial-events-end"] == "true" {
+				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
 					if exitOnInitialEventsEndBookmark != nil {
 						*exitOnInitialEventsEndBookmark = true
 					}

@@ -22,9 +22,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -40,6 +42,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
 		fuzzResetConfiguration,
+		fuzzUpgradeConfiguration,
 	}
 }
 
@@ -62,6 +65,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.NodeRegistration.ImagePullSerial = ptr.To(true)
 	obj.Patches = nil
 	obj.DryRun = false
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
@@ -72,6 +76,7 @@ func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue)
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.IgnorePreflightErrors = nil
+	obj.ImagePullSerial = ptr.To(true)
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
@@ -91,8 +96,10 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Scheduler.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
-	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
+	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	obj.Proxy.Disabled = false
+	obj.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
+	obj.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
@@ -132,6 +139,7 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	}
 	obj.SkipPhases = nil
 	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.NodeRegistration.ImagePullSerial = ptr.To(true)
 	obj.Patches = nil
 	obj.DryRun = false
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
@@ -146,5 +154,16 @@ func fuzzResetConfiguration(obj *kubeadm.ResetConfiguration, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "/tmp"
+	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
+}
+
+func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.Node.EtcdUpgrade = ptr.To(true)
+	obj.Apply.EtcdUpgrade = ptr.To(true)
+	obj.Apply.CertificateRenewal = ptr.To(false)
+	obj.Node.CertificateRenewal = ptr.To(false)
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }

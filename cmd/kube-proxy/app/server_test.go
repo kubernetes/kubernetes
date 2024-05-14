@@ -422,7 +422,14 @@ kind: KubeProxyConfiguration
 		},
 		Options: logsapi.FormatOptions{
 			JSON: logsapi.JSONOptions{
-				InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				OutputRoutingOptions: logsapi.OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
+			},
+			Text: logsapi.TextOptions{
+				OutputRoutingOptions: logsapi.OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
 			},
 		},
 	}
@@ -506,7 +513,7 @@ kind: KubeProxyConfiguration
 type fakeProxyServerLongRun struct{}
 
 // Run runs the specified ProxyServer.
-func (s *fakeProxyServerLongRun) Run() error {
+func (s *fakeProxyServerLongRun) Run(ctx context.Context) error {
 	for {
 		time.Sleep(2 * time.Second)
 	}
@@ -520,7 +527,7 @@ func (s *fakeProxyServerLongRun) CleanupAndExit() error {
 type fakeProxyServerError struct{}
 
 // Run runs the specified ProxyServer.
-func (s *fakeProxyServerError) Run() error {
+func (s *fakeProxyServerError) Run(ctx context.Context) error {
 	for {
 		time.Sleep(2 * time.Second)
 		return fmt.Errorf("mocking error from ProxyServer.Run()")
@@ -647,8 +654,8 @@ func Test_getNodeIPs(t *testing.T) {
 		nodeName := fmt.Sprintf("node%d", i+1)
 		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
 		go func() {
-			logger, _ := ktesting.NewTestContext(t)
-			ips := getNodeIPs(logger, client, nodeName)
+			_, ctx := ktesting.NewTestContext(t)
+			ips := getNodeIPs(ctx, client, nodeName)
 			if len(ips) == 0 {
 				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
 			} else if ips[0].String() != expectIP {
@@ -827,8 +834,8 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-			primaryFamily, ips := detectNodeIPs(logger, c.rawNodeIPs, c.bindAddress)
+			_, ctx := ktesting.NewTestContext(t)
+			primaryFamily, ips := detectNodeIPs(ctx, c.rawNodeIPs, c.bindAddress)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}
@@ -842,7 +849,81 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 }
 
-func Test_checkIPConfig(t *testing.T) {
+func Test_checkBadConfig(t *testing.T) {
+	cases := []struct {
+		name  string
+		proxy *ProxyServer
+		err   bool
+	}{
+		{
+			name: "single-stack NodePortAddresses with single-stack config",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:       "10.0.0.0/8",
+					NodePortAddresses: []string{"192.168.0.0/24"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: false,
+		},
+		{
+			name: "dual-stack NodePortAddresses with dual-stack config",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:       "10.0.0.0/8,fd09::/64",
+					NodePortAddresses: []string{"192.168.0.0/24", "fd03::/64"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: false,
+		},
+		{
+			name: "empty NodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					NodePortAddresses: []string{},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: true,
+		},
+		{
+			name: "single-stack NodePortAddresses with dual-stack config",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:       "10.0.0.0/8,fd09::/64",
+					NodePortAddresses: []string{"192.168.0.0/24"},
+				},
+				PrimaryIPFamily: v1.IPv4Protocol,
+			},
+			err: true,
+		},
+		{
+			name: "wrong-single-stack NodePortAddresses",
+			proxy: &ProxyServer{
+				Config: &kubeproxyconfig.KubeProxyConfiguration{
+					ClusterCIDR:       "fd09::/64",
+					NodePortAddresses: []string{"192.168.0.0/24"},
+				},
+				PrimaryIPFamily: v1.IPv6Protocol,
+			},
+			err: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := checkBadConfig(c.proxy)
+			if err != nil && !c.err {
+				t.Errorf("unexpected error: %v", err)
+			} else if err == nil && c.err {
+				t.Errorf("unexpected lack of error")
+			}
+		})
+	}
+}
+
+func Test_checkBadIPConfig(t *testing.T) {
 	cases := []struct {
 		name    string
 		proxy   *ProxyServer
@@ -918,53 +999,6 @@ func Test_checkIPConfig(t *testing.T) {
 			},
 			ssErr:   true,
 			ssFatal: true,
-			dsErr:   true,
-			dsFatal: false,
-		},
-
-		{
-			name: "ok single-stack nodePortAddresses",
-			proxy: &ProxyServer{
-				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					NodePortAddresses: []string{"10.0.0.0/8", "192.168.0.0/24"},
-				},
-				PrimaryIPFamily: v1.IPv4Protocol,
-			},
-			ssErr: false,
-			dsErr: false,
-		},
-		{
-			name: "ok dual-stack nodePortAddresses",
-			proxy: &ProxyServer{
-				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					NodePortAddresses: []string{"10.0.0.0/8", "fd01:2345::/64", "fd01:abcd::/64"},
-				},
-				PrimaryIPFamily: v1.IPv4Protocol,
-			},
-			ssErr: false,
-			dsErr: false,
-		},
-		{
-			name: "ok reversed dual-stack nodePortAddresses",
-			proxy: &ProxyServer{
-				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					NodePortAddresses: []string{"fd01:2345::/64", "fd01:abcd::/64", "10.0.0.0/8"},
-				},
-				PrimaryIPFamily: v1.IPv4Protocol,
-			},
-			ssErr: false,
-			dsErr: false,
-		},
-		{
-			name: "wrong-family nodePortAddresses",
-			proxy: &ProxyServer{
-				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					NodePortAddresses: []string{"10.0.0.0/8"},
-				},
-				PrimaryIPFamily: v1.IPv6Protocol,
-			},
-			ssErr:   true,
-			ssFatal: false,
 			dsErr:   true,
 			dsFatal: false,
 		},
@@ -1126,7 +1160,7 @@ func Test_checkIPConfig(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err, fatal := checkIPConfig(c.proxy, false)
+			err, fatal := checkBadIPConfig(c.proxy, false)
 			if err != nil && !c.ssErr {
 				t.Errorf("unexpected error in single-stack case: %v", err)
 			} else if err == nil && c.ssErr {
@@ -1135,7 +1169,7 @@ func Test_checkIPConfig(t *testing.T) {
 				t.Errorf("expected fatal=%v, got %v", c.ssFatal, fatal)
 			}
 
-			err, fatal = checkIPConfig(c.proxy, true)
+			err, fatal = checkBadIPConfig(c.proxy, true)
 			if err != nil && !c.dsErr {
 				t.Errorf("unexpected error in dual-stack case: %v", err)
 			} else if err == nil && c.dsErr {

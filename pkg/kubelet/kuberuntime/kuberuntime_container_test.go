@@ -78,8 +78,9 @@ func TestRemoveContainer(t *testing.T) {
 		pattern = strings.Replace(pattern, "\\", "\\\\", -1)
 		return regexp.MustCompile(pattern).MatchString(path)
 	}
-	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
-	expectedContainerLogPathRotated := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
+	podLogsDirectory := "/var/log/pods"
+	expectedContainerLogPath := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogPathRotated := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
 	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
 
 	fakeOS.Create(expectedContainerLogPath)
@@ -236,11 +237,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 // TestToKubeContainerStatusWithResources tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
-	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
-	if goruntime.GOOS == "windows" {
-		t.Skip("Updating Pod Container Resources is not supported on Windows.")
-	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
@@ -250,8 +247,9 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 	)
 
 	for desc, test := range map[string]struct {
-		input    *runtimeapi.ContainerStatus
-		expected *kubecontainer.Status
+		input         *runtimeapi.ContainerStatus
+		expected      *kubecontainer.Status
+		skipOnWindows bool
 	}{
 		"container reporting cpu and memory": {
 			input: &runtimeapi.ContainerStatus{
@@ -292,6 +290,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
 				},
 			},
+			skipOnWindows: true,
 		},
 		"container reporting cpu only": {
 			input: &runtimeapi.ContainerStatus{
@@ -360,6 +359,10 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			if test.skipOnWindows && goruntime.GOOS == "windows" {
+				// TODO: remove skip once the failing test has been fixed.
+				t.Skip("Skip failing test on Windows.")
+			}
 			actual := toKubeContainerStatus(test.input, cid.Type)
 			assert.Equal(t, test.expected, actual, desc)
 		})
@@ -848,10 +851,6 @@ func TestKillContainerGracePeriod(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
-	// TODO: remove this check on this PR merges: https://github.com/kubernetes/kubernetes/pull/112599
-	if goruntime.GOOS == "windows" {
-		t.Skip("Updating Pod Container Resources is not supported on Windows.")
-	}
 	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
 	require.NoError(t, errCreate)
 	pod := &v1.Pod{

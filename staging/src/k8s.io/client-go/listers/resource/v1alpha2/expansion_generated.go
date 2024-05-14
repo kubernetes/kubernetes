@@ -34,6 +34,14 @@ type ResourceClaimListerExpansion interface{}
 // ResourceClaimNamespaceLister.
 type ResourceClaimNamespaceListerExpansion interface{}
 
+// ResourceClaimParametersListerExpansion allows custom methods to be added to
+// ResourceClaimParametersLister.
+type ResourceClaimParametersListerExpansion interface{}
+
+// ResourceClaimParametersNamespaceListerExpansion allows custom methods to be added to
+// ResourceClaimParametersNamespaceLister.
+type ResourceClaimParametersNamespaceListerExpansion interface{}
+
 // ResourceClaimTemplateListerExpansion allows custom methods to be added to
 // ResourceClaimTemplateLister.
 type ResourceClaimTemplateListerExpansion interface{}
@@ -45,3 +53,15 @@ type ResourceClaimTemplateNamespaceListerExpansion interface{}
 // ResourceClassListerExpansion allows custom methods to be added to
 // ResourceClassLister.
 type ResourceClassListerExpansion interface{}
+
+// ResourceClassParametersListerExpansion allows custom methods to be added to
+// ResourceClassParametersLister.
+type ResourceClassParametersListerExpansion interface{}
+
+// ResourceClassParametersNamespaceListerExpansion allows custom methods to be added to
+// ResourceClassParametersNamespaceLister.
+type ResourceClassParametersNamespaceListerExpansion interface{}
+
+// ResourceSliceListerExpansion allows custom methods to be added to
+// ResourceSliceLister.
+type ResourceSliceListerExpansion interface{}

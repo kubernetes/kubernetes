@@ -23,6 +23,7 @@ import (
 	_ "github.com/aojea/sloppy-netparser"
 	_ "github.com/client9/misspell/cmd/misspell"
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/jcchavezs/porto/cmd/porto"
 	_ "honnef.co/go/tools/cmd/staticcheck"
 	_ "sigs.k8s.io/logtools/logcheck"
 
@@ -31,7 +32,7 @@ import (
 	_ "gotest.tools/gotestsum"
 
 	// mockgen
-	_ "github.com/golang/mock/mockgen"
+	_ "go.uber.org/mock/mockgen"
 
 	// tools like cpu
 	_ "go.uber.org/automaxprocs"

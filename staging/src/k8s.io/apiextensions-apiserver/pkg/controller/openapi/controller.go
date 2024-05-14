@@ -22,10 +22,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -48,7 +51,7 @@ type Controller struct {
 	// To allow injection for testing.
 	syncFn func(string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	staticSpec *spec.Swagger
 
@@ -88,7 +91,10 @@ func createSpecCache(crd *apiextensionsv1.CustomResourceDefinition) *specCache {
 			if !v.Served {
 				continue
 			}
-			s, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{V2: true})
+			s, err := builder.BuildOpenAPIV2(crd, v.Name, builder.Options{
+				V2:                      true,
+				IncludeSelectableFields: utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors),
+			})
 			// Defaults must be pruned here for CRDs to cleanly merge with the static
 			// spec that already has defaults pruned
 			if err != nil {
@@ -108,9 +114,12 @@ func createSpecCache(crd *apiextensionsv1.CustomResourceDefinition) *specCache {
 // NewController creates a new Controller with input CustomResourceDefinition informer
 func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Controller {
 	c := &Controller{
-		crdLister:   crdInformer.Lister(),
-		crdsSynced:  crdInformer.Informer().HasSynced,
-		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_openapi_controller"),
+		crdLister:  crdInformer.Lister(),
+		crdsSynced: crdInformer.Informer().HasSynced,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "crd_openapi_controller"},
+		),
 		specsByName: map[string]*specCache{},
 	}
 
@@ -177,11 +186,11 @@ func (c *Controller) processNextWorkItem() bool {
 	defer func() {
 		elapsed := time.Since(start)
 		if elapsed > time.Second {
-			klog.Warningf("slow openapi aggregation of %q: %s", key.(string), elapsed)
+			klog.Warningf("slow openapi aggregation of %q: %s", key, elapsed)
 		}
 	}()
 
-	err := c.syncFn(key.(string))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

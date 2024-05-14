@@ -951,7 +951,7 @@ func FilterActivePods(logger klog.Logger, pods []*v1.Pod) []*v1.Pod {
 		if IsPodActive(p) {
 			result = append(result, p)
 		} else {
-			logger.V(4).Info("Ignoring inactive pod", "pod", klog.KObj(p), "phase", p.Status.Phase, "deletionTime", p.DeletionTimestamp)
+			logger.V(4).Info("Ignoring inactive pod", "pod", klog.KObj(p), "phase", p.Status.Phase, "deletionTime", klog.SafePtr(p.DeletionTimestamp))
 		}
 	}
 	return result

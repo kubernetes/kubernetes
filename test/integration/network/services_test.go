@@ -17,7 +17,6 @@ limitations under the License.
 package network
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -45,23 +44,20 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	clusterIP := "10.0.0.20"
 	interval := 5 * time.Second
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = serviceCIDR
 		},
 		ModifyServerConfig: func(cfg *controlplane.Config) {
-			cfg.ExtraConfig.RepairServicesInterval = interval
+			cfg.Extra.RepairServicesInterval = interval
 		},
 	})
 	defer tearDownFn()
 
 	// verify client is working
 	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
+		_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
@@ -90,20 +86,20 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	}
 
 	// Create service
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, &svcNodePort, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, &svcNodePort, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unexpected error creating service: %v", err)
 	}
 	t.Logf("Created service: %s", svcNodePort.Name)
 
 	// Check the service has been created correctly
-	svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+	svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svcNodePort.Name, metav1.GetOptions{})
 	if err != nil || svc.Spec.ClusterIP != clusterIP {
 		t.Errorf("created service is not correct: %v", err)
 	}
 	t.Logf("Service created successfully: %v", svc)
 
 	// Delete service
-	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(ctx, svcNodePort.Name, metav1.DeleteOptions{}); err != nil {
+	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(tCtx, svcNodePort.Name, metav1.DeleteOptions{}); err != nil {
 		t.Errorf("unexpected error deleting service: %v", err)
 	}
 	t.Logf("Deleted service: %s", svcNodePort.Name)
@@ -112,26 +108,26 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 	time.Sleep(interval + 1)
 
 	// Check that the service was not deleted and the IP is already allocated
-	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svcNodePort.Name, metav1.GetOptions{})
 	if err != nil || svc.Spec.ClusterIP != clusterIP {
 		t.Errorf("created service is not correct: %v", err)
 	}
 	t.Logf("Service after Delete: %v", svc)
 
 	// Remove the finalizer
-	if _, err = client.CoreV1().Services(metav1.NamespaceDefault).Patch(ctx, svcNodePort.Name, types.JSONPatchType, []byte(`[{"op":"remove","path":"/metadata/finalizers"}]`), metav1.PatchOptions{}); err != nil {
+	if _, err = client.CoreV1().Services(metav1.NamespaceDefault).Patch(tCtx, svcNodePort.Name, types.JSONPatchType, []byte(`[{"op":"remove","path":"/metadata/finalizers"}]`), metav1.PatchOptions{}); err != nil {
 		t.Errorf("unexpected error removing finalizer: %v", err)
 	}
 	t.Logf("Removed service finalizer: %s", svcNodePort.Name)
 
 	// Check that the service was deleted
-	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svcNodePort.Name, metav1.GetOptions{})
 	if err == nil {
 		t.Errorf("service was not delete: %v", err)
 	}
 
 	// Try to create service again
-	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, &svcNodePort, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, &svcNodePort, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unexpected error creating service: %v", err)
 	}
 	t.Logf("Created service: %s", svcNodePort.Name)
@@ -141,11 +137,8 @@ func TestServicesFinalizersPatchStatus(t *testing.T) {
 	serviceCIDR := "10.0.0.0/16"
 	clusterIP := "10.0.0.21"
 	nodePort := 30443
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = serviceCIDR
 		},
@@ -176,26 +169,26 @@ func TestServicesFinalizersPatchStatus(t *testing.T) {
 			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 			// Create service
-			if _, err := client.CoreV1().Services(ns.Name).Create(ctx, &svcNodePort, metav1.CreateOptions{}); err != nil {
+			if _, err := client.CoreV1().Services(ns.Name).Create(tCtx, &svcNodePort, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
 			}
 			t.Logf("Created service: %s", svcNodePort.Name)
 
 			// Check the service has been created correctly
-			svc, err := client.CoreV1().Services(ns.Name).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+			svc, err := client.CoreV1().Services(ns.Name).Get(tCtx, svcNodePort.Name, metav1.GetOptions{})
 			if err != nil || svc.Spec.ClusterIP != clusterIP {
 				t.Fatalf("created service is not correct: %v", err)
 			}
 			t.Logf("Service created successfully: %+v", svc)
 
 			// Delete service
-			if err := client.CoreV1().Services(ns.Name).Delete(ctx, svcNodePort.Name, metav1.DeleteOptions{}); err != nil {
+			if err := client.CoreV1().Services(ns.Name).Delete(tCtx, svcNodePort.Name, metav1.DeleteOptions{}); err != nil {
 				t.Fatalf("unexpected error deleting service: %v", err)
 			}
 			t.Logf("Deleted service: %s", svcNodePort.Name)
 
 			// Check that the service was not deleted and the IP is already allocated
-			svc, err = client.CoreV1().Services(ns.Name).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+			svc, err = client.CoreV1().Services(ns.Name).Get(tCtx, svcNodePort.Name, metav1.GetOptions{})
 			if err != nil ||
 				svc.Spec.ClusterIP != clusterIP ||
 				int(svc.Spec.Ports[0].NodePort) != nodePort ||
@@ -214,18 +207,18 @@ func TestServicesFinalizersPatchStatus(t *testing.T) {
 			}
 
 			if testcase == "spec" {
-				if _, err = client.CoreV1().Services(ns.Name).Patch(ctx, svcNodePort.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+				if _, err = client.CoreV1().Services(ns.Name).Patch(tCtx, svcNodePort.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 					t.Fatalf("unexpected error removing finalizer: %v", err)
 				}
 			} else {
-				if _, err = client.CoreV1().Services(ns.Name).Patch(ctx, svcNodePort.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status"); err != nil {
+				if _, err = client.CoreV1().Services(ns.Name).Patch(tCtx, svcNodePort.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status"); err != nil {
 					t.Fatalf("unexpected error removing finalizer: %v", err)
 				}
 			}
 			t.Logf("Removed service finalizer: %s", svcNodePort.Name)
 
 			// Check that the service was deleted
-			_, err = client.CoreV1().Services(ns.Name).Get(ctx, svcNodePort.Name, metav1.GetOptions{})
+			_, err = client.CoreV1().Services(ns.Name).Get(tCtx, svcNodePort.Name, metav1.GetOptions{})
 			if err == nil {
 				t.Fatalf("service was not delete: %v", err)
 			}
@@ -233,11 +226,11 @@ func TestServicesFinalizersPatchStatus(t *testing.T) {
 			// Try to create service again without the finalizer to check the ClusterIP and NodePort are deallocated
 			svc = svcNodePort.DeepCopy()
 			svc.Finalizers = []string{}
-			if _, err := client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{}); err != nil {
+			if _, err := client.CoreV1().Services(ns.Name).Create(tCtx, svc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
 			}
 			// Delete service
-			if err := client.CoreV1().Services(ns.Name).Delete(ctx, svc.Name, metav1.DeleteOptions{}); err != nil {
+			if err := client.CoreV1().Services(ns.Name).Delete(tCtx, svc.Name, metav1.DeleteOptions{}); err != nil {
 				t.Fatalf("unexpected error deleting service: %v", err)
 			}
 		})
@@ -248,11 +241,8 @@ func TestServicesFinalizersPatchStatus(t *testing.T) {
 func TestServiceCIDR28bits(t *testing.T) {
 	serviceCIDR := "10.0.0.0/28"
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = serviceCIDR
 		},
@@ -261,7 +251,7 @@ func TestServiceCIDR28bits(t *testing.T) {
 
 	// Wait until the default "kubernetes" service is created.
 	if err := wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(ctx, "kubernetes", metav1.GetOptions{})
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, "kubernetes", metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -288,7 +278,7 @@ func TestServiceCIDR28bits(t *testing.T) {
 		},
 	}
 
-	_, err := client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	_, err := client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}

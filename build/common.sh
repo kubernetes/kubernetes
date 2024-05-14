@@ -81,6 +81,7 @@ readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 # This is a symlink to binaries for "this platform" (e.g. build tools).
 readonly THIS_PLATFORM_BIN="${LOCAL_OUTPUT_ROOT}/bin"
 
+readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly REMOTE_ROOT="/go/src/${KUBE_GO_PACKAGE}"
 readonly REMOTE_OUTPUT_ROOT="${REMOTE_ROOT}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
@@ -96,9 +97,9 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.4.4
-readonly __default_go_runner_version=v2.3.1-go1.21.6-bookworm.0
-readonly __default_setcap_version=bookworm-v1.0.0
+readonly __default_distroless_iptables_version=v0.5.4
+readonly __default_go_runner_version=v2.3.1-go1.22.3-bookworm.0
+readonly __default_setcap_version=bookworm-v1.0.2
 
 # These are the base images for the Docker-wrapped binaries.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
@@ -610,11 +611,11 @@ function kube::build::start_rsyncd_container() {
   V=3 kube::log::status "Starting rsyncd container"
   kube::build::run_build_command_ex \
     "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:"${KUBE_RSYNC_PORT}":"${KUBE_CONTAINER_RSYNC_PORT}" -d \
-    -e ALLOW_HOST="$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')" \
+    -e ALLOW_HOST="$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | tr '\n' ' ')" \
     -- /rsyncd.sh >/dev/null
 
   local mapped_port
-  if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" ${KUBE_CONTAINER_RSYNC_PORT} 2> /dev/null | cut -d: -f 2) ; then
+  if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" "${KUBE_CONTAINER_RSYNC_PORT}" 2> /dev/null | cut -d: -f 2) ; then
     kube::log::error "Could not get effective rsync port"
     return 1
   fi
@@ -630,7 +631,7 @@ function kube::build::start_rsyncd_container() {
   if kube::build::rsync_probe 127.0.0.1 "${mapped_port}"; then
     KUBE_RSYNC_ADDR="127.0.0.1:${mapped_port}"
     return 0
-  elif kube::build::rsync_probe "${container_ip}" ${KUBE_CONTAINER_RSYNC_PORT}; then
+  elif kube::build::rsync_probe "${container_ip}" "${KUBE_CONTAINER_RSYNC_PORT}"; then
     KUBE_RSYNC_ADDR="${container_ip}:${KUBE_CONTAINER_RSYNC_PORT}"
     return 0
   fi

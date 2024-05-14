@@ -20,8 +20,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/lithammer/dedent"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -31,11 +34,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-
-	"github.com/lithammer/dedent"
 )
 
 func TestCompileManifests(t *testing.T) {
@@ -585,7 +587,7 @@ func TestDeployedDNSReplicas(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := newMockClientForTest(t, 2, tt.deploymentSize)
+			client := newMockClientForTest(t, 2, tt.deploymentSize, "", "", "")
 			got, err := deployedDNSReplicas(client, 5)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("deployedDNSReplicas() error = %v, wantErr %v", err, tt.wantErr)
@@ -614,7 +616,7 @@ func TestCoreDNSAddon(t *testing.T) {
 			name: "cfg is empty",
 			args: args{
 				cfg:           &kubeadmapi.ClusterConfiguration{},
-				client:        newMockClientForTest(t, 2, 1),
+				client:        newMockClientForTest(t, 2, 1, "", "", ""),
 				printManifest: false,
 			},
 			wantOut: "",
@@ -626,14 +628,14 @@ func TestCoreDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 2, 1),
+				client:        newMockClientForTest(t, 2, 1, "", "", ""),
 				printManifest: false,
 			},
 			wantOut: "[addons] Applied essential addon: CoreDNS\n",
@@ -645,14 +647,14 @@ func TestCoreDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 2, 1),
+				client:        newMockClientForTest(t, 2, 1, "", "", ""),
 				printManifest: true,
 			},
 			wantOut: dedent.Dedent(`---
@@ -699,7 +701,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: daocloud.io/coredns:v1.11.1
+        image: foo.bar.io/coredns:v1.11.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -892,17 +894,36 @@ func TestEnsureDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 0, 1),
+				client:        newMockClientForTest(t, 0, 1, "", "", ""),
 				printManifest: false,
 			},
 			wantOut: "[addons] Applied essential addon: CoreDNS\n",
+		},
+		{
+			name: "get dns replicas failed",
+			args: args{
+				cfg: &kubeadmapi.ClusterConfiguration{
+					DNS: kubeadmapi.DNS{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageRepository: "foo.bar.io",
+						},
+					},
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.0.0.0/16",
+					},
+				},
+				client:        newMockClientForTest(t, 0, 2, "", "", ""),
+				printManifest: false,
+			},
+			wantErr: true,
+			wantOut: "",
 		},
 		{
 			name: "not print Manifest",
@@ -910,14 +931,14 @@ func TestEnsureDNSAddon(t *testing.T) {
 				cfg: &kubeadmapi.ClusterConfiguration{
 					DNS: kubeadmapi.DNS{
 						ImageMeta: kubeadmapi.ImageMeta{
-							ImageRepository: "daocloud.io",
+							ImageRepository: "foo.bar.io",
 						},
 					},
 					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 0, 1),
+				client:        newMockClientForTest(t, 0, 1, "", "", ""),
 				printManifest: true,
 			},
 			wantOut: dedent.Dedent(`---
@@ -964,7 +985,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: daocloud.io/coredns:v1.11.1
+        image: foo.bar.io/coredns:v1.11.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -1375,7 +1396,7 @@ func TestCreateDNSService(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := newMockClientForTest(t, 1, 1)
+			client := newMockClientForTest(t, 1, 1, "", "", "")
 			if err := createDNSService(tt.args.dnsService, tt.args.serviceBytes, client); (err != nil) != tt.wantErr {
 				t.Errorf("createDNSService() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1383,9 +1404,259 @@ func TestCreateDNSService(t *testing.T) {
 	}
 }
 
+func TestDeployedDNSAddon(t *testing.T) {
+	tests := []struct {
+		name           string
+		image          string
+		wantVersion    string
+		deploymentSize int
+		wantErr        bool
+	}{
+		{
+			name:           "default",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.1",
+			deploymentSize: 1,
+			wantVersion:    "v1.11.1",
+		},
+		{
+			name:           "no dns addon deployment",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.1",
+			deploymentSize: 0,
+			wantVersion:    "",
+		},
+		{
+			name:           "multiple dns addon deployment",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.1",
+			deploymentSize: 2,
+			wantVersion:    "",
+			wantErr:        true,
+		},
+		{
+			name:           "with digest",
+			image:          "registry.k8s.io/coredns/coredns:v1.11.1@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			deploymentSize: 1,
+			wantVersion:    "v1.11.1",
+		},
+		{
+			name:           "without registry",
+			image:          "coredns/coredns:coredns-s390x",
+			deploymentSize: 1,
+			wantVersion:    "coredns-s390x",
+		},
+		{
+			name:           "without registry and tag",
+			image:          "coredns/coredns",
+			deploymentSize: 1,
+			wantVersion:    "",
+		},
+		{
+			name:           "with explicit port",
+			image:          "localhost:4711/coredns/coredns:v1.11.2-pre.1",
+			deploymentSize: 1,
+			wantVersion:    "v1.11.2-pre.1",
+		},
+		{
+			name:           "with explicit port but without tag",
+			image:          "localhost:4711/coredns/coredns@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			deploymentSize: 1,
+			wantVersion:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newMockClientForTest(t, 1, tt.deploymentSize, tt.image, "", "")
+
+			version, err := DeployedDNSAddon(client)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeployedDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if version != tt.wantVersion {
+				t.Errorf("DeployedDNSAddon() for image %q returned %q, want %q", tt.image, version, tt.wantVersion)
+			}
+		})
+	}
+}
+
+func TestGetCoreDNSInfo(t *testing.T) {
+	tests := []struct {
+		name          string
+		client        clientset.Interface
+		wantConfigMap *v1.ConfigMap
+		wantCorefile  string
+		wantVersion   string
+		wantErr       bool
+	}{
+		{
+			name:          "no coredns configmap",
+			client:        newMockClientForTest(t, 1, 1, "localhost:4711/coredns/coredns:v1.11.2-pre.1", "", ""),
+			wantConfigMap: nil,
+			wantCorefile:  "",
+			wantVersion:   "",
+			wantErr:       false,
+		},
+		{
+			name:          "the key of coredns configmap data does not contain corefile",
+			client:        newMockClientForTest(t, 1, 1, "localhost:4711/coredns/coredns:v1.11.2-pre.1", "coredns", "Corefilefake"),
+			wantConfigMap: nil,
+			wantCorefile:  "",
+			wantVersion:   "",
+			wantErr:       true,
+		},
+		{
+			name:          "failed to obtain coredns version",
+			client:        newMockClientForTest(t, 1, 2, "localhost:4711/coredns/coredns:v1.11.2-pre.1", "coredns", "Corefile"),
+			wantConfigMap: nil,
+			wantCorefile:  "",
+			wantVersion:   "",
+			wantErr:       true,
+		},
+		{
+			name:   "coredns information can be obtained normally",
+			client: newMockClientForTest(t, 1, 1, "localhost:4711/coredns/coredns:v1.11.2-pre.1", "coredns", "Corefile"),
+			wantConfigMap: &v1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "coredns",
+					Labels: map[string]string{
+						"k8s-app":            "kube-dns",
+						"kubernetes.io/name": "coredns",
+					},
+					Namespace: "kube-system",
+				},
+				Data: map[string]string{
+					"Corefile": dedent.Dedent(`
+    .:53 {
+        errors
+        health {
+            lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+          prefer_udp
+          max_concurrent 1000
+        }
+        cache 30
+
+        loop
+        reload
+        loadbalance
+    }
+	`),
+				},
+			},
+			wantCorefile: dedent.Dedent(`
+    .:53 {
+        errors
+        health {
+            lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+          prefer_udp
+          max_concurrent 1000
+        }
+        cache 30
+
+        loop
+        reload
+        loadbalance
+    }
+	`),
+			wantVersion: "v1.11.2-pre.1",
+			wantErr:     false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, got2, err := GetCoreDNSInfo(tt.client)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetCoreDNSInfo() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.wantConfigMap) {
+				t.Errorf("GetCoreDNSInfo() got = %v, want %v", got, tt.wantConfigMap)
+			}
+			if got1 != tt.wantCorefile {
+				t.Errorf("GetCoreDNSInfo() got1 = %v, want %v", got1, tt.wantCorefile)
+			}
+			if got2 != tt.wantVersion {
+				t.Errorf("GetCoreDNSInfo() got2 = %v, want %v", got2, tt.wantVersion)
+			}
+		})
+	}
+}
+
+func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
+	tests := []struct {
+		name                           string
+		corefile                       string
+		currentInstalledCoreDNSVersion string
+		want                           bool
+		wantErr                        bool
+	}{
+		{
+			name:                           "currentInstalledCoreDNSVersion is empty",
+			corefile:                       "",
+			currentInstalledCoreDNSVersion: "",
+			want:                           false,
+			wantErr:                        false,
+		},
+		{
+			name:                           "currentInstalledCoreDNSVersion is consistent with the standard version",
+			corefile:                       "",
+			currentInstalledCoreDNSVersion: kubeadmconstants.CoreDNSVersion,
+			want:                           false,
+			wantErr:                        false,
+		},
+		{
+			name:                           "Coredns Configmap needs to be migrated",
+			corefile:                       "Corefile: fake",
+			currentInstalledCoreDNSVersion: "v1.2.0",
+			want:                           true,
+			wantErr:                        false,
+		},
+		{
+			name:                           "currentInstalledCoreDNSVersion is not supported",
+			corefile:                       "",
+			currentInstalledCoreDNSVersion: "v0.11.1",
+			want:                           false,
+			wantErr:                        true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := isCoreDNSConfigMapMigrationRequired(tt.corefile, tt.currentInstalledCoreDNSVersion)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isCoreDNSConfigMapMigrationRequired() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("isCoreDNSConfigMapMigrationRequired() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // replicas is replica of each DNS deployment
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
-func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *clientsetfake.Clientset {
+func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string, configMap string, configData string) *clientsetfake.Clientset {
+	if image == "" {
+		image = "registry.k8s.io/coredns/coredns:v1.11.1"
+	}
 	client := clientsetfake.NewSimpleClientset()
 	for i := 0; i < deploymentSize; i++ {
 		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
@@ -1402,7 +1673,11 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *cli
 			},
 			Spec: apps.DeploymentSpec{
 				Replicas: &replicas,
-				Template: v1.PodTemplateSpec{},
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{Image: image}},
+					},
+				},
 			},
 		}, metav1.CreateOptions{})
 		if err != nil {
@@ -1439,6 +1714,54 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *cli
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating service: %v", err)
+	}
+
+	if configMap != "" {
+		if configMap == "" {
+			configMap = "Corefile"
+		}
+		_, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "ConfigMap",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: configMap,
+				Labels: map[string]string{
+					"k8s-app":            "kube-dns",
+					"kubernetes.io/name": "coredns",
+				},
+				Namespace: "kube-system",
+			},
+			Data: map[string]string{
+				configData: dedent.Dedent(`
+    .:53 {
+        errors
+        health {
+            lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+          prefer_udp
+          max_concurrent 1000
+        }
+        cache 30
+
+        loop
+        reload
+        loadbalance
+    }
+	`),
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("error creating service: %v", err)
+		}
 	}
 	return client
 }

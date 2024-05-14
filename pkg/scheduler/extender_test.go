@@ -93,7 +93,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			extenders: []tf.FakeExtender{
@@ -246,7 +246,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			// because of the errors from errorPredicateExtender.
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
-				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 20),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -289,10 +289,29 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			nodes: []string{"node1", "node2"},
 			expectedResult: ScheduleResult{
 				SuggestedHost:  "node1",
+				EvaluatedNodes: 2,
+				FeasibleNodes:  1,
+			},
+			name: "test 10 - no scoring, extender filters configured, multiple feasible nodes are evaluated",
+		},
+		{
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: []tf.FakeExtender{
+				{
+					ExtenderName: "FakeExtender1",
+					Binder:       func() error { return nil },
+				},
+			},
+			nodes: []string{"node1", "node2"},
+			expectedResult: ScheduleResult{
+				SuggestedHost:  "node1",
 				EvaluatedNodes: 1,
 				FeasibleNodes:  1,
 			},
-			name: "test 10",
+			name: "test 11 - no scoring, no prefilters or  extender filters configured, a single feasible node is evaluated",
 		},
 	}
 

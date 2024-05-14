@@ -89,78 +89,6 @@ func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod
 	return dswp, fakePodManager, fakePodStateProvider
 }
 
-func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
-	// Outer volume spec replacement is needed only when the old volume reconstruction is used
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NewVolumeManagerReconstruction, false)()
-	// create dswp
-	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
-
-	// create pod
-	fakeOuterVolumeName := "dswp-test-volume-name"
-	containers := []v1.Container{
-		{
-			VolumeMounts: []v1.VolumeMount{
-				{
-					Name:      fakeOuterVolumeName,
-					MountPath: "/mnt",
-				},
-			},
-		},
-	}
-	pod := createPodWithVolume("dswp-test-pod", fakeOuterVolumeName, "file-bound", containers)
-
-	fakePodManager.AddPod(pod)
-
-	podName := util.GetUniquePodName(pod)
-
-	mode := v1.PersistentVolumeFilesystem
-	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fakeOuterVolumeName,
-		},
-		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-			VolumeMode: &mode,
-		},
-	}
-	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
-	uniqueVolumeName := v1.UniqueVolumeName(generatedVolumeName)
-	expectedOuterVolumeName := "dswp-test-volume-name"
-
-	opts := operationexecutor.MarkVolumeOpts{
-		PodName:             podName,
-		PodUID:              pod.UID,
-		VolumeName:          uniqueVolumeName,
-		OuterVolumeSpecName: generatedVolumeName, // fake reconstructed volume
-		VolumeGidVolume:     "",
-		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
-		VolumeMountState:    operationexecutor.VolumeMounted,
-	}
-	logger, _ := ktesting.NewTestContext(t)
-	dswp.actualStateOfWorld.MarkVolumeAsAttached(logger, opts.VolumeName, opts.VolumeSpec, "fake-node", "")
-	dswp.actualStateOfWorld.MarkVolumeAsMounted(opts)
-
-	dswp.findAndAddNewPods()
-
-	mountedVolumes := dswp.actualStateOfWorld.GetMountedVolumesForPod(podName)
-	found := false
-	for _, volume := range mountedVolumes {
-		if volume.OuterVolumeSpecName == expectedOuterVolumeName {
-			found = true
-			break
-		}
-	}
-	if dswp.hasAddedPods {
-		t.Fatalf("HasAddedPod should be false but it is true")
-	}
-	if !found {
-		t.Fatalf(
-			"Could not found pod volume %v in the list of actual state of world volumes to mount.",
-			expectedOuterVolumeName)
-	}
-
-}
-
 func TestFindAndAddNewPods_WithDifferentConditions(t *testing.T) {
 	tests := []struct {
 		desc          string
@@ -1190,7 +1118,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 }
 
 func TestCheckVolumeSELinux(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	fullOpts := &v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -1212,6 +1140,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 		accessModes                  []v1.PersistentVolumeAccessMode
 		existingContainerSELinuxOpts *v1.SELinuxOptions
 		newContainerSELinuxOpts      *v1.SELinuxOptions
+		seLinuxMountFeatureEnabled   bool
 		pluginSupportsSELinux        bool
 		expectError                  bool
 		expectedContext              string
@@ -1231,14 +1160,22 @@ func TestCheckVolumeSELinux(t *testing.T) {
 			expectedContext:         "system_u:object_r:container_file_t:s0:c3,c4",
 		},
 		{
-			name:                    "RWX with plugin with SELinux with fill context in pod",
+			name:                    "RWX with plugin with SELinux with full context in pod and SELinuxMount feature disabled",
 			accessModes:             []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
 			newContainerSELinuxOpts: fullOpts,
 			pluginSupportsSELinux:   true,
 			expectedContext:         "", // RWX volumes don't support SELinux
 		},
 		{
-			name:                    "RWOP with plugin with no SELinux with fill context in pod",
+			name:                       "RWX with plugin with SELinux with full context in pod and SELinuxMount feature enabled",
+			accessModes:                []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+			newContainerSELinuxOpts:    fullOpts,
+			pluginSupportsSELinux:      true,
+			seLinuxMountFeatureEnabled: true,
+			expectedContext:            "system_u:object_r:container_file_t:s0:c1,c2",
+		},
+		{
+			name:                    "RWOP with plugin with no SELinux with full context in pod",
 			accessModes:             []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod},
 			newContainerSELinuxOpts: fullOpts,
 			pluginSupportsSELinux:   false,
@@ -1266,6 +1203,25 @@ func TestCheckVolumeSELinux(t *testing.T) {
 			newContainerSELinuxOpts:      differentFullOpts,
 			pluginSupportsSELinux:        true,
 			expectedContext:              "",
+		},
+		{
+			name:                         "mismatched SELinux with RWX and SELinuxMount feature disabled",
+			accessModes:                  []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+			existingContainerSELinuxOpts: fullOpts,
+			newContainerSELinuxOpts:      differentFullOpts,
+			pluginSupportsSELinux:        true,
+			expectedContext:              "",
+		},
+		{
+			name:                         "mismatched SELinux with RWX and SELinuxMount feature enabled",
+			accessModes:                  []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+			existingContainerSELinuxOpts: fullOpts,
+			newContainerSELinuxOpts:      differentFullOpts,
+			pluginSupportsSELinux:        true,
+			seLinuxMountFeatureEnabled:   true,
+			expectError:                  true,
+			// The original seLinuxOpts are kept in DSW
+			expectedContext: "system_u:object_r:container_file_t:s0:c1,c2",
 		},
 		{
 			name:                         "mismatched SELinux with RWOP - failure",
@@ -1319,6 +1275,7 @@ func TestCheckVolumeSELinux(t *testing.T) {
 					},
 				},
 			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMount, tc.seLinuxMountFeatureEnabled)
 
 			fakeVolumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			plugin.SupportsSELinux = tc.pluginSupportsSELinux
@@ -1639,7 +1596,6 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,
-		keepTerminatedPodVolumes: false,
 		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 		intreeToCSITranslator:    csiTranslator,
 		volumePluginMgr:          fakeVolumePluginMgr,

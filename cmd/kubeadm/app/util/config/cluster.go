@@ -197,7 +197,7 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 
 func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
 	return getAPIEndpointWithRetry(client, nodeName, apiEndpoint,
-		constants.StaticPodMirroringRetryInterval, constants.StaticPodMirroringTimeout)
+		constants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration)
 }
 
 func getAPIEndpointWithRetry(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,

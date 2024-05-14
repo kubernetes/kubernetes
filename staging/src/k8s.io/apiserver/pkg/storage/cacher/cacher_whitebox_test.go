@@ -29,9 +29,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/metadata"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -85,10 +87,23 @@ type dummyStorage struct {
 	err       error
 	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
 	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+
+	// use getRequestWatchProgressCounter when reading
+	// the value of the counter
+	requestWatchProgressCounter int
 }
 
 func (d *dummyStorage) RequestWatchProgress(ctx context.Context) error {
+	d.Lock()
+	defer d.Unlock()
+	d.requestWatchProgressCounter++
 	return nil
+}
+
+func (d *dummyStorage) getRequestWatchProgressCounter() int {
+	d.RLock()
+	defer d.RUnlock()
+	return d.requestWatchProgressCounter
 }
 
 type dummyWatch struct {
@@ -177,7 +192,7 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 
 	t.Run("ConsistentListFromStorage", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
 		)
@@ -187,7 +202,7 @@ func TestGetListCacheBypass(t *testing.T) {
 
 	})
 	t.Run("ConsistentListFromCache", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
 		)
@@ -323,8 +338,6 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
@@ -333,12 +346,32 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
 	}
 
-	// With unset RV, check if cacher is bypassed.
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "",
+		Predicate:       storage.Everything,
 	})
-	if err != errDummy {
-		t.Errorf("Watch with unset RV should bypass cacher: %v", err)
+	if err != nil {
+		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+		Predicate:       storage.Everything,
+	})
+	if err != nil {
+		t.Errorf("With WatchFromStorageWithoutResourceVersion disabled, watch with unset RV should be served from cache: %v", err)
+	}
+
+	// Inject error to underlying layer and check if cacher is not bypassed.
+	backingStorage.injectError(errDummy)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+		Predicate:       storage.Everything,
+	})
+	if !errors.Is(err, errDummy) {
+		t.Errorf("With WatchFromStorageWithoutResourceVersion enabled, watch with unset RV should be served from storage: %v", err)
 	}
 }
 
@@ -416,7 +449,14 @@ func TestEmptyWatchEventCache(t *testing.T) {
 				if e, a := tt.expectedEvent.Object, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 					t.Errorf("Expected: %#v, got: %#v", e, a)
 				}
-			case <-time.After(3 * time.Second):
+			case <-time.After(1 * time.Second):
+				// the watch was established otherwise
+				// we would be blocking on cache.Watch(...)
+				// in addition to that, the tests are serial in nature,
+				// meaning that there is no other actor
+				// that could add items to the database,
+				// which could result in receiving new items.
+				// given that waiting 1s seems okay
 				if tt.expectedEvent != nil {
 					t.Errorf("Failed to get an event")
 				}
@@ -442,7 +482,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// terminate instead of hanging forever.
 	go func() {
 		defer cancel()
-		cacher.clock.Sleep(5 * time.Second)
+		cacher.clock.Sleep(1 * time.Second)
 	}()
 
 	// Watch hangs waiting on watchcache being initialized.
@@ -1604,49 +1644,158 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 
-	opts := storage.ListOptions{
-		Predicate:         storage.Everything,
-		SendInitialEvents: pointer.Bool(true),
-		ResourceVersion:   "105",
-	}
-	opts.Predicate.AllowWatchBookmarks = true
-
-	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
-	require.NoError(t, err, "failed to create watch: %v")
-	defer w.Stop()
-	verifyEvents(t, w, []watch.Event{
+	scenarios := []struct {
+		name               string
+		opts               storage.ListOptions
+		backingStorage     *dummyStorage
+		verifyBackingStore func(t *testing.T, s *dummyStorage)
+	}{
 		{
-			Type: watch.Error,
-			Object: &metav1.Status{
-				Status:  metav1.StatusFailure,
-				Message: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).Error(),
-				Details: storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds).(*apierrors.StatusError).Status().Details,
-				Reason:  metav1.StatusReasonTimeout,
-				Code:    504,
+			name: "allowWatchBookmarks=true, sendInitialEvents=true, RV=105",
+			opts: storage.ListOptions{
+				Predicate: func() storage.SelectionPredicate {
+					p := storage.Everything
+					p.AllowWatchBookmarks = true
+					return p
+				}(),
+				SendInitialEvents: pointer.Bool(true),
+				ResourceVersion:   "105",
+			},
+			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
+				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
 			},
 		},
-	}, true)
 
-	go func() {
-		cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
-	}()
-	w, err = cacher.Watch(context.Background(), "pods/ns", opts)
-	require.NoError(t, err, "failed to create watch: %v")
-	defer w.Stop()
-	verifyEvents(t, w, []watch.Event{
 		{
-			Type:   watch.Added,
-			Object: makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}),
+			name: "legacy: allowWatchBookmarks=false, sendInitialEvents=true, RV=unset",
+			opts: storage.ListOptions{
+				Predicate: func() storage.SelectionPredicate {
+					p := storage.Everything
+					p.AllowWatchBookmarks = false
+					return p
+				}(),
+				SendInitialEvents: pointer.Bool(true),
+			},
+			backingStorage: func() *dummyStorage {
+				hasBeenPrimed := false
+				s := &dummyStorage{}
+				s.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+					listAccessor, err := meta.ListAccessor(listObj)
+					if err != nil {
+						return err
+					}
+					// the first call to this function
+					// primes the cacher
+					if !hasBeenPrimed {
+						listAccessor.SetResourceVersion("100")
+						hasBeenPrimed = true
+						return nil
+					}
+					listAccessor.SetResourceVersion("105")
+					return nil
+				}
+				return s
+			}(),
+			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
+				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+			},
 		},
-	}, true)
+
+		{
+			name: "allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			opts: storage.ListOptions{
+				Predicate: func() storage.SelectionPredicate {
+					p := storage.Everything
+					p.AllowWatchBookmarks = true
+					return p
+				}(),
+				SendInitialEvents: pointer.Bool(true),
+			},
+			backingStorage: func() *dummyStorage {
+				hasBeenPrimed := false
+				s := &dummyStorage{}
+				s.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+					listAccessor, err := meta.ListAccessor(listObj)
+					if err != nil {
+						return err
+					}
+					// the first call to this function
+					// primes the cacher
+					if !hasBeenPrimed {
+						listAccessor.SetResourceVersion("100")
+						hasBeenPrimed = true
+						return nil
+					}
+					listAccessor.SetResourceVersion("105")
+					return nil
+				}
+				return s
+			}(),
+			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
+				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
+			var backingStorage *dummyStorage
+			if scenario.backingStorage != nil {
+				backingStorage = scenario.backingStorage
+			} else {
+				backingStorage = &dummyStorage{}
+			}
+			cacher, _, err := newTestCacher(backingStorage)
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			defer cacher.Stop()
+			if err := cacher.ready.wait(context.Background()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready")
+			}
+
+			w, err := cacher.Watch(context.Background(), "pods/ns", scenario.opts)
+			require.NoError(t, err, "failed to create watch: %v")
+			defer w.Stop()
+			var expectedErr *apierrors.StatusError
+			if !errors.As(storage.NewTooLargeResourceVersionError(105, 100, resourceVersionTooHighRetrySeconds), &expectedErr) {
+				t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
+			}
+			verifyEvents(t, w, []watch.Event{
+				{
+					Type: watch.Error,
+					Object: &metav1.Status{
+						Status:  metav1.StatusFailure,
+						Message: expectedErr.Error(),
+						Details: expectedErr.ErrStatus.Details,
+						Reason:  metav1.StatusReasonTimeout,
+						Code:    504,
+					},
+				},
+			}, true)
+
+			go func(t *testing.T) {
+				err := cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
+				require.NoError(t, err, "failed adding a pod to the watchCache")
+			}(t)
+			w, err = cacher.Watch(context.Background(), "pods/ns", scenario.opts)
+			require.NoError(t, err, "failed to create watch: %v")
+			defer w.Stop()
+			verifyEvents(t, w, []watch.Event{
+				{
+					Type:   watch.Added,
+					Object: makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}),
+				},
+			}, true)
+			if scenario.verifyBackingStore != nil {
+				scenario.verifyBackingStore(t, backingStorage)
+			}
+		})
+	}
 }
 
 type fakeStorage struct {
@@ -1757,7 +1906,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 // a bookmark event will be delivered after the cacher has seen an event.
 // Previously the watchers have been removed from the "want bookmark" queue.
 func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1803,7 +1952,7 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 		{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				ResourceVersion: "102",
-				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 			},
 		}},
 	}, true)
@@ -1863,4 +2012,491 @@ func TestForgetWatcher(t *testing.T) {
 	forgetWatcherWrapped(false)
 	assertCacherInternalState(0, 0)
 	require.Equal(t, 2, forgetCounter)
+}
+
+// TestGetWatchCacheResourceVersion test the following cases:
+//
+// +-----------------+---------------------+-----------------------+
+// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+// +=================+=====================+=======================+
+// | Unset           | true/false          | nil/true/false        |
+// | 0               | true/false          | nil/true/false        |
+// | 95             | true/false          | nil/true/false         |
+// +-----------------+---------------------+-----------------------+
+// where:
+// - false indicates the value of the param was set to "false" by a test case
+// - true  indicates the value of the param was set to "true" by a test case
+func TestGetWatchCacheResourceVersion(t *testing.T) {
+	listOptions := func(allowBookmarks bool, sendInitialEvents *bool, rv string) storage.ListOptions {
+		p := storage.Everything
+		p.AllowWatchBookmarks = allowBookmarks
+
+		opts := storage.ListOptions{}
+		opts.Predicate = p
+		opts.SendInitialEvents = sendInitialEvents
+		opts.ResourceVersion = rv
+		return opts
+	}
+
+	scenarios := []struct {
+		name string
+		opts storage.ListOptions
+
+		expectedWatchResourceVersion int
+	}{
+		// +-----------------+---------------------+-----------------------+
+		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+		// +=================+=====================+=======================+
+		// | Unset           | true/false          | nil/true/false        |
+		// +-----------------+---------------------+-----------------------+
+		{
+			name: "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts: listOptions(true, nil, ""),
+			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
+			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
+			expectedWatchResourceVersion: 0,
+		},
+		{
+			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
+			opts:                         listOptions(true, pointer.Bool(true), ""),
+			expectedWatchResourceVersion: 100,
+		},
+		{
+			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=false",
+			opts:                         listOptions(true, pointer.Bool(false), ""),
+			expectedWatchResourceVersion: 100,
+		},
+		{
+			name: "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts: listOptions(false, nil, ""),
+			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
+			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
+			expectedWatchResourceVersion: 0,
+		},
+		{
+			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true, legacy",
+			opts:                         listOptions(false, pointer.Bool(true), ""),
+			expectedWatchResourceVersion: 100,
+		},
+		{
+			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=false",
+			opts:                         listOptions(false, pointer.Bool(false), ""),
+			expectedWatchResourceVersion: 100,
+		},
+		// +-----------------+---------------------+-----------------------+
+		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+		// +=================+=====================+=======================+
+		// | 0               | true/false          | nil/true/false        |
+		// +-----------------+---------------------+-----------------------+
+		{
+			name:                         "RV=0, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts:                         listOptions(true, nil, "0"),
+			expectedWatchResourceVersion: 0,
+		},
+		{
+			name:                         "RV=0, allowWatchBookmarks=true, sendInitialEvents=true",
+			opts:                         listOptions(true, pointer.Bool(true), "0"),
+			expectedWatchResourceVersion: 0,
+		},
+		{
+			name:                         "RV=0, allowWatchBookmarks=true, sendInitialEvents=false",
+			opts:                         listOptions(true, pointer.Bool(false), "0"),
+			expectedWatchResourceVersion: 0,
+		},
+		{
+			name:                         "RV=0, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts:                         listOptions(false, nil, "0"),
+			expectedWatchResourceVersion: 0,
+		},
+		{
+			name:                         "RV=0, allowWatchBookmarks=false, sendInitialEvents=true",
+			opts:                         listOptions(false, pointer.Bool(true), "0"),
+			expectedWatchResourceVersion: 0,
+		},
+		{
+			name:                         "RV=0, allowWatchBookmarks=false, sendInitialEvents=false",
+			opts:                         listOptions(false, pointer.Bool(false), "0"),
+			expectedWatchResourceVersion: 0,
+		},
+		// +-----------------+---------------------+-----------------------+
+		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+		// +=================+=====================+=======================+
+		// | 95             | true/false          | nil/true/false         |
+		// +-----------------+---------------------+-----------------------+
+		{
+			name:                         "RV=95, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts:                         listOptions(true, nil, "95"),
+			expectedWatchResourceVersion: 95,
+		},
+		{
+			name:                         "RV=95, allowWatchBookmarks=true, sendInitialEvents=true",
+			opts:                         listOptions(true, pointer.Bool(true), "95"),
+			expectedWatchResourceVersion: 95,
+		},
+		{
+			name:                         "RV=95, allowWatchBookmarks=true, sendInitialEvents=false",
+			opts:                         listOptions(true, pointer.Bool(false), "95"),
+			expectedWatchResourceVersion: 95,
+		},
+		{
+			name:                         "RV=95, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts:                         listOptions(false, nil, "95"),
+			expectedWatchResourceVersion: 95,
+		},
+		{
+			name:                         "RV=95, allowWatchBookmarks=false, sendInitialEvents=true",
+			opts:                         listOptions(false, pointer.Bool(true), "95"),
+			expectedWatchResourceVersion: 95,
+		},
+		{
+			name:                         "RV=95, allowWatchBookmarks=false, sendInitialEvents=false",
+			opts:                         listOptions(false, pointer.Bool(false), "95"),
+			expectedWatchResourceVersion: 95,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			backingStorage := &dummyStorage{}
+			cacher, _, err := newTestCacher(backingStorage)
+			require.NoError(t, err, "couldn't create cacher")
+			defer cacher.Stop()
+
+			parsedResourceVersion := 0
+			if len(scenario.opts.ResourceVersion) > 0 {
+				parsedResourceVersion, err = strconv.Atoi(scenario.opts.ResourceVersion)
+				require.NoError(t, err)
+			}
+
+			actualResourceVersion, err := cacher.getWatchCacheResourceVersion(context.TODO(), uint64(parsedResourceVersion), scenario.opts)
+			require.NoError(t, err)
+			require.Equal(t, uint64(scenario.expectedWatchResourceVersion), actualResourceVersion, "received unexpected ResourceVersion")
+		})
+	}
+}
+
+// TestGetBookmarkAfterResourceVersionLockedFunc test the following cases:
+//
+// +-----------------+---------------------+-----------------------+
+// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+// +=================+=====================+=======================+
+// | Unset           | true/false          | nil/true/false        |
+// | 0               | true/false          | nil/true/false        |
+// | 95             | true/false          | nil/true/false         |
+// +-----------------+---------------------+-----------------------+
+// where:
+// - false indicates the value of the param was set to "false" by a test case
+// - true  indicates the value of the param was set to "true" by a test case
+func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
+	listOptions := func(allowBookmarks bool, sendInitialEvents *bool, rv string) storage.ListOptions {
+		p := storage.Everything
+		p.AllowWatchBookmarks = allowBookmarks
+
+		opts := storage.ListOptions{}
+		opts.Predicate = p
+		opts.SendInitialEvents = sendInitialEvents
+		opts.ResourceVersion = rv
+		return opts
+	}
+
+	scenarios := []struct {
+		name                      string
+		opts                      storage.ListOptions
+		requiredResourceVersion   int
+		watchCacheResourceVersion int
+
+		expectedBookmarkResourceVersion int
+	}{
+		// +-----------------+---------------------+-----------------------+
+		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+		// +=================+=====================+=======================+
+		// | Unset           | true/false          | nil/true/false        |
+		// +-----------------+---------------------+-----------------------+
+		{
+			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts:                            listOptions(true, nil, ""),
+			requiredResourceVersion:         100,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
+			opts:                            listOptions(true, pointer.Bool(true), ""),
+			requiredResourceVersion:         100,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 100,
+		},
+		{
+			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=false",
+			opts:                            listOptions(true, pointer.Bool(false), ""),
+			requiredResourceVersion:         100,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts:                            listOptions(false, nil, ""),
+			requiredResourceVersion:         100,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true",
+			opts:                            listOptions(false, pointer.Bool(true), ""),
+			requiredResourceVersion:         100,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=false",
+			opts:                            listOptions(false, pointer.Bool(false), ""),
+			requiredResourceVersion:         100,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		// +-----------------+---------------------+-----------------------+
+		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+		// +=================+=====================+=======================+
+		// | 0               | true/false          | nil/true/false        |
+		// +-----------------+---------------------+-----------------------+
+		{
+			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts:                            listOptions(true, nil, "0"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=true",
+			opts:                            listOptions(true, pointer.Bool(true), "0"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 99,
+		},
+		{
+			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=false",
+			opts:                            listOptions(true, pointer.Bool(false), "0"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts:                            listOptions(false, nil, "0"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=true",
+			opts:                            listOptions(false, pointer.Bool(true), "0"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=false",
+			opts:                            listOptions(false, pointer.Bool(false), "0"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		// +-----------------+---------------------+-----------------------+
+		// | ResourceVersion | AllowWatchBookmarks | SendInitialEvents     |
+		// +=================+=====================+=======================+
+		// | 95             | true/false          | nil/true/false         |
+		// +-----------------+---------------------+-----------------------+
+		{
+			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts:                            listOptions(true, nil, "95"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=true",
+			opts:                            listOptions(true, pointer.Bool(true), "95"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 95,
+		},
+		{
+			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=false",
+			opts:                            listOptions(true, pointer.Bool(false), "95"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts:                            listOptions(false, nil, "95"),
+			requiredResourceVersion:         100,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=true",
+			opts:                            listOptions(false, pointer.Bool(true), "95"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+		{
+			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=false",
+			opts:                            listOptions(false, pointer.Bool(false), "95"),
+			requiredResourceVersion:         0,
+			watchCacheResourceVersion:       99,
+			expectedBookmarkResourceVersion: 0,
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			backingStorage := &dummyStorage{}
+			cacher, _, err := newTestCacher(backingStorage)
+			require.NoError(t, err, "couldn't create cacher")
+
+			defer cacher.Stop()
+			if err := cacher.ready.wait(context.Background()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready")
+			}
+
+			cacher.watchCache.UpdateResourceVersion(fmt.Sprintf("%d", scenario.watchCacheResourceVersion))
+			parsedResourceVersion := 0
+			if len(scenario.opts.ResourceVersion) > 0 {
+				parsedResourceVersion, err = strconv.Atoi(scenario.opts.ResourceVersion)
+				require.NoError(t, err)
+			}
+
+			getBookMarkFn, err := cacher.getBookmarkAfterResourceVersionLockedFunc(uint64(parsedResourceVersion), uint64(scenario.requiredResourceVersion), scenario.opts)
+			require.NoError(t, err)
+			cacher.watchCache.RLock()
+			defer cacher.watchCache.RUnlock()
+			getBookMarkResourceVersion := getBookMarkFn()
+			require.Equal(t, uint64(scenario.expectedBookmarkResourceVersion), getBookMarkResourceVersion, "received unexpected ResourceVersion")
+		})
+	}
+}
+
+func TestWatchStreamSeparation(t *testing.T) {
+	tcs := []struct {
+		name                         string
+		separateCacheWatchRPC        bool
+		useWatchCacheContextMetadata bool
+		expectBookmarkOnWatchCache   bool
+		expectBookmarkOnEtcd         bool
+	}{
+		{
+			name:                       "common RPC > both get bookmarks",
+			separateCacheWatchRPC:      false,
+			expectBookmarkOnEtcd:       true,
+			expectBookmarkOnWatchCache: true,
+		},
+		{
+			name:                         "common RPC & watch cache context > both get bookmarks",
+			separateCacheWatchRPC:        false,
+			useWatchCacheContextMetadata: true,
+			expectBookmarkOnEtcd:         true,
+			expectBookmarkOnWatchCache:   true,
+		},
+		{
+			name:                       "separate RPC > only etcd gets bookmarks",
+			separateCacheWatchRPC:      true,
+			expectBookmarkOnEtcd:       true,
+			expectBookmarkOnWatchCache: false,
+		},
+		{
+			name:                         "separate RPC & watch cache context > only watch cache gets bookmarks",
+			separateCacheWatchRPC:        true,
+			useWatchCacheContextMetadata: true,
+			expectBookmarkOnEtcd:         false,
+			expectBookmarkOnWatchCache:   true,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)
+			_, cacher, _, terminate := testSetupWithEtcdServer(t)
+			t.Cleanup(terminate)
+			if err := cacher.ready.wait(context.TODO()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready")
+			}
+
+			getCacherRV := func() uint64 {
+				cacher.watchCache.RLock()
+				defer cacher.watchCache.RUnlock()
+				return cacher.watchCache.resourceVersion
+			}
+			waitContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			waitForEtcdBookmark := watchAndWaitForBookmark(t, waitContext, cacher.storage)
+
+			var out example.Pod
+			err := cacher.Create(context.Background(), "foo", &example.Pod{}, &out, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			versioner := storage.APIObjectVersioner{}
+			var lastResourceVersion uint64
+			lastResourceVersion, err = versioner.ObjectResourceVersion(&out)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var contextMetadata metadata.MD
+			if tc.useWatchCacheContextMetadata {
+				contextMetadata = cacher.watchCache.waitingUntilFresh.contextMetadata
+			}
+			// For the first 100ms from watch creation, watch progress requests are ignored.
+			time.Sleep(200 * time.Millisecond)
+			err = cacher.storage.RequestWatchProgress(metadata.NewOutgoingContext(context.Background(), contextMetadata))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Give time for bookmark to arrive
+			time.Sleep(time.Second)
+
+			etcdWatchResourceVersion := waitForEtcdBookmark()
+			gotEtcdWatchBookmark := etcdWatchResourceVersion == lastResourceVersion
+			if gotEtcdWatchBookmark != tc.expectBookmarkOnEtcd {
+				t.Errorf("Unexpected etcd bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", etcdWatchResourceVersion, lastResourceVersion, tc.expectBookmarkOnEtcd)
+			}
+
+			watchCacheResourceVersion := getCacherRV()
+			cacherGotBookmark := watchCacheResourceVersion == lastResourceVersion
+			if cacherGotBookmark != tc.expectBookmarkOnWatchCache {
+				t.Errorf("Unexpected watch cache bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", watchCacheResourceVersion, lastResourceVersion, tc.expectBookmarkOnWatchCache)
+			}
+		})
+	}
+}
+
+func watchAndWaitForBookmark(t *testing.T, ctx context.Context, etcdStorage storage.Interface) func() (resourceVersion uint64) {
+	opts := storage.ListOptions{ResourceVersion: "", Predicate: storage.Everything, Recursive: true}
+	opts.Predicate.AllowWatchBookmarks = true
+	w, err := etcdStorage.Watch(ctx, "/pods/", opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	versioner := storage.APIObjectVersioner{}
+	var rv uint64
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for event := range w.ResultChan() {
+			if event.Type == watch.Bookmark {
+				rv, err = versioner.ObjectResourceVersion(event.Object)
+				break
+			}
+		}
+	}()
+	return func() (resourceVersion uint64) {
+		defer w.Stop()
+		wg.Wait()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rv
+	}
 }

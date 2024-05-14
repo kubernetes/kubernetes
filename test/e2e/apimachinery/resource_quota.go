@@ -1219,7 +1219,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 })
 
-var _ = SIGDescribe("ResourceQuota", feature.ScopeSelectors, func() {
+var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("scope-selectors")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("should verify ResourceQuota with best effort scope using scope-selectors.", func(ctx context.Context) {

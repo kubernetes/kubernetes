@@ -425,7 +425,7 @@ type PersistentVolumeStatus struct {
 	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
 	// lastPhaseTransitionTime is the time the phase transitioned from one to another
 	// and automatically resets to current time everytime a volume phase transitions.
-	// This is an alpha field and requires enabling PersistentVolumeLastPhaseTransitionTime feature.
+	// This is a beta field and requires the PersistentVolumeLastPhaseTransitionTime feature to be enabled (enabled by default).
 	// +featureGate=PersistentVolumeLastPhaseTransitionTime
 	// +optional
 	LastPhaseTransitionTime *metav1.Time `json:"lastPhaseTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastPhaseTransitionTime"`
@@ -556,7 +556,7 @@ type PersistentVolumeClaimSpec struct {
 	// If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
 	// set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
 	// exists.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+	// More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
 	// (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
 	// +featureGate=VolumeAttributesClass
 	// +optional
@@ -2156,6 +2156,26 @@ type VolumeMount struct {
 	// Defaults to false.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+	// RecursiveReadOnly specifies whether read-only mounts should be handled
+	// recursively.
+	//
+	// If ReadOnly is false, this field has no meaning and must be unspecified.
+	//
+	// If ReadOnly is true, and this field is set to Disabled, the mount is not made
+	// recursively read-only.  If this field is set to IfPossible, the mount is made
+	// recursively read-only, if it is supported by the container runtime.  If this
+	// field is set to Enabled, the mount is made recursively read-only if it is
+	// supported by the container runtime, otherwise the pod will not be started and
+	// an error will be generated to indicate the reason.
+	//
+	// If this field is set to IfPossible or Enabled, MountPropagation must be set to
+	// None (or be unspecified, which defaults to None).
+	//
+	// If this field is not specified, it is treated as an equivalent of Disabled.
+	//
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,7,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
 	// Path within the container at which the volume should be mounted.  Must
 	// not contain ':'.
 	MountPath string `json:"mountPath" protobuf:"bytes,3,opt,name=mountPath"`
@@ -2167,6 +2187,8 @@ type VolumeMount struct {
 	// to container and the other way around.
 	// When not set, MountPropagationNone is used.
 	// This field is beta in 1.10.
+	// When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+	// (which defaults to None).
 	// +optional
 	MountPropagation *MountPropagationMode `json:"mountPropagation,omitempty" protobuf:"bytes,5,opt,name=mountPropagation,casttype=MountPropagationMode"`
 	// Expanded path within the volume from which the container's volume should be mounted.
@@ -2201,6 +2223,18 @@ const (
 	// Note that this mode is recursively applied to all mounts in the volume
 	// ("rshared" in Linux terminology).
 	MountPropagationBidirectional MountPropagationMode = "Bidirectional"
+)
+
+// RecursiveReadOnlyMode describes recursive-readonly mode.
+type RecursiveReadOnlyMode string
+
+const (
+	// RecursiveReadOnlyDisabled disables recursive-readonly mode.
+	RecursiveReadOnlyDisabled RecursiveReadOnlyMode = "Disabled"
+	// RecursiveReadOnlyIfPossible enables recursive-readonly mode if possible.
+	RecursiveReadOnlyIfPossible RecursiveReadOnlyMode = "IfPossible"
+	// RecursiveReadOnlyEnabled enables recursive-readonly mode, or raise an error.
+	RecursiveReadOnlyEnabled RecursiveReadOnlyMode = "Enabled"
 )
 
 // volumeDevice describes a mapping of a raw block device within a container.
@@ -2988,6 +3022,14 @@ type ContainerStatus struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,11,opt,name=resources"`
+	// Status of volume mounts.
+	// +optional
+	// +patchMergeKey=mountPath
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=mountPath
+	// +featureGate=RecursiveReadOnlyMounts
+	VolumeMounts []VolumeMountStatus `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,12,rep,name=volumeMounts"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -3096,6 +3138,23 @@ const (
 	// Requested pod resize is not feasible and will not be re-evaluated.
 	PodResizeStatusInfeasible PodResizeStatus = "Infeasible"
 )
+
+// VolumeMountStatus shows status of volume mounts.
+type VolumeMountStatus struct {
+	// Name corresponds to the name of the original VolumeMount.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// MountPath corresponds to the original VolumeMount.
+	MountPath string `json:"mountPath" protobuf:"bytes,2,opt,name=mountPath"`
+	// ReadOnly corresponds to the original VolumeMount.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+	// An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+	// depending on the mount result.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,4,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
+}
 
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
@@ -3367,7 +3426,8 @@ type PodAffinityTerm struct {
 	// pod labels will be ignored. The default value is empty.
 	// The same key is forbidden to exist in both matchLabelKeys and labelSelector.
 	// Also, matchLabelKeys cannot be set when labelSelector isn't set.
-	// This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+	// This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+	//
 	// +listType=atomic
 	// +optional
 	MatchLabelKeys []string `json:"matchLabelKeys,omitempty" protobuf:"bytes,5,opt,name=matchLabelKeys"`
@@ -3379,7 +3439,8 @@ type PodAffinityTerm struct {
 	// pod labels will be ignored. The default value is empty.
 	// The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
 	// Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-	// This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+	// This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+	//
 	// +listType=atomic
 	// +optional
 	MismatchLabelKeys []string `json:"mismatchLabelKeys,omitempty" protobuf:"bytes,6,opt,name=mismatchLabelKeys"`
@@ -3599,7 +3660,7 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty" protobuf:"bytes,8,opt,name=serviceAccountName"`
-	// DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
+	// DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
 	// Deprecated: Use serviceAccountName instead.
 	// +k8s:conversion-gen=false
 	// +optional
@@ -3608,9 +3669,11 @@ type PodSpec struct {
 	// +optional
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty" protobuf:"varint,21,opt,name=automountServiceAccountToken"`
 
-	// NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
-	// the scheduler simply schedules this pod onto that node, assuming that it fits resource
-	// requirements.
+	// NodeName indicates in which node this pod is scheduled.
+	// If empty, this pod is a candidate for scheduling by the scheduler defined in schedulerName.
+	// Once this field is set, the kubelet for this node becomes responsible for the lifecycle of this pod.
+	// This field should not be used to express a desire for the pod to be scheduled on a specific node.
+	// https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
 	// +optional
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
 	// Host networking requested for this pod. Use the host's network namespace.
@@ -3670,7 +3733,7 @@ type PodSpec struct {
 	// +listType=atomic
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 	// HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
-	// file if specified. This is only valid for non-hostNetwork pods.
+	// file if specified.
 	// +optional
 	// +patchMergeKey=ip
 	// +patchStrategy=merge
@@ -3757,6 +3820,7 @@ type PodSpec struct {
 	// - spec.hostPID
 	// - spec.hostIPC
 	// - spec.hostUsers
+	// - spec.securityContext.appArmorProfile
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
 	// - spec.securityContext.fsGroup
@@ -3766,6 +3830,7 @@ type PodSpec struct {
 	// - spec.securityContext.runAsUser
 	// - spec.securityContext.runAsGroup
 	// - spec.securityContext.supplementalGroups
+	// - spec.containers[*].securityContext.appArmorProfile
 	// - spec.containers[*].securityContext.seLinuxOptions
 	// - spec.containers[*].securityContext.seccompProfile
 	// - spec.containers[*].securityContext.capabilities
@@ -3797,13 +3862,10 @@ type PodSpec struct {
 	//
 	// SchedulingGates can only be set at pod creation time, and be removed only afterwards.
 	//
-	// This is a beta feature enabled by the PodSchedulingReadiness feature gate.
-	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	// +featureGate=PodSchedulingReadiness
 	// +optional
 	SchedulingGates []PodSchedulingGate `json:"schedulingGates,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,38,opt,name=schedulingGates"`
 	// ResourceClaims defines which ResourceClaims must be allocated
@@ -3871,7 +3933,7 @@ type PodResourceClaimStatus struct {
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
 	// ResourceClaimName is the name of the ResourceClaim that was
-	// generated for the Pod in the namespace of the Pod. It this is
+	// generated for the Pod in the namespace of the Pod. If this is
 	// unset, then generating a ResourceClaim was not necessary. The
 	// pod.spec.resourceClaims entry can be ignored in this case.
 	//
@@ -4010,8 +4072,6 @@ type TopologySpreadConstraint struct {
 	// In this situation, new pod with the same labelSelector cannot be scheduled,
 	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
 	// it will violate MaxSkew.
-	//
-	// This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
 	// +optional
 	MinDomains *int32 `json:"minDomains,omitempty" protobuf:"varint,5,opt,name=minDomains"`
 	// NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
@@ -4057,7 +4117,8 @@ const (
 // pod's hosts file.
 type HostAlias struct {
 	// IP address of the host file entry.
-	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+	// +required
+	IP string `json:"ip" protobuf:"bytes,1,opt,name=ip"`
 	// Hostnames for the above IP address.
 	// +listType=atomic
 	Hostnames []string `json:"hostnames,omitempty" protobuf:"bytes,2,rep,name=hostnames"`
@@ -4163,6 +4224,10 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,10,opt,name=seccompProfile"`
+	// appArmorProfile is the AppArmor options to use by the containers in this pod.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,11,opt,name=appArmorProfile"`
 }
 
 // SeccompProfile defines a pod/container's seccomp profile settings.
@@ -4197,6 +4262,38 @@ const (
 	// SeccompProfileTypeLocalhost indicates a profile defined in a file on the node should be used.
 	// The file's location relative to <kubelet-root-dir>/seccomp.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+)
+
+// AppArmorProfile defines a pod or container's AppArmor settings.
+// +union
+type AppArmorProfile struct {
+	// type indicates which kind of AppArmor profile will be applied.
+	// Valid options are:
+	//   Localhost - a profile pre-loaded on the node.
+	//   RuntimeDefault - the container runtime's default profile.
+	//   Unconfined - no AppArmor enforcement.
+	// +unionDiscriminator
+	Type AppArmorProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=AppArmorProfileType"`
+
+	// localhostProfile indicates a profile loaded on the node that should be used.
+	// The profile must be preconfigured on the node to work.
+	// Must match the loaded name of the profile.
+	// Must be set if and only if type is "Localhost".
+	// +optional
+	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+}
+
+// +enum
+type AppArmorProfileType string
+
+const (
+	// AppArmorProfileTypeUnconfined indicates that no AppArmor profile should be enforced.
+	AppArmorProfileTypeUnconfined AppArmorProfileType = "Unconfined"
+	// AppArmorProfileTypeRuntimeDefault indicates that the container runtime's default AppArmor
+	// profile should be used.
+	AppArmorProfileTypeRuntimeDefault AppArmorProfileType = "RuntimeDefault"
+	// AppArmorProfileTypeLocalhost indicates that a profile pre-loaded on the node should be used.
+	AppArmorProfileTypeLocalhost AppArmorProfileType = "Localhost"
 )
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -4911,6 +5008,18 @@ const (
 	ServiceExternalTrafficPolicyTypeCluster = ServiceExternalTrafficPolicyCluster
 )
 
+// These are valid values for the TrafficDistribution field of a Service.
+const (
+	// Indicates a preference for routing traffic to endpoints that are
+	// topologically proximate to the client. The interpretation of "topologically
+	// proximate" may vary across implementations and could encompass endpoints
+	// within the same node, rack, zone, or even region. Setting this value gives
+	// implementations permission to make different tradeoffs, e.g. optimizing for
+	// proximity rather than equal distribution of load. Users should not set this
+	// value if such tradeoffs are not acceptable.
+	ServiceTrafficDistributionPreferClose = "PreferClose"
+)
+
 // These are the valid conditions of a service.
 const (
 	// LoadBalancerPortsError represents the condition of the requested ports
@@ -5255,6 +5364,17 @@ type ServiceSpec struct {
 	// (possibly modified by topology and other features).
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
+
+	// TrafficDistribution offers a way to express preferences for how traffic is
+	// distributed to Service endpoints. Implementations can use this field as a
+	// hint, but are not required to guarantee strict adherence. If the field is
+	// not set, the implementation will apply its default routing strategy. If set
+	// to "PreferClose", implementations should prioritize endpoints that are
+	// topologically close (e.g., same zone).
+	// This is an alpha field and requires enabling ServiceTrafficDistribution feature.
+	// +featureGate=ServiceTrafficDistribution
+	// +optional
+	TrafficDistribution *string `json:"trafficDistribution,omitempty" protobuf:"bytes,23,opt,name=trafficDistribution"`
 }
 
 // ServicePort contains information on service's port.
@@ -5656,6 +5776,26 @@ type NodeDaemonEndpoints struct {
 	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty" protobuf:"bytes,1,opt,name=kubeletEndpoint"`
 }
 
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+type NodeRuntimeHandlerFeatures struct {
+	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty" protobuf:"varint,1,opt,name=recursiveReadOnlyMounts"`
+	// Reserved: UserNamespaces *bool (varint 2, for consistency with CRI API)
+}
+
+// NodeRuntimeHandler is a set of runtime handler information.
+type NodeRuntimeHandler struct {
+	// Runtime handler name.
+	// Empty for the default runtime handler.
+	// +optional
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// Supported features.
+	// +optional
+	Features *NodeRuntimeHandlerFeatures `json:"features,omitempty" protobuf:"bytes,2,opt,name=features"`
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
 	// MachineID reported by the node. For unique machine identification
@@ -5676,7 +5816,7 @@ type NodeSystemInfo struct {
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion" protobuf:"bytes,6,opt,name=containerRuntimeVersion"`
 	// Kubelet Version reported by the node.
 	KubeletVersion string `json:"kubeletVersion" protobuf:"bytes,7,opt,name=kubeletVersion"`
-	// KubeProxy Version reported by the node.
+	// Deprecated: KubeProxy Version reported by the node.
 	KubeProxyVersion string `json:"kubeProxyVersion" protobuf:"bytes,8,opt,name=kubeProxyVersion"`
 	// The Operating System reported by the node
 	OperatingSystem string `json:"operatingSystem" protobuf:"bytes,9,opt,name=operatingSystem"`
@@ -5792,6 +5932,11 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
+	// The available runtime handlers.
+	// +featureGate=RecursiveReadOnlyMounts
+	// +optional
+	// +listType=atomic
+	RuntimeHandlers []NodeRuntimeHandler `json:"runtimeHandlers,omitempty" protobuf:"bytes,12,rep,name=runtimeHandlers"`
 }
 
 type UniqueVolumeName string
@@ -5867,8 +6012,7 @@ const (
 type NodeConditionType string
 
 // These are valid but not exhaustive conditions of node. A cloud provider may set a condition not listed here.
-// The built-in set of conditions are:
-// NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
+// Relevant events contain "NodeReady", "NodeNotReady", "NodeSchedulable", and "NodeNotSchedulable".
 const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionType = "Ready"
@@ -6416,9 +6560,15 @@ type ObjectReference struct {
 // +structType=atomic
 type LocalObjectReference struct {
 	// Name of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// This field is effectively required, but due to backwards compatibility is
+	// allowed to be empty. Instances of this type with an empty value here are
+	// almost certainly wrong.
 	// TODO: Add other useful fields. apiVersion, kind, uid?
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	// +optional
+	// +default=""
+	// +kubebuilder:default=""
+	// TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
 
@@ -7094,7 +7244,7 @@ const (
 type DownwardAPIVolumeFile struct {
 	// Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
-	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	// Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
 	// +optional
 	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty" protobuf:"bytes,2,opt,name=fieldRef"`
 	// Selects a resource of the container: only resources limits and requests
@@ -7198,6 +7348,11 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,11,opt,name=seccompProfile"`
+	// appArmorProfile is the AppArmor options to use by this container. If set, this profile
+	// overrides the pod's appArmorProfile.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	AppArmorProfile *AppArmorProfile `json:"appArmorProfile,omitempty" protobuf:"bytes,12,opt,name=appArmorProfile"`
 }
 
 // +enum
@@ -7291,13 +7446,6 @@ type Sysctl struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Value of a property to set
 	Value string `json:"value" protobuf:"bytes,2,opt,name=value"`
-}
-
-// NodeResources is an object for conveying resource information about a node.
-// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
-type NodeResources struct {
-	// Capacity represents the available resources of a node
-	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
 }
 
 const (

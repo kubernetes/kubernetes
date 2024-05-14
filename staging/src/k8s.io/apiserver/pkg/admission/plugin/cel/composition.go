@@ -54,13 +54,22 @@ func NewCompositedCompiler(envSet *environment.EnvSet) (*CompositedCompiler, err
 	if err != nil {
 		return nil, err
 	}
-	compiler := NewCompiler(compositionContext.EnvSet)
-	filterCompiler := NewFilterCompiler(compositionContext.EnvSet)
+	return NewCompositedCompilerFromTemplate(compositionContext), nil
+}
+
+func NewCompositedCompilerFromTemplate(context *CompositionEnv) *CompositedCompiler {
+	context = &CompositionEnv{
+		MapType:           context.MapType,
+		EnvSet:            context.EnvSet,
+		CompiledVariables: map[string]CompilationResult{},
+	}
+	compiler := NewCompiler(context.EnvSet)
+	filterCompiler := NewFilterCompiler(context.EnvSet)
 	return &CompositedCompiler{
 		Compiler:       compiler,
 		FilterCompiler: filterCompiler,
-		CompositionEnv: compositionContext,
-	}, nil
+		CompositionEnv: context,
+	}
 }
 
 func (c *CompositedCompiler) CompileAndStoreVariables(variables []NamedExpressionAccessor, options OptionalVariableDeclarations, mode environment.Type) {

@@ -21,9 +21,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -537,7 +537,7 @@ func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 		imageStats  = &kubecontainer.ImageStats{TotalStorageBytes: 100}
 	)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, false)
 
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
@@ -577,7 +577,7 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 		ImageFilesystems:     []*runtimeapi.FilesystemUsage{imageFsInfoCRI},
 		ContainerFilesystems: []*runtimeapi.FilesystemUsage{imageFsInfoCRI},
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
 	mockCadvisor.EXPECT().ContainerFsInfo().Return(imageFsInfo, nil)
@@ -637,7 +637,7 @@ func TestCadvisorSplitImagesFsStats(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
 	mockCadvisor.EXPECT().ContainerFsInfo().Return(containerFsInfo, nil)
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
 	stats, containerfs, err := provider.ImageFsStats(ctx)
@@ -706,8 +706,8 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	containerLogStats0 := makeFakeLogStats(0)
 	containerLogStats1 := makeFakeLogStats(0)
 	fakeStats := map[string]*volume.Metrics{
-		kuberuntime.BuildContainerLogsDirectory(prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName00): containerLogStats0,
-		kuberuntime.BuildContainerLogsDirectory(prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName01): containerLogStats1,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName00): containerLogStats0,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName01): containerLogStats1,
 	}
 	fakeStatsSlice := []*volume.Metrics{containerLogStats0, containerLogStats1}
 	fakeOS := &containertest.FakeOS{}

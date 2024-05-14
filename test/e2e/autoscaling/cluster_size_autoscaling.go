@@ -124,7 +124,7 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 		framework.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
 		ginkgo.By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
-		framework.ExpectNotEqual(nodeCount, 0)
+		gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
 		mem := nodes.Items[0].Status.Allocatable[v1.ResourceMemory]
 		memAllocatableMb = int((&mem).Value() / 1024 / 1024)
 

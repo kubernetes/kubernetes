@@ -33,6 +33,7 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -55,12 +56,12 @@ func testingPod(name, value, defaultContainerName string) v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "container-1",
-					Image: agnhostImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"logs-generator", "--log-lines-total", "10", "--run-duration", "5s"},
 				},
 				{
 					Name:  defaultContainerName,
-					Image: agnhostImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"logs-generator", "--log-lines-total", "20", "--run-duration", "5s"},
 				},
 			},
@@ -94,7 +95,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("creating an pod")
 			// Agnhost image generates logs for a total of 100 lines over 20s.
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, "--restart=Never", podRunningTimeoutArg, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+imageutils.GetE2EImage(imageutils.Agnhost), "--restart=Never", podRunningTimeoutArg, "--", "logs-generator", "--log-lines-total", "100", "--run-duration", "20s")
 		})
 		ginkgo.AfterEach(func() {
 			e2ekubectl.RunKubectlOrDie(ns, "delete", "pod", podName)

@@ -17,7 +17,6 @@ limitations under the License.
 package openapi
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -56,11 +55,8 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)()
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)
 
 			getDefinitionsFn := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 				defs := generated.GetOpenAPIDefinitions(ref)
@@ -79,10 +75,10 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 				return defs
 			})
 
-			_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-					config.GenericConfig.OpenAPIConfig.GetDefinitions = getDefinitionsFn
+					config.ControlPlane.Generic.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+					config.ControlPlane.Generic.OpenAPIConfig.GetDefinitions = getDefinitionsFn
 				},
 			})
 			defer tearDownFn()

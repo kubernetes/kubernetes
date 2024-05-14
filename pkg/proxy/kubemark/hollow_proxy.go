@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -53,6 +54,7 @@ func (*FakeProxier) OnEndpointSliceAdd(slice *discoveryv1.EndpointSlice)        
 func (*FakeProxier) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointSlice) {}
 func (*FakeProxier) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice)           {}
 func (*FakeProxier) OnEndpointSlicesSynced()                                          {}
+func (*FakeProxier) OnServiceCIDRsChanged(_ []string)                                 {}
 
 func NewHollowProxy(
 	nodeName string,
@@ -84,7 +86,8 @@ func NewHollowProxy(
 }
 
 func (hp *HollowProxy) Run() error {
-	if err := hp.ProxyServer.Run(); err != nil {
+
+	if err := hp.ProxyServer.Run(context.TODO()); err != nil {
 		return fmt.Errorf("Error while running proxy: %w", err)
 	}
 	return nil

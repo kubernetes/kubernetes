@@ -135,6 +135,66 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 		// Verify PodReady is not set (since sandboxcreation is blocked)
 		_, err = getTransitionTimeForPodConditionWithStatus(p, v1.PodReady, false)
 		framework.ExpectNoError(err)
+
+		// this testcase is creating the missing volume that unblock the pod above,
+		// and check PodReadyToStartContainer is setting correctly.
+		ginkgo.By("checking pod condition for a pod when volumes source is created")
+
+		configmap := v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cm-that-unblock-pod-condition",
+			},
+			Data: map[string]string{
+				"key": "value",
+			},
+			BinaryData: map[string][]byte{
+				"binaryKey": []byte("value"),
+			},
+		}
+
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, &configmap, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		defer func() {
+			err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(ctx, "cm-that-unblock-pod-condition", metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "unable to delete configmap")
+		}()
+
+		p2 := webserverPodSpec("pod2-"+string(uuid.NewUUID()), "web2", "init2", hasInitContainers)
+		p2.Spec.Volumes = []v1.Volume{
+			{
+				Name: "cm-2",
+				VolumeSource: v1.VolumeSource{
+					ConfigMap: &v1.ConfigMapVolumeSource{
+						LocalObjectReference: v1.LocalObjectReference{Name: "cm-that-unblock-pod-condition"},
+					},
+				},
+			},
+		}
+		p2.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+			{
+				Name:      "cm-2",
+				MountPath: "/config",
+			},
+		}
+
+		p2 = e2epod.NewPodClient(f).Create(ctx, p2)
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, p2.Name, p2.Namespace, framework.PodStartTimeout))
+
+		p2, err = e2epod.NewPodClient(f).Get(ctx, p2.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		_, err = getTransitionTimeForPodConditionWithStatus(p2, v1.PodScheduled, true)
+		framework.ExpectNoError(err)
+
+		_, err = getTransitionTimeForPodConditionWithStatus(p2, v1.PodInitialized, true)
+		framework.ExpectNoError(err)
+
+		// Verify PodReadyToStartContainers is set (since sandboxcreation is unblocked)
+		if checkPodReadyToStart {
+			_, err = getTransitionTimeForPodConditionWithStatus(p2, v1.PodReadyToStartContainers, true)
+			framework.ExpectNoError(err)
+		}
 	}
 }
 

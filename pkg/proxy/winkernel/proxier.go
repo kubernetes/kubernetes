@@ -596,10 +596,9 @@ type Proxier struct {
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	// These are effectively const and do not need the mutex to be held.
-	clusterCIDR string
-	hostname    string
-	nodeIP      net.IP
-	recorder    events.EventRecorder
+	hostname string
+	nodeIP   net.IP
+	recorder events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxierHealthServer
@@ -654,26 +653,27 @@ func NewProxier(
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	clusterCIDR string,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxierHealthServer,
+	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
-	healthzPort int,
 ) (*Proxier, error) {
 	if nodeIP == nil {
 		klog.InfoS("Invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
 		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
 
-	if len(clusterCIDR) == 0 {
-		klog.InfoS("ClusterCIDR not specified, unable to distinguish between internal and external traffic")
-	}
-
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+
+	var healthzPort int
+	if len(healthzBindAddress) > 0 {
+		_, port, _ := net.SplitHostPort(healthzBindAddress)
+		healthzPort, _ = strconv.Atoi(port)
+	}
 
 	hcnImpl := newHcnImpl()
 	hns, supportedFeatures := newHostNetworkService(hcnImpl)
@@ -757,7 +757,6 @@ func NewProxier(
 		endPointsRefCount:     make(endPointsReferenceCountMap),
 		svcPortMap:            make(proxy.ServicePortMap),
 		endpointsMap:          make(proxy.EndpointsMap),
-		clusterCIDR:           clusterCIDR,
 		hostname:              hostname,
 		nodeIP:                nodeIP,
 		recorder:              recorder,
@@ -790,29 +789,28 @@ func NewProxier(
 func NewDualStackProxier(
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	clusterCIDR string,
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxierHealthServer,
+	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
-	healthzPort int,
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, syncPeriod, minSyncPeriod,
-		clusterCIDR, hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
-		config, healthzPort)
+		hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
+		healthzBindAddress, config)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv4Protocol])
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv4Protocol])
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, syncPeriod, minSyncPeriod,
-		clusterCIDR, hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
-		config, healthzPort)
+		hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
+		healthzBindAddress, config)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIPs[v1.IPv6Protocol])
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv6Protocol])
 	}
 
 	// Return a meta-proxier that dispatch calls between the two
@@ -1008,6 +1006,10 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	// Sync unconditionally - this is called once per lifetime.
 	proxier.syncProxyRules()
 }
+
+// OnServiceCIDRsChanged is called whenever a change is observed
+// in any of the ServiceCIDRs, and provides complete list of service cidrs.
+func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
 
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.svcPortMap {

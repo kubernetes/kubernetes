@@ -71,7 +71,7 @@ type StatefulSetController struct {
 	// revListerSynced returns true if the rev shared informer has synced at least once
 	revListerSynced cache.InformerSynced
 	// StatefulSets that need to be synced.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 	// eventBroadcaster is the core of event processing pipeline.
 	eventBroadcaster record.EventBroadcaster
 }
@@ -86,7 +86,7 @@ func NewStatefulSetController(
 	kubeClient clientset.Interface,
 ) *StatefulSetController {
 	logger := klog.FromContext(ctx)
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
@@ -98,12 +98,14 @@ func NewStatefulSetController(
 				recorder),
 			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister()),
 			history.NewHistory(kubeClient, revInformer.Lister()),
-			recorder,
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		revListerSynced: revInformer.Informer().HasSynced,
-		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
-		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "statefulset"},
+		),
+		podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 
 		eventBroadcaster: eventBroadcaster,
 	}
@@ -151,7 +153,7 @@ func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	// Start events processing pipeline.
-	ssc.eventBroadcaster.StartStructuredLogging(0)
+	ssc.eventBroadcaster.StartStructuredLogging(3)
 	ssc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ssc.kubeClient.CoreV1().Events("")})
 	defer ssc.eventBroadcaster.Shutdown()
 
@@ -235,6 +237,9 @@ func (ssc *StatefulSetController) updatePod(logger klog.Logger, old, cur interfa
 			return
 		}
 		logger.V(4).Info("Pod objectMeta updated", "pod", klog.KObj(curPod), "oldObjectMeta", oldPod.ObjectMeta, "newObjectMeta", curPod.ObjectMeta)
+		if oldPod.Status.Phase != curPod.Status.Phase {
+			logger.V(4).Info("StatefulSet Pod phase changed", "pod", klog.KObj(curPod), "statefulSet", klog.KObj(set), "podPhase", curPod.Status.Phase)
+		}
 		ssc.enqueueStatefulSet(set)
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning replica set thus
@@ -426,8 +431,8 @@ func (ssc *StatefulSetController) processNextWorkItem(ctx context.Context) bool 
 		return false
 	}
 	defer ssc.queue.Done(key)
-	if err := ssc.sync(ctx, key.(string)); err != nil {
-		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %v", key.(string), err))
+	if err := ssc.sync(ctx, key); err != nil {
+		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %w", key, err))
 		ssc.queue.AddRateLimited(key)
 	} else {
 		ssc.queue.Forget(key)

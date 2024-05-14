@@ -82,10 +82,6 @@ kube::log::error_exit() {
   local stack_skip="${3:-0}"
   stack_skip=$((stack_skip + 1))
 
-  # Always print the error message, regardless of KUBE_VERBOSE value
-  kube::log::error "${message}"
-
-  # Additional debug information printed if KUBE_VERBOSE is 4 or greater
   if [[ ${KUBE_VERBOSE} -ge 4 ]]; then
     local source_file=${BASH_SOURCE[${stack_skip}]}
     local source_line=${BASH_LINENO[$((stack_skip - 1))]}

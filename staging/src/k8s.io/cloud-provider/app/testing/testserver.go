@@ -109,6 +109,8 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		return TestServer{}, err
 	}
 
+	s.Generic.LeaderElection.LeaderElect = false
+
 	cloudInitializer := func(config *config.CompletedConfig) cloudprovider.Interface {
 		capturedConfig = *config
 		// send signal to indicate the capturedConfig has been properly set

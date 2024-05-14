@@ -277,21 +277,6 @@ func getTimeHashInMinutes(scheduledTime time.Time) int64 {
 	return scheduledTime.Unix() / 60
 }
 
-func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {
-	for _, c := range j.Status.Conditions {
-		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == corev1.ConditionTrue {
-			return true, c.Type
-		}
-	}
-	return false, ""
-}
-
-// IsJobFinished returns whether or not a job has completed successfully or failed.
-func IsJobFinished(j *batchv1.Job) bool {
-	isFinished, _ := getFinishedStatus(j)
-	return isFinished
-}
-
 // byJobStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
 type byJobStartTime []*batchv1.Job
 

@@ -39,6 +39,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -160,6 +161,27 @@ func (lcm *localCM) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceL
 	return lcm.capacity
 }
 
+type delegatingNodeLister struct {
+	client clientset.Interface
+}
+
+func (l delegatingNodeLister) Get(name string) (*v1.Node, error) {
+	return l.client.CoreV1().Nodes().Get(context.Background(), name, metav1.GetOptions{})
+}
+
+func (l delegatingNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
+	opts := metav1.ListOptions{}
+	if selector != nil {
+		opts.LabelSelector = selector.String()
+	}
+	nodeList, err := l.client.CoreV1().Nodes().List(context.Background(), opts)
+	if err != nil {
+		return nil, err
+	}
+	nodes := make([]*v1.Node, len(nodeList.Items))
+	return nodes, nil
+}
+
 func TestUpdateNewNodeStatus(t *testing.T) {
 	cases := []struct {
 		desc                string
@@ -211,6 +233,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			kubeClient := testKubelet.fakeKubeClient
 			existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+			kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 			machineInfo := &cadvisorapi.MachineInfo{
 				MachineID:      "123",
 				SystemUUID:     "abc",
@@ -268,7 +291,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 						Architecture:            goruntime.GOARCH,
 						ContainerRuntimeVersion: "test://1.5.0",
 						KubeletVersion:          version.Get().String(),
-						KubeProxyVersion:        version.Get().String(),
+						KubeProxyVersion:        "",
 					},
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -390,6 +413,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		},
 	}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+	kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -447,7 +471,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
+				KubeProxyVersion:        "",
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -602,6 +626,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
+	kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -652,7 +677,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
+				KubeProxyVersion:        "",
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -824,6 +849,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*existingNode}}).ReactionChain
+	kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -882,7 +908,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 				Architecture:            goruntime.GOARCH,
 				ContainerRuntimeVersion: "test://1.5.0",
 				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
+				KubeProxyVersion:        "",
 			},
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -1108,6 +1134,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 
 			kubeClient := testKubelet.fakeKubeClient
 			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*tc.existingNode}}).ReactionChain
+			kubelet.nodeLister = delegatingNodeLister{client: kubeClient}
 
 			// Execute
 			assert.NoError(t, kubelet.updateNodeStatus(ctx))
@@ -1260,11 +1287,15 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 				return
 			}
 
-			// patch, get, patch, get, patch, ... up to initial patch + nodeStatusUpdateRetry patches
-			require.Len(t, actions, 2*tc.wantPatches-1)
+			// patch, then patch, get, patch, get, patch, ... up to initial patch + nodeStatusUpdateRetry patches
+			expectedActions := 2*tc.wantPatches - 2
+			if tc.wantPatches == 1 {
+				expectedActions = 1
+			}
+			require.Len(t, actions, expectedActions)
 
 			for i, action := range actions {
-				if i%2 == 1 {
+				if i%2 == 0 && i > 0 {
 					require.IsType(t, core.GetActionImpl{}, action)
 					continue
 				}
@@ -1566,11 +1597,11 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	kubelet.updateRuntimeUp()
 	assert.NoError(t, kubelet.updateNodeStatus(ctx))
 	actions := kubeClient.Actions()
-	require.Len(t, actions, 2)
-	require.True(t, actions[1].Matches("patch", "nodes"))
-	require.Equal(t, actions[1].GetSubresource(), "status")
+	require.Len(t, actions, 1)
+	require.True(t, actions[0].Matches("patch", "nodes"))
+	require.Equal(t, actions[0].GetSubresource(), "status")
 
-	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
+	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[0].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", cmp.Diff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
 }

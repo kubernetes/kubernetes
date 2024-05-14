@@ -74,6 +74,8 @@ function stop()
     exit 0
 }
 
+# rpc.statd has issues with very high ulimits
+ulimit -n 65535
 
 trap stop TERM
 

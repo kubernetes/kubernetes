@@ -31,7 +31,8 @@ type Data interface {
 	EtcdUpgrade() bool
 	RenewCerts() bool
 	DryRun() bool
-	Cfg() *kubeadmapi.InitConfiguration
+	Cfg() *kubeadmapi.UpgradeConfiguration
+	InitCfg() *kubeadmapi.InitConfiguration
 	IsControlPlaneNode() bool
 	Client() clientset.Interface
 	IgnorePreflightErrors() sets.Set[string]

@@ -55,6 +55,7 @@ var (
 func Register(registry k8smetrics.KubeRegistry) {
 	registry.Register(healthcheck)
 	registry.Register(healthchecksTotal)
+	_ = k8smetrics.RegisterProcessStartTime(registry.Register)
 }
 
 func ResetHealthMetrics() {

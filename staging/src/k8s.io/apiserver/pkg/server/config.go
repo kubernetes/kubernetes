@@ -668,6 +668,11 @@ func (c *Config) DrainedNotify() <-chan struct{} {
 	return c.lifecycleSignals.InFlightRequestsDrained.Signaled()
 }
 
+// ShutdownInitiated returns a lifecycle signal of apiserver shutdown having been initiated.
+func (c *Config) ShutdownInitiatedNotify() <-chan struct{} {
+	return c.lifecycleSignals.ShutdownInitiated.Signaled()
+}
+
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
@@ -1011,6 +1016,10 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 
+	// WithWarningRecorder must be wrapped by the timeout handler
+	// to make the addition of warning headers threadsafe
+	handler = genericapifilters.WithWarningRecorder(handler)
+
 	// WithTimeoutForNonLongRunningRequests will call the rest of the request handling in a go-routine with the
 	// context with deadline. The go-routine can keep running, while the timeout logic will return a timeout to the client.
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
@@ -1024,7 +1033,6 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
-	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
 	if c.ShutdownSendRetryAfter {
@@ -1035,6 +1043,12 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
 	}
 	handler = genericapifilters.WithLatencyTrackers(handler)
+	// WithRoutine will execute future handlers in a separate goroutine and serving
+	// handler in current goroutine to minimize the stack memory usage. It must be
+	// after WithPanicRecover() to be protected from panics.
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServingWithRoutine) {
+		handler = genericfilters.WithRoutine(handler, c.LongRunningFunc)
+	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
 	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())

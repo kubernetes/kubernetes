@@ -23,7 +23,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	certutil "k8s.io/client-go/util/cert"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -189,7 +192,7 @@ func TestCreateCertificateChain(t *testing.T) {
 		t.Fatalf("unexpected error getting tree: %v", err)
 	}
 
-	if certTree.CreateTree(ic); err != nil {
+	if err := certTree.CreateTree(ic); err != nil {
 		t.Fatal(err)
 	}
 
@@ -297,6 +300,88 @@ func TestCreateKeyAndCSR(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := createKeyAndCSR(tt.args.kubeadmConfig, tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("createKeyAndCSR() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGetConfig(t *testing.T) {
+	var (
+		now      = time.Now()
+		backdate = kubeadmconstants.CertificateBackdate
+	)
+
+	tests := []struct {
+		name           string
+		cert           *KubeadmCert
+		cfg            *kubeadmapi.InitConfiguration
+		expectedConfig *pkiutil.CertConfig
+	}{
+		{
+			name: "encryption algorithm is set",
+			cert: &KubeadmCert{
+				creationTime: now,
+			},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
+				},
+			},
+			expectedConfig: &pkiutil.CertConfig{
+				Config: certutil.Config{
+					NotBefore: now.Add(-backdate),
+				},
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
+			},
+		},
+		{
+			name: "cert validity is set",
+			cert: &KubeadmCert{
+				CAName:       "some-ca",
+				creationTime: now,
+			},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					CertificateValidityPeriod: &metav1.Duration{
+						Duration: time.Hour * 1,
+					},
+				},
+			},
+			expectedConfig: &pkiutil.CertConfig{
+				Config: certutil.Config{
+					NotBefore: now.Add(-backdate),
+				},
+				NotAfter: now.Add(time.Hour * 1)},
+		},
+		{
+			name: "CA cert validity is set",
+			cert: &KubeadmCert{
+				CAName:       "",
+				creationTime: now,
+			},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					CACertificateValidityPeriod: &metav1.Duration{
+						Duration: time.Hour * 10,
+					},
+				},
+			},
+			expectedConfig: &pkiutil.CertConfig{
+				Config: certutil.Config{
+					NotBefore: now.Add(-backdate),
+				},
+				NotAfter: now.Add(time.Hour * 10),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := tt.cert.GetConfig(tt.cfg)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(actual, tt.expectedConfig); diff != "" {
+				t.Fatalf("GetConfig() returned diff (-want,+got):\n%s", diff)
 			}
 		})
 	}

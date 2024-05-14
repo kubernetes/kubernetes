@@ -36,12 +36,14 @@ import (
 
 	"gopkg.in/square/go-jose.v2"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 )
@@ -133,18 +135,20 @@ var (
 )
 
 type claimsTest struct {
-	name               string
-	options            Options
-	optsFunc           func(*Options)
-	signingKey         *jose.JSONWebKey
-	pubKeys            []*jose.JSONWebKey
-	claims             string
-	want               *user.DefaultInfo
-	wantSkip           bool
-	wantErr            string
-	wantInitErr        string
-	claimToResponseMap map[string]string
-	openIDConfig       string
+	name                string
+	options             Options
+	optsFunc            func(*Options)
+	signingKey          *jose.JSONWebKey
+	pubKeys             []*jose.JSONWebKey
+	claims              string
+	want                *user.DefaultInfo
+	wantSkip            bool
+	wantErr             string
+	wantInitErr         string
+	wantHealthErrPrefix string
+	claimToResponseMap  map[string]string
+	openIDConfig        string
+	fetchKeysFromRemote bool
 }
 
 // Replace formats the contents of v into the provided template.
@@ -174,7 +178,8 @@ func newClaimServer(t *testing.T, keys jose.JSONWebKeySet, signer jose.Signer, c
 			klog.V(5).Infof("%v: returning: %+v", r.URL, string(keyBytes))
 			w.Write(keyBytes)
 
-		case "/.well-known/openid-configuration":
+		// /c/d/bar/.well-known/openid-configuration is used to test issuer url and discovery url with a path
+		case "/.well-known/openid-configuration", "/c/d/bar/.well-known/openid-configuration":
 			w.Header().Set("Content-Type", "application/json")
 			klog.V(5).Infof("%v: returning: %+v", r.URL, *openIDConfig)
 			w.Write([]byte(*openIDConfig))
@@ -261,14 +266,17 @@ func (c *claimsTest) run(t *testing.T) {
 	c.claims = replace(c.claims, &v)
 	c.openIDConfig = replace(c.openIDConfig, &v)
 	c.options.JWTAuthenticator.Issuer.URL = replace(c.options.JWTAuthenticator.Issuer.URL, &v)
+	c.options.JWTAuthenticator.Issuer.DiscoveryURL = replace(c.options.JWTAuthenticator.Issuer.DiscoveryURL, &v)
 	for claim, response := range c.claimToResponseMap {
 		c.claimToResponseMap[claim] = replace(response, &v)
 	}
 	c.wantErr = replace(c.wantErr, &v)
 	c.wantInitErr = replace(c.wantInitErr, &v)
 
-	// Set the verifier to use the public key set instead of reading from a remote.
-	c.options.KeySet = &staticKeySet{keys: c.pubKeys}
+	if !c.fetchKeysFromRemote {
+		// Set the verifier to use the public key set instead of reading from a remote.
+		c.options.KeySet = &staticKeySet{keys: c.pubKeys}
+	}
 
 	if c.optsFunc != nil {
 		c.optsFunc(&c.options)
@@ -276,8 +284,10 @@ func (c *claimsTest) run(t *testing.T) {
 
 	expectInitErr := len(c.wantInitErr) > 0
 
+	ctx := testContext(t)
+
 	// Initialize the authenticator.
-	a, err := New(c.options)
+	a, err := New(ctx, c.options)
 	if err != nil {
 		if !expectInitErr {
 			t.Fatalf("initialize authenticator: %v", err)
@@ -289,6 +299,25 @@ func (c *claimsTest) run(t *testing.T) {
 	}
 	if expectInitErr {
 		t.Fatalf("wanted initialization error %q but got none", c.wantInitErr)
+	}
+
+	if len(c.wantHealthErrPrefix) > 0 {
+		if err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(context.Context) (bool, error) {
+			healthErr := a.HealthCheck()
+			if healthErr == nil {
+				return false, fmt.Errorf("authenticator reported healthy when it should not")
+			}
+
+			if strings.HasPrefix(healthErr.Error(), c.wantHealthErrPrefix) {
+				return true, nil
+			}
+
+			t.Logf("saw health error prefix that did not match: want=%q got=%q", c.wantHealthErrPrefix, healthErr.Error())
+			return false, nil
+		}); err != nil {
+			t.Fatalf("authenticator did not match wanted health error: %v", err)
+		}
+		return
 	}
 
 	claims := struct{}{}
@@ -306,7 +335,15 @@ func (c *claimsTest) run(t *testing.T) {
 		t.Fatalf("serialize token: %v", err)
 	}
 
-	got, ok, err := a.AuthenticateToken(testContext(t), token)
+	// wait for the authenticator to be healthy
+	err = wait.PollUntilContextCancel(ctx, time.Millisecond, true, func(context.Context) (bool, error) {
+		return a.HealthCheck() == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("failed to initialize the authenticator: %v", err)
+	}
+
+	got, ok, err := a.AuthenticateToken(ctx, token)
 
 	expectErr := len(c.wantErr) > 0
 
@@ -341,7 +378,7 @@ func (c *claimsTest) run(t *testing.T) {
 }
 
 func TestToken(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	synchronizeTokenIDVerifierForTest = true
 	tests := []claimsTest{
@@ -1522,6 +1559,179 @@ func TestToken(t *testing.T) {
 			},
 		},
 		{
+			name: "multiple-audiences in authentication config",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"random-client", "my-client"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["not-my-client", "my-client"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "multiple-audiences in authentication config, multiple matches",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"random-client", "my-client", "other-client"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["not-my-client", "my-client", "other-client"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "multiple-audiences in authentication config, no match",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"random-client", "my-client"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["not-my-client"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: `oidc: verify token: oidc: expected audience in ["my-client" "random-client"] got ["not-my-client"]`,
+		},
+		{
+			name: "nuanced audience validation using claim validation rules",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"bar", "foo", "baz"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: `sets.equivalent(claims.aud, ["bar", "foo", "baz"])`,
+							Message:    "audience must exactly contain [bar, foo, baz]",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["foo", "bar", "baz"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "audience validation using claim validation rules fails",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                 "https://auth.example.com",
+						Audiences:           []string{"bar", "foo", "baz"},
+						AudienceMatchPolicy: "MatchAny",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: `sets.equivalent(claims.aud, ["bar", "foo", "baz"])`,
+							Message:    "audience must exactly contain [bar, foo, baz]",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": ["foo", "baz"],
+				"azp": "not-my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: `oidc: error evaluating claim validation expression: validation expression 'sets.equivalent(claims.aud, ["bar", "foo", "baz"])' failed: audience must exactly contain [bar, foo, baz]`,
+		},
+		{
 			name: "invalid-issuer",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
@@ -1859,6 +2069,51 @@ func TestToken(t *testing.T) {
 				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
 			},
 			wantInitErr: "oidc: Client and CAContentProvider are mutually exclusive",
+		},
+		{
+			name: "keyset and discovery URL mutually exclusive",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com",
+						DiscoveryURL: "https://auth.example.com/foo",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String("prefix:"),
+						},
+					},
+				},
+				SupportedSigningAlgs: []string{"RS256"},
+				now:                  func() time.Time { return now },
+				KeySet:               &staticKeySet{},
+			},
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			wantInitErr: "oidc: KeySet and DiscoveryURL are mutually exclusive",
+		},
+		{
+			name: "health check failure",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://this-will-not-work.notatld",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String("prefix:"),
+						},
+					},
+				},
+				SupportedSigningAlgs: []string{"RS256"},
+			},
+			fetchKeysFromRemote: true,
+			wantHealthErrPrefix: `oidc: authenticator for issuer "https://this-will-not-work.notatld" is not healthy: Get "https://this-will-not-work.notatld/.well-known/openid-configuration": dial tcp: lookup this-will-not-work.notatld`,
 		},
 		{
 			name: "accounts.google.com issuer",
@@ -2573,6 +2828,58 @@ func TestToken(t *testing.T) {
 			wantInitErr: `claimMappings.extra[2].key: Duplicate value: "example.org/foo"`,
 		},
 		{
+			name: "disallowed issuer via configured value",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				DisallowedIssuers: []string{"https://auth.example.com"},
+				now:               func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `issuer.url: Invalid value: "https://auth.example.com": URL must not overlap with disallowed issuers: [https://auth.example.com]`,
+		},
+		{
 			name: "extra claim mapping, empty string value for key",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
@@ -2730,7 +3037,7 @@ func TestToken(t *testing.T) {
 		// test to ensure omitempty fields not included in user info
 		// are set and accessible for CEL evaluation.
 		{
-			name: "test user validation rule doesn't fail when user info is empty",
+			name: "test user validation rule doesn't fail when user info is empty except username",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
 					Issuer: apiserver.Issuer{
@@ -2740,6 +3047,58 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username == " "`,
+							Message:    "username must be single space",
+						},
+						{
+							Expression: `user.uid == ""`,
+							Message:    "uid must be empty string",
+						},
+						{
+							Expression: `!('bar' in user.groups)`,
+							Message:    "groups must not contain bar",
+						},
+						{
+							Expression: `!('bar' in user.extra)`,
+							Message:    "extra must not contain bar",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": " ",
+				"groups": null,
+				"exp": %d,
+				"baz": "qux"
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{Name: " "},
+		},
+		{
+			name: "empty username is allowed via claim",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Expression: "claims.groups",
@@ -2780,9 +3139,239 @@ func TestToken(t *testing.T) {
 			}`, valid.Unix()),
 			want: &user.DefaultInfo{},
 		},
+		// test to assert the minimum valid jwt payload
+		// the required claims are iss, aud, exp and <claimMappings.Username> (in this case user).
+		{
+			name: "minimum valid jwt payload",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.user",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"user": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery-url",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com",
+						DiscoveryURL: "{{.URL}}/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url, issuer has a path",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com/a/b/foo",
+						DiscoveryURL: "{{.URL}}/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com/a/b/foo",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com/a/b/foo",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url has a path, issuer url has no path",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com",
+						DiscoveryURL: "{{.URL}}/c/d/bar/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url and issuer url have paths",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com/a/b/foo",
+						DiscoveryURL: "{{.URL}}/c/d/bar/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com/a/b/foo",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com/a/b/foo",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "discovery url and issuer url have paths, issuer url has trailing slash",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:          "https://auth.example.com/a/b/foo/",
+						DiscoveryURL: "{{.URL}}/c/d/bar/.well-known/openid-configuration",
+						Audiences:    []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: pointer.String(""),
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com/a/b/foo/",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com/a/b/foo/",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
 	}
+
+	var successTestCount, failureTestCount int
 	for _, test := range tests {
 		t.Run(test.name, test.run)
+		if test.wantSkip || len(test.wantInitErr) > 0 || len(test.wantHealthErrPrefix) > 0 {
+			continue
+		}
+		// check metrics for success and failure
+		if test.wantErr == "" {
+			successTestCount++
+			testutil.AssertHistogramTotalCount(t, "apiserver_authentication_jwt_authenticator_latency_seconds", map[string]string{"result": "success"}, successTestCount)
+		} else {
+			failureTestCount++
+			testutil.AssertHistogramTotalCount(t, "apiserver_authentication_jwt_authenticator_latency_seconds", map[string]string{"result": "failure"}, failureTestCount)
+		}
 	}
 }
 

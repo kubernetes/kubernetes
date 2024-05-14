@@ -129,7 +129,7 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 // 8. No-op updates to the secret should cause new AES GCM key to be used
 // 9. Direct AES GCM decryption works after the new AES GCM key is used
 func TestKMSProvider(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	encryptionConfig := `
 kind: EncryptionConfiguration
@@ -307,7 +307,7 @@ resources:
 // 10. confirm that cluster wide secret read still works
 // 11. confirm that api server can restart with last applied encryption config
 func TestEncryptionConfigHotReload(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
@@ -357,6 +357,7 @@ resources:
 	wantMetricStrings := []string{
 		`apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 		`apiserver_encryption_config_controller_automatic_reload_success_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795"} 2`,
+		`apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 2`,
 	}
 
 	test.secret, err = test.createSecret(testSecret, testNamespace)
@@ -620,10 +621,10 @@ resources:
 	t.Run("encrypt all resources", func(t *testing.T) {
 		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 		// To ensure we are checking all REST resources
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)()
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
 		// Need to enable this explicitly as the feature is deprecated
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 		test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 		if err != nil {
@@ -749,7 +750,7 @@ resources:
 	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
 	if err != nil {
@@ -822,7 +823,7 @@ resources:
 }
 
 func TestEncryptionConfigHotReloadFilePolling(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
@@ -1090,7 +1091,7 @@ func updateFile(t *testing.T, configDir, filename string, newContent []byte) {
 }
 
 func TestKMSHealthz(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	encryptionConfig := `
 kind: EncryptionConfiguration
@@ -1153,7 +1154,7 @@ resources:
 }
 
 func TestKMSHealthzWithReload(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	encryptionConfig := `
 kind: EncryptionConfiguration

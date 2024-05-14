@@ -118,6 +118,7 @@ type SchedulingQueue interface {
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod)
 	PendingPods() ([]*v1.Pod, string)
+	PodsInActiveQ() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
@@ -409,6 +410,26 @@ const (
 	queueImmediately
 )
 
+// isEventOfInterest returns true if the event is of interest by some plugins.
+func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event framework.ClusterEvent) bool {
+	if event.IsWildCard() {
+		return true
+	}
+
+	for _, hintMap := range p.queueingHintMap {
+		for eventToMatch := range hintMap {
+			if eventToMatch.Match(event) {
+				// This event is interested by some plugins.
+				return true
+			}
+		}
+	}
+
+	logger.V(6).Info("receive an event that isn't interested by any enabled plugins", "event", event)
+
+	return false
+}
+
 // isPodWorthRequeuing calls QueueingHintFn of only plugins registered in pInfo.unschedulablePlugins and pInfo.PendingPlugins.
 //
 // If any of pInfo.PendingPlugins return Queue,
@@ -441,7 +462,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 	pod := pInfo.Pod
 	queueStrategy := queueSkip
 	for eventToMatch, hintfns := range hintMap {
-		if eventToMatch.Resource != event.Resource || eventToMatch.ActionType&event.ActionType == 0 {
+		if !eventToMatch.Match(event) {
 			continue
 		}
 
@@ -1077,6 +1098,12 @@ func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v
 // if Pop() is waiting for an item, it receives the signal after all the pods are in the
 // queue and the head is the highest priority pod.
 func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event framework.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
+	if !p.isEventOfInterest(logger, event) {
+		// No plugin is interested in this event.
+		// Return early before iterating all pods in unschedulablePods for preCheck.
+		return
+	}
+
 	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		if preCheck == nil || preCheck(pInfo.Pod) {
@@ -1141,8 +1168,18 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) {
+	if !p.isEventOfInterest(logger, event) {
+		// No plugin is interested in this event.
+		return
+	}
+
 	activated := false
 	for _, pInfo := range podInfoList {
+		// Since there may be many gated pods and they will not move from the
+		// unschedulable pool, we skip calling the expensive isPodWorthRequeueing.
+		if pInfo.Gated {
+			continue
+		}
 		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
 		if schedulingHint == queueSkip {
 			// QueueingHintFn determined that this Pod isn't worth putting to activeQ or backoffQ by this event.
@@ -1194,6 +1231,18 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(logger klog
 
 	}
 	return podsToMove
+}
+
+// PodsInActiveQ returns all the Pods in the activeQ.
+// This function is only used in tests.
+func (p *PriorityQueue) PodsInActiveQ() []*v1.Pod {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	var result []*v1.Pod
+	for _, pInfo := range p.activeQ.List() {
+		result = append(result, pInfo.(*framework.QueuedPodInfo).Pod)
+	}
+	return result
 }
 
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"

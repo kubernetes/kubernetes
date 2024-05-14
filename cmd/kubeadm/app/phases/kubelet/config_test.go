@@ -58,7 +58,7 @@ func TestCreateConfigMap(t *testing.T) {
 		t.Fatalf("unexpected failure when defaulting InitConfiguration: %v", err)
 	}
 
-	if err := CreateConfigMap(&internalcfg.ClusterConfiguration, "", client); err != nil {
+	if err := CreateConfigMap(&internalcfg.ClusterConfiguration, client); err != nil {
 		t.Errorf("CreateConfigMap: unexpected error %v", err)
 	}
 }

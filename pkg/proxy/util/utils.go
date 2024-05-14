@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -85,11 +84,6 @@ func IsLoopBack(ip string) bool {
 		return netIP.IsLoopback()
 	}
 	return false
-}
-
-// Resolver is an interface for net.Resolver
-type Resolver interface {
-	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
 // GetLocalAddrs returns a list of all network addresses on the local system

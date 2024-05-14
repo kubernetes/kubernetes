@@ -36,6 +36,7 @@ type CheckpointState interface {
 }
 
 // ClaimInfoState is used to store claim info state in a checkpoint
+// +k8s:deepcopy-gen=true
 type ClaimInfoState struct {
 	// Name of the DRA driver
 	DriverName string

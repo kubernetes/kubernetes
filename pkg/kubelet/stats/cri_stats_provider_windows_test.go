@@ -22,8 +22,16 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
+	"k8s.io/kubernetes/pkg/volume"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -425,4 +433,124 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 
 func toP(i uint64) *uint64 {
 	return &i
+}
+
+func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Time{})
+	containerStartTime := fakeClock.Now()
+
+	cpuUsageTimestamp := int64(555555)
+	cpuUsageNanoSeconds := uint64(0x123456)
+	cpuUsageNanoCores := uint64(0x4000)
+	memoryUsageTimestamp := int64(666666)
+	memoryUsageWorkingSetBytes := uint64(0x11223344)
+	memoryUsageAvailableBytes := uint64(0x55667788)
+	memoryUsagePageFaults := uint64(200)
+	logStatsUsed := uint64(5000)
+	logStatsInodesUsed := uint64(5050)
+
+	// getPodContainerLogStats is called during makeWindowsContainerStats to populate ContainerStats.Logs
+	c0LogStats := &volume.Metrics{
+		Used:       resource.NewQuantity(int64(logStatsUsed), resource.BinarySI),
+		InodesUsed: resource.NewQuantity(int64(logStatsInodesUsed), resource.BinarySI),
+	}
+	fakeStats := map[string]*volume.Metrics{
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sb0-ns", "sb0-name", types.UID("sb0-uid"), "c0"): c0LogStats,
+	}
+	fakeOS := &kubecontainertest.FakeOS{}
+	fakeHostStatsProvider := NewFakeHostStatsProviderWithData(fakeStats, fakeOS)
+
+	p := &criStatsProvider{
+		clock:             fakeClock,
+		hostStatsProvider: fakeHostStatsProvider,
+	}
+
+	inputStats := &runtimeapi.WindowsContainerStats{
+		Attributes: &runtimeapi.ContainerAttributes{
+			Metadata: &runtimeapi.ContainerMetadata{
+				Name: "c0",
+			},
+		},
+		Cpu: &runtimeapi.WindowsCpuUsage{
+			Timestamp: cpuUsageTimestamp,
+			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+				Value: cpuUsageNanoSeconds,
+			},
+			UsageNanoCores: &runtimeapi.UInt64Value{
+				Value: cpuUsageNanoCores,
+			},
+		},
+		Memory: &runtimeapi.WindowsMemoryUsage{
+			Timestamp: memoryUsageTimestamp,
+			AvailableBytes: &runtimeapi.UInt64Value{
+				Value: memoryUsageAvailableBytes,
+			},
+			WorkingSetBytes: &runtimeapi.UInt64Value{
+				Value: memoryUsageWorkingSetBytes,
+			},
+			PageFaults: &runtimeapi.UInt64Value{
+				Value: memoryUsagePageFaults,
+			},
+		},
+	}
+
+	inputContainer := &runtimeapi.Container{
+		CreatedAt: containerStartTime.Unix(),
+		Metadata: &runtimeapi.ContainerMetadata{
+			Name: "c0",
+		},
+	}
+
+	inputRootFsInfo := &cadvisorapiv2.FsInfo{}
+
+	// Used by the getPodContainerLogStats() call in makeWinContainerStats()
+	inputPodSandboxMetadata := &runtimeapi.PodSandboxMetadata{
+		Namespace: "sb0-ns",
+		Name:      "sb0-name",
+		Uid:       "sb0-uid",
+	}
+
+	got, err := p.makeWinContainerStats(inputStats, inputContainer, inputRootFsInfo, make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
+
+	expected := &statsapi.ContainerStats{
+		Name:      "c0",
+		StartTime: v1.NewTime(time.Unix(0, containerStartTime.Unix())),
+		CPU: &statsapi.CPUStats{
+			Time:                 v1.NewTime(time.Unix(0, cpuUsageTimestamp)),
+			UsageNanoCores:       toP(cpuUsageNanoCores),
+			UsageCoreNanoSeconds: toP(cpuUsageNanoSeconds),
+		},
+		Memory: &statsapi.MemoryStats{
+			Time:            v1.NewTime(time.Unix(0, memoryUsageTimestamp)),
+			AvailableBytes:  toP(memoryUsageAvailableBytes),
+			WorkingSetBytes: toP(memoryUsageWorkingSetBytes),
+			PageFaults:      toP(memoryUsagePageFaults),
+		},
+		Rootfs: &statsapi.FsStats{},
+		Logs: &statsapi.FsStats{
+			Time:       c0LogStats.Time,
+			UsedBytes:  toP(logStatsUsed),
+			InodesUsed: toP(logStatsInodesUsed),
+		},
+	}
+
+	if err != nil {
+		t.Fatalf("makeWinContainerStats() error = %v, expected no error", err)
+	}
+
+	if !reflect.DeepEqual(got.CPU, expected.CPU) {
+		t.Errorf("makeWinContainerStats() CPU = %v, expected %v", got.CPU, expected.CPU)
+	}
+
+	if !reflect.DeepEqual(got.Memory, expected.Memory) {
+		t.Errorf("makeWinContainerStats() Memory = %v, want %v", got.Memory, expected.Memory)
+	}
+
+	if !reflect.DeepEqual(got.Rootfs, expected.Rootfs) {
+		t.Errorf("makeWinContainerStats() Rootfs = %v, want %v", got.Rootfs, expected.Rootfs)
+	}
+
+	// Log stats contain pointers to calculated resource values so we cannot use DeepEqual here
+	assert.Equal(t, *got.Logs.UsedBytes, logStatsUsed, "Logs.UsedBytes does not match expected value")
+	assert.Equal(t, *got.Logs.InodesUsed, logStatsInodesUsed, "Logs.InodesUsed does not match expected value")
 }

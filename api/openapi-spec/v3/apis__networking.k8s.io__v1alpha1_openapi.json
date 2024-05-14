@@ -97,6 +97,9 @@
             "description": "ParentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object."
           }
         },
+        "required": [
+          "parentRef"
+        ],
         "type": "object"
       },
       "io.k8s.api.networking.v1alpha1.ParentReference": {
@@ -119,6 +122,10 @@
             "type": "string"
           }
         },
+        "required": [
+          "resource",
+          "name"
+        ],
         "type": "object"
       },
       "io.k8s.api.networking.v1alpha1.ServiceCIDR": {
@@ -746,6 +753,11 @@
             "group": "storage.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           }
         ]
       },
@@ -1425,6 +1437,11 @@
             "group": "storage.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           }
         ]
       },

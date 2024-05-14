@@ -22,6 +22,14 @@ package v1
 // MutatingWebhookConfigurationLister.
 type MutatingWebhookConfigurationListerExpansion interface{}
 
+// ValidatingAdmissionPolicyListerExpansion allows custom methods to be added to
+// ValidatingAdmissionPolicyLister.
+type ValidatingAdmissionPolicyListerExpansion interface{}
+
+// ValidatingAdmissionPolicyBindingListerExpansion allows custom methods to be added to
+// ValidatingAdmissionPolicyBindingLister.
+type ValidatingAdmissionPolicyBindingListerExpansion interface{}
+
 // ValidatingWebhookConfigurationListerExpansion allows custom methods to be added to
 // ValidatingWebhookConfigurationLister.
 type ValidatingWebhookConfigurationListerExpansion interface{}

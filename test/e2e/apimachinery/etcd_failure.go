@@ -84,7 +84,7 @@ func etcdFailTest(ctx context.Context, f *framework.Framework, failCommand, fixC
 
 	checkExistingRCRecovers(ctx, f)
 
-	apps.TestReplicationControllerServeImageOrFail(ctx, f, "basic", framework.ServeHostnameImage)
+	apps.TestReplicationControllerServeImageOrFail(ctx, f, "basic", imageutils.GetE2EImage(imageutils.Agnhost))
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.

@@ -31,8 +31,7 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/test/e2e/feature"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -40,66 +39,16 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeature.PodHostIPs, feature.PodHostIPs, func() {
-	f := framework.NewDefaultFramework("dualstack")
+var _ = common.SIGDescribe("Pod Host IPs", framework.WithSerial(), func() {
+	f := framework.NewDefaultFramework("host-ips")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.Context("when creating a Pod, it has no PodHostIPs feature", func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): false,
-			}
-		})
-		ginkgo.It("should create pod, add host ips is empty", func(ctx context.Context) {
-
-			podName := "pod-dualstack-host-ips"
-
-			pod := genPodHostIPs(podName+string(uuid.NewUUID()), false)
-
-			ginkgo.By("submitting the pod to kubernetes")
-			podClient := e2epod.NewPodClient(f)
-			p := podClient.CreateSync(ctx, pod)
-
-			gomega.Expect(p.Status.HostIP).ShouldNot(gomega.BeEquivalentTo(""))
-			gomega.Expect(p.Status.HostIPs).Should(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
-		})
-
-		ginkgo.It("should create pod with hostNetwork, add host ips is empty", func(ctx context.Context) {
-
-			podName := "pod-dualstack-host-ips"
-
-			pod := genPodHostIPs(podName+string(uuid.NewUUID()), true)
-
-			ginkgo.By("submitting the pod to kubernetes")
-			podClient := e2epod.NewPodClient(f)
-			p := podClient.CreateSync(ctx, pod)
-
-			gomega.Expect(p.Status.HostIP).ShouldNot(gomega.BeEquivalentTo(""))
-			gomega.Expect(p.Status.HostIPs).Should(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err := podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
-		})
-	})
-
-	ginkgo.Context("when creating a Pod, it has PodHostIPs feature", func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): true,
-			}
-		})
-		ginkgo.It("should create pod, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
-
+	ginkgo.Context("when creating a Pod", func() {
+		ginkgo.It("should add node IPs of all supported families to hostIPs of pod-network pod", func(ctx context.Context) {
 			podName := "pod-dualstack-host-ips"
 
 			pod := genPodHostIPs(podName+string(uuid.NewUUID()), false)
@@ -120,28 +69,17 @@ var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeat
 				}
 			}
 
-			nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
-			for _, node := range nodeList.Items {
-				if node.Name == p.Spec.NodeName {
-					nodeIPs := []v1.HostIP{}
-					for _, address := range node.Status.Addresses {
-						if address.Type == v1.NodeInternalIP {
-							nodeIPs = append(nodeIPs, v1.HostIP{IP: address.Address})
-						}
-					}
-					gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(nodeIPs))
-					break
-				}
-			}
+			ginkgo.By("comparing pod.Status.HostIPs against node.Status.Addresses")
+			hostIPs, err := genHostIPsForNode(ctx, f, p.Spec.NodeName)
+			framework.ExpectNoError(err, "failed to fetch node IPs")
+			gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(hostIPs))
 
 			ginkgo.By("deleting the pod")
 			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
 			framework.ExpectNoError(err, "failed to delete pod")
 		})
 
-		ginkgo.It("should create pod with hostNetwork, add ipv6 and ipv4 ip to host ips", func(ctx context.Context) {
-
+		ginkgo.It("should add node IPs of all supported families to hostIPs of host-network pod", func(ctx context.Context) {
 			podName := "pod-dualstack-host-ips"
 
 			pod := genPodHostIPs(podName+string(uuid.NewUUID()), true)
@@ -162,20 +100,10 @@ var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeat
 				}
 			}
 
-			nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
-			framework.ExpectNoError(err)
-			for _, node := range nodeList.Items {
-				if node.Name == p.Spec.NodeName {
-					nodeIPs := []v1.HostIP{}
-					for _, address := range node.Status.Addresses {
-						if address.Type == v1.NodeInternalIP {
-							nodeIPs = append(nodeIPs, v1.HostIP{IP: address.Address})
-						}
-					}
-					gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(nodeIPs))
-					break
-				}
-			}
+			ginkgo.By("comparing pod.Status.HostIPs against node.Status.Addresses")
+			hostIPs, err := genHostIPsForNode(ctx, f, p.Spec.NodeName)
+			framework.ExpectNoError(err, "failed to fetch node IPs")
+			gomega.Expect(p.Status.HostIPs).Should(gomega.Equal(hostIPs))
 
 			ginkgo.By("deleting the pod")
 			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
@@ -207,63 +135,6 @@ var _ = common.SIGDescribe("DualStack Host IP", framework.WithSerial(), nodefeat
 			testDownwardAPI(ctx, f, podName, env, expectations)
 		})
 	})
-
-	ginkgo.Context("when feature rollback", func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): true,
-			}
-		})
-		ginkgo.It("should able upgrade and rollback", func(ctx context.Context) {
-			podName := "pod-dualstack-host-ips"
-
-			pod := genPodHostIPs(podName+string(uuid.NewUUID()), false)
-
-			ginkgo.By("submitting the pod to kubernetes")
-			podClient := e2epod.NewPodClient(f)
-			p := podClient.CreateSync(ctx, pod)
-
-			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
-
-			ginkgo.By("Disable PodHostIPs feature")
-			cfg, err := getCurrentKubeletConfig(ctx)
-			framework.ExpectNoError(err)
-
-			newCfg := cfg.DeepCopy()
-			newCfg.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): false,
-			}
-
-			updateKubeletConfig(ctx, f, newCfg, true)
-
-			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
-
-			ginkgo.By("recreate pod")
-			pod = genPodHostIPs(podName+string(uuid.NewUUID()), false)
-			p = podClient.CreateSync(ctx, pod)
-			// Feature PodHostIPs is disabled, HostIPs should be nil
-			gomega.Expect(p.Status.HostIPs).Should(gomega.BeNil())
-
-			newCfg.FeatureGates = map[string]bool{
-				string(kubefeatures.PodHostIPs): true,
-			}
-
-			updateKubeletConfig(ctx, f, newCfg, true)
-
-			p, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			// Feature PodHostIPs is enabled, HostIPs should not be nil
-			gomega.Expect(p.Status.HostIPs).ShouldNot(gomega.BeNil())
-
-			ginkgo.By("deleting the pod")
-			err = podClient.Delete(ctx, pod.Name, *metav1.NewDeleteOptions(1))
-			framework.ExpectNoError(err, "failed to delete pod")
-		})
-	})
 })
 
 func genPodHostIPs(podName string, hostNetwork bool) *v1.Pod {
@@ -283,6 +154,27 @@ func genPodHostIPs(podName string, hostNetwork bool) *v1.Pod {
 			HostNetwork:   hostNetwork,
 		},
 	}
+}
+
+func genHostIPsForNode(ctx context.Context, f *framework.Framework, nodeName string) ([]v1.HostIP, error) {
+	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+	if err != nil {
+		return nil, err
+	}
+	for _, node := range nodeList.Items {
+		if node.Name == nodeName {
+			nodeIPs, err := utilnode.GetNodeHostIPs(&node)
+			if err != nil {
+				return nil, err
+			}
+			hostIPs := []v1.HostIP{}
+			for _, ip := range nodeIPs {
+				hostIPs = append(hostIPs, v1.HostIP{IP: ip.String()})
+			}
+			return hostIPs, nil
+		}
+	}
+	return nil, fmt.Errorf("no such node %q", nodeName)
 }
 
 func testDownwardAPI(ctx context.Context, f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {

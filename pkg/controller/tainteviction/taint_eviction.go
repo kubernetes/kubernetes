@@ -102,8 +102,8 @@ type Controller struct {
 	nodeUpdateChannels []chan nodeUpdateItem
 	podUpdateChannels  []chan podUpdateItem
 
-	nodeUpdateQueue workqueue.Interface
-	podUpdateQueue  workqueue.Interface
+	nodeUpdateQueue workqueue.TypedInterface[nodeUpdateItem]
+	podUpdateQueue  workqueue.TypedInterface[podUpdateItem]
 }
 
 func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), controllerName string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
@@ -188,7 +188,7 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 func New(ctx context.Context, c clientset.Interface, podInformer corev1informers.PodInformer, nodeInformer corev1informers.NodeInformer, controllerName string) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 	metrics.Register()
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	podIndexer := podInformer.Informer().GetIndexer()
@@ -220,8 +220,8 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 		},
 		taintedNodes: make(map[string][]v1.Taint),
 
-		nodeUpdateQueue: workqueue.NewWithConfig(workqueue.QueueConfig{Name: "noexec_taint_node"}),
-		podUpdateQueue:  workqueue.NewWithConfig(workqueue.QueueConfig{Name: "noexec_taint_pod"}),
+		nodeUpdateQueue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[nodeUpdateItem]{Name: "noexec_taint_node"}),
+		podUpdateQueue:  workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[podUpdateItem]{Name: "noexec_taint_pod"}),
 	}
 	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
 
@@ -286,7 +286,7 @@ func (tc *Controller) Run(ctx context.Context) {
 	defer logger.Info("Shutting down controller", "controller", tc.name)
 
 	// Start events processing pipeline.
-	tc.broadcaster.StartStructuredLogging(0)
+	tc.broadcaster.StartStructuredLogging(3)
 	if tc.client != nil {
 		logger.Info("Sending events to api server")
 		tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
@@ -312,15 +312,14 @@ func (tc *Controller) Run(ctx context.Context) {
 	// into channels.
 	go func(stopCh <-chan struct{}) {
 		for {
-			item, shutdown := tc.nodeUpdateQueue.Get()
+			nodeUpdate, shutdown := tc.nodeUpdateQueue.Get()
 			if shutdown {
 				break
 			}
-			nodeUpdate := item.(nodeUpdateItem)
 			hash := hash(nodeUpdate.nodeName, UpdateWorkerSize)
 			select {
 			case <-stopCh:
-				tc.nodeUpdateQueue.Done(item)
+				tc.nodeUpdateQueue.Done(nodeUpdate)
 				return
 			case tc.nodeUpdateChannels[hash] <- nodeUpdate:
 				// tc.nodeUpdateQueue.Done is called by the nodeUpdateChannels worker
@@ -330,7 +329,7 @@ func (tc *Controller) Run(ctx context.Context) {
 
 	go func(stopCh <-chan struct{}) {
 		for {
-			item, shutdown := tc.podUpdateQueue.Get()
+			podUpdate, shutdown := tc.podUpdateQueue.Get()
 			if shutdown {
 				break
 			}
@@ -338,11 +337,10 @@ func (tc *Controller) Run(ctx context.Context) {
 			// between node worker setting tc.taintedNodes and pod worker reading this to decide
 			// whether to delete pod.
 			// It's possible that even without this assumption this code is still correct.
-			podUpdate := item.(podUpdateItem)
 			hash := hash(podUpdate.nodeName, UpdateWorkerSize)
 			select {
 			case <-stopCh:
-				tc.podUpdateQueue.Done(item)
+				tc.podUpdateQueue.Done(podUpdate)
 				return
 			case tc.podUpdateChannels[hash] <- podUpdate:
 				// tc.podUpdateQueue.Done is called by the podUpdateChannels worker
@@ -471,7 +469,7 @@ func (tc *Controller) processPodOnNode(
 		logger.V(2).Info("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
-		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), time.Now(), time.Now())
+		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), now, now)
 		return
 	}
 	minTolerationTime := getMinTolerationTime(usedTolerations)

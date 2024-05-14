@@ -69,7 +69,7 @@ func pullerTestCases() []pullerTestCase {
 			qps:            0.0,
 			burst:          0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
 			}},
 
 		{ // image present, don't pull
@@ -94,9 +94,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:        0.0,
 			burst:      0,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
 			}},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
@@ -149,9 +149,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:        400.0,
 			burst:      600,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
-				{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
 			}},
 		// image present, non-zero qps, try to pull when qps exceeded
 		{containerImage: "present_image",
@@ -356,7 +356,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
 		}}
 
 	useSerializedEnv := true
@@ -412,12 +412,12 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		inspectErr:     nil,
 		pullerErr:      nil,
 		expected: []pullerExpects{
-			{[]string{"GetImageRef", "PullImage"}, nil, true, true},
+			{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true},
 		}}
 
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 		ctx := context.Background()
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil

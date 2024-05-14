@@ -20,8 +20,8 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/rbac/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type RoleLister interface {
 
 // roleLister implements the RoleLister interface.
 type roleLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1beta1.Role]
 }
 
 // NewRoleLister returns a new RoleLister.
 func NewRoleLister(indexer cache.Indexer) RoleLister {
-	return &roleLister{indexer: indexer}
-}
-
-// List lists all Roles in the indexer.
-func (s *roleLister) List(selector labels.Selector) (ret []*v1beta1.Role, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.Role))
-	})
-	return ret, err
+	return &roleLister{listers.New[*v1beta1.Role](indexer, v1beta1.Resource("role"))}
 }
 
 // Roles returns an object that can list and get Roles.
 func (s *roleLister) Roles(namespace string) RoleNamespaceLister {
-	return roleNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return roleNamespaceLister{listers.NewNamespaced[*v1beta1.Role](s.ResourceIndexer, namespace)}
 }
 
 // RoleNamespaceLister helps list and get Roles.
@@ -74,26 +66,5 @@ type RoleNamespaceLister interface {
 // roleNamespaceLister implements the RoleNamespaceLister
 // interface.
 type roleNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Roles in the indexer for a given namespace.
-func (s roleNamespaceLister) List(selector labels.Selector) (ret []*v1beta1.Role, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.Role))
-	})
-	return ret, err
-}
-
-// Get retrieves the Role from the indexer for a given namespace and name.
-func (s roleNamespaceLister) Get(name string) (*v1beta1.Role, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1beta1.Resource("role"), name)
-	}
-	return obj.(*v1beta1.Role), nil
+	listers.ResourceIndexer[*v1beta1.Role]
 }

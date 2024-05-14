@@ -38,7 +38,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.UpdateAllocatedDevices()
 
-	// Loop through all device resources and generate TopologyHints for them..
+	// Loop through all device resources and generate TopologyHints for them.
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	accumulatedResourceRequests := m.getContainerDeviceRequest(container)
 
@@ -171,7 +171,7 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available set
 			minAffinitySize = mask.Count()
 		}
 
-		// Then check to see if all of the reusable devices are part of the bitmask.
+		// Then check to see if all the reusable devices are part of the bitmask.
 		numMatching := 0
 		for d := range reusable {
 			// Skip the device if it doesn't specify any topology info.

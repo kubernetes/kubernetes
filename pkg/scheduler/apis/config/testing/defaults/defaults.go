@@ -25,6 +25,7 @@ import (
 var PluginsV1 = &config.Plugins{
 	MultiPoint: config.PluginSet{
 		Enabled: []config.Plugin{
+			{Name: names.SchedulingGates},
 			{Name: names.PrioritySort},
 			{Name: names.NodeUnschedulable},
 			{Name: names.NodeName},
@@ -33,10 +34,7 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodePorts},
 			{Name: names.NodeResourcesFit, Weight: 1},
 			{Name: names.VolumeRestrictions},
-			{Name: names.EBSLimits},
-			{Name: names.GCEPDLimits},
 			{Name: names.NodeVolumeLimits},
-			{Name: names.AzureDiskLimits},
 			{Name: names.VolumeBinding},
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread, Weight: 2},
@@ -45,7 +43,6 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
-			{Name: names.SchedulingGates},
 		},
 	},
 }
@@ -68,10 +65,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.NodePorts},
 			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeRestrictions},
-			{Name: names.EBSLimits},
-			{Name: names.GCEPDLimits},
 			{Name: names.NodeVolumeLimits},
-			{Name: names.AzureDiskLimits},
 			{Name: names.VolumeBinding},
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
@@ -87,10 +81,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.NodePorts},
 			{Name: names.NodeResourcesFit},
 			{Name: names.VolumeRestrictions},
-			{Name: names.EBSLimits},
-			{Name: names.GCEPDLimits},
 			{Name: names.NodeVolumeLimits},
-			{Name: names.AzureDiskLimits},
 			{Name: names.VolumeBinding},
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},

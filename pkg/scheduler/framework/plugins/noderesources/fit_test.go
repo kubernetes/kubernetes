@@ -46,16 +46,14 @@ var (
 	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
 )
 
-func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
-	return v1.NodeResources{
-		Capacity: v1.ResourceList{
-			v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
-			v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
-			extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
-			v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
-			hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
-		},
+func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.ResourceList {
+	return v1.ResourceList{
+		v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
+		v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
+		extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
+		hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
 	}
 }
 
@@ -492,7 +490,7 @@ func TestEnoughRequests(t *testing.T) {
 
 	for _, test := range enoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
+			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
 			if test.args.ScoringStrategy == nil {
@@ -644,7 +642,7 @@ func TestStorageRequests(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
+			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})

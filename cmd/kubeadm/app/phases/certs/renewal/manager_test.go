@@ -28,11 +28,13 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	certutil "k8s.io/client-go/util/cert"
 	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -47,7 +49,7 @@ var (
 
 	testCertOrganization = []string{"sig-cluster-lifecycle"}
 
-	testCertCfg = makeTestCertConfig(testCertOrganization)
+	testCertCfg = makeTestCertConfig(testCertOrganization, time.Time{}, time.Time{})
 )
 
 type fakecertificateReadWriter struct {
@@ -55,8 +57,8 @@ type fakecertificateReadWriter struct {
 	cert  *x509.Certificate
 }
 
-func (cr fakecertificateReadWriter) Exists() bool {
-	return cr.exist
+func (cr fakecertificateReadWriter) Exists() (bool, error) {
+	return cr.exist, nil
 }
 
 func (cr fakecertificateReadWriter) Read() (*x509.Certificate, error) {
@@ -118,11 +120,22 @@ func TestRenewUsingLocalCA(t *testing.T) {
 
 	cfg := &kubeadmapi.ClusterConfiguration{
 		CertificatesDir: dir,
+		CertificateValidityPeriod: &metav1.Duration{
+			Duration: time.Hour * 10,
+		},
 	}
 	rm, err := NewManager(cfg, dir)
 	if err != nil {
 		t.Fatalf("Failed to create the certificate renewal manager: %v", err)
 	}
+
+	// Prepare test certs with a past validity.
+	startTime := kubeadmutil.StartTimeUTC()
+
+	fmt.Println("START TIME TEST", startTime)
+
+	notBefore := startTime.Add(-rm.cfg.CertificateValidityPeriod.Duration * 2)
+	notAfter := startTime.Add(-rm.cfg.CertificateValidityPeriod.Duration)
 
 	tests := []struct {
 		name                 string
@@ -134,7 +147,7 @@ func TestRenewUsingLocalCA(t *testing.T) {
 			name:     "Certificate renewal for a PKI certificate",
 			certName: "apiserver",
 			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey, testCertOrganization)
+				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey, testCertOrganization, notBefore, notAfter)
 			},
 			expectedOrganization: testCertOrganization,
 		},
@@ -142,25 +155,9 @@ func TestRenewUsingLocalCA(t *testing.T) {
 			name:     "Certificate renewal for a certificate embedded in a kubeconfig file",
 			certName: "admin.conf",
 			createCertFunc: func() *x509.Certificate {
-				return writeTestKubeconfig(t, dir, "admin.conf", testCACert, testCAKey)
+				return writeTestKubeconfig(t, dir, "admin.conf", testCACert, testCAKey, notBefore, notAfter)
 			},
 			expectedOrganization: testCertOrganization,
-		},
-		{
-			name:     "apiserver-etcd-client cert should not contain SystemPrivilegedGroup after renewal",
-			certName: "apiserver-etcd-client",
-			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver-etcd-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
-			},
-			expectedOrganization: []string{},
-		},
-		{
-			name:     "apiserver-kubelet-client cert should replace SystemPrivilegedGroup with ClusterAdminsGroup after renewal",
-			certName: "apiserver-kubelet-client",
-			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver-kubelet-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
-			},
-			expectedOrganization: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 		},
 	}
 
@@ -168,7 +165,9 @@ func TestRenewUsingLocalCA(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			cert := test.createCertFunc()
 
-			time.Sleep(1 * time.Second)
+			notBefore := startTime.Add(-kubeadmconstants.CertificateBackdate)
+			notAfter := startTime.Add(rm.cfg.CertificateValidityPeriod.Duration)
+			testCertCfg := makeTestCertConfig(testCertOrganization, notBefore, notAfter)
 
 			_, err := rm.RenewUsingLocalCA(test.certName)
 			if err != nil {
@@ -194,6 +193,8 @@ func TestRenewUsingLocalCA(t *testing.T) {
 			certtestutil.AssertCertificateHasCommonName(t, newCert, testCertCfg.CommonName)
 			certtestutil.AssertCertificateHasDNSNames(t, newCert, testCertCfg.AltNames.DNSNames...)
 			certtestutil.AssertCertificateHasIPAddresses(t, newCert, testCertCfg.AltNames.IPs...)
+			certtestutil.AssertCertificateHasNotBefore(t, newCert, testCertCfg.NotBefore)
+			certtestutil.AssertCertificateHasNotAfter(t, newCert, testCertCfg.NotAfter)
 		})
 	}
 }
@@ -229,14 +230,14 @@ func TestCreateRenewCSR(t *testing.T) {
 			name:     "Creation of a CSR request for renewal of a PKI certificate",
 			certName: "apiserver",
 			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey, testCertOrganization)
+				return writeTestCertificate(t, dir, "apiserver", testCACert, testCAKey, testCertOrganization, time.Time{}, time.Time{})
 			},
 		},
 		{
 			name:     "Creation of a CSR request for renewal of a certificate embedded in a kubeconfig file",
 			certName: "admin.conf",
 			createCertFunc: func() *x509.Certificate {
-				return writeTestKubeconfig(t, dir, "admin.conf", testCACert, testCAKey)
+				return writeTestKubeconfig(t, dir, "admin.conf", testCACert, testCAKey, time.Time{}, time.Time{})
 			},
 		},
 	}
@@ -311,7 +312,7 @@ func TestCertToConfig(t *testing.T) {
 	}
 }
 
-func makeTestCertConfig(organization []string) *pkiutil.CertConfig {
+func makeTestCertConfig(organization []string, notBefore, notAfter time.Time) *pkiutil.CertConfig {
 	return &pkiutil.CertConfig{
 		Config: certutil.Config{
 			CommonName:   "test-common-name",
@@ -320,8 +321,10 @@ func makeTestCertConfig(organization []string) *pkiutil.CertConfig {
 				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 				DNSNames: []string{"test-domain.space"},
 			},
-			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			Usages:    []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			NotBefore: notBefore,
 		},
+		NotAfter: notAfter,
 	}
 }
 

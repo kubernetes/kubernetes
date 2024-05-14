@@ -25,9 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/utils/ptr"
 
@@ -99,208 +96,98 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		}
 		return scheme
 	}
-	errExpectedFn := func(v int32, msg string) field.ErrorList {
-		return field.ErrorList{
-			field.Invalid(field.NewPath("spec").Child("limited").Child("nominalConcurrencyShares"), int32(v), msg),
-		}
-	}
 
 	tests := []struct {
-		name               string
-		obj                runtime.Object
-		old                *flowcontrol.PriorityLevelConfiguration // for UPDATE only
-		zeroFeatureEnabled bool
-		scheme             *runtime.Scheme
-		errExpected        field.ErrorList
+		name        string
+		obj         runtime.Object
+		old         *flowcontrol.PriorityLevelConfiguration // for UPDATE only
+		scheme      *runtime.Scheme
+		errExpected field.ErrorList
 	}{
 		{
-			name:               "v1, feature disabled, create, zero value, error expected",
-			obj:                v1ObjFn(ptr.To(int32(0))),
-			zeroFeatureEnabled: false,
-			scheme:             v1SchemeFn(t),
-			errExpected:        errExpectedFn(0, "must be positive"),
+			name:        "v1, create, zero value, no error expected",
+			obj:         v1ObjFn(ptr.To(int32(0))),
+			scheme:      v1SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature disabled, create, unset, no error expected",
-			obj:                v1ObjFn(nil),
-			zeroFeatureEnabled: false,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1, create, unset, no error expected",
+			obj:         v1ObjFn(nil),
+			scheme:      v1SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature disabled, create, non-zero, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(1))),
-			zeroFeatureEnabled: false,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1, create, non-zero, no error expected",
+			obj:         v1ObjFn(ptr.To(int32(1))),
+			scheme:      v1SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature enabled, create, zero value, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(0))),
-			zeroFeatureEnabled: true,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1beta3, create, zero value, no error expected",
+			obj:         v1beta3ObjFn(0, true),
+			scheme:      v1beta3SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature enabled, create, unset, no error expected",
-			obj:                v1ObjFn(nil),
-			zeroFeatureEnabled: true,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1beta3, create, zero value without annotation, no error expected",
+			obj:         v1beta3ObjFn(0, false),
+			scheme:      v1beta3SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature enabled, create, non-zero, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(1))),
-			zeroFeatureEnabled: true,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature disabled, create, zero value, error expected",
-			obj:                v1beta3ObjFn(0, true),
-			zeroFeatureEnabled: false,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        errExpectedFn(0, "must be positive"),
-		},
-		{
-			name:               "v1beta3, feature disabled, create, zero value without annotation, no error expected",
-			obj:                v1beta3ObjFn(0, false),
-			zeroFeatureEnabled: false,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature disabled, create, non-zero, no error expected",
-			obj:                v1beta3ObjFn(1, false),
-			zeroFeatureEnabled: false,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature enabled, create, zero value, no error expected",
-			obj:                v1beta3ObjFn(0, true),
-			zeroFeatureEnabled: true,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature enabled, create, zero value without annotation, no error expected",
-			obj:                v1beta3ObjFn(0, false),
-			zeroFeatureEnabled: true,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature enabled, create, non-zero, no error expected",
-			obj:                v1beta3ObjFn(1, false),
-			zeroFeatureEnabled: true,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1beta3, create, non-zero, no error expected",
+			obj:         v1beta3ObjFn(1, false),
+			scheme:      v1beta3SchemeFn(t),
+			errExpected: nil,
 		},
 
 		// the following use cases cover UPDATE
 		{
-			name:               "v1, feature disabled, update, zero value, existing has non-zero, error expected",
-			obj:                v1ObjFn(ptr.To(int32(0))),
-			old:                internalObjFn(1),
-			zeroFeatureEnabled: false,
-			scheme:             v1SchemeFn(t),
-			errExpected:        errExpectedFn(0, "must be positive"),
+			name:        "v1, update, zero value, existing has non-zero, no error expected",
+			obj:         v1ObjFn(ptr.To(int32(0))),
+			old:         internalObjFn(1),
+			scheme:      v1SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature disabled, update, zero value, existing has zero, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(0))),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: false,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1, update, zero value, existing has zero, no error expected",
+			obj:         v1ObjFn(ptr.To(int32(0))),
+			old:         internalObjFn(0),
+			scheme:      v1SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature disabled, update, non-zero value, existing has zero, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(1))),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: false,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1, update, non-zero value, existing has zero, no error expected",
+			obj:         v1ObjFn(ptr.To(int32(1))),
+			old:         internalObjFn(0),
+			scheme:      v1SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature enabled, update, zero value, existing has non-zero, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(0))),
-			old:                internalObjFn(1),
-			zeroFeatureEnabled: true,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1beta3, update, zero value, existing has non-zero, no error expected",
+			obj:         v1beta3ObjFn(0, true),
+			old:         internalObjFn(1),
+			scheme:      v1beta3SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature enabled, update, zero value, existing has zero, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(0))),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: true,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1beta3, update, zero value, existing has zero, no error expected",
+			obj:         v1beta3ObjFn(0, true),
+			old:         internalObjFn(0),
+			scheme:      v1beta3SchemeFn(t),
+			errExpected: nil,
 		},
 		{
-			name:               "v1, feature enabled, update, non-zero value, existing has zero, no error expected",
-			obj:                v1ObjFn(ptr.To(int32(1))),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: true,
-			scheme:             v1SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature disabled, update, zero value, existing has non-zero, error expected",
-			obj:                v1beta3ObjFn(0, true),
-			old:                internalObjFn(1),
-			zeroFeatureEnabled: false,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        errExpectedFn(0, "must be positive"),
-		},
-		{
-			name:               "v1beta3, feature disabled, update, zero value, existing has zero, no error expected",
-			obj:                v1beta3ObjFn(0, true),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: false,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature disabled, update, non-zero value, existing has zero, no error expected",
-			obj:                v1beta3ObjFn(1, false),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: false,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature enabled, update, zero value, existing has non-zero, no error expected",
-			obj:                v1beta3ObjFn(0, true),
-			old:                internalObjFn(1),
-			zeroFeatureEnabled: true,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature enabled, update, zero value, existing has zero, no error expected",
-			obj:                v1beta3ObjFn(0, true),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: true,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
-		},
-		{
-			name:               "v1beta3, feature enabled, update, non-zero value, existing has zero, no error expected",
-			obj:                v1beta3ObjFn(1, false),
-			old:                internalObjFn(0),
-			zeroFeatureEnabled: true,
-			scheme:             v1beta3SchemeFn(t),
-			errExpected:        nil,
+			name:        "v1beta3, update, non-zero value, existing has zero, no error expected",
+			obj:         v1beta3ObjFn(1, false),
+			old:         internalObjFn(0),
+			scheme:      v1beta3SchemeFn(t),
+			errExpected: nil,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ZeroLimitedNominalConcurrencyShares, test.zeroFeatureEnabled)()
-
 			scheme := test.scheme
 			scheme.Default(test.obj)
 

@@ -25,12 +25,6 @@ set -o pipefail
 # https://github.com/kubernetes/kubernetes/issues/52255
 unset CDPATH
 
-# Until all GOPATH references are removed from all build scripts as well,
-# explicitly disable module mode to avoid picking up user-set GO111MODULE preferences.
-# As individual scripts (like hack/update-vendor.sh) make use of go modules,
-# they can explicitly set GO111MODULE=on
-export GO111MODULE=off
-
 # FIXME(dims): Note that here we assume that if GOFLAGS are already set we
 # leave them as-is and not try to add providerless to it. So if you
 # really need to set your own GOFLAGS, ensure you add "providerless" explicitly
@@ -41,9 +35,21 @@ fi
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
-KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
-KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
-KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
+# Where output goes.  We should avoid redefining these anywhere else.
+#
+# KUBE_OUTPUT: the root directory (absolute) where this build should drop any
+#     files (subdirs are encouraged).
+# KUBE_OUTPUT_BIN: the directory in which compiled binaries will be placed,
+#     under OS/ARCH specific subdirs
+# THIS_PLATFORM_BIN: a symlink to the output directory for binaries built for
+#     the current host platform (e.g. build/test tools).
+#
+# Compat: The KUBE_OUTPUT_SUBPATH variable is sometimes passed in by callers.
+# If it is specified, we'll use it in KUBE_OUTPUT.
+_KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
+export KUBE_OUTPUT="${KUBE_ROOT}/${_KUBE_OUTPUT_SUBPATH}"
+export KUBE_OUTPUT_BIN="${KUBE_OUTPUT}/bin"
+export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 # This controls rsync compression. Set to a value > 0 to enable rsync
 # compression for build container
@@ -52,9 +58,6 @@ KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
 # Set no_proxy for localhost if behind a proxy, otherwise,
 # the connections to localhost in scripts will time out
 export no_proxy="127.0.0.1,localhost${no_proxy:+,${no_proxy}}"
-
-# This is a symlink to binaries for "this platform", e.g. build tools.
-export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
@@ -65,9 +68,6 @@ kube::util::ensure-bash-version
 source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
-
-KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
-export KUBE_OUTPUT_HOSTBIN
 
 # list of all available group versions.  This should be used when generated code
 # or when starting an API server that you want to have everything.
@@ -123,6 +123,7 @@ storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1 \
+storagemigration.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1beta1 \
 flowcontrol.apiserver.k8s.io/v1beta2 \
 flowcontrol.apiserver.k8s.io/v1beta3 \
@@ -135,6 +136,7 @@ KUBE_NONSERVER_GROUP_VERSIONS="
  abac.authorization.kubernetes.io/v0 \
  abac.authorization.kubernetes.io/v1beta1 \
  apidiscovery.k8s.io/v2beta1 \
+ apidiscovery.k8s.io/v2 \
  componentconfig/v1alpha1 \
  imagepolicy.k8s.io/v1alpha1\
  admission.k8s.io/v1\

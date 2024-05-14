@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestWatchList(t *testing.T) {
@@ -173,7 +174,7 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "2",
-						Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 					},
 				}},
 			},
@@ -202,7 +203,7 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "5",
-						Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 					},
 				}},
 			},
@@ -240,7 +241,7 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "2",
-						Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 					},
 				}},
 			},
@@ -278,7 +279,7 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "1",
-						Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 					},
 				}},
 			},
@@ -309,7 +310,7 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "2",
-						Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 					},
 				}},
 				{Type: watch.Added, Object: makePod("p3", "3")},
@@ -350,7 +351,7 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "2",
-						Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 					},
 				}},
 				{Type: watch.Added, Object: makePod("p3", "3")},
@@ -381,7 +382,7 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						ResourceVersion: "2",
-						Annotations:     map[string]string{"k8s.io/initial-events-end": "false"},
+						Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "false"},
 					},
 				}},
 			},
@@ -415,7 +416,7 @@ func TestWatchList(t *testing.T) {
 			listWatcher.customListResponse = scenario.podList
 			listWatcher.closeAfterListRequests = scenario.closeAfterListRequests
 			if scenario.disableUseWatchList {
-				reflector.UseWatchList = false
+				reflector.UseWatchList = ptr.To(false)
 			}
 
 			err := reflector.ListAndWatch(stopCh)
@@ -505,7 +506,7 @@ func testData() (*fakeListWatcher, Store, *Reflector, chan struct{}) {
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
-	r.UseWatchList = true
+	r.UseWatchList = ptr.To(true)
 
 	return lw, s, r, stopCh
 }

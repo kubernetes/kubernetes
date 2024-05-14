@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -40,15 +42,16 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	"k8s.io/klog/v2"
 )
@@ -392,11 +395,54 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 // finishNothing is a do-nothing FinishFunc.
 func finishNothing(context.Context, bool) {}
 
+// maxNameGenerationCreateAttempts is the maximum number of
+// times create will be attempted when generateName is used
+// and create attempts fails due to name conflict errors.
+// Each attempt uses a newly randomly generated name.
+// 8 was selected as the max because it is sufficient to generate
+// 1 million names per generateName prefix, with only a 0.1%
+// probability of any generated name conflicting with existing names.
+// Without retry, a 0.1% probability occurs at ~500
+// generated names and a 50% probability occurs at ~4500
+// generated names.
+const maxNameGenerationCreateAttempts = 8
+
 // Create inserts a new item according to the unique key from the object.
 // Note that registries may mutate the input object (e.g. in the strategy
 // hooks).  Tests which call this might want to call DeepCopy if they expect to
 // be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RetryGenerateName) && needsNameGeneration(obj) {
+		return e.createWithGenerateNameRetry(ctx, obj, createValidation, options)
+	}
+
+	return e.create(ctx, obj, createValidation, options)
+}
+
+// needsNameGeneration returns true if the obj has a generateName but no name.
+func needsNameGeneration(obj runtime.Object) bool {
+	if objectMeta, err := meta.Accessor(obj); err == nil {
+		if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// createWithGenerateNameRetry attempts to create obj up to maxNameGenerationCreateAttempts
+// when create fails due to a name conflict error. Each attempt randomly generates a new
+// name based on generateName.
+func (e *Store) createWithGenerateNameRetry(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (resultObj runtime.Object, err error) {
+	for i := 0; i < maxNameGenerationCreateAttempts; i++ {
+		resultObj, err = e.create(ctx, obj.DeepCopyObject(), createValidation, options)
+		if err == nil || !apierrors.IsAlreadyExists(err) {
+			return resultObj, err
+		}
+	}
+	return resultObj, err
+}
+
+func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	var finishCreate FinishFunc = finishNothing
 
 	// Init metadata as early as possible.

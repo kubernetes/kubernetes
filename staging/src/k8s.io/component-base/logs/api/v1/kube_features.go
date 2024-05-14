@@ -24,15 +24,17 @@ const (
 	// owner: @pohly
 	// kep: https://kep.k8s.io/3077
 	// alpha: v1.24
+	// beta: v1.30
 	//
 	// Enables looking up a logger from a context.Context instead of using
 	// the global fallback logger and manipulating the logger that is
 	// used by a call chain.
 	ContextualLogging featuregate.Feature = "ContextualLogging"
 
-	// contextualLoggingDefault must remain false while in alpha. It can
-	// become true in beta.
-	contextualLoggingDefault = false
+	// contextualLoggingDefault is now true because the feature reached beta
+	// and performance comparisons showed no relevant degradation when
+	// enabling it.
+	contextualLoggingDefault = true
 
 	// Allow fine-tuning of experimental, alpha-quality logging options.
 	//
@@ -57,7 +59,7 @@ const (
 
 func featureGates() map[featuregate.Feature]featuregate.FeatureSpec {
 	return map[featuregate.Feature]featuregate.FeatureSpec{
-		ContextualLogging: {Default: contextualLoggingDefault, PreRelease: featuregate.Alpha},
+		ContextualLogging: {Default: contextualLoggingDefault, PreRelease: featuregate.Beta},
 
 		LoggingAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 		LoggingBetaOptions:  {Default: true, PreRelease: featuregate.Beta},

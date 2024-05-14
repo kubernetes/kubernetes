@@ -62,8 +62,8 @@ const (
 	numberOfHighestScoredNodesToReport = 3
 )
 
-// scheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
-func (sched *Scheduler) scheduleOne(ctx context.Context) {
+// ScheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
+func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	podInfo, err := sched.NextPod(logger)
 	if err != nil {
@@ -417,12 +417,12 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	if len(feasibleNodes) == 1 {
 		return ScheduleResult{
 			SuggestedHost:  feasibleNodes[0].Node().Name,
-			EvaluatedNodes: 1 + len(diagnosis.NodeToStatusMap),
+			EvaluatedNodes: diagnosis.EvaluatedNodes,
 			FeasibleNodes:  1,
 		}, nil
 	}
 
-	priorityList, err := sched.prioritizeNodes(ctx, fwk, state, pod, feasibleNodes)
+	priorityList, err := prioritizeNodes(ctx, sched.Extenders, fwk, state, pod, feasibleNodes)
 	if err != nil {
 		return result, err
 	}
@@ -432,7 +432,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 	return ScheduleResult{
 		SuggestedHost:  host,
-		EvaluatedNodes: len(feasibleNodes) + len(diagnosis.NodeToStatusMap),
+		EvaluatedNodes: diagnosis.EvaluatedNodes,
 		FeasibleNodes:  len(feasibleNodes),
 	}, err
 }
@@ -441,13 +441,14 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 // filter plugins and filter extenders.
 func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*framework.NodeInfo, framework.Diagnosis, error) {
 	logger := klog.FromContext(ctx)
-	diagnosis := framework.Diagnosis{
-		NodeToStatusMap: make(framework.NodeToStatusMap),
-	}
 
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
-		return nil, diagnosis, err
+		return nil, framework.Diagnosis{}, err
+	}
+
+	diagnosis := framework.Diagnosis{
+		NodeToStatusMap: make(framework.NodeToStatusMap, len(allNodes)),
 	}
 	// Run "prefilter" plugins.
 	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
@@ -559,6 +560,16 @@ func (sched *Scheduler) hasScoring(fwk framework.Framework) bool {
 	return false
 }
 
+// hasExtenderFilters checks if any extenders filter nodes.
+func (sched *Scheduler) hasExtenderFilters() bool {
+	for _, extender := range sched.Extenders {
+		if extender.IsFilter() {
+			return true
+		}
+	}
+	return false
+}
+
 // findNodesThatPassFilters finds the nodes that fit the filter plugins.
 func (sched *Scheduler) findNodesThatPassFilters(
 	ctx context.Context,
@@ -569,7 +580,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	nodes []*framework.NodeInfo) ([]*framework.NodeInfo, error) {
 	numAllNodes := len(nodes)
 	numNodesToFind := sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes))
-	if !sched.hasScoring(fwk) {
+	if !sched.hasExtenderFilters() && !sched.hasScoring(fwk) {
 		numNodesToFind = 1
 	}
 
@@ -581,14 +592,20 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		for i := range feasibleNodes {
 			feasibleNodes[i] = nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		}
+		diagnosis.EvaluatedNodes = int(numNodesToFind)
 		return feasibleNodes, nil
 	}
 
 	errCh := parallelize.NewErrorChannel()
-	var statusesLock sync.Mutex
 	var feasibleNodesLen int32
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	type nodeStatus struct {
+		node   string
+		status *framework.Status
+	}
+	result := make([]*nodeStatus, numAllNodes)
 	checkNode := func(i int) {
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
@@ -607,10 +624,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 				feasibleNodes[length-1] = nodeInfo
 			}
 		} else {
-			statusesLock.Lock()
-			diagnosis.NodeToStatusMap[nodeInfo.Node().Name] = status
-			diagnosis.AddPluginStatus(status)
-			statusesLock.Unlock()
+			result[i] = &nodeStatus{node: nodeInfo.Node().Name, status: status}
 		}
 	}
 
@@ -627,6 +641,15 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	// are found.
 	fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, metrics.Filter)
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
+	diagnosis.EvaluatedNodes = int(feasibleNodesLen)
+	for _, item := range result {
+		if item == nil {
+			continue
+		}
+		diagnosis.NodeToStatusMap[item.node] = item.status
+		diagnosis.EvaluatedNodes++
+		diagnosis.AddPluginStatus(item.status)
+	}
 	if err := errCh.ReceiveError(); err != nil {
 		statusCode = framework.Error
 		return feasibleNodes, err
@@ -723,8 +746,9 @@ func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Exten
 // The scores from each plugin are added together to make the score for that node, then
 // any extenders are run as well.
 // All scores are finally combined (added) to get the total weighted scores of all nodes
-func (sched *Scheduler) prioritizeNodes(
+func prioritizeNodes(
 	ctx context.Context,
+	extenders []framework.Extender,
 	fwk framework.Framework,
 	state *framework.CycleState,
 	pod *v1.Pod,
@@ -733,7 +757,7 @@ func (sched *Scheduler) prioritizeNodes(
 	logger := klog.FromContext(ctx)
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
-	if !sched.hasScoring(fwk) {
+	if len(extenders) == 0 && !fwk.HasScorePlugins() {
 		result := make([]framework.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
 			result = append(result, framework.NodePluginScores{
@@ -766,17 +790,14 @@ func (sched *Scheduler) prioritizeNodes(
 		}
 	}
 
-	if len(sched.Extenders) != 0 && nodes != nil {
+	if len(extenders) != 0 && nodes != nil {
 		// allNodeExtendersScores has all extenders scores for all nodes.
 		// It is keyed with node name.
 		allNodeExtendersScores := make(map[string]*framework.NodePluginScores, len(nodes))
 		var mu sync.Mutex
 		var wg sync.WaitGroup
-		for i := range sched.Extenders {
-			if !sched.Extenders[i].IsInterested(pod) {
-				continue
-			}
-			if !sched.Extenders[i].IsPrioritizer() {
+		for i := range extenders {
+			if !extenders[i].IsInterested(pod) {
 				continue
 			}
 			wg.Add(1)
@@ -786,10 +807,10 @@ func (sched *Scheduler) prioritizeNodes(
 					metrics.Goroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
 					wg.Done()
 				}()
-				prioritizedList, weight, err := sched.Extenders[extIndex].Prioritize(pod, nodes)
+				prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
 				if err != nil {
 					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
-					logger.V(5).Info("Failed to run extender's priority function. No score given by this extender.", "error", err, "pod", klog.KObj(pod), "extender", sched.Extenders[extIndex].Name())
+					logger.V(5).Info("Failed to run extender's priority function. No score given by this extender.", "error", err, "pod", klog.KObj(pod), "extender", extenders[extIndex].Name())
 					return
 				}
 				mu.Lock()
@@ -798,7 +819,7 @@ func (sched *Scheduler) prioritizeNodes(
 					nodename := (*prioritizedList)[i].Host
 					score := (*prioritizedList)[i].Score
 					if loggerVTen.Enabled() {
-						loggerVTen.Info("Extender scored node for pod", "pod", klog.KObj(pod), "extender", sched.Extenders[extIndex].Name(), "node", nodename, "score", score)
+						loggerVTen.Info("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", nodename, "score", score)
 					}
 
 					// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
@@ -808,11 +829,11 @@ func (sched *Scheduler) prioritizeNodes(
 					if allNodeExtendersScores[nodename] == nil {
 						allNodeExtendersScores[nodename] = &framework.NodePluginScores{
 							Name:   nodename,
-							Scores: make([]framework.PluginScore, 0, len(sched.Extenders)),
+							Scores: make([]framework.PluginScore, 0, len(extenders)),
 						}
 					}
 					allNodeExtendersScores[nodename].Scores = append(allNodeExtendersScores[nodename].Scores, framework.PluginScore{
-						Name:  sched.Extenders[extIndex].Name(),
+						Name:  extenders[extIndex].Name(),
 						Score: finalscore,
 					})
 					allNodeExtendersScores[nodename].TotalScore += finalscore

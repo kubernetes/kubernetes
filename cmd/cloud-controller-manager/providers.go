@@ -1,6 +1,3 @@
-//go:build !providerless
-// +build !providerless
-
 /*
 Copyright 2020 The Kubernetes Authors.
 
@@ -22,10 +19,13 @@ limitations under the License.
 
 package main
 
-import (
-	// NOTE: Importing all in-tree cloud-providers is not required when
-	// implementing an out-of-tree cloud-provider.
-	_ "k8s.io/legacy-cloud-providers/azure"
-	_ "k8s.io/legacy-cloud-providers/gce"
-	_ "k8s.io/legacy-cloud-providers/vsphere"
-)
+// NOTE: Importing all in-tree cloud-providers is not required when
+// implementing an out-of-tree cloud-provider. Leaving this empty file
+// here as a reference.
+
+// Here is how you would inject a cloud provider, first
+// you would use a init() method in say "k8s.io/legacy-cloud-providers/gce"
+// package that calls `cloudprovider.RegisterCloudProvider()`
+// and then here in this file you would add an import.
+//
+// import _ "k8s.io/legacy-cloud-providers/gce"

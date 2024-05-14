@@ -23,11 +23,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -94,6 +98,13 @@ func TestRotateLogs(t *testing.T) {
 		},
 		osInterface: container.RealOS{},
 		clock:       testingclock.NewFakeClock(now),
+		mutex:       sync.Mutex{},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
+		maxWorkers:       10,
+		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
 	}
 	testLogs := []string{
 		"test-log-1",
@@ -149,7 +160,23 @@ func TestRotateLogs(t *testing.T) {
 		},
 	}
 	f.SetFakeContainers(testContainers)
+
+	// Push the items into the queue for before starting the worker to avoid issue with the queue being empty.
 	require.NoError(t, c.rotateLogs(ctx))
+
+	// Start a routine that can monitor the queue and shutdown the queue to trigger the retrun from the processQueueItems
+	// Keeping the monitor duration smaller in order to keep the unwanted delay in the test to a minimal.
+	go func() {
+		pollTimeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		err = wait.PollUntilContextCancel(pollTimeoutCtx, 5*time.Millisecond, false, func(ctx context.Context) (done bool, err error) {
+			return c.queue.Len() == 0, nil
+		})
+		require.NoError(t, err)
+		c.queue.ShutDown()
+	}()
+	// This is a blocking call. But the above routine takes care of ensuring that this is terminated once the queue is shutdown
+	c.processQueueItems(ctx, 1)
 
 	timestamp := now.Format(timestampFormat)
 	logs, err := os.ReadDir(dir)
@@ -182,6 +209,13 @@ func TestClean(t *testing.T) {
 		},
 		osInterface: container.RealOS{},
 		clock:       testingclock.NewFakeClock(now),
+		mutex:       sync.Mutex{},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
+		maxWorkers:       10,
+		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
 	}
 	testLogs := []string{
 		"test-log-1",
@@ -387,6 +421,13 @@ func TestRotateLatestLog(t *testing.T) {
 			policy:         LogRotatePolicy{MaxFiles: test.maxFiles},
 			osInterface:    container.RealOS{},
 			clock:          testingclock.NewFakeClock(now),
+			mutex:          sync.Mutex{},
+			queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[string](),
+				workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+			),
+			maxWorkers:       10,
+			monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
 		}
 		if test.runtimeError != nil {
 			f.InjectError("ReopenContainerLog", test.runtimeError)

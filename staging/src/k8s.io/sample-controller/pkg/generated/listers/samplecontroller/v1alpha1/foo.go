@@ -19,8 +19,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 )
@@ -38,25 +38,17 @@ type FooLister interface {
 
 // fooLister implements the FooLister interface.
 type fooLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha1.Foo]
 }
 
 // NewFooLister returns a new FooLister.
 func NewFooLister(indexer cache.Indexer) FooLister {
-	return &fooLister{indexer: indexer}
-}
-
-// List lists all Foos in the indexer.
-func (s *fooLister) List(selector labels.Selector) (ret []*v1alpha1.Foo, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.Foo))
-	})
-	return ret, err
+	return &fooLister{listers.New[*v1alpha1.Foo](indexer, v1alpha1.Resource("foo"))}
 }
 
 // Foos returns an object that can list and get Foos.
 func (s *fooLister) Foos(namespace string) FooNamespaceLister {
-	return fooNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return fooNamespaceLister{listers.NewNamespaced[*v1alpha1.Foo](s.ResourceIndexer, namespace)}
 }
 
 // FooNamespaceLister helps list and get Foos.
@@ -74,26 +66,5 @@ type FooNamespaceLister interface {
 // fooNamespaceLister implements the FooNamespaceLister
 // interface.
 type fooNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Foos in the indexer for a given namespace.
-func (s fooNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.Foo, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.Foo))
-	})
-	return ret, err
-}
-
-// Get retrieves the Foo from the indexer for a given namespace and name.
-func (s fooNamespaceLister) Get(name string) (*v1alpha1.Foo, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("foo"), name)
-	}
-	return obj.(*v1alpha1.Foo), nil
+	listers.ResourceIndexer[*v1alpha1.Foo]
 }

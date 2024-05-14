@@ -54,10 +54,6 @@ type KubeSchedulerConfiguration struct {
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
 	ClientConnection componentbaseconfig.ClientConnectionConfiguration
-	// HealthzBindAddress is the IP address and port for the health check server to serve on.
-	HealthzBindAddress string
-	// MetricsBindAddress is the IP address and port for the metrics server to serve on.
-	MetricsBindAddress string
 
 	// DebuggingConfiguration holds configuration for Debugging related features
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfig.DebuggingConfiguration

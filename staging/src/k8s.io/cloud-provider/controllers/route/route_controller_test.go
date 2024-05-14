@@ -31,6 +31,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
@@ -415,7 +416,8 @@ func TestReconcile(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route)}
 			for _, route := range testCase.initialRoutes {

@@ -46,6 +46,7 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
@@ -89,9 +90,6 @@ const (
 	// the destination will echo its hostname.
 	echoHostname = "hostname"
 )
-
-// NetexecImageName is the image name for agnhost.
-var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
 // Option is used to configure the NetworkingTest object
 type Option func(*NetworkingTestConfig)
@@ -328,6 +326,25 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 				responses.Insert(trimmed)
 			}
 		}
+		if responses.Difference(expectedResponses).Len() > 0 {
+			returnMsg := fmt.Errorf("received unexpected responses... \nAttempt %d\nCommand %v\nretrieved %v\nexpected %v", i, cmd, responses, expectedResponses)
+			// TODO(aojea) Remove once issues.k8s.io/123760 is solved
+			// Dump the nodes network routes and addresses for troubleshooting #123760
+			framework.Logf("encountered error during dial (%v)", returnMsg)
+			hostExec := storageutils.NewHostExec(config.f)
+			ginkgo.DeferCleanup(hostExec.Cleanup)
+			cmd := `echo "IP routes: " && ip route && echo "IP addresses:" && ip addr && echo "Open sockets: " && ss -anp --socket=tcp`
+			for _, node := range config.Nodes {
+				result, err := hostExec.IssueCommandWithResult(ctx, cmd, &node)
+				if err != nil {
+					framework.Logf("error occurred while executing command %s on node: %v", cmd, err)
+					continue
+				}
+				framework.Logf("Dump network information for node %s:\n%s", node.Name, result)
+			}
+			return returnMsg
+		}
+
 		framework.Logf("Waiting for responses: %v", expectedResponses.Difference(responses))
 
 		// Check against i+1 so we exit if minTries == maxTries.
@@ -587,7 +604,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 			Containers: []v1.Container{
 				{
 					Name:            "webserver",
-					Image:           NetexecImageName,
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args:            netexecArgs,
 					Ports: []v1.ContainerPort{
@@ -657,7 +674,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:            "webserver",
-					Image:           NetexecImageName,
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
@@ -885,10 +902,10 @@ func (config *NetworkingTestConfig) createNetProxyPods(ctx context.Context, podN
 // DeleteNetProxyPod deletes the first endpoint pod and waits for it being removed.
 func (config *NetworkingTestConfig) DeleteNetProxyPod(ctx context.Context) {
 	pod := config.EndpointPods[0]
-	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0)))
+	framework.ExpectNoError(config.getPodClient().Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
-	err := e2epod.WaitForPodNotFoundInNamespace(ctx, config.f.ClientSet, pod.Name, config.Namespace, wait.ForeverTestTimeout)
+	err := e2epod.WaitForPodNotFoundInNamespace(ctx, config.f.ClientSet, pod.Name, config.Namespace, config.f.Timeouts.PodDelete)
 	if err != nil {
 		framework.Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}

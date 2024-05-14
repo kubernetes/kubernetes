@@ -1,0 +1,38 @@
+// This is a generated file. Do not edit directly.
+
+go 1.22.0
+
+use (
+	.
+	./staging/src/k8s.io/api
+	./staging/src/k8s.io/apiextensions-apiserver
+	./staging/src/k8s.io/apimachinery
+	./staging/src/k8s.io/apiserver
+	./staging/src/k8s.io/cli-runtime
+	./staging/src/k8s.io/client-go
+	./staging/src/k8s.io/cloud-provider
+	./staging/src/k8s.io/cluster-bootstrap
+	./staging/src/k8s.io/code-generator
+	./staging/src/k8s.io/component-base
+	./staging/src/k8s.io/component-helpers
+	./staging/src/k8s.io/controller-manager
+	./staging/src/k8s.io/cri-api
+	./staging/src/k8s.io/cri-client
+	./staging/src/k8s.io/csi-translation-lib
+	./staging/src/k8s.io/dynamic-resource-allocation
+	./staging/src/k8s.io/endpointslice
+	./staging/src/k8s.io/kms
+	./staging/src/k8s.io/kube-aggregator
+	./staging/src/k8s.io/kube-controller-manager
+	./staging/src/k8s.io/kube-proxy
+	./staging/src/k8s.io/kube-scheduler
+	./staging/src/k8s.io/kubectl
+	./staging/src/k8s.io/kubelet
+	./staging/src/k8s.io/legacy-cloud-providers
+	./staging/src/k8s.io/metrics
+	./staging/src/k8s.io/mount-utils
+	./staging/src/k8s.io/pod-security-admission
+	./staging/src/k8s.io/sample-apiserver
+	./staging/src/k8s.io/sample-cli-plugin
+	./staging/src/k8s.io/sample-controller
+)

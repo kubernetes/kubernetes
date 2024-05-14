@@ -53,6 +53,9 @@ type Extender interface {
 	// IsPrioritizer returns whether this extender is configured for the Prioritize method.
 	IsPrioritizer() bool
 
+	// IsFilter returns whether this extender is configured for the Filter method.
+	IsFilter() bool
+
 	// ProcessPreemption returns nodes with their victim pods processed by extender based on
 	// given:
 	//   1. Pod to schedule

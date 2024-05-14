@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
@@ -298,7 +297,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 						}
 					} else {
 						if !isPodShutdown(&pod) {
-							framework.Logf("Expecting non-critical pod (%v/%v) to be shutdown, but it's not currently. Pod Status %+v", pod.Name, pod.Status)
+							framework.Logf("Expecting non-critical pod (%v/%v) to be shutdown, but it's not currently. Pod Status %+v", pod.Namespace, pod.Name, pod.Status)
 							return fmt.Errorf("pod (%v/%v) should be shutdown, phase: %s", pod.Namespace, pod.Name, pod.Status.Phase)
 						}
 					}
@@ -377,7 +376,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		})
 	})
 
-	ginkgo.Context("when gracefully shutting down with Pod priority", func() {
+	framework.Context("when gracefully shutting down with Pod priority", framework.WithFlaky(), func() {
 
 		const (
 			pollInterval                 = 1 * time.Second
@@ -650,44 +649,6 @@ func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "the number of nodes is not as expected")
 	return isNodeReady(&nodeList.Items[0])
-}
-
-func systemctlDaemonReload() error {
-	cmd := "systemctl daemon-reload"
-	_, err := runCommand("sh", "-c", cmd)
-	return err
-}
-
-var (
-	dbusConfPath = "/etc/systemd/system/dbus.service.d/k8s-graceful-node-shutdown-e2e.conf"
-	dbusConf     = `
-[Unit]
-RefuseManualStart=no
-RefuseManualStop=no
-[Service]
-KillMode=control-group
-ExecStop=
-`
-)
-
-func overlayDbusConfig() error {
-	err := os.MkdirAll(filepath.Dir(dbusConfPath), 0755)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(dbusConfPath, []byte(dbusConf), 0644)
-	if err != nil {
-		return err
-	}
-	return systemctlDaemonReload()
-}
-
-func restoreDbusConfig() error {
-	err := os.Remove(dbusConfPath)
-	if err != nil {
-		return err
-	}
-	return systemctlDaemonReload()
 }
 
 const (

@@ -17,4 +17,4 @@ limitations under the License.
 // Package fakeclient contains examples on how to use fakeclient in tests.
 // Note: This file is here to avoid warnings on go build since there are no
 // non-test files in this package.
-package fakeclient
+package fakeclient // import "k8s.io/client-go/examples/fake-client"

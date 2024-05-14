@@ -41,17 +41,23 @@ func TestController(t *testing.T) {
 	t.Cleanup(func() { minKMSPluginCloseGracePeriod = origMinKMSPluginCloseGracePeriod })
 	minKMSPluginCloseGracePeriod = 300 * time.Millisecond
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	const expectedSuccessMetricValue = `
 # HELP apiserver_encryption_config_controller_automatic_reload_success_total [ALPHA] Total number of successful automatic reloads of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reload_success_total counter
 apiserver_encryption_config_controller_automatic_reload_success_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027"} 1
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
+apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="success"} 1
 `
 	const expectedFailureMetricValue = `
 # HELP apiserver_encryption_config_controller_automatic_reload_failures_total [ALPHA] Total number of failed automatic reloads of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reload_failures_total counter
 apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027"} 1
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
+apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="failure"} 1
 `
 
 	tests := []struct {
@@ -334,6 +340,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.wantMetrics),
 				"apiserver_encryption_config_controller_automatic_reload_success_total",
 				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total",
 			); err != nil {
 				t.Errorf("failed to validate metrics: %v", err)
 			}
@@ -342,7 +349,7 @@ apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver
 }
 
 type mockWorkQueue struct {
-	workqueue.RateLimitingInterface // will panic if any unexpected method is called
+	workqueue.TypedRateLimitingInterface[string] // will panic if any unexpected method is called
 
 	closeOnce sync.Once
 	addCalled chan struct{}
@@ -355,33 +362,33 @@ type mockWorkQueue struct {
 	addRateLimitedCount atomic.Uint64
 }
 
-func (m *mockWorkQueue) Done(item interface{}) {
+func (m *mockWorkQueue) Done(item string) {
 	m.count.Add(1)
 	m.wasCanceled = m.ctx.Err() != nil
 	m.cancel()
 }
 
-func (m *mockWorkQueue) Get() (item interface{}, shutdown bool) {
+func (m *mockWorkQueue) Get() (item string, shutdown bool) {
 	<-m.addCalled
 
 	switch m.count.Load() {
 	case 0:
-		return nil, false
+		return "", false
 	case 1:
-		return nil, true
+		return "", true
 	default:
 		panic("too many calls to Get")
 	}
 }
 
-func (m *mockWorkQueue) Add(item interface{}) {
+func (m *mockWorkQueue) Add(item string) {
 	m.closeOnce.Do(func() {
 		close(m.addCalled)
 	})
 }
 
-func (m *mockWorkQueue) ShutDown()                       {}
-func (m *mockWorkQueue) AddRateLimited(item interface{}) { m.addRateLimitedCount.Add(1) }
+func (m *mockWorkQueue) ShutDown()                  {}
+func (m *mockWorkQueue) AddRateLimited(item string) { m.addRateLimitedCount.Add(1) }
 
 type mockHealthChecker struct {
 	pluginName string

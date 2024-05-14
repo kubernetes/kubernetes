@@ -19,35 +19,11 @@ package providers
 import (
 	"context"
 	"fmt"
-	"os"
 	"path"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
-
-const etcdImage = "3.5.11-0"
-
-// EtcdUpgrade upgrades etcd on GCE.
-func EtcdUpgrade(targetStorage, targetVersion string) error {
-	switch framework.TestContext.Provider {
-	case "gce":
-		return etcdUpgradeGCE(targetStorage, targetVersion)
-	default:
-		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
-	}
-}
-
-func etcdUpgradeGCE(targetStorage, targetVersion string) error {
-	env := append(
-		os.Environ(),
-		"TEST_ETCD_VERSION="+targetVersion,
-		"STORAGE_BACKEND="+targetStorage,
-		"TEST_ETCD_IMAGE="+etcdImage)
-
-	_, _, err := framework.RunCmdEnv(env, GCEUpgradeScript(), "-l", "-M")
-	return err
-}
 
 // LocationParamGKE returns parameter related to location for gcloud command.
 func LocationParamGKE() string {

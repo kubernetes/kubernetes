@@ -1,0 +1,77 @@
+# Do not delete linter settings. Linters like gocritic can be enabled on the command line.
+
+linters-settings:
+  dupl:
+    threshold: 100
+  funlen:
+    lines: 100
+    statements: 50
+  goconst:
+    min-len: 2
+    min-occurrences: 3
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport # https://github.com/go-critic/go-critic/issues/845
+      - ifElseChain
+      - octalLiteral
+      - paramTypeCombine
+      - whyNoLint
+      - wrapperFunc
+  gofmt:
+    simplify: false
+  goimports:
+    local-prefixes: github.com/fxamacker/cbor
+  golint:
+    min-confidence: 0
+  govet:
+    check-shadowing: true
+  lll:
+    line-length: 140
+  maligned:
+    suggest-new: true
+  misspell:
+    locale: US
+
+linters:
+  disable-all: true
+  enable:
+    - bidichk
+    - errcheck
+    - goconst
+    - gocyclo
+    - gofmt
+    - goimports
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - typecheck
+    - unconvert
+    - unused
+
+issues:
+  # max-issues-per-linter default is 50.  Set to 0 to disable limit.
+  max-issues-per-linter: 0
+  # max-same-issues default is 3.  Set to 0 to disable limit.
+  max-same-issues: 0
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - goconst
+        - dupl
+        - gomnd
+        - lll
+    - path: doc\.go
+      linters:
+        - goimports
+        - gomnd
+        - lll

@@ -129,7 +129,7 @@ var _ = SIGDescribe("Discovery", func() {
 		list := &metav1.APIGroupList{}
 		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(ctx).Into(list)
 		framework.ExpectNoError(err, "Failed to find /apis/")
-		framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
+		gomega.Expect(list.Groups).ToNot(gomega.BeEmpty(), "Missing APIGroups")
 
 		for _, group := range list.Groups {
 			if strings.HasSuffix(group.Name, ".example.com") {
@@ -143,7 +143,7 @@ var _ = SIGDescribe("Discovery", func() {
 			apiPath := "/apis/" + group.Name + "/"
 			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(ctx).Into(checkGroup)
 			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
-			framework.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
+			gomega.Expect(checkGroup.Versions).ToNot(gomega.BeEmpty(), "No version found for %v", group.Name)
 			framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)
 			framework.Logf("Versions found %v", checkGroup.Versions)
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/distribution/reference"
@@ -106,29 +107,33 @@ var (
 
 var nameSuffixFunc = utilrand.String
 
+type DebugAttachFunc func(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, cmdPath string, ns, podName, containerName string) error
+
 // DebugOptions holds the options for an invocation of kubectl debug.
 type DebugOptions struct {
-	Args            []string
-	ArgsOnly        bool
-	Attach          bool
-	AttachFunc      func(ctx context.Context, restClientGetter genericclioptions.RESTClientGetter, cmdPath string, ns, podName, containerName string) error
-	Container       string
-	CopyTo          string
-	Replace         bool
-	Env             []corev1.EnvVar
-	Image           string
-	Interactive     bool
-	Namespace       string
-	TargetNames     []string
-	PullPolicy      corev1.PullPolicy
-	Quiet           bool
-	SameNode        bool
-	SetImages       map[string]string
-	ShareProcesses  bool
-	TargetContainer string
-	TTY             bool
-	Profile         string
-	Applier         ProfileApplier
+	Args              []string
+	ArgsOnly          bool
+	Attach            bool
+	AttachFunc        DebugAttachFunc
+	Container         string
+	CopyTo            string
+	Replace           bool
+	Env               []corev1.EnvVar
+	Image             string
+	Interactive       bool
+	Namespace         string
+	TargetNames       []string
+	PullPolicy        corev1.PullPolicy
+	Quiet             bool
+	SameNode          bool
+	SetImages         map[string]string
+	ShareProcesses    bool
+	TargetContainer   string
+	TTY               bool
+	Profile           string
+	CustomProfileFile string
+	CustomProfile     *corev1.Container
+	Applier           ProfileApplier
 
 	explicitNamespace     bool
 	attachChanged         bool
@@ -192,7 +197,10 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.ShareProcesses, "share-processes", o.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&o.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Debugging profile. Options are "legacy", "general", "baseline", "netadmin", or "restricted".`))
+	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
+	if cmdutil.DebugCustomProfile.IsEnabled() {
+		cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON file containing a partial container spec to customize built-in debug profiles."))
+	}
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -254,6 +262,18 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 			return err
 		}
 		o.Applier = applier
+	}
+
+	if o.CustomProfileFile != "" {
+		customProfileBytes, err := os.ReadFile(o.CustomProfileFile)
+		if err != nil {
+			return fmt.Errorf("must pass a container spec json file for custom profile: %w", err)
+		}
+
+		err = json.Unmarshal(customProfileBytes, &o.CustomProfile)
+		if err != nil {
+			return fmt.Errorf("%s does not contain a valid container spec: %w", o.CustomProfileFile, err)
+		}
 	}
 
 	clientConfig, err := restClientGetter.ToRESTConfig()
@@ -346,6 +366,12 @@ func (o *DebugOptions) Validate() error {
 	// WarningPrinter
 	if o.WarningPrinter == nil {
 		return fmt.Errorf("WarningPrinter can not be used without initialization")
+	}
+
+	if o.CustomProfile != nil {
+		if o.CustomProfile.Name != "" || len(o.CustomProfile.Command) > 0 || o.CustomProfile.Image != "" || o.CustomProfile.Lifecycle != nil || len(o.CustomProfile.VolumeDevices) > 0 {
+			return fmt.Errorf("name, command, image, lifecycle and volume devices are not modifiable via custom profile")
+		}
 	}
 
 	return nil
@@ -467,6 +493,90 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 	return result, debugContainer.Name, nil
 }
 
+// applyCustomProfile applies given partial container json file on to the profile
+// incorporated debug pod.
+func (o *DebugOptions) applyCustomProfile(debugPod *corev1.Pod, containerName string) error {
+	o.CustomProfile.Name = containerName
+	customJS, err := json.Marshal(o.CustomProfile)
+	if err != nil {
+		return fmt.Errorf("unable to marshall custom profile: %w", err)
+	}
+
+	var index int
+	found := false
+	for i, val := range debugPod.Spec.Containers {
+		if val.Name == containerName {
+			index = i
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("unable to find the %s container in the pod %s", containerName, debugPod.Name)
+	}
+
+	var debugContainerJS []byte
+	debugContainerJS, err = json.Marshal(debugPod.Spec.Containers[index])
+	if err != nil {
+		return fmt.Errorf("unable to marshall container: %w", err)
+	}
+
+	patchedContainer, err := strategicpatch.StrategicMergePatch(debugContainerJS, customJS, corev1.Container{})
+	if err != nil {
+		return fmt.Errorf("error creating three way patch to add debug container: %w", err)
+	}
+
+	err = json.Unmarshal(patchedContainer, &debugPod.Spec.Containers[index])
+	if err != nil {
+		return fmt.Errorf("unable to unmarshall patched container to container: %w", err)
+	}
+
+	return nil
+}
+
+// applyCustomProfileEphemeral applies given partial container json file on to the profile
+// incorporated ephemeral container of the pod.
+func (o *DebugOptions) applyCustomProfileEphemeral(debugPod *corev1.Pod, containerName string) error {
+	o.CustomProfile.Name = containerName
+	customJS, err := json.Marshal(o.CustomProfile)
+	if err != nil {
+		return fmt.Errorf("unable to marshall custom profile: %w", err)
+	}
+
+	var index int
+	found := false
+	for i, val := range debugPod.Spec.EphemeralContainers {
+		if val.Name == containerName {
+			index = i
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("unable to find the %s ephemeral container in the pod %s", containerName, debugPod.Name)
+	}
+
+	var debugContainerJS []byte
+	debugContainerJS, err = json.Marshal(debugPod.Spec.EphemeralContainers[index])
+	if err != nil {
+		return fmt.Errorf("unable to marshall ephemeral container:%w", err)
+	}
+
+	patchedContainer, err := strategicpatch.StrategicMergePatch(debugContainerJS, customJS, corev1.Container{})
+	if err != nil {
+		return fmt.Errorf("error creating three way patch to add debug container: %w", err)
+	}
+
+	err = json.Unmarshal(patchedContainer, &debugPod.Spec.EphemeralContainers[index])
+	if err != nil {
+		return fmt.Errorf("unable to unmarshall patched container to ephemeral container: %w", err)
+	}
+
+	return nil
+}
+
 // debugByCopy runs a copy of the target Pod with a debug container added or an original container modified
 func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
 	copied, dc, err := o.generatePodCopyWithDebugContainer(pod)
@@ -513,6 +623,13 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 	copied.Spec.EphemeralContainers = append(copied.Spec.EphemeralContainers, *ec)
 	if err := o.Applier.Apply(copied, name, copied); err != nil {
 		return nil, nil, err
+	}
+
+	if o.CustomProfile != nil {
+		err := o.applyCustomProfileEphemeral(copied, ec.Name)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	ec = &copied.Spec.EphemeralContainers[len(copied.Spec.EphemeralContainers)-1]
@@ -572,6 +689,13 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 
 	if err := o.Applier.Apply(p, cn, node); err != nil {
 		return nil, err
+	}
+
+	if o.CustomProfile != nil {
+		err := o.applyCustomProfile(p, cn)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return p, nil
@@ -654,6 +778,13 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	err := o.Applier.Apply(copied, c.Name, pod)
 	if err != nil {
 		return nil, "", err
+	}
+
+	if o.CustomProfile != nil {
+		err = o.applyCustomProfile(copied, name)
+		if err != nil {
+			return nil, "", err
+		}
 	}
 
 	return copied, name, nil

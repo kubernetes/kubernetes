@@ -631,6 +631,18 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: framework.PodSchedulingContext, ActionType: framework.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
+				{Resource: framework.ResourceClaim, ActionType: framework.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.ResourceClass, ActionType: framework.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.ResourceClaimParameters, ActionType: framework.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
+				{Resource: framework.ResourceClassParameters, ActionType: framework.All}: {
+					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
+				},
 			},
 		},
 		{
@@ -642,6 +654,9 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
+				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
 		},
@@ -655,6 +670,9 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
 		},
@@ -673,13 +691,16 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -755,15 +776,19 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[framework.GVK]framework.ActionType{
-				framework.Pod:                   framework.All,
-				framework.Node:                  framework.All,
-				framework.CSINode:               framework.All,
-				framework.CSIDriver:             framework.All,
-				framework.CSIStorageCapacity:    framework.All,
-				framework.PersistentVolume:      framework.All,
-				framework.PersistentVolumeClaim: framework.All,
-				framework.StorageClass:          framework.All,
-				framework.PodSchedulingContext:  framework.All,
+				framework.Pod:                     framework.All,
+				framework.Node:                    framework.All,
+				framework.CSINode:                 framework.All,
+				framework.CSIDriver:               framework.All,
+				framework.CSIStorageCapacity:      framework.All,
+				framework.PersistentVolume:        framework.All,
+				framework.PersistentVolumeClaim:   framework.All,
+				framework.StorageClass:            framework.All,
+				framework.PodSchedulingContext:    framework.All,
+				framework.ResourceClaim:           framework.All,
+				framework.ResourceClass:           framework.All,
+				framework.ResourceClaimParameters: framework.All,
+				framework.ResourceClassParameters: framework.All,
 			},
 		},
 		{
@@ -777,7 +802,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[framework.GVK]framework.ActionType{
-				framework.Node: framework.Add,
+				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{
@@ -807,7 +832,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:  framework.Add,
-				framework.Node: framework.Add,
+				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{

@@ -37,7 +37,7 @@ import (
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -114,8 +114,8 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	}
 
 	initializers := admission.PluginInitializers{
-		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, stopCh),
-		kubeapiserveradmission.NewPluginInitializer(nil, nil, quotaConfiguration),
+		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, stopCh, nil),
+		controlplaneadmission.NewPluginInitializer(quotaConfiguration, nil),
 	}
 	initializers.Initialize(handler)
 

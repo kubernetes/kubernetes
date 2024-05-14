@@ -97,6 +97,8 @@ type Options struct {
 
 	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
 	AllowNonStructural bool
+
+	IncludeSelectableFields bool
 }
 
 func generateBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, opts Options) (*builder, error) {
@@ -313,12 +315,12 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		Doc(b.descriptionFor(path, operationVerb)).
 		Param(b.ws.QueryParameter("pretty", "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).")).
 		Operation(operationVerb+namespaced+b.kind+strings.Title(subresource(path))).
-		Metadata(endpoints.ROUTE_META_GVK, metav1.GroupVersionKind{
+		Metadata(endpoints.RouteMetaGVK, metav1.GroupVersionKind{
 			Group:   b.group,
 			Version: b.version,
 			Kind:    b.kind,
 		}).
-		Metadata(endpoints.ROUTE_META_ACTION, actionVerb).
+		Metadata(endpoints.RouteMetaAction, actionVerb).
 		Produces("application/json", "application/yaml").
 		Returns(http.StatusOK, "OK", sample).
 		Writes(sample)
@@ -374,7 +376,7 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 
 // buildKubeNative builds input schema with Kubernetes' native object meta, type meta and
 // extensions
-func (b *builder) buildKubeNative(schema *structuralschema.Structural, opts Options, crdPreserveUnknownFields bool) (ret *spec.Schema) {
+func (b *builder) buildKubeNative(crd *apiextensionsv1.CustomResourceDefinition, schema *structuralschema.Structural, opts Options, crdPreserveUnknownFields bool) (ret *spec.Schema) {
 	// only add properties if we have a schema. Otherwise, kubectl would (wrongly) assume additionalProperties=false
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
@@ -395,13 +397,19 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, opts Opti
 		addTypeMetaProperties(ret, opts.V2)
 		addEmbeddedProperties(ret, opts)
 	}
-	ret.AddExtension(endpoints.ROUTE_META_GVK, []interface{}{
+	ret.AddExtension(endpoints.RouteMetaGVK, []interface{}{
 		map[string]interface{}{
 			"group":   b.group,
 			"version": b.version,
 			"kind":    b.kind,
 		},
 	})
+
+	if opts.IncludeSelectableFields {
+		if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
+			ret.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
+		}
+	}
 
 	return ret
 }
@@ -486,24 +494,29 @@ func addTypeMetaProperties(s *spec.Schema, v2 bool) {
 }
 
 // buildListSchema builds the list kind schema for the CRD
-func (b *builder) buildListSchema(v2 bool) *spec.Schema {
+func (b *builder) buildListSchema(crd *apiextensionsv1.CustomResourceDefinition, opts Options) *spec.Schema {
 	name := definitionPrefix + util.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", b.group, b.version, b.kind))
 	doc := fmt.Sprintf("List of %s. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md", b.plural)
 	s := new(spec.Schema).
 		Typed("object", "").
 		WithDescription(fmt.Sprintf("%s is a list of %s", b.listKind, b.kind)).
 		WithRequired("items").
-		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, v2))).WithDescription(doc)).
-		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, v2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))
+		SetProperty("items", *spec.ArrayProperty(spec.RefSchema(refForOpenAPIVersion(name, opts.V2))).WithDescription(doc)).
+		SetProperty("metadata", *spec.RefSchema(refForOpenAPIVersion(listMetaSchemaRef, opts.V2)).WithDescription(swaggerPartialObjectMetadataListDescriptions["metadata"]))
 
-	addTypeMetaProperties(s, v2)
-	s.AddExtension(endpoints.ROUTE_META_GVK, []map[string]string{
+	addTypeMetaProperties(s, opts.V2)
+	s.AddExtension(endpoints.RouteMetaGVK, []map[string]string{
 		{
 			"group":   b.group,
 			"version": b.version,
 			"kind":    b.listKind,
 		},
 	})
+	if opts.IncludeSelectableFields {
+		if selectableFields := buildSelectableFields(crd, b.version); selectableFields != nil {
+			s.AddExtension(endpoints.RouteMetaSelectableFields, selectableFields)
+		}
+	}
 	return s
 }
 
@@ -596,8 +609,29 @@ func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, s
 	}
 
 	// Pre-build schema with Kubernetes native properties
-	b.schema = b.buildKubeNative(schema, opts, crd.Spec.PreserveUnknownFields)
-	b.listSchema = b.buildListSchema(opts.V2)
+	b.schema = b.buildKubeNative(crd, schema, opts, crd.Spec.PreserveUnknownFields)
+	b.listSchema = b.buildListSchema(crd, opts)
 
 	return b
+}
+
+func buildSelectableFields(crd *apiextensionsv1.CustomResourceDefinition, version string) any {
+	var specVersion *apiextensionsv1.CustomResourceDefinitionVersion
+	for _, v := range crd.Spec.Versions {
+		if v.Name == version {
+			specVersion = &v
+			break
+		}
+	}
+	if specVersion == nil && len(specVersion.SelectableFields) == 0 {
+		return nil
+	}
+	selectableFields := make([]any, len(specVersion.SelectableFields))
+	for i, sf := range specVersion.SelectableFields {
+		props := map[string]any{
+			"fieldPath": strings.TrimPrefix(sf.JSONPath, "."),
+		}
+		selectableFields[i] = props
+	}
+	return selectableFields
 }

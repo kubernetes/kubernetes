@@ -37,7 +37,6 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -361,7 +360,6 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		fw.fakeAuth,
-		oteltrace.NewNoopTracerProvider(),
 		kubeCfg,
 	)
 	fw.serverUnderTest = &server
@@ -561,7 +559,7 @@ func TestAuthzCoverage(t *testing.T) {
 
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -858,18 +856,24 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 }
 
 func TestCheckpointContainer(t *testing.T) {
-	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
-
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
 	podNamespace := "other"
 	podName := "foo"
 	expectedContainerName := "baz"
-	// GetPodByName() should always fail
-	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
-		return nil, false
+
+	setupTest := func(featureGate bool) *serverTestFramework {
+		// Enable features.ContainerCheckpoint during test
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)
+
+		fw := newServerTest()
+		// GetPodByName() should always fail
+		fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+			return nil, false
+		}
+		return fw
 	}
+	fw := setupTest(true)
+	defer fw.testHTTPServer.Close()
+
 	t.Run("wrong pod namespace", func(t *testing.T) {
 		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
 		if err != nil {
@@ -926,6 +930,19 @@ func TestCheckpointContainer(t *testing.T) {
 			t.Errorf("Got error POSTing: %v", err)
 		}
 		assert.Equal(t, resp.StatusCode, 200)
+	})
+
+	// Now test for 404 if checkpointing support is explicitly disabled.
+	fw.testHTTPServer.Close()
+	fw = setupTest(false)
+	defer fw.testHTTPServer.Close()
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	t.Run("checkpointing fails because disabled", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 404, resp.StatusCode)
 	})
 }
 

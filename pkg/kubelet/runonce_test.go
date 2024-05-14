@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"go.uber.org/mock/gomock"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -84,6 +84,7 @@ func TestRunOnce(t *testing.T) {
 	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
 		rootDirectory:    filepath.Clean(basePath),
+		podLogsDirectory: filepath.Join(basePath, "pod-logs"),
 		recorder:         &record.FakeRecorder{},
 		cadvisor:         cadvisor,
 		nodeLister:       testNodeLister{},
@@ -121,7 +122,6 @@ func TestRunOnce(t *testing.T) {
 		kb.hostutil,
 		kb.getPodsDir(),
 		kb.recorder,
-		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
 	// TODO: Factor out "stats.Provider" from Kubelet so we don't have a cyclic dependency

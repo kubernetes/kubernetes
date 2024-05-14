@@ -2,3 +2,5 @@
 
 approvers:
   - feiskyer
+  - sig-node-approvers
+  - sig-node-cri-approvers

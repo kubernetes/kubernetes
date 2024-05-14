@@ -1,6 +1,3 @@
-//go:build !providerless
-// +build !providerless
-
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -20,10 +17,6 @@ limitations under the License.
 package app
 
 import (
-	// Credential providers
-	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
-	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
-
 	"k8s.io/component-base/featuregate"
 	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
@@ -31,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/portworx"
-	"k8s.io/kubernetes/pkg/volume/rbd"
 )
 
 type probeFn func() []volume.VolumePlugin
@@ -64,7 +56,6 @@ type pluginInfo struct {
 func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin, featureGate featuregate.FeatureGate) ([]volume.VolumePlugin, error) {
 	pluginMigrationStatus := make(map[string]pluginInfo)
 	pluginMigrationStatus[plugins.PortworxVolumePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationPortworx, pluginUnregisterFeature: features.InTreePluginPortworxUnregister, pluginProbeFunction: portworx.ProbeVolumePlugins}
-	pluginMigrationStatus[plugins.RBDVolumePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationRBD, pluginUnregisterFeature: features.InTreePluginRBDUnregister, pluginProbeFunction: rbd.ProbeVolumePlugins}
 	var err error
 	for pluginName, pluginInfo := range pluginMigrationStatus {
 		allPlugins, err = appendPluginBasedOnFeatureFlags(allPlugins, pluginName, featureGate, pluginInfo)

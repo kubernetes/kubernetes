@@ -24,6 +24,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiserver "k8s.io/apiserver/pkg/apis/apiserver"
@@ -324,7 +325,17 @@ func Convert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginC
 }
 
 func autoConvert_v1alpha1_AuthenticationConfiguration_To_apiserver_AuthenticationConfiguration(in *AuthenticationConfiguration, out *apiserver.AuthenticationConfiguration, s conversion.Scope) error {
-	out.JWT = *(*[]apiserver.JWTAuthenticator)(unsafe.Pointer(&in.JWT))
+	if in.JWT != nil {
+		in, out := &in.JWT, &out.JWT
+		*out = make([]apiserver.JWTAuthenticator, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_JWTAuthenticator_To_apiserver_JWTAuthenticator(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.JWT = nil
+	}
 	return nil
 }
 
@@ -334,7 +345,17 @@ func Convert_v1alpha1_AuthenticationConfiguration_To_apiserver_AuthenticationCon
 }
 
 func autoConvert_apiserver_AuthenticationConfiguration_To_v1alpha1_AuthenticationConfiguration(in *apiserver.AuthenticationConfiguration, out *AuthenticationConfiguration, s conversion.Scope) error {
-	out.JWT = *(*[]JWTAuthenticator)(unsafe.Pointer(&in.JWT))
+	if in.JWT != nil {
+		in, out := &in.JWT, &out.JWT
+		*out = make([]JWTAuthenticator, len(*in))
+		for i := range *in {
+			if err := Convert_apiserver_JWTAuthenticator_To_v1alpha1_JWTAuthenticator(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.JWT = nil
+	}
 	return nil
 }
 
@@ -580,8 +601,12 @@ func Convert_apiserver_ExtraMapping_To_v1alpha1_ExtraMapping(in *apiserver.Extra
 
 func autoConvert_v1alpha1_Issuer_To_apiserver_Issuer(in *Issuer, out *apiserver.Issuer, s conversion.Scope) error {
 	out.URL = in.URL
+	if err := v1.Convert_Pointer_string_To_string(&in.DiscoveryURL, &out.DiscoveryURL, s); err != nil {
+		return err
+	}
 	out.CertificateAuthority = in.CertificateAuthority
 	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	out.AudienceMatchPolicy = apiserver.AudienceMatchPolicyType(in.AudienceMatchPolicy)
 	return nil
 }
 
@@ -592,8 +617,12 @@ func Convert_v1alpha1_Issuer_To_apiserver_Issuer(in *Issuer, out *apiserver.Issu
 
 func autoConvert_apiserver_Issuer_To_v1alpha1_Issuer(in *apiserver.Issuer, out *Issuer, s conversion.Scope) error {
 	out.URL = in.URL
+	if err := v1.Convert_string_To_Pointer_string(&in.DiscoveryURL, &out.DiscoveryURL, s); err != nil {
+		return err
+	}
 	out.CertificateAuthority = in.CertificateAuthority
 	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
+	out.AudienceMatchPolicy = AudienceMatchPolicyType(in.AudienceMatchPolicy)
 	return nil
 }
 

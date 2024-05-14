@@ -26,11 +26,6 @@ import (
 	cadvisorfs "github.com/google/cadvisor/fs"
 )
 
-// LabelCrioContainers is a label to allow for cadvisor to track writeable layers
-// separately from read-only layers.
-// Once CAdvisor upstream changes are merged, we should remove this constant
-const LabelCrioContainers string = "crio-containers"
-
 // imageFsInfoProvider knows how to translate the configured runtime
 // to its file system label for images.
 type imageFsInfoProvider struct {
@@ -50,7 +45,7 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 // For remote runtimes, it handles addition runtimes natively understood by cAdvisor.
 func (i *imageFsInfoProvider) ContainerFsInfoLabel() (string, error) {
 	if detectCrioWorkaround(i) {
-		return LabelCrioContainers, nil
+		return cadvisorfs.LabelCrioContainers, nil
 	}
 	return "", fmt.Errorf("no containerfs label for configured runtime")
 }

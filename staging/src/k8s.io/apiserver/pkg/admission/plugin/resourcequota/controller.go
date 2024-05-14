@@ -61,7 +61,7 @@ type quotaEvaluator struct {
 	// The technique is valuable for rollup activities to avoid fanout and reduce resource contention.
 	// We could move this into a library if another component needed it.
 	// queue is indexed by namespace, so that we bundle up on a per-namespace basis
-	queue      *workqueue.Type
+	queue      *workqueue.Typed[string]
 	workLock   sync.Mutex
 	work       map[string][]*admissionWaiter
 	dirtyWork  map[string][]*admissionWaiter
@@ -122,7 +122,7 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		ignoredResources: ignoredResources,
 		registry:         quotaRegistry,
 
-		queue:      workqueue.NewNamed("admission_quota_controller"),
+		queue:      workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "admission_quota_controller"}),
 		work:       map[string][]*admissionWaiter{},
 		dirtyWork:  map[string][]*admissionWaiter{},
 		inProgress: sets.String{},
@@ -217,8 +217,8 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 // AFTER it has checked all the admissionAttributes.  The method breaks down into phase like this:
 //  0. make a copy of the quotas to act as a "running" quota so we know what we need to update and can still compare against the
 //     originals
-//  1. check each admission attribute to see if it fits within *all* the quotas.  If it doesn't fit, mark the waiter as failed
-//     and the running quota don't change.  If it did fit, check to see if any quota was changed.  It there was no quota change
+//  1. check each admission attribute to see if it fits within *all* the quotas.  If it didn't fit, mark the waiter as failed
+//     and the running quota doesn't change.  If it did fit, check to see if any quota was changed.  If there was no quota change
 //     mark the waiter as succeeded.  If some quota did change, update the running quotas
 //  2. If no running quota was changed, return now since no updates are needed.
 //  3. for each quota that has changed, attempt an update.  If all updates succeeded, update all unset waiters to success status and return.  If the some
@@ -666,11 +666,10 @@ func (e *quotaEvaluator) completeWork(ns string) {
 // returned namespace (regardless of whether the work item list is
 // empty).
 func (e *quotaEvaluator) getWork() (string, []*admissionWaiter, bool) {
-	uncastNS, shutdown := e.queue.Get()
+	ns, shutdown := e.queue.Get()
 	if shutdown {
 		return "", []*admissionWaiter{}, shutdown
 	}
-	ns := uncastNS.(string)
 
 	e.workLock.Lock()
 	defer e.workLock.Unlock()

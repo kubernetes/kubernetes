@@ -1510,7 +1510,7 @@ func TestFitError_Error(t *testing.T) {
 }
 
 func TestCalculatePodResourcesWithResize(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	cpu500m := resource.MustParse("500m")
 	mem500M := resource.MustParse("500Mi")
 	cpu700m := resource.MustParse("700m")
@@ -1604,6 +1604,55 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			}
 			if non0Mem != tt.expectedNon0Mem {
 				t.Errorf("Test: %s expected non0Mem: %d, got: %d", tt.name, tt.expectedNon0Mem, non0Mem)
+			}
+		})
+	}
+}
+
+func TestCloudEvent_Match(t *testing.T) {
+	testCases := []struct {
+		name        string
+		event       ClusterEvent
+		comingEvent ClusterEvent
+		wantResult  bool
+	}{
+		{
+			name:        "wildcard event matches with all kinds of coming events",
+			event:       ClusterEvent{Resource: WildCard, ActionType: All},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = '*' matching with coming events carries same actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
+		{
+			name:        "event with resource = '*' matching with coming events carries different actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeAllocatable},
+			wantResult:  false,
+		},
+		{
+			name:        "event matching with coming events carries '*' resources",
+			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			wantResult:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.event.Match(tc.comingEvent)
+			if got != tc.wantResult {
+				t.Fatalf("unexpected result")
 			}
 		})
 	}

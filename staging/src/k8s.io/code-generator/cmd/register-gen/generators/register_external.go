@@ -21,13 +21,13 @@ import (
 	"sort"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 type registerExternalGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage   string
 	gv              clientgentypes.GroupVersion
 	typesToGenerate []*types.Type
@@ -91,7 +91,7 @@ var (
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
 	SchemeBuilder      runtime.SchemeBuilder
 	localSchemeBuilder = &SchemeBuilder
-    // Depreciated: use Install instead
+    // Deprecated: use Install instead
 	AddToScheme        = localSchemeBuilder.AddToScheme
 	Install            = localSchemeBuilder.AddToScheme
 )

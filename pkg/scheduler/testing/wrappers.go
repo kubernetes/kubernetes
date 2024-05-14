@@ -882,6 +882,20 @@ func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSou
 	return p
 }
 
+// NodeAffinityIn creates a HARD node affinity (with the operator In)
+// and injects into the pv.
+func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *PersistentVolumeWrapper {
+	if p.Spec.NodeAffinity == nil {
+		p.Spec.NodeAffinity = &v1.VolumeNodeAffinity{}
+	}
+	if p.Spec.NodeAffinity.Required == nil {
+		p.Spec.NodeAffinity.Required = &v1.NodeSelector{}
+	}
+	nodeSelector := MakeNodeSelector().In(key, vals).Obj()
+	p.Spec.NodeAffinity.Required.NodeSelectorTerms = append(p.Spec.NodeAffinity.Required.NodeSelectorTerms, nodeSelector.NodeSelectorTerms...)
+	return p
+}
+
 // ResourceClaimWrapper wraps a ResourceClaim inside.
 type ResourceClaimWrapper struct{ resourcev1alpha2.ResourceClaim }
 
@@ -938,6 +952,16 @@ func (wrapper *ResourceClaimWrapper) AllocationMode(a resourcev1alpha2.Allocatio
 	return wrapper
 }
 
+// ParametersRef sets a reference to a ResourceClaimParameters.resource.k8s.io.
+func (wrapper *ResourceClaimWrapper) ParametersRef(name string) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Spec.ParametersRef = &resourcev1alpha2.ResourceClaimParametersReference{
+		Name:     name,
+		Kind:     "ResourceClaimParameters",
+		APIGroup: "resource.k8s.io",
+	}
+	return wrapper
+}
+
 // ResourceClassName sets the resource class name of the inner object.
 func (wrapper *ResourceClaimWrapper) ResourceClassName(name string) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Spec.ResourceClassName = name
@@ -945,8 +969,57 @@ func (wrapper *ResourceClaimWrapper) ResourceClassName(name string) *ResourceCla
 }
 
 // Allocation sets the allocation of the inner object.
-func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourcev1alpha2.AllocationResult) *ResourceClaimWrapper {
+func (wrapper *ResourceClaimWrapper) Allocation(driverName string, allocation *resourcev1alpha2.AllocationResult) *ResourceClaimWrapper {
+	wrapper.ResourceClaim.Status.DriverName = driverName
 	wrapper.ResourceClaim.Status.Allocation = allocation
+	return wrapper
+}
+
+// Structured turns a "normal" claim into one which was allocated via structured parameters.
+// This modifies the allocation result and adds the reserved finalizer if the claim
+// is allocated. The claim has to become local to a node. The assumption is that
+// "named resources" are used.
+func (wrapper *ResourceClaimWrapper) Structured(nodeName string, namedResourcesInstances ...string) *ResourceClaimWrapper {
+	if wrapper.ResourceClaim.Status.Allocation != nil {
+		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourcev1alpha2.Finalizer)
+		for i, resourceHandle := range wrapper.ResourceClaim.Status.Allocation.ResourceHandles {
+			resourceHandle.Data = ""
+			resourceHandle.StructuredData = &resourcev1alpha2.StructuredResourceHandle{
+				NodeName: nodeName,
+			}
+			wrapper.ResourceClaim.Status.Allocation.ResourceHandles[i] = resourceHandle
+		}
+		if len(wrapper.ResourceClaim.Status.Allocation.ResourceHandles) == 0 {
+			wrapper.ResourceClaim.Status.Allocation.ResourceHandles = []resourcev1alpha2.ResourceHandle{{
+				DriverName: wrapper.ResourceClaim.Status.DriverName,
+				StructuredData: &resourcev1alpha2.StructuredResourceHandle{
+					NodeName: nodeName,
+				},
+			}}
+		}
+		for _, resourceHandle := range wrapper.ResourceClaim.Status.Allocation.ResourceHandles {
+			for _, name := range namedResourcesInstances {
+				result := resourcev1alpha2.DriverAllocationResult{
+					AllocationResultModel: resourcev1alpha2.AllocationResultModel{
+						NamedResources: &resourcev1alpha2.NamedResourcesAllocationResult{
+							Name: name,
+						},
+					},
+				}
+				resourceHandle.StructuredData.Results = append(resourceHandle.StructuredData.Results, result)
+			}
+		}
+		wrapper.ResourceClaim.Status.Allocation.Shareable = true
+		wrapper.ResourceClaim.Status.Allocation.AvailableOnNodes = &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{{
+				MatchExpressions: []v1.NodeSelectorRequirement{{
+					Key:      "kubernetes.io/hostname",
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{nodeName},
+				}},
+			}},
+		}
+	}
 	return wrapper
 }
 
@@ -960,6 +1033,11 @@ func (wrapper *ResourceClaimWrapper) DeallocationRequested(deallocationRequested
 func (wrapper *ResourceClaimWrapper) ReservedFor(consumers ...resourcev1alpha2.ResourceClaimConsumerReference) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Status.ReservedFor = consumers
 	return wrapper
+}
+
+// ReservedFor sets that field of the inner object given information about one pod.
+func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types.UID) *ResourceClaimWrapper {
+	return wrapper.ReservedFor(resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
 }
 
 // PodSchedulingWrapper wraps a PodSchedulingContext inside.
@@ -1039,5 +1117,133 @@ func (wrapper *PodSchedulingWrapper) PotentialNodes(nodes ...string) *PodSchedul
 // ResourceClaims sets that field of the inner object.
 func (wrapper *PodSchedulingWrapper) ResourceClaims(statuses ...resourcev1alpha2.ResourceClaimSchedulingStatus) *PodSchedulingWrapper {
 	wrapper.Status.ResourceClaims = statuses
+	return wrapper
+}
+
+type ResourceSliceWrapper struct {
+	resourcev1alpha2.ResourceSlice
+}
+
+func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
+	wrapper := new(ResourceSliceWrapper)
+	wrapper.Name = nodeName + "-" + driverName
+	wrapper.NodeName = nodeName
+	wrapper.DriverName = driverName
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) Obj() *resourcev1alpha2.ResourceSlice {
+	return &wrapper.ResourceSlice
+}
+
+func (wrapper *ResourceSliceWrapper) NamedResourcesInstances(names ...string) *ResourceSliceWrapper {
+	wrapper.ResourceModel = resourcev1alpha2.ResourceModel{NamedResources: &resourcev1alpha2.NamedResourcesResources{}}
+	for _, name := range names {
+		wrapper.ResourceModel.NamedResources.Instances = append(wrapper.ResourceModel.NamedResources.Instances,
+			resourcev1alpha2.NamedResourcesInstance{Name: name},
+		)
+	}
+	return wrapper
+}
+
+type ClaimParametersWrapper struct {
+	resourcev1alpha2.ResourceClaimParameters
+}
+
+func MakeClaimParameters() *ClaimParametersWrapper {
+	return &ClaimParametersWrapper{}
+}
+
+func (wrapper *ClaimParametersWrapper) Obj() *resourcev1alpha2.ResourceClaimParameters {
+	return &wrapper.ResourceClaimParameters
+}
+
+func (wrapper *ClaimParametersWrapper) Name(s string) *ClaimParametersWrapper {
+	wrapper.SetName(s)
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) UID(s string) *ClaimParametersWrapper {
+	wrapper.SetUID(types.UID(s))
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) Namespace(s string) *ClaimParametersWrapper {
+	wrapper.SetNamespace(s)
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) Shareable(value bool) *ClaimParametersWrapper {
+	wrapper.ResourceClaimParameters.Shareable = value
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) GeneratedFrom(value *resourcev1alpha2.ResourceClaimParametersReference) *ClaimParametersWrapper {
+	wrapper.ResourceClaimParameters.GeneratedFrom = value
+	return wrapper
+}
+
+func (wrapper *ClaimParametersWrapper) NamedResourcesRequests(driverName string, selectors ...string) *ClaimParametersWrapper {
+	requests := resourcev1alpha2.DriverRequests{
+		DriverName: driverName,
+	}
+	for _, selector := range selectors {
+		request := resourcev1alpha2.ResourceRequest{
+			ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
+				NamedResources: &resourcev1alpha2.NamedResourcesRequest{
+					Selector: selector,
+				},
+			},
+		}
+		requests.Requests = append(requests.Requests, request)
+	}
+	wrapper.DriverRequests = append(wrapper.DriverRequests, requests)
+	return wrapper
+}
+
+type ClassParametersWrapper struct {
+	resourcev1alpha2.ResourceClassParameters
+}
+
+func MakeClassParameters() *ClassParametersWrapper {
+	return &ClassParametersWrapper{}
+}
+
+func (wrapper *ClassParametersWrapper) Obj() *resourcev1alpha2.ResourceClassParameters {
+	return &wrapper.ResourceClassParameters
+}
+
+func (wrapper *ClassParametersWrapper) Name(s string) *ClassParametersWrapper {
+	wrapper.SetName(s)
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) UID(s string) *ClassParametersWrapper {
+	wrapper.SetUID(types.UID(s))
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) Namespace(s string) *ClassParametersWrapper {
+	wrapper.SetNamespace(s)
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) GeneratedFrom(value *resourcev1alpha2.ResourceClassParametersReference) *ClassParametersWrapper {
+	wrapper.ResourceClassParameters.GeneratedFrom = value
+	return wrapper
+}
+
+func (wrapper *ClassParametersWrapper) NamedResourcesFilters(driverName string, selectors ...string) *ClassParametersWrapper {
+	for _, selector := range selectors {
+		filter := resourcev1alpha2.ResourceFilter{
+			DriverName: driverName,
+			ResourceFilterModel: resourcev1alpha2.ResourceFilterModel{
+				NamedResources: &resourcev1alpha2.NamedResourcesFilter{
+					Selector: selector,
+				},
+			},
+		}
+		wrapper.Filters = append(wrapper.Filters, filter)
+	}
 	return wrapper
 }

@@ -121,7 +121,7 @@ func (d *Decoder) Read() (Token, error) {
 
 	case ObjectClose:
 		if len(d.openStack) == 0 ||
-			d.lastToken.kind == comma ||
+			d.lastToken.kind&(Name|comma) != 0 ||
 			d.openStack[len(d.openStack)-1] != ObjectOpen {
 			return Token{}, d.newSyntaxError(tok.pos, unexpectedFmt, tok.RawString())
 		}

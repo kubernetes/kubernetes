@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/apps"
 	"k8s.io/kubernetes/test/e2e/upgrades/autoscaling"
@@ -57,6 +58,10 @@ var _ = SIGDescribe("Upgrade", feature.Upgrade, func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
+
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+	})
 
 	// Create the frameworks here because we can only create them
 	// in a "Describe".
@@ -96,6 +101,10 @@ var _ = SIGDescribe("Downgrade", feature.Downgrade, func() {
 	f := framework.NewDefaultFramework("cluster-downgrade")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
+
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+	})
 
 	ginkgo.Describe("cluster downgrade", func() {
 		f.It("should maintain a functioning cluster", feature.ClusterDowngrade, func(ctx context.Context) {

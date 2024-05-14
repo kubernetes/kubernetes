@@ -11,6 +11,9 @@
     },
     "spec": {
         "securityContext": {
+            {{runAsUser}}
+            {{runAsGroup}}
+            {{supplementalGroups}}
             "seccompProfile": {
                 "type": "RuntimeDefault"
             }

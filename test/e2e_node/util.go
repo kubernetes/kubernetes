@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -74,6 +74,7 @@ import (
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
+var agnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
@@ -233,7 +234,10 @@ func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletCon
 
 	ginkgo.By("Starting the kubelet")
 	startKubelet()
+	waitForKubeletToStart(ctx, f)
+}
 
+func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
@@ -312,22 +316,13 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 	}
 }
 
-// runCommand runs the cmd and returns the combined stdout and stderr, or an
-// error if the command failed.
-func runCommand(cmd ...string) (string, error) {
-	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
-	}
-	return string(output), nil
-}
-
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.
 func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
+	logger := klog.Background()
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, oteltrace.NewNoopTracerProvider())
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -337,7 +332,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, oteltrace.NewNoopTracerProvider())
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -465,18 +460,6 @@ func stopKubelet() func() {
 		stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 	}
-}
-
-// killKubelet sends a signal (SIGINT, SIGSTOP, SIGTERM...) to the running kubelet
-func killKubelet(sig string) {
-	kubeletServiceName := findKubeletServiceName(true)
-
-	// reset the kubelet service start-limit-hit
-	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
-
-	stdout, err = exec.Command("sudo", "systemctl", "kill", "-s", sig, kubeletServiceName).CombinedOutput()
-	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
 }
 
 func kubeletHealthCheck(url string) bool {

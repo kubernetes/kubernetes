@@ -64,7 +64,7 @@ func (fs FS) NetSoftnetStat() ([]SoftnetStat, error) {
 
 	entries, err := parseSoftnet(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse /proc/net/softnet_stat: %w", err)
+		return nil, fmt.Errorf("%s: /proc/net/softnet_stat: %w", ErrFileParse, err)
 	}
 
 	return entries, nil
@@ -83,7 +83,7 @@ func parseSoftnet(r io.Reader) ([]SoftnetStat, error) {
 		softnetStat := SoftnetStat{}
 
 		if width < minColumns {
-			return nil, fmt.Errorf("%d columns were detected, but at least %d were expected", width, minColumns)
+			return nil, fmt.Errorf("%w: detected %d columns, but expected at least %d", ErrFileParse, width, minColumns)
 		}
 
 		// Linux 2.6.23 https://elixir.bootlin.com/linux/v2.6.23/source/net/core/dev.c#L2347

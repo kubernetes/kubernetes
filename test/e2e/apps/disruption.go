@@ -317,10 +317,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 			if c.shouldDeny {
 				err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
-				framework.ExpectError(err, "pod eviction should fail")
-				if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
-					framework.Fail("pod eviction should fail with DisruptionBudget cause")
-				}
+				gomega.Expect(err).To(gomega.MatchError(func(err error) bool {
+					return apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause)
+				}, "pod eviction should fail with DisruptionBudget cause"))
 			} else {
 				// Only wait for running pods in the "allow" case
 				// because one of shouldDeny cases relies on the
@@ -363,10 +362,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			},
 		}
 		err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
-		framework.ExpectError(err, "pod eviction should fail")
-		if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
-			framework.Failf("pod eviction should fail with DisruptionBudget cause. The error was \"%v\"", err)
-		}
+		gomega.Expect(err).To(gomega.MatchError(func(err error) bool {
+			return apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause)
+		}, fmt.Sprintf("pod eviction should fail with DisruptionBudget cause. The error was \"%v\"\n", err)))
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
 		updatePDBOrDie(ctx, cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
@@ -403,10 +401,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			},
 		}
 		err = cs.CoreV1().Pods(ns).EvictV1(ctx, e)
-		framework.ExpectError(err, "pod eviction should fail")
-		if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
-			framework.Failf("pod eviction should fail with DisruptionBudget cause. The error was \"%v\"", err)
-		}
+		gomega.Expect(err).To(gomega.MatchError(func(err error) bool {
+			return apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause)
+		}, fmt.Sprintf("pod eviction should fail with DisruptionBudget cause. The error was \"%v\"\n", err)))
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
 		deletePDBOrDie(ctx, cs, ns, defaultName)

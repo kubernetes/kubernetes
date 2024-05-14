@@ -54,6 +54,10 @@ type Provider interface {
 	// Returns false if not found.
 	FindStructType(structType string) (*Type, bool)
 
+	// FindStructFieldNames returns thet field names associated with the type, if the type
+	// is found.
+	FindStructFieldNames(structType string) ([]string, bool)
+
 	// FieldStructFieldType returns the field type for a checked type value. Returns
 	// false if the field could not be found.
 	FindStructFieldType(structType, fieldName string) (*FieldType, bool)
@@ -154,7 +158,7 @@ func (p *Registry) EnumValue(enumName string) ref.Val {
 	return Int(enumVal.Value())
 }
 
-// FieldFieldType returns the field type for a checked type value. Returns false if
+// FindFieldType returns the field type for a checked type value. Returns false if
 // the field could not be found.
 //
 // Deprecated: use FindStructFieldType
@@ -173,7 +177,24 @@ func (p *Registry) FindFieldType(structType, fieldName string) (*ref.FieldType, 
 		GetFrom: field.GetFrom}, true
 }
 
-// FieldStructFieldType returns the field type for a checked type value. Returns
+// FindStructFieldNames returns the set of field names for the given struct type,
+// if the type exists in the registry.
+func (p *Registry) FindStructFieldNames(structType string) ([]string, bool) {
+	msgType, found := p.pbdb.DescribeType(structType)
+	if !found {
+		return []string{}, false
+	}
+	fieldMap := msgType.FieldMap()
+	fields := make([]string, len(fieldMap))
+	idx := 0
+	for f := range fieldMap {
+		fields[idx] = f
+		idx++
+	}
+	return fields, true
+}
+
+// FindStructFieldType returns the field type for a checked type value. Returns
 // false if the field could not be found.
 func (p *Registry) FindStructFieldType(structType, fieldName string) (*FieldType, bool) {
 	msgType, found := p.pbdb.DescribeType(structType)
@@ -255,7 +276,7 @@ func (p *Registry) NewValue(structType string, fields map[string]ref.Val) ref.Va
 		}
 		err := msgSetField(msg, field, value)
 		if err != nil {
-			return &Err{err}
+			return &Err{error: err}
 		}
 	}
 	return p.NativeToValue(msg.Interface())
@@ -569,12 +590,33 @@ func nativeToValue(a Adapter, value any) (ref.Val, bool) {
 			return NewDynamicMap(a, v), true
 		// type aliases of primitive types cannot be asserted as that type, but rather need
 		// to be downcast to int32 before being converted to a CEL representation.
+		case reflect.Bool:
+			boolTupe := reflect.TypeOf(false)
+			return Bool(refValue.Convert(boolTupe).Interface().(bool)), true
+		case reflect.Int:
+			intType := reflect.TypeOf(int(0))
+			return Int(refValue.Convert(intType).Interface().(int)), true
+		case reflect.Int8:
+			intType := reflect.TypeOf(int8(0))
+			return Int(refValue.Convert(intType).Interface().(int8)), true
+		case reflect.Int16:
+			intType := reflect.TypeOf(int16(0))
+			return Int(refValue.Convert(intType).Interface().(int16)), true
 		case reflect.Int32:
 			intType := reflect.TypeOf(int32(0))
 			return Int(refValue.Convert(intType).Interface().(int32)), true
 		case reflect.Int64:
 			intType := reflect.TypeOf(int64(0))
 			return Int(refValue.Convert(intType).Interface().(int64)), true
+		case reflect.Uint:
+			uintType := reflect.TypeOf(uint(0))
+			return Uint(refValue.Convert(uintType).Interface().(uint)), true
+		case reflect.Uint8:
+			uintType := reflect.TypeOf(uint8(0))
+			return Uint(refValue.Convert(uintType).Interface().(uint8)), true
+		case reflect.Uint16:
+			uintType := reflect.TypeOf(uint16(0))
+			return Uint(refValue.Convert(uintType).Interface().(uint16)), true
 		case reflect.Uint32:
 			uintType := reflect.TypeOf(uint32(0))
 			return Uint(refValue.Convert(uintType).Interface().(uint32)), true
@@ -587,6 +629,9 @@ func nativeToValue(a Adapter, value any) (ref.Val, bool) {
 		case reflect.Float64:
 			doubleType := reflect.TypeOf(float64(0))
 			return Double(refValue.Convert(doubleType).Interface().(float64)), true
+		case reflect.String:
+			stringType := reflect.TypeOf("")
+			return String(refValue.Convert(stringType).Interface().(string)), true
 		}
 	}
 	return nil, false

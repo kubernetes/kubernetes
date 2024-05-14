@@ -19,10 +19,9 @@ package validation
 import (
 	"fmt"
 	"math"
-	"net"
 	"regexp"
-	"strconv"
 	"strings"
+	"unicode"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	netutils "k8s.io/utils/net"
@@ -352,11 +351,12 @@ func IsValidPortName(port string) []string {
 }
 
 // IsValidIP tests that the argument is a valid IP address.
-func IsValidIP(value string) []string {
+func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
 	if netutils.ParseIPSloppy(value) == nil {
-		return []string{"must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"}
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"))
 	}
-	return nil
+	return allErrors
 }
 
 // IsValidIPv4Address tests that the argument is a valid IPv4 address.
@@ -375,6 +375,16 @@ func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
 	ip := netutils.ParseIPSloppy(value)
 	if ip == nil || ip.To4() != nil {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
+	}
+	return allErrors
+}
+
+// IsValidCIDR tests that the argument is a valid CIDR value.
+func IsValidCIDR(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	_, _, err := netutils.ParseCIDRSloppy(value)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
 	}
 	return allErrors
 }
@@ -409,6 +419,9 @@ func IsHTTPHeaderName(value string) []string {
 const envVarNameFmt = "[-._a-zA-Z][-._a-zA-Z0-9]*"
 const envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
 
+// TODO(hirazawaui): Rename this when the RelaxedEnvironmentVariableValidation gate is removed.
+const relaxedEnvVarNameFmtErrMsg string = "a valid environment variable name must consist only of printable ASCII characters other than '='"
+
 var envVarNameRegexp = regexp.MustCompile("^" + envVarNameFmt + "$")
 
 // IsEnvVarName tests if a string is a valid environment variable name.
@@ -419,6 +432,24 @@ func IsEnvVarName(value string) []string {
 	}
 
 	errs = append(errs, hasChDirPrefix(value)...)
+	return errs
+}
+
+// IsRelaxedEnvVarName tests if a string is a valid environment variable name.
+func IsRelaxedEnvVarName(value string) []string {
+	var errs []string
+
+	if len(value) == 0 {
+		errs = append(errs, "environment variable name "+EmptyError())
+	}
+
+	for _, r := range value {
+		if r > unicode.MaxASCII || !unicode.IsPrint(r) || r == '=' {
+			errs = append(errs, relaxedEnvVarNameFmtErrMsg)
+			break
+		}
+	}
+
 	return errs
 }
 
@@ -491,20 +522,5 @@ func hasChDirPrefix(value string) []string {
 	case strings.HasPrefix(value, ".."):
 		errs = append(errs, `must not start with '..'`)
 	}
-	return errs
-}
-
-// IsValidSocketAddr checks that string represents a valid socket address
-// as defined in RFC 789. (e.g 0.0.0.0:10254 or [::]:10254))
-func IsValidSocketAddr(value string) []string {
-	var errs []string
-	ip, port, err := net.SplitHostPort(value)
-	if err != nil {
-		errs = append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
-		return errs
-	}
-	portInt, _ := strconv.Atoi(port)
-	errs = append(errs, IsValidPortNum(portInt)...)
-	errs = append(errs, IsValidIP(ip)...)
 	return errs
 }

@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	supportedEtcdVersions = []string{"3.4.18", "3.5.11"}
+	supportedEtcdVersions = []string{"3.4.18", "3.5.13"}
 )
 
 const (

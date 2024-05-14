@@ -26,6 +26,8 @@ limitations under the License.
 package replication
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -48,8 +50,9 @@ type ReplicationManager struct {
 }
 
 // NewReplicationManager configures a replication manager with the specified event recorder
-func NewReplicationManager(logger klog.Logger, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicationManager {
-	eventBroadcaster := record.NewBroadcaster()
+func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicationManager {
+	logger := klog.FromContext(ctx)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	return &ReplicationManager{
 		*replicaset.NewBaseController(logger, informerAdapter{rcInformer}, podInformer, clientsetAdapter{kubeClient}, burstReplicas,
 			v1.SchemeGroupVersion.WithKind("ReplicationController"),

@@ -19,7 +19,16 @@ package v1alpha2
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	// Finalizer is the finalizer that gets set for claims
+	// which were allocated through a builtin controller.
+	// Reserved for use by Kubernetes, DRA driver controllers must
+	// use their own finalizer.
+	Finalizer = "dra.k8s.io/delete-protection"
 )
 
 // +genclient
@@ -114,8 +123,10 @@ type ResourceClaimStatus struct {
 	//
 	// +listType=map
 	// +listMapKey=uid
+	// +patchStrategy=merge
+	// +patchMergeKey=uid
 	// +optional
-	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
+	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
 
 	// DeallocationRequested indicates that a ResourceClaim is to be
 	// deallocated.
@@ -177,7 +188,7 @@ type ResourceHandle struct {
 	// plugin should be invoked to process this ResourceHandle's data once it
 	// lands on a node. This may differ from the DriverName set in
 	// ResourceClaimStatus this ResourceHandle is embedded in.
-	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+	DriverName string `json:"driverName" protobuf:"bytes,1,name=driverName"`
 
 	// Data contains the opaque data associated with this ResourceHandle. It is
 	// set by the controller component of the resource driver whose name
@@ -190,10 +201,62 @@ type ResourceHandle struct {
 	// future, but not reduced.
 	// +optional
 	Data string `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
+
+	// If StructuredData is set, then it needs to be used instead of Data.
+	//
+	// +optional
+	StructuredData *StructuredResourceHandle `json:"structuredData,omitempty" protobuf:"bytes,5,opt,name=structuredData"`
 }
 
 // ResourceHandleDataMaxSize represents the maximum size of resourceHandle.data.
 const ResourceHandleDataMaxSize = 16 * 1024
+
+// StructuredResourceHandle is the in-tree representation of the allocation result.
+type StructuredResourceHandle struct {
+	// VendorClassParameters are the per-claim configuration parameters
+	// from the resource class at the time that the claim was allocated.
+	//
+	// +optional
+	VendorClassParameters runtime.RawExtension `json:"vendorClassParameters,omitempty" protobuf:"bytes,1,opt,name=vendorClassParameters"`
+
+	// VendorClaimParameters are the per-claim configuration parameters
+	// from the resource claim parameters at the time that the claim was
+	// allocated.
+	//
+	// +optional
+	VendorClaimParameters runtime.RawExtension `json:"vendorClaimParameters,omitempty" protobuf:"bytes,2,opt,name=vendorClaimParameters"`
+
+	// NodeName is the name of the node providing the necessary resources
+	// if the resources are local to a node.
+	//
+	// +optional
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,4,name=nodeName"`
+
+	// Results lists all allocated driver resources.
+	//
+	// +listType=atomic
+	Results []DriverAllocationResult `json:"results" protobuf:"bytes,5,name=results"`
+}
+
+// DriverAllocationResult contains vendor parameters and the allocation result for
+// one request.
+type DriverAllocationResult struct {
+	// VendorRequestParameters are the per-request configuration parameters
+	// from the time that the claim was allocated.
+	//
+	// +optional
+	VendorRequestParameters runtime.RawExtension `json:"vendorRequestParameters,omitempty" protobuf:"bytes,1,opt,name=vendorRequestParameters"`
+
+	AllocationResultModel `json:",inline" protobuf:"bytes,2,name=allocationResultModel"`
+}
+
+// AllocationResultModel must have one and only one field set.
+type AllocationResultModel struct {
+	// NamedResources describes the allocation result when using the named resources model.
+	//
+	// +optional
+	NamedResources *NamedResourcesAllocationResult `json:"namedResources,omitempty" protobuf:"bytes,1,opt,name=namedResources"`
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
@@ -345,6 +408,11 @@ type ResourceClass struct {
 	// Setting this field is optional. If null, all nodes are candidates.
 	// +optional
 	SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,4,opt,name=suitableNodes"`
+
+	// If and only if allocation of claims using this class is handled
+	// via structured parameters, then StructuredParameters must be set to true.
+	// +optional
+	StructuredParameters *bool `json:"structuredParameters,omitempty" protobuf:"bytes,5,opt,name=structuredParameters"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -459,4 +527,213 @@ type ResourceClaimTemplateList struct {
 
 	// Items is the list of resource claim templates.
 	Items []ResourceClaimTemplate `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
+
+// ResourceSlice provides information about available
+// resources on individual nodes.
+type ResourceSlice struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// NodeName identifies the node which provides the resources
+	// if they are local to a node.
+	//
+	// A field selector can be used to list only ResourceSlice
+	// objects with a certain node name.
+	//
+	// +optional
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,2,opt,name=nodeName"`
+
+	// DriverName identifies the DRA driver providing the capacity information.
+	// A field selector can be used to list only ResourceSlice
+	// objects with a certain driver name.
+	DriverName string `json:"driverName" protobuf:"bytes,3,name=driverName"`
+
+	ResourceModel `json:",inline" protobuf:"bytes,4,name=resourceModel"`
+}
+
+// ResourceModel must have one and only one field set.
+type ResourceModel struct {
+	// NamedResources describes available resources using the named resources model.
+	//
+	// +optional
+	NamedResources *NamedResourcesResources `json:"namedResources,omitempty" protobuf:"bytes,1,opt,name=namedResources"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
+
+// ResourceSliceList is a collection of ResourceSlices.
+type ResourceSliceList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of node resource capacity objects.
+	Items []ResourceSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
+
+// ResourceClaimParameters defines resource requests for a ResourceClaim in an
+// in-tree format understood by Kubernetes.
+type ResourceClaimParameters struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// If this object was created from some other resource, then this links
+	// back to that resource. This field is used to find the in-tree representation
+	// of the claim parameters when the parameter reference of the claim refers
+	// to some unknown type.
+	// +optional
+	GeneratedFrom *ResourceClaimParametersReference `json:"generatedFrom,omitempty" protobuf:"bytes,2,opt,name=generatedFrom"`
+
+	// Shareable indicates whether the allocated claim is meant to be shareable
+	// by multiple consumers at the same time.
+	// +optional
+	Shareable bool `json:"shareable,omitempty" protobuf:"bytes,3,opt,name=shareable"`
+
+	// DriverRequests describes all resources that are needed for the
+	// allocated claim. A single claim may use resources coming from
+	// different drivers. For each driver, this array has at most one
+	// entry which then may have one or more per-driver requests.
+	//
+	// May be empty, in which case the claim can always be allocated.
+	//
+	// +listType=atomic
+	DriverRequests []DriverRequests `json:"driverRequests,omitempty" protobuf:"bytes,4,opt,name=driverRequests"`
+}
+
+// DriverRequests describes all resources that are needed from one particular driver.
+type DriverRequests struct {
+	// DriverName is the name used by the DRA driver kubelet plugin.
+	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+
+	// VendorParameters are arbitrary setup parameters for all requests of the
+	// claim. They are ignored while allocating the claim.
+	//
+	// +optional
+	VendorParameters runtime.RawExtension `json:"vendorParameters,omitempty" protobuf:"bytes,2,opt,name=vendorParameters"`
+
+	// Requests describes all resources that are needed from the driver.
+	// +listType=atomic
+	Requests []ResourceRequest `json:"requests,omitempty" protobuf:"bytes,3,opt,name=requests"`
+}
+
+// ResourceRequest is a request for resources from one particular driver.
+type ResourceRequest struct {
+	// VendorParameters are arbitrary setup parameters for the requested
+	// resource. They are ignored while allocating a claim.
+	//
+	// +optional
+	VendorParameters runtime.RawExtension `json:"vendorParameters,omitempty" protobuf:"bytes,1,opt,name=vendorParameters"`
+
+	ResourceRequestModel `json:",inline" protobuf:"bytes,2,name=resourceRequestModel"`
+}
+
+// ResourceRequestModel must have one and only one field set.
+type ResourceRequestModel struct {
+	// NamedResources describes a request for resources with the named resources model.
+	//
+	// +optional
+	NamedResources *NamedResourcesRequest `json:"namedResources,omitempty" protobuf:"bytes,1,opt,name=namedResources"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
+
+// ResourceClaimParametersList is a collection of ResourceClaimParameters.
+type ResourceClaimParametersList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of node resource capacity objects.
+	Items []ResourceClaimParameters `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
+
+// ResourceClassParameters defines resource requests for a ResourceClass in an
+// in-tree format understood by Kubernetes.
+type ResourceClassParameters struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// If this object was created from some other resource, then this links
+	// back to that resource. This field is used to find the in-tree representation
+	// of the class parameters when the parameter reference of the class refers
+	// to some unknown type.
+	// +optional
+	GeneratedFrom *ResourceClassParametersReference `json:"generatedFrom,omitempty" protobuf:"bytes,2,opt,name=generatedFrom"`
+
+	// VendorParameters are arbitrary setup parameters for all claims using
+	// this class. They are ignored while allocating the claim. There must
+	// not be more than one entry per driver.
+	//
+	// +listType=atomic
+	// +optional
+	VendorParameters []VendorParameters `json:"vendorParameters,omitempty" protobuf:"bytes,3,opt,name=vendorParameters"`
+
+	// Filters describes additional contraints that must be met when using the class.
+	//
+	// +listType=atomic
+	Filters []ResourceFilter `json:"filters,omitempty" protobuf:"bytes,4,opt,name=filters"`
+}
+
+// ResourceFilter is a filter for resources from one particular driver.
+type ResourceFilter struct {
+	// DriverName is the name used by the DRA driver kubelet plugin.
+	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+
+	ResourceFilterModel `json:",inline" protobuf:"bytes,2,name=resourceFilterModel"`
+}
+
+// ResourceFilterModel must have one and only one field set.
+type ResourceFilterModel struct {
+	// NamedResources describes a resource filter using the named resources model.
+	//
+	// +optional
+	NamedResources *NamedResourcesFilter `json:"namedResources,omitempty" protobuf:"bytes,1,opt,name=namedResources"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
+
+// ResourceClassParametersList is a collection of ResourceClassParameters.
+type ResourceClassParametersList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of node resource capacity objects.
+	Items []ResourceClassParameters `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// VendorParameters are opaque parameters for one particular driver.
+type VendorParameters struct {
+	// DriverName is the name used by the DRA driver kubelet plugin.
+	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+
+	// Parameters can be arbitrary setup parameters. They are ignored while
+	// allocating a claim.
+	//
+	// +optional
+	Parameters runtime.RawExtension `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
 }

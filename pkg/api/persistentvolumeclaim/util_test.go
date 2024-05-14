@@ -269,8 +269,8 @@ func TestDataSourceFilter(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, test.xnsEnabled)
 			DropDisabledFields(&test.spec, &test.oldSpec)
 			if test.spec.DataSource != test.want {
 				t.Errorf("expected condition was not met, test: %s, anyEnabled: %v, xnsEnabled: %v, spec: %+v, expected DataSource: %+v",
@@ -367,8 +367,8 @@ func TestDataSourceRef(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
@@ -435,7 +435,7 @@ func TestDropDisabledVolumeAttributesClass(t *testing.T) {
 
 	for testName, test := range tests {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.vacEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.vacEnabled)
 			DropDisabledFields(&test.spec, &test.oldSpec)
 			if test.spec.VolumeAttributesClassName != test.wantVAC {
 				t.Errorf("expected vac was not met, test: %s, vacEnabled: %v, spec: %+v, expected VAC: %+v",
@@ -594,8 +594,8 @@ func TestDropDisabledFieldsFromStatus(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.enableRecoverVolumeExpansionFailure)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.enableRecoverVolumeExpansionFailure)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.enableVolumeAttributesClass)
 
 			DropDisabledFieldsFromStatus(test.pvc, test.oldPVC)
 
@@ -726,12 +726,12 @@ func TestWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("pvcspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForPersistentVolumeClaim(tc.template)...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForPersistentVolumeClaim(tc.template)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})

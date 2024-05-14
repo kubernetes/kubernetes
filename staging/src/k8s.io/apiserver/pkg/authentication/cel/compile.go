@@ -106,6 +106,7 @@ func (c compiler) compile(expressionAccessor ExpressionAccessor, envVarName stri
 
 	return CompilationResult{
 		Program:            prog,
+		AST:                ast,
 		ExpressionAccessor: expressionAccessor,
 	}, nil
 }

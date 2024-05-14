@@ -66,11 +66,12 @@ type tokenAuth struct {
 
 // kubeConfigSpec struct holds info required to build a KubeConfig object
 type kubeConfigSpec struct {
-	CACert         *x509.Certificate
-	APIServer      string
-	ClientName     string
-	TokenAuth      *tokenAuth      `datapolicy:"token"`
-	ClientCertAuth *clientCertAuth `datapolicy:"security-key"`
+	CACert             *x509.Certificate
+	APIServer          string
+	ClientName         string
+	ClientCertNotAfter time.Time
+	TokenAuth          *tokenAuth      `datapolicy:"token"`
+	ClientCertAuth     *clientCertAuth `datapolicy:"security-key"`
 }
 
 // CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
@@ -103,9 +104,6 @@ func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitCo
 	return nil
 }
 
-// CreateKubeConfigFileFunc defines a function type used for creating kubeconfig files.
-type CreateKubeConfigFileFunc func(string, string, *kubeadmapi.InitConfiguration) error
-
 // CreateKubeConfigFile creates a kubeconfig file.
 // If the kubeconfig file already exists, it is used only if evaluated equal; otherwise an error is returned.
 func CreateKubeConfigFile(kubeConfigFileName string, outDir string, cfg *kubeadmapi.InitConfiguration) error {
@@ -131,7 +129,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 		}
 
 		// builds the KubeConfig object
-		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName, nil)
+		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
 		if err != nil {
 			return err
 		}
@@ -170,7 +168,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 }
 
 // buildKubeConfigFromSpec creates a kubeconfig object for the given kubeConfigSpec
-func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string, notAfter *time.Time) (*clientcmdapi.Config, error) {
+func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientcmdapi.Config, error) {
 
 	// If this kubeconfig should use token
 	if spec.TokenAuth != nil {
@@ -184,8 +182,8 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string, notAfter 
 		), nil
 	}
 
-	// otherwise, create a client certs
-	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec, notAfter)
+	// otherwise, create a client cert
+	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec)
 
 	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, &clientCertConfig)
 	if err != nil {
@@ -207,14 +205,14 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string, notAfter 
 	), nil
 }
 
-func newClientCertConfigFromKubeConfigSpec(spec *kubeConfigSpec, notAfter *time.Time) pkiutil.CertConfig {
+func newClientCertConfigFromKubeConfigSpec(spec *kubeConfigSpec) pkiutil.CertConfig {
 	return pkiutil.CertConfig{
 		Config: certutil.Config{
 			CommonName:   spec.ClientName,
 			Organization: spec.ClientCertAuth.Organizations,
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
-		NotAfter: notAfter,
+		NotAfter: spec.ClientCertNotAfter,
 	}
 }
 
@@ -303,7 +301,7 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 }
 
 // WriteKubeConfigWithClientCert writes a kubeconfig file - with a client certificate as authentication info  - to the given writer.
-func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName string, organizations []string, notAfter *time.Time) error {
+func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName string, organizations []string, notAfter time.Time) error {
 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -326,13 +324,14 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 			CAKey:         caKey,
 			Organizations: organizations,
 		},
+		ClientCertNotAfter: notAfter,
 	}
 
-	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName, notAfter)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
 // WriteKubeConfigWithToken writes a kubeconfig file - with a token as client authentication info - to the given writer.
-func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName, token string, notAfter *time.Time) error {
+func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, clientName, token string, notAfter time.Time) error {
 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -354,16 +353,17 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		TokenAuth: &tokenAuth{
 			Token: token,
 		},
+		ClientCertNotAfter: notAfter,
 	}
 
-	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName, notAfter)
+	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
 }
 
 // writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec and writes it to the given writer.
-func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string, notAfter *time.Time) error {
+func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername string) error {
 
 	// builds the KubeConfig object
-	config, err := buildKubeConfigFromSpec(spec, clustername, notAfter)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		return err
 	}
@@ -439,6 +439,12 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 		return nil, err
 	}
 
+	startTime := kubeadmutil.StartTimeUTC()
+	notAfter := startTime.Add(kubeadmconstants.CertificateValidityPeriod)
+	if cfg.ClusterConfiguration.CertificateValidityPeriod != nil {
+		notAfter = startTime.Add(cfg.ClusterConfiguration.CertificateValidityPeriod.Duration)
+	}
+
 	return map[string]*kubeConfigSpec{
 		kubeadmconstants.AdminKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -446,6 +452,7 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 			},
+			ClientCertNotAfter: notAfter,
 		},
 		kubeadmconstants.SuperAdminKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -453,6 +460,7 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
+			ClientCertNotAfter: notAfter,
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -460,16 +468,19 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.NodesGroup},
 			},
+			ClientCertNotAfter: notAfter,
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
-			APIServer:      localAPIEndpoint,
-			ClientName:     kubeadmconstants.ControllerManagerUser,
-			ClientCertAuth: &clientCertAuth{},
+			APIServer:          localAPIEndpoint,
+			ClientName:         kubeadmconstants.ControllerManagerUser,
+			ClientCertAuth:     &clientCertAuth{},
+			ClientCertNotAfter: notAfter,
 		},
 		kubeadmconstants.SchedulerKubeConfigFileName: {
-			APIServer:      localAPIEndpoint,
-			ClientName:     kubeadmconstants.SchedulerUser,
-			ClientCertAuth: &clientCertAuth{},
+			APIServer:          localAPIEndpoint,
+			ClientName:         kubeadmconstants.SchedulerUser,
+			ClientCertAuth:     &clientCertAuth{},
+			ClientCertNotAfter: notAfter,
 		},
 	}, nil
 }
@@ -497,7 +508,7 @@ func createKubeConfigAndCSR(kubeConfigDir string, kubeadmConfig *kubeadmapi.Init
 		return errors.Errorf("%s: csr: %s", errExist, kubeConfigPath)
 	}
 
-	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec, nil)
+	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec)
 
 	clientKey, err := pkiutil.NewPrivateKey(clientCertConfig.EncryptionAlgorithm)
 	if err != nil {
@@ -610,7 +621,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 
 	var (
 		err, lastError     error
-		crbResult          *rbac.ClusterRoleBinding
+		crbExists          bool
 		clusterRoleBinding = &rbac.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding,
@@ -637,7 +648,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 		retryInterval,
 		retryTimeout,
 		true, func(ctx context.Context) (bool, error) {
-			if crbResult, err = adminClient.RbacV1().ClusterRoleBindings().Create(
+			if _, err := adminClient.RbacV1().ClusterRoleBindings().Create(
 				ctx,
 				clusterRoleBinding,
 				metav1.CreateOptions{},
@@ -646,15 +657,11 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 					// If it encounters a forbidden error this means that the API server was reached
 					// but the CRB is missing - i.e. the admin.conf user does not have permissions
 					// to create its own permission RBAC yet.
-					//
-					// When a "create" call is made, but the resource is forbidden, a non-nil
-					// CRB will still be returned. Return true here, but update "crbResult" to nil,
-					// to ensure that the process continues with super-admin.conf.
-					crbResult = nil
 					return true, nil
 				} else if apierrors.IsAlreadyExists(err) {
 					// If the CRB exists it means the admin.conf already has the right
 					// permissions; return.
+					crbExists = true
 					return true, nil
 				} else {
 					// Retry on any other error type.
@@ -662,14 +669,15 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 					return false, nil
 				}
 			}
+			crbExists = true
 			return true, nil
 		})
 	if err != nil {
 		return nil, lastError
 	}
 
-	// The CRB exists; return the admin.conf client.
-	if crbResult != nil {
+	// The CRB was created or already existed; return the admin.conf client.
+	if crbExists {
 		return adminClient, nil
 	}
 
@@ -697,9 +705,8 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 			); err != nil {
 				lastError = err
 				if apierrors.IsAlreadyExists(err) {
-					// This should not happen, as the previous "create" call that uses
-					// the admin.conf should have passed. Return the error.
-					return true, err
+					klog.V(5).Infof("ClusterRoleBinding %s already exists.", kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding)
+					return true, nil
 				}
 				// Retry on any other type of error.
 				return false, nil

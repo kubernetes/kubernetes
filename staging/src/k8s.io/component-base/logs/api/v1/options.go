@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -188,7 +189,19 @@ func Validate(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldP
 
 func validateFormatOptions(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
+	errs = append(errs, validateTextOptions(c, featureGate, fldPath.Child("text"))...)
 	errs = append(errs, validateJSONOptions(c, featureGate, fldPath.Child("json"))...)
+	return errs
+}
+
+func validateTextOptions(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
+	errs := field.ErrorList{}
+	if gate := LoggingAlphaOptions; c.Options.Text.SplitStream && !featureEnabled(featureGate, gate) {
+		errs = append(errs, field.Forbidden(fldPath.Child("splitStream"), fmt.Sprintf("Feature %s is disabled", gate)))
+	}
+	if gate := LoggingAlphaOptions; c.Options.Text.InfoBufferSize.Value() != 0 && !featureEnabled(featureGate, gate) {
+		errs = append(errs, field.Forbidden(fldPath.Child("infoBufferSize"), fmt.Sprintf("Feature %s is disabled", gate)))
+	}
 	return errs
 }
 
@@ -254,7 +267,14 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 			defer setverbositylevel.Mutex.Unlock()
 			setverbositylevel.Callbacks = append(setverbositylevel.Callbacks, control.SetVerbosityLevel)
 		}
-		klog.SetLoggerWithOptions(log, klog.ContextualLogger(p.ContextualLoggingEnabled), klog.FlushLogger(control.Flush))
+		opts := []klog.LoggerOption{
+			klog.ContextualLogger(p.ContextualLoggingEnabled),
+			klog.FlushLogger(control.Flush),
+		}
+		if writer, ok := log.GetSink().(textlogger.KlogBufferWriter); ok {
+			opts = append(opts, klog.WriteKlogBuffer(writer.WriteKlogBuffer))
+		}
+		klog.SetLoggerWithOptions(log, opts...)
 	}
 	if err := loggingFlags.Lookup("v").Value.Set(VerbosityLevelPflag(&c.Verbosity).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog verbosity: %v", err)
@@ -262,6 +282,7 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 	if err := loggingFlags.Lookup("vmodule").Value.Set(VModuleConfigurationPflag(&c.VModule).String()); err != nil {
 		return fmt.Errorf("internal error while setting klog vmodule: %v", err)
 	}
+	setSlogDefaultLogger()
 	klog.StartFlushDaemon(c.FlushFrequency.Duration.Duration)
 	klog.EnableContextualLogging(p.ContextualLoggingEnabled)
 	return nil
@@ -346,6 +367,9 @@ func addFlags(c *LoggingConfiguration, fs flagSet) {
 	fs.VarP(VerbosityLevelPflag(&c.Verbosity), "v", "v", "number for the log level verbosity")
 	fs.Var(VModuleConfigurationPflag(&c.VModule), "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
 
+	fs.BoolVar(&c.Options.Text.SplitStream, "log-text-split-stream", false, "[Alpha] In text format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.")
+	fs.Var(&c.Options.Text.InfoBufferSize, "log-text-info-buffer-size", "[Alpha] In text format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.")
+
 	// JSON options. We only register them if "json" is a valid format. The
 	// config file API however always has them.
 	if _, err := logRegistry.get("json"); err == nil {
@@ -368,16 +392,21 @@ func SetRecommendedLoggingConfiguration(c *LoggingConfiguration) {
 		c.FlushFrequency.Duration.Duration = LogFlushFreqDefault
 		c.FlushFrequency.SerializeAsString = true
 	}
+	setRecommendedOutputRouting(&c.Options.Text.OutputRoutingOptions)
+	setRecommendedOutputRouting(&c.Options.JSON.OutputRoutingOptions)
+}
+
+func setRecommendedOutputRouting(o *OutputRoutingOptions) {
 	var empty resource.QuantityValue
-	if c.Options.JSON.InfoBufferSize == empty {
-		c.Options.JSON.InfoBufferSize = resource.QuantityValue{
+	if o.InfoBufferSize == empty {
+		o.InfoBufferSize = resource.QuantityValue{
 			// This is similar, but not quite the same as a default
 			// constructed instance.
 			Quantity: *resource.NewQuantity(0, resource.DecimalSI),
 		}
 		// This sets the unexported Quantity.s which will be compared
 		// by reflect.DeepEqual in some tests.
-		_ = c.Options.JSON.InfoBufferSize.String()
+		_ = o.InfoBufferSize.String()
 	}
 }
 

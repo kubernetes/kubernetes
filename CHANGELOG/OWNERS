@@ -13,13 +13,14 @@ approvers:
   - ramrodo # 1.26 Release Notes Lead
   - sanchita-07 # 1.28 Release Notes Lead
   - fsmunoz # 1.29 Release Notes Lead
+  - rashansmith # 1.30 Release Notes Lead
 reviewers:
   - release-managers
-  - fsmunoz # 1.29 Release Notes Lead
-  - fykaa # 1.29 Release Notes Shadow
-  - mengjiao-liu # 1.29 Release Notes Shadow
-  - muddapu # 1.29 Release Notes Shadow
-  - rashansmith # 1.29 Release Notes Shadow
+  - fykaa # 1.30 Release Notes Shadow
+  - npolshakova # 1.30 Release Notes Shadow
+  - OrlinVasilev # 1.30 Release Notes Shadow
+  - rashansmith # 1.30 Release Notes Lead
+  - satyampsoni # 1.30 Release Notes Shadow
 labels:
   - sig/release
   - area/release-eng

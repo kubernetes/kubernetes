@@ -155,7 +155,7 @@ func (v transitionRuleMatcher) String() string {
 }
 
 func TestCelCompilation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 	cases := []struct {
 		name            string
 		input           schema.Structural
@@ -850,7 +850,7 @@ func TestCelCompilation(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
+			env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(
 				environment.VersionedOptions{
 					IntroducedVersion: version.MajorMinor(1, 999),
 					EnvOptions:        []celgo.EnvOption{celgo.Lib(&fakeLib{})},
@@ -1327,7 +1327,7 @@ func genMapWithCustomItemRule(item *schema.Structural, rule string) func(maxProp
 // if expectedCostExceedsLimit is non-zero. Typically, only expectedCost or expectedCostExceedsLimit is non-zero, not both.
 func schemaChecker(schema *schema.Structural, expectedCost uint64, expectedCostExceedsLimit uint64, t *testing.T) func(t *testing.T) {
 	return func(t *testing.T) {
-		compilationResults, err := Compile(schema, model.SchemaDeclType(schema, false), celconfig.PerCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()), NewExpressionsEnvLoader())
+		compilationResults, err := Compile(schema, model.SchemaDeclType(schema, false), celconfig.PerCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true), NewExpressionsEnvLoader())
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -1885,7 +1885,7 @@ func TestCostEstimation(t *testing.T) {
 }
 
 func BenchmarkCompile(b *testing.B) {
-	env := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()) // prepare the environment
+	env := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true) // prepare the environment
 	s := genArrayWithRule("number", "true")(nil)
 	b.ReportAllocs()
 	b.ResetTimer()

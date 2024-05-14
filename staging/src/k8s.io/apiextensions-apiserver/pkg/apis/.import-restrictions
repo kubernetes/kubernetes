@@ -3,6 +3,10 @@ inverseRules:
   - selectorRegexp: k8s[.]io/apiextensions-apiserver
     allowedPrefixes:
       - ''
+  # Allow use from within e2e tests.
+  - selectorRegexp: k8s[.]io/kubernetes/test
+    allowedPrefixes:
+      - k8s.io/kubernetes/test/e2e/apimachinery
   # Forbid use of this package in other k8s.io packages.
   - selectorRegexp: k8s[.]io
     forbiddenPrefixes:

@@ -41,8 +41,6 @@ $ kind create cluster --config test/e2e/dra/kind.yaml --image dra/node:latest
 
 - Build ginkgo
 
-> NB: If you are using go workspace you must disable it `GOWORK=off make ginkgo`
-
 ```bash
 $ make ginkgo
 ```

@@ -263,7 +263,7 @@ func TestParseWatchCacheSizes(t *testing.T) {
 }
 
 func TestKMSHealthzEndpoint(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	testCases := []struct {
 		name                 string
@@ -428,5 +428,20 @@ func healthChecksAreEqual(t *testing.T, want []string, healthChecks []healthz.He
 
 	if !wantSet.Equal(gotSet) {
 		t.Errorf("%s checks are not equal, missing=%q, extra=%q", checkerType, wantSet.Difference(gotSet).List(), gotSet.Difference(wantSet).List())
+	}
+}
+
+func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
+	serverConfig := server.NewConfig(codecs)
+	etcdOptions := &EtcdOptions{}
+	if err := etcdOptions.ApplyTo(serverConfig); err != nil {
+		t.Fatalf("Failed to apply etcd options error: %v", err)
+	}
+	restOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restOptions.StorageConfig.StorageObjectCountTracker != serverConfig.StorageObjectCountTracker {
+		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
 	}
 }

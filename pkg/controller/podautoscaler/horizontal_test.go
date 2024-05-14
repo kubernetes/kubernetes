@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -156,8 +158,6 @@ type testCase struct {
 
 	recommendations []timestampedRecommendation
 	hpaSelectors    *selectors.BiMultimap
-
-	containerResourceMetricsEnabled bool
 }
 
 // Needs to be called under a lock.
@@ -767,7 +767,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	defaultDownscalestabilizationWindow := 5 * time.Minute
 
+	tCtx := ktesting.Init(t)
 	hpaController := NewHorizontalController(
+		tCtx,
 		eventClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
@@ -780,7 +782,6 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
-		tc.containerResourceMetricsEnabled,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -929,10 +930,9 @@ func TestScaleUpContainer(t *testing.T) {
 				Container: "container1",
 			},
 		}},
-		reportedLevels:                            []uint64{300, 500, 700},
-		reportedCPURequests:                       []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:                             true,
-		containerResourceMetricsEnabled:           true,
+		reportedLevels:      []uint64{300, 500, 700},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
 		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
@@ -942,46 +942,6 @@ func TestScaleUpContainer(t *testing.T) {
 			autoscalingv2.ContainerResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
 	}
-	tc.runTest(t)
-}
-
-func TestContainerMetricWithTheFeatureGateDisabled(t *testing.T) {
-	// In this test case, the container metrics will be ignored
-	// and only the CPUTarget will be taken into consideration.
-
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 4,
-		CPUTarget:               30,
-		verifyCPUCurrent:        true,
-		metricsTarget: []autoscalingv2.MetricSpec{{
-			Type: autoscalingv2.ContainerResourceMetricSourceType,
-			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
-				Name: v1.ResourceCPU,
-				Target: autoscalingv2.MetricTarget{
-					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: pointer.Int32(10),
-				},
-				Container: "container1",
-			},
-		}},
-		reportedLevels:      []uint64{300, 400, 500},
-		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType:          monitor.ActionLabelScaleUp,
-			autoscalingv2.ContainerResourceMetricSourceType: monitor.ActionLabelNone,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType:          monitor.ErrorLabelNone,
-			autoscalingv2.ContainerResourceMetricSourceType: monitor.ErrorLabelInternal,
-		},
-	}
-
 	tc.runTest(t)
 }
 
@@ -1663,9 +1623,8 @@ func TestScaleDownContainerResource(t *testing.T) {
 				},
 			},
 		}},
-		useMetricsAPI:                             true,
-		containerResourceMetricsEnabled:           true,
-		recommendations:                           []timestampedRecommendation{},
+		useMetricsAPI:   true,
+		recommendations: []timestampedRecommendation{},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
 		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
@@ -2858,6 +2817,10 @@ func TestUpscaleCap(t *testing.T) {
 }
 
 func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
+	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skip flaking test on Windows.")
+	}
 	tc := testCase{
 		minReplicas:     1,
 		maxReplicas:     20,
@@ -2889,6 +2852,10 @@ func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
 }
 
 func TestMoreReplicasThanSpecNoScale(t *testing.T) {
+	// TODO: Remove skip once this issue is resolved: https://github.com/kubernetes/kubernetes/issues/124083
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skip flaking test on Windows.")
+	}
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             8,
@@ -5292,7 +5259,9 @@ func TestMultipleHPAs(t *testing.T) {
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 
+	tCtx := ktesting.Init(t)
 	hpaController := NewHorizontalController(
+		tCtx,
 		testClient.CoreV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
@@ -5305,15 +5274,12 @@ func TestMultipleHPAs(t *testing.T) {
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
-		false,
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	informerFactory.Start(ctx.Done())
-	go hpaController.Run(ctx, 5)
+	informerFactory.Start(tCtx.Done())
+	go hpaController.Run(tCtx, 5)
 
 	timeoutTime := time.After(15 * time.Second)
 	timeout := false

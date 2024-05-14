@@ -136,11 +136,11 @@ func temporarilyUnsetDefaultClasses(ctx context.Context, client clientset.Interf
 	classes, err := client.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 
-	var changedClasses []storagev1.StorageClass
+	changedClasses := make(map[string]bool)
 
 	for _, sc := range classes.Items {
 		if sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] == "true" {
-			changedClasses = append(changedClasses, sc)
+			changedClasses[sc.GetName()] = true
 			sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = "false"
 			_, err := client.StorageV1().StorageClasses().Update(ctx, &sc, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
@@ -148,10 +148,14 @@ func temporarilyUnsetDefaultClasses(ctx context.Context, client clientset.Interf
 	}
 
 	return func() {
-		for _, sc := range changedClasses {
-			sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = "true"
-			_, err := client.StorageV1().StorageClasses().Update(ctx, &sc, metav1.UpdateOptions{})
-			framework.ExpectNoError(err)
+		classes, err = client.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, sc := range classes.Items {
+			if _, found := changedClasses[sc.GetName()]; found {
+				sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = "true"
+				_, err := client.StorageV1().StorageClasses().Update(ctx, &sc, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+			}
 		}
 	}
 

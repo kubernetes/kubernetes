@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -72,7 +71,7 @@ func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir s
 		}
 	}
 
-	return path.Base(mountPath), nil
+	return filepath.Base(mountPath), nil
 }
 
 // DeviceOpened determines if the device is in use elsewhere
@@ -106,7 +105,7 @@ func (hu *(HostUtil)) GetFileType(pathname string) (FileType, error) {
 
 	// os.Stat will return a 1920 error (windows.ERROR_CANT_ACCESS_FILE) if we use it on a Unix Socket
 	// on Windows. In this case, we need to use a different method to check if it's a Unix Socket.
-	if isSystemCannotAccessErr(err) {
+	if err == errUnknownFileType || isSystemCannotAccessErr(err) {
 		if isSocket, errSocket := filesystem.IsUnixDomainSocket(pathname); errSocket == nil && isSocket {
 			return FileTypeSocket, nil
 		}

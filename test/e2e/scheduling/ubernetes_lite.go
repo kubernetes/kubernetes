@@ -73,7 +73,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	})
 
 	f.It("should spread the pods of a replication controller across zones", f.WithSerial(), func(ctx context.Context) {
-		SpreadRCOrFail(ctx, f, int32(5*zoneCount), zoneNames, framework.ServeHostnameImage, []string{"serve-hostname"})
+		SpreadRCOrFail(ctx, f, int32(5*zoneCount), zoneNames, imageutils.GetE2EImage(imageutils.Agnhost), []string{"serve-hostname"})
 	})
 })
 

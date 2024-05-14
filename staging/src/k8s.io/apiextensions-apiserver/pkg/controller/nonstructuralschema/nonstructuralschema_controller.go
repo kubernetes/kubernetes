@@ -50,7 +50,7 @@ type ConditionController struct {
 	// To allow injection for testing.
 	syncFn func(key string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// last generation this controller updated the condition per CRD name (to avoid two
 	// different version of the apiextensions-apiservers in HA to fight for the right message)
@@ -64,10 +64,13 @@ func NewConditionController(
 	crdClient client.CustomResourceDefinitionsGetter,
 ) *ConditionController {
 	c := &ConditionController{
-		crdClient:          crdClient,
-		crdLister:          crdInformer.Lister(),
-		crdSynced:          crdInformer.Informer().HasSynced,
-		queue:              workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "non_structural_schema_condition_controller"),
+		crdClient: crdClient,
+		crdLister: crdInformer.Lister(),
+		crdSynced: crdInformer.Informer().HasSynced,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "non_structural_schema_condition_controller"},
+		),
 		lastSeenGeneration: map[string]int64{},
 	}
 
@@ -216,7 +219,7 @@ func (c *ConditionController) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key.(string))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

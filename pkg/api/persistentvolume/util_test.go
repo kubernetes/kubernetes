@@ -87,7 +87,7 @@ func TestDropDisabledFields(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.vacEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.vacEnabled)
 
 			DropDisabledSpecFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
@@ -307,12 +307,12 @@ func TestWarnings(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
-			actual := sets.NewString(GetWarningsForPersistentVolume(tc.template)...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForPersistentVolume(tc.template)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})

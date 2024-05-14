@@ -848,7 +848,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer setSwapControllerAvailableDuringTest(false)()
 			if tc.scalingFg {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 			}
 
 			setCgroupVersionDuringTest(cgroupV1)
@@ -918,19 +918,6 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		}
 	}
 
-	expectUnlimitedSwap := func(cgroupVersion CgroupVersion, resources ...*runtimeapi.LinuxContainerResources) {
-		const msg = "container is expected to have unlimited swap access"
-
-		for _, r := range resources {
-			switch cgroupVersion {
-			case cgroupV1:
-				assert.Equal(t, int64(-1), r.MemorySwapLimitInBytes, msg)
-			case cgroupV2:
-				assert.Equal(t, "max", r.Unified[cm.Cgroup2MaxSwapFilename], msg)
-			}
-		}
-	}
-
 	expectSwap := func(cgroupVersion CgroupVersion, swapBytesExpected int64, resources *runtimeapi.LinuxContainerResources) {
 		msg := fmt.Sprintf("container swap is expected to be limited by %d bytes", swapBytesExpected)
 
@@ -968,13 +955,6 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			swapBehavior:               types.LimitedSwap,
 		},
 		{
-			name:                       "cgroups v1, UnlimitedSwap, Burstable QoS",
-			cgroupVersion:              cgroupV1,
-			qosClass:                   v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled: true,
-			swapBehavior:               types.UnlimitedSwap,
-		},
-		{
 			name:                       "cgroups v1, LimitedSwap, Best-effort QoS",
 			cgroupVersion:              cgroupV1,
 			qosClass:                   v1.PodQOSBestEffort,
@@ -990,17 +970,10 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			nodeSwapFeatureGateEnabled: false,
 			swapBehavior:               types.LimitedSwap,
 		},
-		{
-			name:                       "NodeSwap feature gate turned off, cgroups v2, UnlimitedSwap",
-			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled: false,
-			swapBehavior:               types.UnlimitedSwap,
-		},
 
-		// With no swapBehavior, UnlimitedSwap should be the default
+		// With no swapBehavior, NoSwap should be the default
 		{
-			name:                       "With no swapBehavior - UnlimitedSwap should be the default",
+			name:                       "With no swapBehavior - NoSwap should be the default",
 			cgroupVersion:              cgroupV2,
 			qosClass:                   v1.PodQOSBestEffort,
 			nodeSwapFeatureGateEnabled: true,
@@ -1009,6 +982,13 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 
 		// With Guaranteed and Best-effort QoS
 		{
+			name:                       "Best-effort QoS, cgroups v2, NoSwap",
+			cgroupVersion:              cgroupV2,
+			qosClass:                   v1.PodQOSBestEffort,
+			nodeSwapFeatureGateEnabled: true,
+			swapBehavior:               "NoSwap",
+		},
+		{
 			name:                       "Best-effort QoS, cgroups v2, LimitedSwap",
 			cgroupVersion:              cgroupV2,
 			qosClass:                   v1.PodQOSBurstable,
@@ -1016,25 +996,11 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			swapBehavior:               types.LimitedSwap,
 		},
 		{
-			name:                       "Best-effort QoS, cgroups v2, UnlimitedSwap",
-			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled: true,
-			swapBehavior:               types.UnlimitedSwap,
-		},
-		{
 			name:                       "Guaranteed QoS, cgroups v2, LimitedSwap",
 			cgroupVersion:              cgroupV2,
 			qosClass:                   v1.PodQOSGuaranteed,
 			nodeSwapFeatureGateEnabled: true,
 			swapBehavior:               types.LimitedSwap,
-		},
-		{
-			name:                       "Guaranteed QoS, cgroups v2, UnlimitedSwap",
-			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSGuaranteed,
-			nodeSwapFeatureGateEnabled: true,
-			swapBehavior:               types.UnlimitedSwap,
 		},
 
 		// With a "guaranteed" container (when memory requests equal to limits)
@@ -1044,15 +1010,6 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			qosClass:                    v1.PodQOSBurstable,
 			nodeSwapFeatureGateEnabled:  true,
 			swapBehavior:                types.LimitedSwap,
-			addContainerWithoutRequests: false,
-			addGuaranteedContainer:      true,
-		},
-		{
-			name:                        "Burstable QoS, cgroups v2, UnlimitedSwap, with a guaranteed container",
-			cgroupVersion:               cgroupV2,
-			qosClass:                    v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled:  true,
-			swapBehavior:                types.UnlimitedSwap,
 			addContainerWithoutRequests: false,
 			addGuaranteedContainer:      true,
 		},
@@ -1068,29 +1025,11 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			addGuaranteedContainer:      false,
 		},
 		{
-			name:                        "Burstable QoS, cgroups v2, UnlimitedSwap",
-			cgroupVersion:               cgroupV2,
-			qosClass:                    v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled:  true,
-			swapBehavior:                types.UnlimitedSwap,
-			addContainerWithoutRequests: false,
-			addGuaranteedContainer:      false,
-		},
-		{
 			name:                        "Burstable QoS, cgroups v2, LimitedSwap, with a container with no requests",
 			cgroupVersion:               cgroupV2,
 			qosClass:                    v1.PodQOSBurstable,
 			nodeSwapFeatureGateEnabled:  true,
 			swapBehavior:                types.LimitedSwap,
-			addContainerWithoutRequests: true,
-			addGuaranteedContainer:      false,
-		},
-		{
-			name:                        "Burstable QoS, cgroups v2, UnlimitedSwap, with a container with no requests",
-			cgroupVersion:               cgroupV2,
-			qosClass:                    v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled:  true,
-			swapBehavior:                types.UnlimitedSwap,
 			addContainerWithoutRequests: true,
 			addGuaranteedContainer:      false,
 		},
@@ -1102,14 +1041,6 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			qosClass:                   v1.PodQOSBurstable,
 			nodeSwapFeatureGateEnabled: true,
 			swapBehavior:               types.LimitedSwap,
-		},
-		{
-			name:                       "Swap disabled on node, cgroups v1, UnlimitedSwap, Burstable QoS",
-			swapDisabledOnNode:         true,
-			cgroupVersion:              cgroupV1,
-			qosClass:                   v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled: true,
-			swapBehavior:               types.UnlimitedSwap,
 		},
 		{
 			name:                       "Swap disabled on node, cgroups v1, LimitedSwap, Best-effort QoS",
@@ -1129,18 +1060,10 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			nodeSwapFeatureGateEnabled: false,
 			swapBehavior:               types.LimitedSwap,
 		},
-		{
-			name:                       "Swap disabled on node, NodeSwap feature gate turned off, cgroups v2, UnlimitedSwap",
-			swapDisabledOnNode:         true,
-			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled: false,
-			swapBehavior:               types.UnlimitedSwap,
-		},
 
-		// With no swapBehavior, UnlimitedSwap should be the default
+		// With no swapBehavior, NoSwap should be the default
 		{
-			name:                       "Swap disabled on node, With no swapBehavior - UnlimitedSwap should be the default",
+			name:                       "Swap disabled on node, With no swapBehavior - NoSwap should be the default",
 			swapDisabledOnNode:         true,
 			cgroupVersion:              cgroupV2,
 			qosClass:                   v1.PodQOSBestEffort,
@@ -1158,28 +1081,12 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			swapBehavior:               types.LimitedSwap,
 		},
 		{
-			name:                       "Swap disabled on node, Best-effort QoS, cgroups v2, UnlimitedSwap",
-			swapDisabledOnNode:         true,
-			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled: true,
-			swapBehavior:               types.UnlimitedSwap,
-		},
-		{
 			name:                       "Swap disabled on node, Guaranteed QoS, cgroups v2, LimitedSwap",
 			swapDisabledOnNode:         true,
 			cgroupVersion:              cgroupV2,
 			qosClass:                   v1.PodQOSGuaranteed,
 			nodeSwapFeatureGateEnabled: true,
 			swapBehavior:               types.LimitedSwap,
-		},
-		{
-			name:                       "Swap disabled on node, Guaranteed QoS, cgroups v2, UnlimitedSwap",
-			swapDisabledOnNode:         true,
-			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSGuaranteed,
-			nodeSwapFeatureGateEnabled: true,
-			swapBehavior:               types.UnlimitedSwap,
 		},
 
 		// With a "guaranteed" container (when memory requests equal to limits)
@@ -1190,16 +1097,6 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			qosClass:                    v1.PodQOSBurstable,
 			nodeSwapFeatureGateEnabled:  true,
 			swapBehavior:                types.LimitedSwap,
-			addContainerWithoutRequests: false,
-			addGuaranteedContainer:      true,
-		},
-		{
-			name:                        "Swap disabled on node, Burstable QoS, cgroups v2, UnlimitedSwap, with a guaranteed container",
-			swapDisabledOnNode:          true,
-			cgroupVersion:               cgroupV2,
-			qosClass:                    v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled:  true,
-			swapBehavior:                types.UnlimitedSwap,
 			addContainerWithoutRequests: false,
 			addGuaranteedContainer:      true,
 		},
@@ -1216,16 +1113,6 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			addGuaranteedContainer:      false,
 		},
 		{
-			name:                        "Swap disabled on node, Burstable QoS, cgroups v2, UnlimitedSwap",
-			swapDisabledOnNode:          true,
-			cgroupVersion:               cgroupV2,
-			qosClass:                    v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled:  true,
-			swapBehavior:                types.UnlimitedSwap,
-			addContainerWithoutRequests: false,
-			addGuaranteedContainer:      false,
-		},
-		{
 			name:                        "Swap disabled on node, Burstable QoS, cgroups v2, LimitedSwap, with a container with no requests",
 			swapDisabledOnNode:          true,
 			cgroupVersion:               cgroupV2,
@@ -1235,21 +1122,11 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			addContainerWithoutRequests: true,
 			addGuaranteedContainer:      false,
 		},
-		{
-			name:                        "Swap disabled on node, Burstable QoS, cgroups v2, UnlimitedSwap, with a container with no requests",
-			swapDisabledOnNode:          true,
-			cgroupVersion:               cgroupV2,
-			qosClass:                    v1.PodQOSBurstable,
-			nodeSwapFeatureGateEnabled:  true,
-			swapBehavior:                types.UnlimitedSwap,
-			addContainerWithoutRequests: true,
-			addGuaranteedContainer:      false,
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setCgroupVersionDuringTest(tc.cgroupVersion)
 			defer setSwapControllerAvailableDuringTest(!tc.swapDisabledOnNode)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.nodeSwapFeatureGateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.nodeSwapFeatureGateEnabled)
 			m.memorySwapBehavior = tc.swapBehavior
 
 			var resourceReqsC1, resourceReqsC2 v1.ResourceRequirements
@@ -1294,8 +1171,8 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 				return
 			}
 
-			if tc.swapBehavior == types.UnlimitedSwap || tc.swapBehavior == "" {
-				expectUnlimitedSwap(tc.cgroupVersion, resourcesC1, resourcesC2)
+			if tc.swapBehavior == types.NoSwap || tc.swapBehavior == "" {
+				expectNoSwap(tc.cgroupVersion, resourcesC1, resourcesC2)
 				return
 			}
 

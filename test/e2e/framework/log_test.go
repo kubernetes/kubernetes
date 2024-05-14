@@ -98,14 +98,14 @@ There were additional failures detected after the initial failure. These are vis
 `,
 					},
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
-INFO: before
+<klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] fails - log_test.go:55 <time>
 [FAILED] I'm failing.
 In [It] at: log_test.go:57 <time>
 < Exit [It] fails - log_test.go:55 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
-INFO: after
+<klog> log_test.go:52] after
 [FAILED] true is never false either
 Expected
     <bool>: true
@@ -129,7 +129,7 @@ There were additional failures detected after the initial failure. These are vis
 `,
 					},
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
-INFO: before
+<klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] asserts - log_test.go:60 <time>
 [FAILED] false is never true
@@ -139,7 +139,7 @@ to be true
 In [It] at: log_test.go:61 <time>
 < Exit [It] asserts - log_test.go:60 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
-INFO: after
+<klog> log_test.go:52] after
 [FAILED] true is never false either
 Expected
     <bool>: true
@@ -160,10 +160,10 @@ There were additional failures detected after the initial failure. These are vis
 `,
 					},
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
-INFO: before
+<klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] error - log_test.go:63 <time>
-INFO: Unexpected error: hard-coded error: 
+<klog> log_test.go:65] Unexpected error: hard-coded error: 
     <*errors.errorString>: 
     an error with a long, useless description
     {
@@ -173,7 +173,7 @@ INFO: Unexpected error: hard-coded error:
 In [It] at: log_test.go:65 <time>
 < Exit [It] error - log_test.go:63 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
-INFO: after
+<klog> log_test.go:52] after
 [FAILED] true is never false either
 Expected
     <bool>: true
@@ -198,7 +198,7 @@ There were additional failures detected after the initial failure. These are vis
 `,
 					},
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
-INFO: before
+<klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] equal - log_test.go:67 <time>
 [FAILED] of course it's not equal...
@@ -209,7 +209,7 @@ to equal
 In [It] at: log_test.go:68 <time>
 < Exit [It] equal - log_test.go:67 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
-INFO: after
+<klog> log_test.go:52] after
 [FAILED] true is never false either
 Expected
     <bool>: true
@@ -230,14 +230,14 @@ There were additional failures detected after the initial failure. These are vis
 `,
 					},
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
-INFO: before
+<klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] fails with helper - log_test.go:70 <time>
 [FAILED] I'm failing with helper.
 In [It] at: log_test.go:44 <time>
 < Exit [It] fails with helper - log_test.go:70 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
-INFO: after
+<klog> log_test.go:52] after
 [FAILED] true is never false either
 Expected
     <bool>: true
@@ -259,14 +259,14 @@ In [AfterEach] at: log_test.go:53 <time>
 `,
 					},
 					SystemErr: `> Enter [BeforeEach] log - log_test.go:48 <time>
-INFO: before
+<klog> log_test.go:49] before
 < Exit [BeforeEach] log - log_test.go:48 <time>
 > Enter [It] redirects klog - log_test.go:73 <time>
 <klog> log_test.go:74] hello world
 <klog> log_test.go:75] <nil>not really an error
 < Exit [It] redirects klog - log_test.go:73 <time>
 > Enter [AfterEach] log - log_test.go:51 <time>
-INFO: after
+<klog> log_test.go:52] after
 [FAILED] true is never false either
 Expected
     <bool>: true

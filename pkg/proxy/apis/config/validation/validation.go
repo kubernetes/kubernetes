@@ -297,6 +297,13 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 	allErrs := field.ErrorList{}
 
 	for i := range nodePortAddresses {
+		if nodePortAddresses[i] == kubeproxyconfig.NodePortAddressesPrimary {
+			if i != 0 || len(nodePortAddresses) != 1 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "can't use both 'primary' and CIDRs"))
+			}
+			break
+		}
+
 		if _, _, err := netutils.ParseCIDRSloppy(nodePortAddresses[i]); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "must be a valid CIDR"))
 		}

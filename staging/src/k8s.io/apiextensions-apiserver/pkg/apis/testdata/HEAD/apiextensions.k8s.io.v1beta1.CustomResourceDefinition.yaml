@@ -64,6 +64,8 @@ spec:
     singular: singularValue
   preserveUnknownFields: true
   scope: scopeValue
+  selectableFields:
+  - jsonPath: jsonPathValue
   subresources:
     scale:
       labelSelectorPath: labelSelectorPathValue
@@ -212,6 +214,8 @@ spec:
           optionalOldSelf: true
           reason: reasonValue
           rule: ruleValue
+    selectableFields:
+    - jsonPath: jsonPathValue
     served: true
     storage: true
     subresources:

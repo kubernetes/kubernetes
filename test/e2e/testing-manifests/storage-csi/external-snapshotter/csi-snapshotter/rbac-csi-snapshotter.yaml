@@ -1,5 +1,5 @@
-# Do not edit, downloaded from https://github.com/kubernetes-csi/external-snapshotter/raw/v5.0.1/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
-# for csi-driver-host-path v1.8.0
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-snapshotter/raw/v7.0.1/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+# for csi-driver-host-path release-1.13
 # by ./update-hostpath.sh
 #
 # Together with the RBAC file for external-provisioner, this YAML file
@@ -12,6 +12,7 @@
 # - optionally rename the non-namespaced ClusterRole if there
 #   are conflicts with other deployments
 
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -38,12 +39,23 @@ rules:
     resources: ["volumesnapshotclasses"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "watch", "update", "patch", "create"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents"]
-    verbs: ["create", "get", "list", "watch", "update", "delete", "patch"]
+    verbs: ["get", "list", "watch", "update", "patch", "create"]
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotcontents/status"]
     verbs: ["update", "patch"]
-
+  - apiGroups: ["groupsnapshot.storage.k8s.io"]
+    resources: ["volumegroupsnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["groupsnapshot.storage.k8s.io"]
+    resources: ["volumegroupsnapshotcontents"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["groupsnapshot.storage.k8s.io"]
+    resources: ["volumegroupsnapshotcontents/status"]
+    verbs: ["update", "patch"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

@@ -140,6 +140,9 @@ linters:
     - ginkgolinter
     - gocritic
     - govet
+    {{- if .Hints}}
+    - errorlint
+    {{- end}}
     - ineffassign
     - logcheck
     - revive

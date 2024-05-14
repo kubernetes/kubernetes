@@ -17,7 +17,6 @@ limitations under the License.
 package benchmark
 
 import (
-	"context"
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -70,16 +69,15 @@ func TestScheduling(t *testing.T) {
 	for _, config := range configs {
 		// Not a sub test because we don't have a good name for it.
 		func() {
-			_, ctx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
+
 			// No timeout here because the `go test -timeout` will ensure that
 			// the test doesn't get stuck forever.
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
 
 			for feature, flag := range config.featureGates {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
 			}
-			informerFactory, client, dynClient := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates, nil)
+			informerFactory, tCtx := setupClusterForWorkload(tCtx, config.schedulerConfigPath, config.featureGates, nil)
 
 			for _, tc := range testCases {
 				if !config.equals(tc) {
@@ -93,8 +91,8 @@ func TestScheduling(t *testing.T) {
 							if !enabled(*testSchedulingLabelFilter, append(tc.Labels, w.Labels...)...) {
 								t.Skipf("disabled by label filter %q", *testSchedulingLabelFilter)
 							}
-							_, ctx := ktesting.NewTestContext(t)
-							runWorkload(ctx, t, tc, w, informerFactory, client, dynClient, true)
+							tCtx := ktesting.WithTB(tCtx, t)
+							runWorkload(tCtx, tc, w, informerFactory)
 						})
 					}
 				})

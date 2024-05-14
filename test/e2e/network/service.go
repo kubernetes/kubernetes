@@ -281,7 +281,7 @@ func StartServeHostnameService(ctx context.Context, c clientset.Interface, svc *
 	maxContainerFailures := 0
 	config := testutils.RCConfig{
 		Client:               c,
-		Image:                framework.ServeHostnameImage,
+		Image:                imageutils.GetE2EImage(imageutils.Agnhost),
 		Command:              []string{"/agnhost", "serve-hostname"},
 		Name:                 name,
 		Namespace:            ns,
@@ -430,8 +430,8 @@ func verifyServeHostnameServiceDown(ctx context.Context, c clientset.Interface, 
 }
 
 // testNotReachableHTTP tests that a HTTP request doesn't connect to the given host and port.
-func testNotReachableHTTP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testNotReachableHTTP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := e2enetwork.PokeHTTP(host, port, "/", nil)
 		if result.Code == 0 {
 			return true, nil
@@ -439,23 +439,8 @@ func testNotReachableHTTP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
-	}
-}
-
-// testRejectedHTTP tests that the given host rejects a HTTP request on the given port.
-func testRejectedHTTP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := e2enetwork.PokeHTTP(host, port, "/", nil)
-		if result.Status == e2enetwork.HTTPRefused {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		framework.Failf("HTTP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
@@ -534,8 +519,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
 	if err != nil {
 		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
+		var neterr net.Error
+		if errors.As(err, &neterr) && neterr.Timeout() {
 			ret.Status = UDPTimeout
 		} else if strings.Contains(err.Error(), "connection refused") {
 			ret.Status = UDPRefused
@@ -564,8 +549,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	n, err := con.Read(buf)
 	if err != nil {
 		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
+		var neterr net.Error
+		if errors.As(err, &neterr) && neterr.Timeout() {
 			ret.Status = UDPTimeout
 		} else if strings.Contains(err.Error(), "connection refused") {
 			ret.Status = UDPRefused
@@ -590,8 +575,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 }
 
 // testReachableUDP tests that the given host serves UDP on the given port.
-func testReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{
 			Timeout:  3 * time.Second,
 			Response: "hello",
@@ -602,43 +587,43 @@ func testReachableUDP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 // testNotReachableUDP tests that the given host doesn't serve UDP on the given port.
-func testNotReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testNotReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
 		if result.Status != UDPSuccess && result.Status != UDPError {
 			return true, nil
 		}
 		return false, nil // caller can retry
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
 
 // testRejectedUDP tests that the given host rejects a UDP request on the given port.
-func testRejectedUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testRejectedUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
 		if result.Status == UDPRefused {
 			return true, nil
 		}
 		return false, nil // caller can retry
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("UDP service %v:%v not rejected: %v", host, port, err)
 	}
 }
 
 // TestHTTPHealthCheckNodePort tests a HTTP connection by the given request to the given host and port.
-func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
+func TestHTTPHealthCheckNodePort(ctx context.Context, host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		success, _ := testHTTPHealthCheckNodePort(host, port, request)
 		if success && expectSucceed ||
 			!success && !expectSucceed {
@@ -650,7 +635,7 @@ func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout 
 		return false, nil
 	}
 
-	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v%v, got %d", threshold, expectSucceed, host, port, count)
 	}
 	return nil
@@ -669,7 +654,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 		framework.Logf("Got error testing for reachability of %s: %v", url, err)
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		framework.Logf("Got error reading response from %s: %v", url, err)
 		return false, err
@@ -687,7 +672,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 
 func testHTTPHealthCheckNodePortFromTestContainer(ctx context.Context, config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0
-	pollFn := func() (bool, error) {
+	pollFn := func(ctx context.Context) (bool, error) {
 		statusCode, err := config.GetHTTPCodeFromTestContainer(ctx,
 			"/healthz",
 			host,
@@ -704,7 +689,7 @@ func testHTTPHealthCheckNodePortFromTestContainer(ctx context.Context, config *e
 		}
 		return count >= threshold, nil
 	}
-	err := wait.PollImmediate(time.Second, timeout, pollFn)
+	err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, pollFn)
 	if err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v:%v/healthz, got %d", threshold, expectSucceed, host, port, count)
 	}
@@ -1077,7 +1062,7 @@ var _ = common.SIGDescribe("Services", func() {
 		pausePods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
 		framework.ExpectNoError(err, "Error in listing pods associated with pause pod deployments")
 
-		framework.ExpectNotEqual(pausePods.Items[0].Spec.NodeName, pausePods.Items[1].Spec.NodeName)
+		gomega.Expect(pausePods.Items[0].Spec.NodeName).NotTo(gomega.Equal(pausePods.Items[1].Spec.NodeName))
 
 		serviceAddress := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 
@@ -2773,7 +2758,7 @@ var _ = common.SIGDescribe("Services", func() {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				framework.Logf("unexpected error trying to connect to nodeport %s : %v", healthCheckNodePortAddr, err)
 				return false, nil
 			}
 
@@ -2796,7 +2781,7 @@ var _ = common.SIGDescribe("Services", func() {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				framework.Logf("unexpected error trying to connect to nodeport %s : %v", healthCheckNodePortAddr, err)
 				return false, nil
 			}
 
@@ -3111,15 +3096,18 @@ var _ = common.SIGDescribe("Services", func() {
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
 			// pausePod0 -> node1 node port fails because it's "external" and there are no local endpoints
 			// pausePod1 -> node0 node port succeeds because webserver0 is running on node0
-			// pausePod0 -> node0 and pausePod1 -> node1 both succeed because pod-to-same-node-NodePort
-			// connections are neither internal nor external and always get Cluster traffic policy.
+			// pausePod0 -> node0 node port succeeds because webserver0 is running on node0
+			//
+			// NOTE: pausePod1 -> node1 will succeed for kube-proxy because kube-proxy considers pod-to-same-node-NodePort
+			// connections as neither internal nor external and always get Cluster traffic policy. However, we do not test
+			// this here because not all Network implementations follow kube-proxy's interpretation of "destination"
+			// traffic policy. See: https://github.com/kubernetes/kubernetes/pull/123622
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
-			execHostnameTest(*pausePod1, nodePortAddress1, webserverPod0.Name)
 
 			time.Sleep(5 * time.Second)
 		}
@@ -3917,7 +3905,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 			family = v1.IPv6Protocol
 		}
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
@@ -4000,7 +3988,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 			family = v1.IPv6Protocol
 		}
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
@@ -4146,9 +4134,9 @@ func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name
 }
 
 // checkReachabilityFromPod checks reachability from the specified pod.
-func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
+func checkReachabilityFromPod(ctx context.Context, expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
-	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := e2eoutput.RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
@@ -4162,12 +4150,6 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		return true, nil
 	})
 	framework.ExpectNoError(err)
-}
-
-// enableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
-// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
-func enableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
 func validatePorts(ep, expectedEndpoints portsByPodUID) error {

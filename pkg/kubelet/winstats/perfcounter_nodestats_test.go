@@ -160,14 +160,16 @@ func TestConvertCPUValue(t *testing.T) {
 }
 
 func TestGetCPUUsageNanoCores(t *testing.T) {
+	// Scaled expected unit test values by the frequency the CPU perf counters are polled.
+	perfCounterUpdatePeriodSeconds := uint64(perfCounterUpdatePeriod / time.Second)
 	testCases := []struct {
 		latestValue   uint64
 		previousValue uint64
 		expected      uint64
 	}{
 		{latestValue: uint64(0), previousValue: uint64(0), expected: uint64(0)},
-		{latestValue: uint64(2000000000), previousValue: uint64(0), expected: uint64(200000000)},
-		{latestValue: uint64(5000000000), previousValue: uint64(2000000000), expected: uint64(300000000)},
+		{latestValue: uint64(2000000000), previousValue: uint64(0), expected: uint64(200000000 * perfCounterUpdatePeriodSeconds)},
+		{latestValue: uint64(5000000000), previousValue: uint64(2000000000), expected: uint64(300000000 * perfCounterUpdatePeriodSeconds)},
 	}
 
 	for _, tc := range testCases {

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -86,6 +87,11 @@ type Waiter struct{}
 // NewWaiter returns a new Waiter object that talks to the given Kubernetes cluster
 func NewWaiter() apiclient.Waiter {
 	return &Waiter{}
+}
+
+// WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
+func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
+	return nil
 }
 
 // WaitForAPI just returns a dummy nil, to indicate that the program should just proceed

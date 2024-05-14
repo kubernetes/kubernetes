@@ -1170,6 +1170,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRV:    currentRV,
 			expectedOut: []example.Pod{},
 		},
+		{
+			name:         "test non-consistent List",
+			prefix:       "/pods/empty",
+			pred:         storage.Everything,
+			rv:           "0",
+			expectRVFunc: resourceVersionNotOlderThan(list.ResourceVersion),
+			expectedOut:  []example.Pod{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1237,6 +1245,67 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 			} else {
 				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
+			}
+		})
+	}
+}
+
+func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, cacheEnabled, consistentReadsSupported bool) {
+	outPod := &example.Pod{}
+	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
+	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	lastObjecRV := outPod.ResourceVersion
+	compaction(ctx, t, outPod.ResourceVersion)
+	parsedRV, _ := strconv.Atoi(outPod.ResourceVersion)
+	currentRV := fmt.Sprintf("%d", parsedRV+1)
+
+	firstNonConsistentReadRV := lastObjecRV
+	if consistentReadsSupported && !cacheEnabled {
+		firstNonConsistentReadRV = currentRV
+	}
+
+	secondNonConsistentReadRV := lastObjecRV
+	if consistentReadsSupported {
+		secondNonConsistentReadRV = currentRV
+	}
+
+	tcs := []struct {
+		name             string
+		requestRV        string
+		expectResponseRV string
+	}{
+		{
+			name:             "Non-consistent list before sync",
+			requestRV:        "0",
+			expectResponseRV: firstNonConsistentReadRV,
+		},
+		{
+			name:             "Consistent request returns currentRV",
+			requestRV:        "",
+			expectResponseRV: currentRV,
+		},
+		{
+			name:             "Non-consistent request after sync returns currentRV",
+			requestRV:        "0",
+			expectResponseRV: secondNonConsistentReadRV,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			out := &example.PodList{}
+			opts := storage.ListOptions{
+				ResourceVersion: tc.requestRV,
+				Predicate:       storage.Everything,
+			}
+			err = store.GetList(ctx, "/pods/empty", opts, out)
+			if err != nil {
+				t.Fatalf("GetList failed: %v", err)
+			}
+			if out.ResourceVersion != tc.expectResponseRV {
+				t.Errorf("resourceVersion in list response want=%s, got=%s", tc.expectResponseRV, out.ResourceVersion)
 			}
 		})
 	}
@@ -1341,7 +1410,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, [
 	return initialRV, created, nil
 }
 
-func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Compaction, store storage.Interface) {
 	key, prevStoredObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
 
@@ -1354,7 +1423,11 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		}, nil); err != nil {
 		t.Fatalf("update failed: %v", err)
 	}
-	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+	objRV, _ := strconv.Atoi(storedObj.ResourceVersion)
+	// Use compact to increase etcd global revision without changes to any resources.
+	// The increase in resources version comes from Kubernetes compaction updating hidden key.
+	// Used to test consistent List to confirm it returns latest etcd revision.
+	compaction(ctx, t, prevStoredObj.ResourceVersion)
 
 	tests := []struct {
 		name                 string
@@ -1388,13 +1461,13 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{*storedObj},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 	}, {
 		name:        "existing key, resourceVersion=current, resourceVersionMatch=notOlderThan",
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{*storedObj},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 	}, {
 		name:                 "existing key, resourceVersion=previous, resourceVersionMatch=notOlderThan",
@@ -1408,7 +1481,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		key:         key,
 		pred:        storage.Everything,
 		expectedOut: []example.Pod{*storedObj},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 		rvMatch:     metav1.ResourceVersionMatchExact,
 	}, {
 		name:        "existing key, resourceVersion=previous, resourceVersionMatch=exact",
@@ -1453,7 +1526,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 			},
 		},
 		expectedOut: []example.Pod{},
-		rv:          fmt.Sprintf("%d", currentRV),
+		rv:          fmt.Sprintf("%d", objRV),
 	}}
 
 	for _, tt := range tests {
@@ -1558,7 +1631,9 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		}
 	}
 	options := storage.ListOptions{
-		ResourceVersion: "0",
+		// Limit is ignored when ResourceVersion is set to 0.
+		// Set it to consistent read.
+		ResourceVersion: "",
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
@@ -1581,7 +1656,8 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	// no limit, should get two items
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
@@ -1604,7 +1680,8 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 	// limit, should get two more pages
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(1, continueFromSecondItem),
 		Recursive:       true,
 	}
@@ -1626,7 +1703,8 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
@@ -1742,7 +1820,9 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		}
 	}
 	options := storage.ListOptions{
-		ResourceVersion: "0",
+		// Limit is ignored when ResourceVersion is set to 0.
+		// Set it to consistent read.
+		ResourceVersion: "",
 		Predicate:       pred(2, ""),
 		Recursive:       true,
 	}
@@ -1772,7 +1852,8 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	// both read counters should be incremented for the singular calls they make in this case
 	out = &example.PodList{}
 	options = storage.ListOptions{
-		ResourceVersion: "0",
+		// ResourceVersion should be unset when setting continuation token.
+		ResourceVersion: "",
 		Predicate:       pred(2, cont),
 		Recursive:       true,
 	}
@@ -1952,7 +2033,7 @@ type InterfaceWithPrefixTransformer interface {
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
-func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
+func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
 	nextPod := func(index uint32) (string, *example.Pod) {
 		obj := &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2334,7 +2415,7 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	err := store.GuaranteedUpdate(ctx, key, updatedPod, false, nil,
 		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 			pod := obj.(*example.Pod)
-			pod.Name = "foo-2"
+			pod.Generation = 2
 			return pod, nil
 		}),
 		nil,
@@ -2351,7 +2432,7 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	err = store.GuaranteedUpdate(ctx, key, updatedPod2, false, nil,
 		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 			pod := obj.(*example.Pod)
-			if pod.Name != "foo-2" {
+			if pod.Generation != 2 {
 				if sawConflict {
 					t.Fatalf("unexpected second conflict")
 				}
@@ -2359,7 +2440,7 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 				// simulated stale object - return a conflict
 				return nil, apierrors.NewConflict(example.SchemeGroupVersion.WithResource("pods").GroupResource(), "name", errors.New("foo"))
 			}
-			pod.Name = "foo-3"
+			pod.Generation = 3
 			return pod, nil
 		}),
 		originalPod,
@@ -2367,8 +2448,8 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if updatedPod2.Name != "foo-3" {
-		t.Errorf("unexpected pod name: %q", updatedPod2.Name)
+	if updatedPod2.Generation != 3 {
+		t.Errorf("unexpected pod generation: %q", updatedPod2.Generation)
 	}
 
 	// Third, update using a current version as the suggestion.
@@ -2379,14 +2460,8 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	err = store.GuaranteedUpdate(ctx, key, updatedPod3, false, nil,
 		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 			pod := obj.(*example.Pod)
-			if pod.Name != updatedPod2.Name || pod.ResourceVersion != updatedPod2.ResourceVersion {
-				t.Errorf(
-					"unexpected live object (name=%s, rv=%s), expected name=%s, rv=%s",
-					pod.Name,
-					pod.ResourceVersion,
-					updatedPod2.Name,
-					updatedPod2.ResourceVersion,
-				)
+			if pod.Generation != updatedPod2.Generation || pod.ResourceVersion != updatedPod2.ResourceVersion {
+				t.Logf("stale object (rv=%s), expected rv=%s", pod.ResourceVersion, updatedPod2.ResourceVersion)
 			}
 			attempts++
 			return nil, fmt.Errorf("validation or admission error")
@@ -2396,8 +2471,10 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 	if err == nil {
 		t.Fatalf("expected error, got none")
 	}
-	if attempts != 1 {
-		t.Errorf("expected 1 attempt, got %d", attempts)
+	// Implementations of the storage interface are allowed to ignore the suggestion,
+	// in which case two attempts are possible.
+	if attempts > 2 {
+		t.Errorf("update function should have been called at most twice, called %d", attempts)
 	}
 }
 

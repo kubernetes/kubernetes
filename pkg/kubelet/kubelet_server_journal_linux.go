@@ -37,7 +37,7 @@ func getLoggingCmd(n *nodeLogQuery, services []string) (string, []string, error)
 		args = append(args, fmt.Sprintf("--since=%s", n.SinceTime.Format(dateLayout)))
 	}
 	if n.UntilTime != nil {
-		args = append(args, fmt.Sprintf("--until=%s", n.SinceTime.Format(dateLayout)))
+		args = append(args, fmt.Sprintf("--until=%s", n.UntilTime.Format(dateLayout)))
 	}
 	if n.TailLines != nil {
 		args = append(args, "--pager-end", fmt.Sprintf("--lines=%d", *n.TailLines))
