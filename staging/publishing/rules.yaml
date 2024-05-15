@@ -2290,30 +2290,6 @@ rules:
   library: true
 - destination: legacy-cloud-providers
   branches:
-  - name: master
-    dependencies:
-    - repository: api
-      branch: master
-    - repository: apimachinery
-      branch: master
-    - repository: client-go
-      branch: master
-    - repository: cloud-provider
-      branch: master
-    - repository: apiserver
-      branch: master
-    - repository: component-base
-      branch: master
-    - repository: controller-manager
-      branch: master
-    - repository: component-helpers
-      branch: master
-    - repository: kms
-      branch: master
-    source:
-      branch: master
-      dirs:
-      - staging/src/k8s.io/legacy-cloud-providers
   - name: release-1.26
     go: 1.21.9
     dependencies:
