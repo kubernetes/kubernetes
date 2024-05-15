@@ -37,11 +37,10 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		NaNConvert: cbor.NaNConvertReject,
 		InfConvert: cbor.InfConvertReject,
 
-		// Prefer encoding math/big.Int to one of the 64-bit integer types if it fits. When
-		// later decoded into Unstructured, the set of allowable concrete numeric types is
-		// limited to int64 and float64, so the distinction between big integer and integer
-		// can't be preserved.
-		BigIntConvert: cbor.BigIntConvertShortest,
+		// Error on attempt to encode math/big.Int values, which can't be faithfully
+		// roundtripped through Unstructured in general (the dynamic numeric types allowed
+		// in Unstructured are limited to float64 and int64).
+		BigIntConvert: cbor.BigIntConvertReject,
 
 		// MarshalJSON for time.Time writes RFC3339 with nanos.
 		Time: cbor.TimeRFC3339Nano,

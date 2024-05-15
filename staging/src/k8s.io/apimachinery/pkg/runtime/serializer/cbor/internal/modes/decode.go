@@ -116,6 +116,8 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// representation (RFC 8259 Section 6).
 		NaN: cbor.NaNDecodeForbidden,
 		Inf: cbor.InfDecodeForbidden,
+
+		BignumTag: cbor.BignumTagForbidden,
 	}.DecMode()
 	if err != nil {
 		panic(err)

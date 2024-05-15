@@ -18,6 +18,8 @@ package modes_test
 
 import (
 	"fmt"
+	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -53,6 +55,15 @@ func TestEncode(t *testing.T) {
 			want:          []byte{0xa1, 0x41, 0x41, 0x02}, // {"A": 2}
 			assertOnError: assertNilError,
 		},
+		{
+			name: "math/big.Int values are rejected",
+			in:   big.NewInt(1),
+			assertOnError: assertOnConcreteError(func(t *testing.T, got *cbor.UnsupportedTypeError) {
+				if want := (&cbor.UnsupportedTypeError{Type: reflect.TypeFor[big.Int]()}); *want != *got {
+					t.Errorf("unexpected error, got %#v (%q), want %#v (%q)", got, got.Error(), want, want.Error())
+				}
+			}),
+		},
 	} {
 		encModes := tc.modes
 		if len(encModes) == 0 {
@@ -68,7 +79,7 @@ func TestEncode(t *testing.T) {
 			t.Run(fmt.Sprintf("mode=%s/%s", modeName, tc.name), func(t *testing.T) {
 				out, err := encMode.Marshal(tc.in)
 				tc.assertOnError(t, err)
-				if diff := cmp.Diff(tc.want, out); diff != "" {
+				if diff := cmp.Diff(tc.want, out, cmp.Comparer(func(a, b reflect.Type) bool { return a == b })); diff != "" {
 					t.Errorf("unexpected output:\n%s", diff)
 				}
 			})
