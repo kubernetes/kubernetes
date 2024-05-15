@@ -69,10 +69,6 @@ func TestAppendixA(t *testing.T) {
 		reject  string   // reason the decoder rejects the example
 		encoded []byte   // re-encoded object (only if different from example encoding)
 		reasons []string // reasons for re-encode difference
-
-		// TODO: The cases with nonempty fixme are known to be not working and fixing them
-		// is an alpha criteria. They're present and skipped for visibility.
-		fixme string
 	}{
 		{
 			example: hex("00"),
@@ -558,10 +554,6 @@ func TestAppendixA(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%x", tc.example), func(t *testing.T) {
-			if tc.fixme != "" {
-				t.Skip(tc.fixme) // TODO: Remove once all cases are fixed.
-			}
-
 			var decoded interface{}
 			err := modes.Decode.Unmarshal(tc.example, &decoded)
 			if err != nil {
