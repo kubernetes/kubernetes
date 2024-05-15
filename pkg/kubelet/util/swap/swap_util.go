@@ -17,8 +17,10 @@ limitations under the License.
 package swap
 
 import (
+	"bytes"
 	"os"
 	sysruntime "runtime"
+	"strings"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -82,4 +84,15 @@ func IsTmpfsNoswapOptionSupported(mounter mount.Interface) bool {
 	})
 
 	return tmpfsNoswapOptionSupported
+}
+
+// gets /proc/swaps's content as an input, returns true if swap is enabled.
+func isSwapOnAccordingToProcSwaps(procSwapsContent []byte) bool {
+	procSwapsContent = bytes.TrimSpace(procSwapsContent) // extra trailing \n
+	procSwapsStr := string(procSwapsContent)
+	procSwapsLines := strings.Split(procSwapsStr, "\n")
+
+	// If there is more than one line (table headers) in /proc/swaps then swap is enabled
+	klog.InfoS("Swap is on", "/proc/swaps contents", procSwapsStr)
+	return len(procSwapsLines) > 1
 }
