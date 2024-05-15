@@ -121,7 +121,6 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("c249010000000000000000"),
 			reject:  "decoding tagged positive bigint value to interface{} can't reproduce this value without losing distinction between float and integer",
-			fixme:   "decoding bigint to interface{} must not produce math/big.Int",
 		},
 		{
 			example: hex("3bffffffffffffffff"),
@@ -130,7 +129,6 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("c349010000000000000000"),
 			reject:  "-18446744073709551617 overflows int64 and falling back to float64 (as with JSON) loses distinction between float and integer",
-			fixme:   "decoding negative bigint to interface{} must not produce math/big.Int",
 		},
 		{
 			example: hex("20"),
