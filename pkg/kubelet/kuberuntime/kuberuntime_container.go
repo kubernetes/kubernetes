@@ -663,6 +663,10 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod 
 	case <-done:
 		klog.V(3).InfoS("PreStop hook completed", "pod", klog.KObj(pod), "podUID", pod.UID,
 			"containerName", containerSpec.Name, "containerID", containerID.String())
+	case <-ctx.Done():
+		klog.V(2).InfoS("Context expired while executing PreStop hook", "pod", klog.KObj(pod), "podUID", pod.UID,
+			"containerName", containerSpec.Name, "containerID", containerID.String(), "gracePeriod", gracePeriod)
+		return int64(metav1.Now().Sub(start.Time).Seconds())
 	}
 
 	return int64(metav1.Now().Sub(start.Time).Seconds())
