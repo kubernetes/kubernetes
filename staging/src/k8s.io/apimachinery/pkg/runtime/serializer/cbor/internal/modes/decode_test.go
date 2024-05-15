@@ -739,29 +739,25 @@ func TestDecode(t *testing.T) {
 
 		group(t, "unsigned bignum", []test{
 			{
-				name:  "rejected",
-				in:    hex("c249010000000000000000"), // 2(18446744073709551616)
-				fixme: "decoding cbor data tagged with 2 produces big.Int instead of rejecting",
-				assertOnError: func(t *testing.T, e error) {
-					// TODO: Once this can pass, make the assertion stronger.
-					if e == nil {
-						t.Error("expected non-nil error")
+				name: "rejected",
+				in:   hex("c249010000000000000000"), // 2(18446744073709551616)
+				assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.UnacceptableDataItemError) {
+					if diff := cmp.Diff(&cbor.UnacceptableDataItemError{CBORType: "tag", Message: "bignum"}, e); diff != "" {
+						t.Errorf("unexpected error diff:\n%s", diff)
 					}
-				},
+				}),
 			},
 		})
 
 		group(t, "negative bignum", []test{
 			{
-				name:  "rejected",
-				in:    hex("c349010000000000000000"), // 3(-18446744073709551617)
-				fixme: "decoding cbor data tagged with 3 produces big.Int instead of rejecting",
-				assertOnError: func(t *testing.T, e error) {
-					// TODO: Once this can pass, make the assertion stronger.
-					if e == nil {
-						t.Error("expected non-nil error")
+				name: "rejected",
+				in:   hex("c349010000000000000000"), // 3(-18446744073709551617)
+				assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.UnacceptableDataItemError) {
+					if diff := cmp.Diff(&cbor.UnacceptableDataItemError{CBORType: "tag", Message: "bignum"}, e); diff != "" {
+						t.Errorf("unexpected error diff:\n%s", diff)
 					}
-				},
+				}),
 			},
 		})
 
