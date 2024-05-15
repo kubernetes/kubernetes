@@ -387,8 +387,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		err = udpJig.Scale(ctx, 0)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("looking for ICMP REJECT on the UDP service's LoadBalancer")
-		testRejectedUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
+		ginkgo.By("checking that the UDP service's LoadBalancer is not reachable")
+		testNotReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
 		err = udpJig.Scale(ctx, 1)
@@ -927,11 +927,6 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 })
 
 var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature.LoadBalancer, framework.WithSlow(), func() {
-	// FIXME: What are the expected semantics of requesting an
-	// "ExternalTrafficPolicy: Local" service from a cloud provider that does not
-	// support that? What are the expected semantics of "ExternalTrafficPolicy: Local"
-	// on `IPMode: Proxy`-type LoadBalancers?
-
 	f := framework.NewDefaultFramework("esipp")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var loadBalancerCreateTimeout time.Duration
@@ -986,6 +981,14 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 			err = cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
+
+		// FIXME: figure out the actual expected semantics for
+		// "ExternalTrafficPolicy: Local" + "IPMode: Proxy".
+		// https://issues.k8s.io/123714
+		ingress := &svc.Status.LoadBalancer.Ingress[0]
+		if ingress.IP == "" || (ingress.IPMode != nil && *ingress.IPMode == v1.LoadBalancerIPModeProxy) {
+			e2eskipper.Skipf("LoadBalancer uses 'Proxy' IPMode")
+		}
 
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
@@ -1132,6 +1135,14 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 			err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
+
+		// FIXME: figure out the actual expected semantics for
+		// "ExternalTrafficPolicy: Local" + "IPMode: Proxy".
+		// https://issues.k8s.io/123714
+		ingress := &svc.Status.LoadBalancer.Ingress[0]
+		if ingress.IP == "" || (ingress.IPMode != nil && *ingress.IPMode == v1.LoadBalancerIPModeProxy) {
+			e2eskipper.Skipf("LoadBalancer uses 'Proxy' IPMode")
+		}
 
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
