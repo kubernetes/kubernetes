@@ -46,7 +46,7 @@ const KubeReservedMemory = 0.35
 
 var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [LinuxOnly]", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("nodeallocatable-oomkiller-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	testCases := []testCase{
 		{

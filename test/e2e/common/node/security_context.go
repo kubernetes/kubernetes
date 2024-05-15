@@ -638,7 +638,7 @@ var _ = SIGDescribe("Security Context", func() {
 
 var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("user-namespaces-pss-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelRestricted
+	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
 	ginkgo.Context("with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled", func() {
 		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, func(ctx context.Context) {
