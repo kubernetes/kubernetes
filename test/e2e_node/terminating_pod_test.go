@@ -101,7 +101,9 @@ spec:
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func(f *os.File) {
+		_ = f.Close()
+	}(f)
 
 	_, err = f.WriteString(podYaml)
 	return err
