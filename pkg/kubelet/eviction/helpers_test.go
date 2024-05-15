@@ -1216,6 +1216,45 @@ func TestSortByEvictionPriority(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "memory first, even before hard threshold",
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:      evictionapi.SignalNodeFsAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 1,
+				},
+				{
+					Signal:      evictionapi.SignalMemoryAvailable,
+					GracePeriod: 1,
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal:      evictionapi.SignalMemoryAvailable,
+					GracePeriod: 1,
+				},
+				{
+					Signal:      evictionapi.SignalNodeFsAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 0,
+				},
+				{
+					Signal:      evictionapi.SignalPIDAvailable,
+					GracePeriod: 1,
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sort.Sort(byEvictionPriority(tc.thresholds))
