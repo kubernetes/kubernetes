@@ -107,10 +107,8 @@ func TestProtoParser(t *testing.T) {
 		if !test.err {
 			if err != nil {
 				t.Errorf("%s: unexpected error %s", test.expr, err)
-			} else {
-				if actual != ident.Name {
-					t.Errorf("%s: expected %s, got %s", test.expr, ident.Name, actual)
-				}
+			} else if actual != ident.Name {
+				t.Errorf("%s: expected %s, got %s", test.expr, ident.Name, actual)
 			}
 		} else {
 			if err == nil {

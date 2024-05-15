@@ -18,18 +18,18 @@ package generators
 
 import (
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 // groupInterfaceGenerator generates the per-group interface file.
 type groupInterfaceGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage             string
 	imports                   namer.ImportTracker
 	groupVersions             clientgentypes.GroupVersions
@@ -70,7 +70,7 @@ func (g *groupInterfaceGenerator) GenerateType(c *generator.Context, t *types.Ty
 	versions := make([]versionData, 0, len(g.groupVersions.Versions))
 	for _, version := range g.groupVersions.Versions {
 		gv := clientgentypes.GroupVersion{Group: g.groupVersions.Group, Version: version.Version}
-		versionPackage := filepath.Join(g.outputPackage, strings.ToLower(gv.Version.NonEmpty()))
+		versionPackage := path.Join(g.outputPackage, strings.ToLower(gv.Version.NonEmpty()))
 		iface := c.Universe.Type(types.Name{Package: versionPackage, Name: "Interface"})
 		versions = append(versions, versionData{
 			Name:      namer.IC(version.Version.NonEmpty()),

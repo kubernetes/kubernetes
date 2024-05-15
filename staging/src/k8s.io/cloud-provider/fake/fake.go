@@ -80,7 +80,7 @@ type Cloud struct {
 	ExtIDErr       map[types.NodeName]error
 	InstanceTypes  map[types.NodeName]string
 	Machines       []types.NodeName
-	NodeResources  *v1.NodeResources
+	NodeResources  v1.ResourceList
 	ClusterList    []string
 	MasterName     string
 	ExternalIP     net.IP

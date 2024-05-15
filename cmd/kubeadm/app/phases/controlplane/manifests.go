@@ -229,7 +229,10 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		cfg.APIServer.ExtraArgs = []kubeadmapi.Arg{}
 	}
 	authzVal, _ := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "authorization-mode", -1)
-	cfg.APIServer.ExtraArgs = kubeadmapi.SetArgValues(cfg.APIServer.ExtraArgs, "authorization-mode", getAuthzModes(authzVal), 1)
+	_, hasStructuredAuthzVal := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "authorization-config", -1)
+	if hasStructuredAuthzVal == -1 {
+		defaultArguments = kubeadmapi.SetArgValues(defaultArguments, "authorization-mode", getAuthzModes(authzVal), 1)
+	}
 	command = append(command, kubeadmutil.ArgumentsToCommand(defaultArguments, cfg.APIServer.ExtraArgs)...)
 
 	return command

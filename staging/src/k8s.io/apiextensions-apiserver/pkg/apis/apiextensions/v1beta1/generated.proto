@@ -41,7 +41,7 @@ message ConversionRequest {
 
   // objects is the list of custom resource objects to be converted.
   // +listType=atomic
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
+  repeated .k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
 }
 
 // ConversionResponse describes a conversion response.
@@ -55,14 +55,14 @@ message ConversionResponse {
   // must also have the same size as the input list with the same objects in the same order (equal kind, metadata.uid, metadata.name and metadata.namespace).
   // The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
   // +listType=atomic
-  repeated k8s.io.apimachinery.pkg.runtime.RawExtension convertedObjects = 2;
+  repeated .k8s.io.apimachinery.pkg.runtime.RawExtension convertedObjects = 2;
 
   // result contains the result of conversion with extra details if the conversion failed. `result.status` determines if
   // the conversion failed or succeeded. The `result.status` field is required and represents the success or failure of the
   // conversion. A successful conversion must set `result.status` to `Success`. A failed conversion must set
   // `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message`
   // will be used to construct an error message for the end user.
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Status result = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Status result = 3;
 }
 
 // ConversionReview describes a conversion request/response.
@@ -138,7 +138,7 @@ message CustomResourceDefinition {
   // Standard object's metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec describes how the user wants the resources to appear
   optional CustomResourceDefinitionSpec spec = 2;
@@ -159,7 +159,7 @@ message CustomResourceDefinitionCondition {
 
   // lastTransitionTime last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
   // reason is a unique, one-word, CamelCase reason for the condition's last transition.
   // +optional
@@ -175,7 +175,7 @@ message CustomResourceDefinitionList {
   // Standard object's metadata
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items list individual CustomResourceDefinition objects
   repeated CustomResourceDefinition items = 2;
@@ -273,6 +273,14 @@ message CustomResourceDefinitionSpec {
   // +listType=atomic
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
 
+  // selectableFields specifies paths to fields that may be used as field selectors.
+  // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+  //
+  // +featureGate=CustomResourceFieldSelectors
+  // +optional
+  // +listType=atomic
+  repeated SelectableField selectableFields = 11;
+
   // conversion defines conversion settings for the CRD.
   // +optional
   optional CustomResourceConversion conversion = 9;
@@ -359,6 +367,14 @@ message CustomResourceDefinitionVersion {
   // +optional
   // +listType=atomic
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
+
+  // selectableFields specifies paths to fields that may be used as field selectors.
+  // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+  //
+  // +featureGate=CustomResourceFieldSelectors
+  // +optional
+  // +listType=atomic
+  repeated SelectableField selectableFields = 9;
 }
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
@@ -649,6 +665,19 @@ message JSONSchemaPropsOrStringArray {
 
   // +listType=atomic
   repeated string property = 2;
+}
+
+// SelectableField specifies the JSON path of a field that may be used with field selectors.
+message SelectableField {
+  // jsonPath is a simple JSON path which is evaluated against each custom resource to produce a
+  // field selector value.
+  // Only JSON paths without the array notation are allowed.
+  // Must point to a field of type string, boolean or integer. Types with enum values
+  // and strings with formats are allowed.
+  // If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string.
+  // Must not point to metdata fields.
+  // Required.
+  optional string jsonPath = 1;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

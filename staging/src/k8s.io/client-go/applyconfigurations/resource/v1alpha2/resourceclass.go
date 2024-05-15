@@ -36,6 +36,7 @@ type ResourceClassApplyConfiguration struct {
 	DriverName                       *string                                             `json:"driverName,omitempty"`
 	ParametersRef                    *ResourceClassParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`
 	SuitableNodes                    *corev1.NodeSelectorApplyConfiguration              `json:"suitableNodes,omitempty"`
+	StructuredParameters             *bool                                               `json:"structuredParameters,omitempty"`
 }
 
 // ResourceClass constructs an declarative configuration of the ResourceClass type for use with
@@ -262,5 +263,13 @@ func (b *ResourceClassApplyConfiguration) WithParametersRef(value *ResourceClass
 // If called multiple times, the SuitableNodes field is set to the value of the last call.
 func (b *ResourceClassApplyConfiguration) WithSuitableNodes(value *corev1.NodeSelectorApplyConfiguration) *ResourceClassApplyConfiguration {
 	b.SuitableNodes = value
+	return b
+}
+
+// WithStructuredParameters sets the StructuredParameters field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StructuredParameters field is set to the value of the last call.
+func (b *ResourceClassApplyConfiguration) WithStructuredParameters(value bool) *ResourceClassApplyConfiguration {
+	b.StructuredParameters = &value
 	return b
 }

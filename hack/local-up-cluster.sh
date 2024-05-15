@@ -56,7 +56,7 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.4.0"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.4.1"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -94,6 +94,9 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
+CPUMANAGER_POLICY=${CPUMANAGER_POLICY:-""}
+CPUMANAGER_RECONCILE_PERIOD=${CPUMANAGER_RECONCILE_PERIOD:-""}
+CPUMANAGER_POLICY_OPTIONS=${CPUMANAGER_POLICY_OPTIONS:-""}
 STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-"application/vnd.kubernetes.protobuf"}
 # preserve etcd data. you also need to set ETCD_DIR.
@@ -162,6 +165,12 @@ function usage {
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
+            echo "Example 4: FEATURE_GATES=CPUManagerPolicyOptions=true \\"
+            echo "           CPUMANAGER_POLICY=\"static\" \\"
+            echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
+            echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
+            echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi --system-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi\" \\"
+            echo "           hack/local-up-cluster.sh (build a local copy of the source with full-pcpus-only CPU Management policy)"
 }
 
 # This function guesses where the existing cached binary build is for the `-O`
@@ -930,6 +939,22 @@ EOF
       if [[ -n ${FEATURE_GATES} ]]; then
         parse_feature_gates "${FEATURE_GATES}"
       fi
+
+      # cpumanager policy
+      if [[ -n ${CPUMANAGER_POLICY} ]]; then
+        echo "cpuManagerPolicy: \"${CPUMANAGER_POLICY}\""
+      fi
+
+      # cpumanager reconcile period
+      if [[ -n ${CPUMANAGER_RECONCILE_PERIOD} ]]; then
+	echo "cpuManagerReconcilePeriod: \"${CPUMANAGER_RECONCILE_PERIOD}\""
+      fi
+
+      # cpumanager policy options
+      if [[ -n ${CPUMANAGER_POLICY_OPTIONS} ]]; then
+	parse_cpumanager_policy_options "${CPUMANAGER_POLICY_OPTIONS}"
+      fi
+
     } >>"${TMP_DIR}"/kubelet.yaml
 
     # shellcheck disable=SC2024
@@ -1130,6 +1155,16 @@ Logs:
   ${KUBELET_LOG}
 EOF
 fi
+}
+
+function parse_cpumanager_policy_options {
+  echo "cpuManagerPolicyOptions:"
+  # Convert from foo=true,bar=false to
+  #   foo: "true"
+  #   bar: "false"
+  for option in $(echo "$1" | tr ',' ' '); do
+    echo "${option}" | ${SED} -e 's/\(.*\)=\(.*\)/  \1: "\2"/'
+  done
 }
 
 function parse_feature_gates {

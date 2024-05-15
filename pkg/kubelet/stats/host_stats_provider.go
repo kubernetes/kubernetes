@@ -51,13 +51,16 @@ type hostStatsProvider struct {
 	osInterface kubecontainer.OSInterface
 	// podEtcHostsPathFunc fetches a pod etc hosts path by uid.
 	podEtcHostsPathFunc PodEtcHostsPathFunc
+	// podLogsDirectory is the root directory path for pod logs.
+	podLogsDirectory string
 }
 
 // NewHostStatsProvider returns a new HostStatsProvider type struct.
-func NewHostStatsProvider(osInterface kubecontainer.OSInterface, podEtcHostsPathFunc PodEtcHostsPathFunc) HostStatsProvider {
+func NewHostStatsProvider(osInterface kubecontainer.OSInterface, podEtcHostsPathFunc PodEtcHostsPathFunc, podLogsDirectory string) HostStatsProvider {
 	return hostStatsProvider{
 		osInterface:         osInterface,
 		podEtcHostsPathFunc: podEtcHostsPathFunc,
+		podLogsDirectory:    podLogsDirectory,
 	}
 }
 
@@ -102,12 +105,12 @@ func (h hostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cad
 }
 
 func (h hostStatsProvider) podLogMetrics(podNamespace, podName string, podUID types.UID) (metricsProviderByPath, error) {
-	podLogsDirectoryPath := kuberuntime.BuildPodLogsDirectory(podNamespace, podName, podUID)
+	podLogsDirectoryPath := kuberuntime.BuildPodLogsDirectory(h.podLogsDirectory, podNamespace, podName, podUID)
 	return h.fileMetricsByDir(podLogsDirectoryPath)
 }
 
 func (h hostStatsProvider) podContainerLogMetrics(podNamespace, podName string, podUID types.UID, containerName string) (metricsProviderByPath, error) {
-	podContainerLogsDirectoryPath := kuberuntime.BuildContainerLogsDirectory(podNamespace, podName, podUID, containerName)
+	podContainerLogsDirectoryPath := kuberuntime.BuildContainerLogsDirectory(h.podLogsDirectory, podNamespace, podName, podUID, containerName)
 	return h.fileMetricsByDir(podContainerLogsDirectoryPath)
 }
 

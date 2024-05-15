@@ -26,7 +26,7 @@ func HasExtension(m Message, xt protoreflect.ExtensionType) bool {
 }
 
 // ClearExtension clears an extension field such that subsequent
-// HasExtension calls return false.
+// [HasExtension] calls return false.
 // It panics if m is invalid or if xt does not extend m.
 func ClearExtension(m Message, xt protoreflect.ExtensionType) {
 	m.ProtoReflect().Clear(xt.TypeDescriptor())

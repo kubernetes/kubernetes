@@ -70,7 +70,29 @@ readOnlyPort: 10257
 clusterDNS:
 - 192.168.1.10
 systemReserved:
-  memory: 1Gi`)
+  memory: 1Gi
+authorization:
+  mode: Webhook
+  webhook:
+    cacheAuthorizedTTL: "5m"
+    cacheUnauthorizedTTL: "30s"
+staticPodURLHeader:
+  kubelet-api-support:
+  - "Authorization: 234APSDFA"
+  - "X-Custom-Header: 123"
+  custom-static-pod:
+  - "Authorization: 223EWRWER"
+  - "X-Custom-Header: 456"
+shutdownGracePeriodByPodPriority:
+  - priority: 1
+    shutdownGracePeriodSeconds: 60
+  - priority: 2
+    shutdownGracePeriodSeconds: 45
+  - priority: 3
+    shutdownGracePeriodSeconds: 30
+featureGates:
+  DisableKubeletCloudCredentialProviders: true
+  PodAndContainerStatsFromCRI: true`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "10-kubelet.conf"), contents, 0755))
 			contents = []byte(`apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
@@ -81,7 +103,29 @@ clusterDNS:
 port: 8080
 cpuManagerReconcilePeriod: 0s
 systemReserved:
-  memory: 2Gi`)
+  memory: 2Gi
+authorization:
+  mode: Webhook
+  webhook:
+    cacheAuthorizedTTL: "6m"
+    cacheUnauthorizedTTL: "40s"
+staticPodURLHeader:
+  kubelet-api-support:
+  - "Authorization: 8945AFSG1"
+  - "X-Custom-Header: 987"
+  custom-static-pod:
+  - "Authorization: 223EWRWER"
+  - "X-Custom-Header: 345"
+shutdownGracePeriodByPodPriority:
+  - priority: 1
+    shutdownGracePeriodSeconds: 19
+  - priority: 2
+    shutdownGracePeriodSeconds: 41
+  - priority: 6
+    shutdownGracePeriodSeconds: 30
+featureGates:
+  PodAndContainerStatsFromCRI: false
+  DynamicResourceAllocation: true`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755))
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet()
@@ -105,6 +149,27 @@ systemReserved:
 			// Meanwhile, this value was not explicitly set, but could have been overridden by a "default" of 0 for the type.
 			// Ensure the true default persists.
 			initialConfig.CPUCFSQuotaPeriod = metav1.Duration{Duration: time.Duration(100000000)}
+			// This covers the case for a map with the list of values.
+			initialConfig.StaticPodURLHeader = map[string][]string{
+				"kubelet-api-support": {"Authorization: 8945AFSG1", "X-Custom-Header: 987"},
+				"custom-static-pod":   {"Authorization: 223EWRWER", "X-Custom-Header: 345"},
+			}
+			// This covers the case where the fields within the list of structs are overridden.
+			initialConfig.ShutdownGracePeriodByPodPriority = []kubeletconfig.ShutdownGracePeriodByPodPriority{
+				{Priority: 1, ShutdownGracePeriodSeconds: 19},
+				{Priority: 2, ShutdownGracePeriodSeconds: 41},
+				{Priority: 6, ShutdownGracePeriodSeconds: 30},
+			}
+			// This covers the case where the fields within the struct are overridden.
+			initialConfig.Authorization = kubeletconfig.KubeletAuthorization{
+				Mode: "Webhook",
+				Webhook: kubeletconfig.KubeletWebhookAuthorization{
+					CacheAuthorizedTTL:   metav1.Duration{Duration: time.Duration(6 * time.Minute)},
+					CacheUnauthorizedTTL: metav1.Duration{Duration: time.Duration(40 * time.Second)},
+				},
+			}
+			// This covers the case where the fields within the map are overridden.
+			initialConfig.FeatureGates = map[string]bool{"DisableKubeletCloudCredentialProviders": true, "PodAndContainerStatsFromCRI": false, "DynamicResourceAllocation": true}
 			// Compare the expected config with the merged config
 			gomega.Expect(initialConfig).To(gomega.BeComparableTo(mergedConfig), "Merged kubelet config does not match the expected configuration.")
 		})

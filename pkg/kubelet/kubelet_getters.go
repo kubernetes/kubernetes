@@ -48,6 +48,13 @@ func (kl *Kubelet) getRootDir() string {
 	return kl.rootDirectory
 }
 
+// getPodLogsDir returns the full path to the directory that kubelet can use
+// to store pod's log files. This defaults to /var/log/pods if not specified
+// otherwise in the config file.
+func (kl *Kubelet) getPodLogsDir() string {
+	return kl.podLogsDirectory
+}
+
 // getPodsDir returns the full path to the directory under which pod
 // directories are created.
 func (kl *Kubelet) getPodsDir() string {
@@ -116,11 +123,21 @@ func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error)
 	if rtHandlers == nil {
 		return false, fmt.Errorf("runtime handlers are not set")
 	}
-	h, found := rtHandlers[rtHandler]
-	if !found {
-		return false, fmt.Errorf("the handler %q is not known", rtHandler)
+	for _, h := range rtHandlers {
+		if h.Name == rtHandler {
+			return h.SupportsUserNamespaces, nil
+		}
 	}
-	return h.SupportsUserNamespaces, nil
+	return false, fmt.Errorf("the handler %q is not known", rtHandler)
+}
+
+// GetKubeletMappings gets the additional IDs allocated for the Kubelet.
+func (kl *Kubelet) GetKubeletMappings() (uint32, uint32, error) {
+	return kl.getKubeletMappings()
+}
+
+func (kl *Kubelet) GetMaxPods() int {
+	return kl.maxPods
 }
 
 // getPodDir returns the full path to the per-pod directory for the pod with

@@ -46,8 +46,6 @@ func (validatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 func (validatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	ic := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	ic.Generation = 1
-
-	admissionregistration.DropDisabledValidatingWebhookConfigurationFields(ic, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -55,7 +53,6 @@ func (validatingWebhookConfigurationStrategy) PrepareForUpdate(ctx context.Conte
 	newIC := obj.(*admissionregistration.ValidatingWebhookConfiguration)
 	oldIC := old.(*admissionregistration.ValidatingWebhookConfiguration)
 
-	admissionregistration.DropDisabledValidatingWebhookConfigurationFields(newIC, oldIC)
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.

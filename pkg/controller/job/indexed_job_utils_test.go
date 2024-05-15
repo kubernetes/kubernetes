@@ -324,8 +324,8 @@ func TestIsIndexFailed(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			gotResult := isIndexFailed(logger, &tc.job, tc.pod)
 			if diff := cmp.Diff(tc.wantResult, gotResult); diff != "" {
 				t.Errorf("Unexpected result (-want,+got):\n%s", diff)
@@ -554,7 +554,7 @@ func TestGetPodsWithDelayedDeletionPerIndex(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
 			activePods := controller.FilterActivePods(logger, tc.pods)
 			failedIndexes := calculateFailedIndexes(logger, &tc.job, tc.pods)
 			_, succeededIndexes := calculateSucceededIndexes(logger, &tc.job, tc.pods)
@@ -635,8 +635,8 @@ func TestGetNewIndexFailureCountValue(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			gotNewIndexFailureCount, gotNewIndexIgnoredFailureCount := getNewIndexFailureCounts(logger, &tc.job, tc.pod)
 			if diff := cmp.Diff(tc.wantNewIndexFailureCount, gotNewIndexFailureCount); diff != "" {
 				t.Errorf("Unexpected set of pods with delayed deletion (-want,+got):\n%s", diff)
@@ -904,11 +904,11 @@ func TestGetIndexFailureCount(t *testing.T) {
 			wantResult: 2,
 		},
 		"valid maxint32 value": {
-			pod:        buildPod().indexFailureCount(strconv.Itoa(math.MaxInt32)).Pod,
+			pod:        buildPod().indexFailureCount(strconv.FormatInt(math.MaxInt32, 10)).Pod,
 			wantResult: math.MaxInt32,
 		},
 		"too large value": {
-			pod:        buildPod().indexFailureCount(strconv.Itoa(math.MaxInt32 + 1)).Pod,
+			pod:        buildPod().indexFailureCount(strconv.FormatInt(math.MaxInt32+1, 10)).Pod,
 			wantResult: 0,
 		},
 		"negative value": {

@@ -75,7 +75,7 @@ func TestScheduling(t *testing.T) {
 			// the test doesn't get stuck forever.
 
 			for feature, flag := range config.featureGates {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
 			}
 			informerFactory, tCtx := setupClusterForWorkload(tCtx, config.schedulerConfigPath, config.featureGates, nil)
 
@@ -92,7 +92,7 @@ func TestScheduling(t *testing.T) {
 								t.Skipf("disabled by label filter %q", *testSchedulingLabelFilter)
 							}
 							tCtx := ktesting.WithTB(tCtx, t)
-							runWorkload(tCtx, tc, w, informerFactory, true)
+							runWorkload(tCtx, tc, w, informerFactory)
 						})
 					}
 				})

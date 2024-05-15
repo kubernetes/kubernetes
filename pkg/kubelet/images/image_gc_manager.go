@@ -249,11 +249,11 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
 			if !isRuntimeClassInImageCriAPIEnabled {
-				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID)
+				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef)
 				imagesInUse.Insert(container.ImageID)
 			} else {
 				imageKey := getImageTuple(container.ImageID, container.ImageRuntimeHandler)
-				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageKey", imageKey)
+				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef, "imageKey", imageKey)
 				imagesInUse.Insert(imageKey)
 			}
 		}

@@ -57,7 +57,7 @@ type MetaAllocator struct {
 	ipAddressLister   networkingv1alpha1listers.IPAddressLister
 	ipAddressSynced   cache.InformerSynced
 	ipAddressInformer networkingv1alpha1informers.IPAddressInformer
-	queue             workqueue.RateLimitingInterface
+	queue             workqueue.TypedRateLimitingInterface[string]
 
 	internalStopCh chan struct{}
 
@@ -92,10 +92,13 @@ func NewMetaAllocator(
 		ipAddressLister:   ipAddressInformer.Lister(),
 		ipAddressSynced:   ipAddressInformer.Informer().HasSynced,
 		ipAddressInformer: ipAddressInformer,
-		queue:             workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{Name: ControllerName}),
-		internalStopCh:    make(chan struct{}),
-		tree:              iptree.New[*Allocator](),
-		ipFamily:          family,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: ControllerName},
+		),
+		internalStopCh: make(chan struct{}),
+		tree:           iptree.New[*Allocator](),
+		ipFamily:       family,
 	}
 
 	_, _ = serviceCIDRInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{

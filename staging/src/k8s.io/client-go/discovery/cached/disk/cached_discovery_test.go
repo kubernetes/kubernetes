@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
+	apidiscovery "k8s.io/api/apidiscovery/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -643,7 +643,7 @@ func TestCachedDiscoveryClientAggregatedServerGroups(t *testing.T) {
 				return
 			}
 			// Content-type is "aggregated" discovery format.
-			w.Header().Set("Content-Type", discovery.AcceptV2Beta1)
+			w.Header().Set("Content-Type", discovery.AcceptV2)
 			w.WriteHeader(http.StatusOK)
 			w.Write(output)
 		}))

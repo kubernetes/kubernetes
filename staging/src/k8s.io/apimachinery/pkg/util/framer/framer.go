@@ -147,7 +147,6 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 
 	// RawMessage#Unmarshal appends to data - we reset the slice down to 0 and will either see
 	// data written to data, or be larger than data and a different array.
-	n := len(data)
 	m := json.RawMessage(data[:0])
 	if err := r.decoder.Decode(&m); err != nil {
 		return 0, err
@@ -156,12 +155,19 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 	// If capacity of data is less than length of the message, decoder will allocate a new slice
 	// and set m to it, which means we need to copy the partial result back into data and preserve
 	// the remaining result for subsequent reads.
-	if len(m) > n {
-		//nolint:staticcheck // SA4006,SA4010 underlying array of data is modified here.
-		data = append(data[0:0], m[:n]...)
-		r.remaining = m[n:]
-		return n, io.ErrShortBuffer
+	if len(m) > cap(data) {
+		copy(data, m)
+		r.remaining = m[len(data):]
+		return len(data), io.ErrShortBuffer
 	}
+
+	if len(m) > len(data) {
+		// The bytes beyond len(data) were stored in data's underlying array, which we do
+		// not own after this function returns.
+		r.remaining = append([]byte(nil), m[len(data):]...)
+		return len(data), io.ErrShortBuffer
+	}
+
 	return len(m), nil
 }
 

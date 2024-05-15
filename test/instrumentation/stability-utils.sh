@@ -23,7 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 stability_check_setup() {
-  kube::golang::verify_go_version
   kube::util::ensure-temp-dir
   cd "${KUBE_ROOT}"
   kube::golang::setup_env
@@ -36,6 +35,7 @@ function find_files_to_check() {
     git ls-files -cmo --exclude-standard \
         ':!:vendor/*'        `# catches vendor/...` \
         ':!:*/vendor/*'      `# catches any subdir/vendor/...` \
+        ':!:*/testdata/*'    `# catches any subdir/testdata/...` \
         ':!:third_party/*'   `# catches third_party/...` \
         ':!:*/third_party/*' `# catches third_party/...` \
         ':!:hack/*'          `# catches hack/...` \

@@ -88,10 +88,6 @@ func (plugin *downwardAPIPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *downwardAPIPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *downwardAPIPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

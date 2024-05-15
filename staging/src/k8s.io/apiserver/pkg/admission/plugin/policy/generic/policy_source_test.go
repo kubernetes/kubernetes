@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -110,7 +110,7 @@ func TestPolicySourceHasSyncedInitialList(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "policy2",
 			},
-			ParamKind: &v1beta1.ParamKind{
+			ParamKind: &v1.ParamKind{
 				APIVersion: "policy.example.com/v1",
 				Kind:       "FakeParam",
 			},
@@ -177,7 +177,7 @@ type FakePolicy struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
 
-	ParamKind *v1beta1.ParamKind
+	ParamKind *v1.ParamKind
 }
 
 var _ generic.PolicyAccessor = &FakePolicy{}
@@ -199,11 +199,11 @@ func (fp *FakePolicy) GetNamespace() string {
 	return fp.Namespace
 }
 
-func (fp *FakePolicy) GetParamKind() *v1beta1.ParamKind {
+func (fp *FakePolicy) GetParamKind() *v1.ParamKind {
 	return fp.ParamKind
 }
 
-func (fb *FakePolicy) GetMatchConstraints() *v1beta1.MatchResources {
+func (fb *FakePolicy) GetMatchConstraints() *v1.MatchResources {
 	return nil
 }
 
@@ -221,11 +221,11 @@ func (fb *FakeBinding) GetPolicyName() types.NamespacedName {
 	}
 }
 
-func (fb *FakeBinding) GetMatchResources() *v1beta1.MatchResources {
+func (fb *FakeBinding) GetMatchResources() *v1.MatchResources {
 	return nil
 }
 
-func (fb *FakeBinding) GetParamRef() *v1beta1.ParamRef {
+func (fb *FakeBinding) GetParamRef() *v1.ParamRef {
 	return nil
 }
 

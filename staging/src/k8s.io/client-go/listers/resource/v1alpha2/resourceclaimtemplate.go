@@ -20,8 +20,8 @@ package v1alpha2
 
 import (
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type ResourceClaimTemplateLister interface {
 
 // resourceClaimTemplateLister implements the ResourceClaimTemplateLister interface.
 type resourceClaimTemplateLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha2.ResourceClaimTemplate]
 }
 
 // NewResourceClaimTemplateLister returns a new ResourceClaimTemplateLister.
 func NewResourceClaimTemplateLister(indexer cache.Indexer) ResourceClaimTemplateLister {
-	return &resourceClaimTemplateLister{indexer: indexer}
-}
-
-// List lists all ResourceClaimTemplates in the indexer.
-func (s *resourceClaimTemplateLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceClaimTemplate, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha2.ResourceClaimTemplate))
-	})
-	return ret, err
+	return &resourceClaimTemplateLister{listers.New[*v1alpha2.ResourceClaimTemplate](indexer, v1alpha2.Resource("resourceclaimtemplate"))}
 }
 
 // ResourceClaimTemplates returns an object that can list and get ResourceClaimTemplates.
 func (s *resourceClaimTemplateLister) ResourceClaimTemplates(namespace string) ResourceClaimTemplateNamespaceLister {
-	return resourceClaimTemplateNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return resourceClaimTemplateNamespaceLister{listers.NewNamespaced[*v1alpha2.ResourceClaimTemplate](s.ResourceIndexer, namespace)}
 }
 
 // ResourceClaimTemplateNamespaceLister helps list and get ResourceClaimTemplates.
@@ -74,26 +66,5 @@ type ResourceClaimTemplateNamespaceLister interface {
 // resourceClaimTemplateNamespaceLister implements the ResourceClaimTemplateNamespaceLister
 // interface.
 type resourceClaimTemplateNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ResourceClaimTemplates in the indexer for a given namespace.
-func (s resourceClaimTemplateNamespaceLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceClaimTemplate, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha2.ResourceClaimTemplate))
-	})
-	return ret, err
-}
-
-// Get retrieves the ResourceClaimTemplate from the indexer for a given namespace and name.
-func (s resourceClaimTemplateNamespaceLister) Get(name string) (*v1alpha2.ResourceClaimTemplate, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha2.Resource("resourceclaimtemplate"), name)
-	}
-	return obj.(*v1alpha2.ResourceClaimTemplate), nil
+	listers.ResourceIndexer[*v1alpha2.ResourceClaimTemplate]
 }

@@ -1,0 +1,6 @@
+// This is a hack, but it prevents go from climbing further and trying to
+// reconcile the various deps across the "real" modules and this one.
+
+go 1.22.0
+
+use .

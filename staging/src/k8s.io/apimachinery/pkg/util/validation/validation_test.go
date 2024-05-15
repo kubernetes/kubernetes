@@ -904,3 +904,30 @@ func TestIsDomainPrefixedPath(t *testing.T) {
 		}
 	}
 }
+
+func TestIsRelaxedEnvVarName(t *testing.T) {
+	goodValues := []string{
+		"-", ":", "_", "+a", ">a", "<a",
+		"a.", "a..", "*a", "%a", "?a",
+		"a:a", "a_a", "aAz", "~a", "|a",
+		"a0a", "a9", "/a", "a ", "#a",
+		"0a", "0 a", "'a", "(a", "@a",
+	}
+	for _, val := range goodValues {
+		if msgs := IsRelaxedEnvVarName(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
+		}
+	}
+
+	badValues := []string{
+		"", "=", "a=", "1=a", "a=b", "#%=&&",
+		string(rune(1)) + "abc", string(rune(130)) + "abc",
+		"Ç ç", "Ä ä", "Ñ ñ", "Ø ø",
+	}
+
+	for _, val := range badValues {
+		if msgs := IsRelaxedEnvVarName(val); len(msgs) == 0 {
+			t.Errorf("expected false for '%s'", val)
+		}
+	}
+}

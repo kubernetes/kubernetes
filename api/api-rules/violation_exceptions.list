@@ -1,3 +1,4 @@
+API rule violation: list_type_missing,k8s.io/api/storagemigration/v1alpha1,StorageVersionMigrationList,Items
 API rule violation: list_type_missing,k8s.io/cloud-provider/config/v1alpha1,WebhookConfiguration,Webhooks
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,LeaderMigrationConfiguration,ControllerLeaders
@@ -36,7 +37,6 @@ API rule violation: names_match,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,D
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIPersistentVolumeSource,SessionCHAPAuth
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIVolumeSource,DiscoveryCHAPAuth
 API rule violation: names_match,k8s.io/api/core/v1,ISCSIVolumeSource,SessionCHAPAuth
-API rule violation: names_match,k8s.io/api/core/v1,NodeResources,Capacity
 API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUseExternalID
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS
@@ -52,6 +52,13 @@ API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/networking/v1alpha1,ServiceCIDRSpec,CIDRs
+API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,BoolValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,IntSliceValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,IntValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,QuantityValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,StringSliceValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,StringValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,VersionValue
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XEmbeddedResource

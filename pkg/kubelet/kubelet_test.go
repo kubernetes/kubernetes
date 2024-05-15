@@ -35,11 +35,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	core "k8s.io/client-go/testing"
 	"k8s.io/mount-utils"
 
@@ -57,6 +57,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -206,14 +207,8 @@ func newTestKubeletWithImageList(
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	kubelet.runtimeState.setNetworkState(nil)
-	if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-		t.Fatalf("can't make a temp rootdir: %v", err)
-	} else {
-		kubelet.rootDirectory = tempDir
-	}
-	if err := os.MkdirAll(kubelet.rootDirectory, 0750); err != nil {
-		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
-	}
+	kubelet.rootDirectory = t.TempDir()
+	kubelet.podLogsDirectory = t.TempDir()
 	kubelet.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return true })
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
@@ -398,7 +393,6 @@ func newTestKubeletWithImageList(
 		kubelet.hostutil,
 		kubelet.getPodsDir(),
 		kubelet.recorder,
-		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
@@ -2391,7 +2385,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 }
 
 func TestPodResourceAllocationReset(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2575,7 +2569,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 }
 
 func TestHandlePodResourcesResize(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -3039,7 +3033,8 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 }
 
 func createRemoteRuntimeService(endpoint string, t *testing.T, tp oteltrace.TracerProvider) internalapi.RuntimeService {
-	runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, tp)
+	logger := klog.Background()
+	runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, tp, &logger)
 	require.NoError(t, err)
 	return runtimeService
 }
@@ -3112,6 +3107,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		"external",
 		"/tmp/cert",
 		"/tmp/rootdir",
+		tempDir,
 		"",
 		"",
 		false,
@@ -3123,7 +3119,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		metav1.Duration{Duration: time.Minute},
 		1024,
 		110,
-		true,
 		true,
 		map[string]string{},
 		1024,
@@ -3197,7 +3192,8 @@ func TestSyncPodSpans(t *testing.T) {
 
 	fakeRuntime.ImageService.SetFakeImageSize(100)
 	fakeRuntime.ImageService.SetFakeImages([]string{"test:latest"})
-	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp)
+	logger := klog.Background()
+	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger)
 	assert.NoError(t, err)
 
 	kubelet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
@@ -3206,6 +3202,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.readinessManager,
 		kubelet.startupManager,
 		kubelet.rootDirectory,
+		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
 		kubelet.podWorkers,
 		kubelet.os,

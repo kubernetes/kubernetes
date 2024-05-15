@@ -88,6 +88,7 @@ func NewREST(
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.Service{} },
 		NewListFunc:               func() runtime.Object { return &api.ServiceList{} },
+		PredicateFunc:             svcreg.Matcher,
 		DefaultQualifiedResource:  api.Resource("services"),
 		SingularQualifiedResource: api.Resource("service"),
 		ReturnDeletedObject:       true,
@@ -99,7 +100,10 @@ func NewREST(
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    svcreg.GetAttrs,
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, nil, nil, err
 	}
@@ -648,7 +652,11 @@ func needsClusterIP(svc *api.Service) bool {
 }
 
 func needsNodePort(svc *api.Service) bool {
-	if svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer {
+	if svc.Spec.Type == api.ServiceTypeNodePort {
+		return true
+	}
+	if svc.Spec.Type == api.ServiceTypeLoadBalancer &&
+		(svc.Spec.AllocateLoadBalancerNodePorts == nil || *svc.Spec.AllocateLoadBalancerNodePorts) {
 		return true
 	}
 	return false

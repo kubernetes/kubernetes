@@ -27,4 +27,6 @@ limitations under the License.
 // Changes since v1alpha2:
 //   - Added support for outputting certificate expiration information for "kubeadm certs check-expiration"
 //     with the CertificateExpirationInfo structure.
+//   - Introduce a (breaking) change to the UpgradePlan structure used by "kubeadm upgrade plan".
+//     UpgradePlan now contains a list of AvailableUpgrade structures.
 package v1alpha3 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"

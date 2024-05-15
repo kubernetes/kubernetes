@@ -66,7 +66,7 @@ func parseInterrupts(r io.Reader) (Interrupts, error) {
 			continue
 		}
 		if len(parts) < 2 {
-			return nil, fmt.Errorf("not enough fields in interrupts (expected at least 2 fields but got %d): %s", len(parts), parts)
+			return nil, fmt.Errorf("%w: Not enough fields in interrupts (expected 2+ fields but got %d): %s", ErrFileParse, len(parts), parts)
 		}
 		intName := parts[0][:len(parts[0])-1] // remove trailing :
 

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -217,10 +217,10 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 // configuration. If the policy-binding has no param configuration, it
 // returns a single-element list with a nil param.
 func CollectParams(
-	paramKind *v1beta1.ParamKind,
+	paramKind *v1.ParamKind,
 	paramInformer informers.GenericInformer,
 	paramScope meta.RESTScope,
-	paramRef *v1beta1.ParamRef,
+	paramRef *v1.ParamRef,
 	namespace string,
 ) ([]runtime.Object, error) {
 	// If definition has paramKind, paramRef is required in binding.
@@ -326,7 +326,7 @@ func CollectParams(
 	}
 
 	// Apply fail action for params not found case
-	if len(params) == 0 && paramRef.ParameterNotFoundAction != nil && *paramRef.ParameterNotFoundAction == v1beta1.DenyAction {
+	if len(params) == 0 && paramRef.ParameterNotFoundAction != nil && *paramRef.ParameterNotFoundAction == v1.DenyAction {
 		return nil, errors.New("no params found for policy binding with `Deny` parameterNotFoundAction")
 	}
 

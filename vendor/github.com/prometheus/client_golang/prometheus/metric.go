@@ -92,6 +92,9 @@ type Opts struct {
 	// machine_role metric). See also
 	// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-static-scraped-labels
 	ConstLabels Labels
+
+	// now is for testing purposes, by default it's time.Now.
+	now func() time.Time
 }
 
 // BuildFQName joins the given three name components by "_". Empty name

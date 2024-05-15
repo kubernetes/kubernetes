@@ -222,13 +222,11 @@ const (
 	VolumeNFSServer
 	// VolumeISCSIServer image
 	VolumeISCSIServer
-	// VolumeRBDServer image
-	VolumeRBDServer
 )
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.47"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.52"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
@@ -237,8 +235,8 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.36.1-1"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.3"}
-	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.5.1"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.12-0"}
+	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.5.4"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.13-0"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-4"}
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-4"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
@@ -265,7 +263,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[SdDummyExporter] = Config{list.GcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.4"}
 	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.6"}
-	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.6"}
 
 	// This adds more config entries. Those have no pre-defined ImageID number,
 	// but will be used via ReplaceRegistryInImageURL when deploying

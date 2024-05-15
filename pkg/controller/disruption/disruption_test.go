@@ -1029,7 +1029,7 @@ func TestPDBNotExist(t *testing.T) {
 func TestUpdateDisruptedPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	dc, ps := newFakeDisruptionController(ctx)
-	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb_queue")
+	dc.recheckQueue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{Name: "pdb_queue"})
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	currentTime := dc.clock.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{
@@ -1538,12 +1538,10 @@ func TestStalePodDisruption(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			dc, _ := newFakeDisruptionControllerWithTime(ctx, now)
-			go dc.Run(ctx)
-			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(ctx, tc.pod, metav1.CreateOptions{}); err != nil {
+			tCtx := ktesting.Init(t)
+			dc, _ := newFakeDisruptionControllerWithTime(tCtx, now)
+			go dc.Run(tCtx)
+			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(tCtx, tc.pod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
 			dc.clock.Sleep(tc.timePassed)
@@ -1552,7 +1550,7 @@ func TestStalePodDisruption(t *testing.T) {
 			}
 			diff := ""
 			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				pod, err := dc.kubeClient.CoreV1().Pods(tc.pod.Namespace).Get(ctx, tc.pod.Name, metav1.GetOptions{})
+				pod, err := dc.kubeClient.CoreV1().Pods(tc.pod.Namespace).Get(tCtx, tc.pod.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Failed getting updated pod: %v", err)
 				}
@@ -1562,6 +1560,37 @@ func TestStalePodDisruption(t *testing.T) {
 				t.Fatalf("Failed waiting for worker to sync: %v, (-want,+got):\n%s", err, diff)
 			}
 		})
+	}
+}
+
+func TestKeepExistingPDBConditionDuringSync(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	dc, ps := newFakeDisruptionController(ctx)
+
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(3))
+	pdb.Spec.Selector = &metav1.LabelSelector{}
+
+	pdb.Status.Conditions = append(pdb.Status.Conditions, metav1.Condition{
+		Type:               "ExistingTestCondition",
+		Status:             metav1.ConditionTrue,
+		Message:            "This is a test condition",
+		Reason:             "Test",
+		LastTransitionTime: metav1.Now(),
+	})
+
+	add(t, dc.pdbStore, pdb)
+	if err := dc.sync(ctx, pdbName); err != nil {
+		t.Fatalf("Failed to sync PDB: %v", err)
+	}
+	ps.VerifyPdbStatus(t, pdbName, 0, 0, 3, 0, map[string]metav1.Time{})
+
+	actualPDB := ps.Get(pdbName)
+	condition := apimeta.FindStatusCondition(actualPDB.Status.Conditions, "ExistingTestCondition")
+	if len(actualPDB.Status.Conditions) != 2 {
+		t.Fatalf("Expected 2 conditions, but got %d", len(actualPDB.Status.Conditions))
+	}
+	if condition == nil {
+		t.Fatalf("Expected ExistingTestCondition condition, but didn't find it")
 	}
 }
 

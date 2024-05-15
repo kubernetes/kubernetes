@@ -21,7 +21,6 @@ import (
 	"io"
 
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -44,13 +44,21 @@ const (
 )
 
 var (
-	compositionEnvTemplate *cel.CompositionEnv = func() *cel.CompositionEnv {
-		compositionEnvTemplate, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compositionEnvTemplateWithStrictCost *cel.CompositionEnv = func() *cel.CompositionEnv {
+		compositionEnvTemplateWithStrictCost, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 		if err != nil {
 			panic(err)
 		}
 
-		return compositionEnvTemplate
+		return compositionEnvTemplateWithStrictCost
+	}()
+	compositionEnvTemplateWithoutStrictCost *cel.CompositionEnv = func() *cel.CompositionEnv {
+		compositionEnvTemplateWithoutStrictCost, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
+		if err != nil {
+			panic(err)
+		}
+
+		return compositionEnvTemplateWithoutStrictCost
 	}()
 )
 
@@ -62,8 +70,8 @@ func Register(plugins *admission.Plugins) {
 }
 
 // Plugin is an implementation of admission.Interface.
-type Policy = v1beta1.ValidatingAdmissionPolicy
-type PolicyBinding = v1beta1.ValidatingAdmissionPolicyBinding
+type Policy = v1.ValidatingAdmissionPolicy
+type PolicyBinding = v1.ValidatingAdmissionPolicyBinding
 type PolicyEvaluator = Validator
 type PolicyHook = generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]
 
@@ -74,6 +82,7 @@ type Plugin struct {
 var _ admission.Interface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
 var _ initializer.WantsFeatures = &Plugin{}
+var _ initializer.WantsExcludedAdmissionResources = &Plugin{}
 
 func NewPlugin(_ io.Reader) *Plugin {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
@@ -83,8 +92,8 @@ func NewPlugin(_ io.Reader) *Plugin {
 			handler,
 			func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
 				return generic.NewPolicySource(
-					f.Admissionregistration().V1beta1().ValidatingAdmissionPolicies().Informer(),
-					f.Admissionregistration().V1beta1().ValidatingAdmissionPolicyBindings().Informer(),
+					f.Admissionregistration().V1().ValidatingAdmissionPolicies().Informer(),
+					f.Admissionregistration().V1().ValidatingAdmissionPolicyBindings().Informer(),
 					NewValidatingAdmissionPolicyAccessor,
 					NewValidatingAdmissionPolicyBindingAccessor,
 					compilePolicy,
@@ -114,12 +123,18 @@ func compilePolicy(policy *Policy) Validator {
 	if policy.Spec.ParamKind != nil {
 		hasParam = true
 	}
-	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true}
-	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false}
-	failurePolicy := convertv1beta1FailurePolicyTypeTov1FailurePolicyType(policy.Spec.FailurePolicy)
+	strictCost := utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)
+	optionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: true, StrictCost: strictCost}
+	expressionOptionalVars := cel.OptionalVariableDeclarations{HasParams: hasParam, HasAuthorizer: false, StrictCost: strictCost}
+	failurePolicy := policy.Spec.FailurePolicy
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
-
+	var compositionEnvTemplate *cel.CompositionEnv
+	if strictCost {
+		compositionEnvTemplate = compositionEnvTemplateWithStrictCost
+	} else {
+		compositionEnvTemplate = compositionEnvTemplateWithoutStrictCost
+	}
 	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
 	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 
@@ -131,31 +146,17 @@ func compilePolicy(policy *Policy) Validator {
 		matcher = matchconditions.NewMatcher(filterCompiler.Compile(matchExpressionAccessors, optionalVars, environment.StoredExpressions), failurePolicy, "policy", "validate", policy.Name)
 	}
 	res := NewValidator(
-		filterCompiler.Compile(convertv1beta1Validations(policy.Spec.Validations), optionalVars, environment.StoredExpressions),
+		filterCompiler.Compile(convertv1Validations(policy.Spec.Validations), optionalVars, environment.StoredExpressions),
 		matcher,
-		filterCompiler.Compile(convertv1beta1AuditAnnotations(policy.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
-		filterCompiler.Compile(convertv1beta1MessageExpressions(policy.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
+		filterCompiler.Compile(convertv1AuditAnnotations(policy.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
+		filterCompiler.Compile(convertv1MessageExpressions(policy.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 		failurePolicy,
 	)
 
 	return res
 }
 
-func convertv1beta1FailurePolicyTypeTov1FailurePolicyType(policyType *v1beta1.FailurePolicyType) *v1.FailurePolicyType {
-	if policyType == nil {
-		return nil
-	}
-
-	var v1FailPolicy v1.FailurePolicyType
-	if *policyType == v1beta1.Fail {
-		v1FailPolicy = v1.Fail
-	} else if *policyType == v1beta1.Ignore {
-		v1FailPolicy = v1.Ignore
-	}
-	return &v1FailPolicy
-}
-
-func convertv1beta1Validations(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
+func convertv1Validations(inputValidations []v1.Validation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		validation := ValidationCondition{
@@ -168,7 +169,7 @@ func convertv1beta1Validations(inputValidations []v1beta1.Validation) []cel.Expr
 	return celExpressionAccessor
 }
 
-func convertv1beta1MessageExpressions(inputValidations []v1beta1.Validation) []cel.ExpressionAccessor {
+func convertv1MessageExpressions(inputValidations []v1.Validation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		if validation.MessageExpression != "" {
@@ -181,7 +182,7 @@ func convertv1beta1MessageExpressions(inputValidations []v1beta1.Validation) []c
 	return celExpressionAccessor
 }
 
-func convertv1beta1AuditAnnotations(inputValidations []v1beta1.AuditAnnotation) []cel.ExpressionAccessor {
+func convertv1AuditAnnotations(inputValidations []v1.AuditAnnotation) []cel.ExpressionAccessor {
 	celExpressionAccessor := make([]cel.ExpressionAccessor, len(inputValidations))
 	for i, validation := range inputValidations {
 		validation := AuditAnnotationCondition{
@@ -193,7 +194,7 @@ func convertv1beta1AuditAnnotations(inputValidations []v1beta1.AuditAnnotation) 
 	return celExpressionAccessor
 }
 
-func convertv1beta1Variables(variables []v1beta1.Variable) []cel.NamedExpressionAccessor {
+func convertv1beta1Variables(variables []v1.Variable) []cel.NamedExpressionAccessor {
 	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
 	for i, variable := range variables {
 		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}

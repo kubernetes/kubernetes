@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -28,14 +29,49 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func TestEmptyVersion(t *testing.T) {
+func TestMain(m *testing.M) {
+	KubernetesReleaseVersion = kubernetesReleaseVersionTest
+	os.Exit(m.Run())
+}
 
-	ver, err := KubernetesReleaseVersion("")
-	if err == nil {
-		t.Error("KubernetesReleaseVersion returned successfully, but error expected")
+func kubernetesReleaseVersionTest(version string) (string, error) {
+	fetcher := func(string, time.Duration) (string, error) {
+		return constants.DefaultKubernetesPlaceholderVersion.String(), nil
 	}
-	if ver != "" {
-		t.Error("KubernetesReleaseVersion returned value, expected only error")
+	return kubernetesReleaseVersion(version, fetcher)
+}
+
+func TestKubernetesReleaseVersion(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          string
+		expectedOutput string
+		expectedError  bool
+	}{
+		{
+			name:           "empty input",
+			input:          "",
+			expectedOutput: "",
+			expectedError:  true,
+		},
+		{
+			name:           "label as input",
+			input:          "stable",
+			expectedOutput: normalizedBuildVersion(constants.DefaultKubernetesPlaceholderVersion.String()),
+			expectedError:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := KubernetesReleaseVersion(tc.input)
+			if (err != nil) != tc.expectedError {
+				t.Errorf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
+			}
+			if output != tc.expectedOutput {
+				t.Errorf("expected output: %s, got: %s", tc.expectedOutput, output)
+			}
+		})
 	}
 }
 
@@ -57,10 +93,10 @@ func TestValidVersion(t *testing.T) {
 			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Valid: ", s, ver, err)
 			if err != nil {
-				t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
+				t.Errorf("kubernetesReleaseVersion unexpected error for version %q: %v", s, err)
 			}
 			if ver != s && ver != "v"+s {
-				t.Errorf("KubernetesReleaseVersion should return same valid version string. %q != %q", s, ver)
+				t.Errorf("kubernetesReleaseVersion should return same valid version string. %q != %q", s, ver)
 			}
 		})
 	}
@@ -79,10 +115,10 @@ func TestInvalidVersion(t *testing.T) {
 			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Invalid: ", s, ver, err)
 			if err == nil {
-				t.Errorf("KubernetesReleaseVersion error expected for version %q, but returned successfully", s)
+				t.Errorf("kubernetesReleaseVersion error expected for version %q, but returned successfully", s)
 			}
 			if ver != "" {
-				t.Errorf("KubernetesReleaseVersion should return empty string in case of error. Returned %q for version %q", ver, s)
+				t.Errorf("kubernetesReleaseVersion should return empty string in case of error. Returned %q for version %q", ver, s)
 			}
 		})
 	}
@@ -99,10 +135,10 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Valid: ", s, ver, err)
 			if err != nil {
-				t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
+				t.Errorf("kubernetesReleaseVersion unexpected error for version %q: %v", s, err)
 			}
 			if ver != "v"+s {
-				t.Errorf("KubernetesReleaseVersion should return semantic version string. %q vs. %q", s, ver)
+				t.Errorf("kubernetesReleaseVersion should return semantic version string. %q vs. %q", s, ver)
 			}
 		})
 	}
@@ -147,11 +183,11 @@ func TestVersionFromNetwork(t *testing.T) {
 			t.Logf("Key: %q. Result: %q, Error: %v", k, ver, err)
 			switch {
 			case err != nil && !v.ErrorExpected:
-				t.Errorf("KubernetesReleaseVersion: unexpected error for %q. Error: %+v", k, err)
+				t.Errorf("kubernetesReleaseVersion: unexpected error for %q. Error: %+v", k, err)
 			case err == nil && v.ErrorExpected:
-				t.Errorf("KubernetesReleaseVersion: error expected for key %q, but result is %q", k, ver)
+				t.Errorf("kubernetesReleaseVersion: error expected for key %q, but result is %q", k, ver)
 			case ver != v.Expected:
-				t.Errorf("KubernetesReleaseVersion: unexpected result for key %q. Expected: %q Actual: %q", k, v.Expected, ver)
+				t.Errorf("kubernetesReleaseVersion: unexpected result for key %q. Expected: %q Actual: %q", k, v.Expected, ver)
 			}
 		})
 	}
@@ -176,7 +212,7 @@ func TestVersionToTag(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("input:%s/expected:%s", tc.input, tc.expected), func(t *testing.T) {
 			tag := KubernetesVersionToImageTag(tc.input)
-			t.Logf("KubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
+			t.Logf("kubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
 			if tag != tc.expected {
 				t.Errorf("failed KubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
 			}
@@ -245,7 +281,7 @@ func TestKubernetesIsCIVersion(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("input:%s/expected:%t", tc.input, tc.expected), func(t *testing.T) {
 			result := KubernetesIsCIVersion(tc.input)
-			t.Logf("KubernetesIsCIVersion: Input: %q. Result: %v. Expected: %v", tc.input, result, tc.expected)
+			t.Logf("kubernetesIsCIVersion: Input: %q. Result: %v. Expected: %v", tc.input, result, tc.expected)
 			if result != tc.expected {
 				t.Errorf("failed KubernetesIsCIVersion: Input: %q. Result: %v. Expected: %v", tc.input, result, tc.expected)
 			}
@@ -253,7 +289,7 @@ func TestKubernetesIsCIVersion(t *testing.T) {
 	}
 }
 
-// Validate KubernetesReleaseVersion but with bucket prefixes
+// Validate kubernetesReleaseVersion but with bucket prefixes
 func TestCIBuildVersion(t *testing.T) {
 	type T struct {
 		input    string
@@ -287,11 +323,11 @@ func TestCIBuildVersion(t *testing.T) {
 			t.Logf("Input: %q. Result: %q, Error: %v", tc.input, ver, err)
 			switch {
 			case err != nil && tc.valid:
-				t.Errorf("KubernetesReleaseVersion: unexpected error for input %q. Error: %v", tc.input, err)
+				t.Errorf("kubernetesReleaseVersion: unexpected error for input %q. Error: %v", tc.input, err)
 			case err == nil && !tc.valid:
-				t.Errorf("KubernetesReleaseVersion: error expected for input %q, but result is %q", tc.input, ver)
+				t.Errorf("kubernetesReleaseVersion: error expected for input %q, but result is %q", tc.input, ver)
 			case ver != tc.expected:
-				t.Errorf("KubernetesReleaseVersion: unexpected result for input %q. Expected: %q Actual: %q", tc.input, tc.expected, ver)
+				t.Errorf("kubernetesReleaseVersion: unexpected result for input %q. Expected: %q Actual: %q", tc.input, tc.expected, ver)
 			}
 		})
 	}

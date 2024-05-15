@@ -292,8 +292,6 @@ func New(ctx context.Context,
 
 	snapshot := internalcache.NewEmptySnapshot()
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
-	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
-	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -305,7 +303,6 @@ func New(ctx context.Context,
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
-		frameworkruntime.WithWaitingPods(waitingPods),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -389,16 +386,46 @@ func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.Queuei
 		// cannot be moved by any regular cluster event.
 		// So, we can just ignore such EventsToRegister here.
 
+		registerNodeAdded := false
+		registerNodeTaintUpdated := false
 		for _, event := range events {
 			fn := event.QueueingHintFn
 			if fn == nil || !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 				fn = defaultQueueingHintFn
 			}
 
+			if event.Event.Resource == framework.Node {
+				if event.Event.ActionType&framework.Add != 0 {
+					registerNodeAdded = true
+				}
+				if event.Event.ActionType&framework.UpdateNodeTaint != 0 {
+					registerNodeTaintUpdated = true
+				}
+			}
+
 			queueingHintMap[event.Event] = append(queueingHintMap[event.Event], &internalqueue.QueueingHintFunction{
 				PluginName:     e.Name(),
 				QueueingHintFn: fn,
 			})
+		}
+		if registerNodeAdded && !registerNodeTaintUpdated {
+			// Temporally fix for the issue https://github.com/kubernetes/kubernetes/issues/109437
+			// NodeAdded QueueingHint isn't always called because of preCheck.
+			// It's definitely not something expected for plugin developers,
+			// and registering UpdateNodeTaint event is the only mitigation for now.
+			//
+			// So, here registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
+			// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuch in the
+			// unschedulable pod pool.
+			// This behavior will be removed when we remove the preCheck feature.
+			// See: https://github.com/kubernetes/kubernetes/issues/110175
+			queueingHintMap[framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}] =
+				append(queueingHintMap[framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}],
+					&internalqueue.QueueingHintFunction{
+						PluginName:     e.Name(),
+						QueueingHintFn: defaultQueueingHintFn,
+					},
+				)
 		}
 	}
 	return queueingHintMap
@@ -415,7 +442,7 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	// If there are no new pods to schedule, it will be hanging there
 	// and if done in this goroutine it will be blocking closing
 	// SchedulingQueue, in effect causing a deadlock on shutdown.
-	go wait.UntilWithContext(ctx, sched.scheduleOne, 0)
+	go wait.UntilWithContext(ctx, sched.ScheduleOne, 0)
 
 	<-ctx.Done()
 	sched.SchedulingQueue.Close()
@@ -522,7 +549,9 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 	// The Extract workflow (i.e. `ExtractPod`) should be unused.
 	trim := func(obj interface{}) (interface{}, error) {
 		if accessor, err := meta.Accessor(obj); err == nil {
-			accessor.SetManagedFields(nil)
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
 		}
 		return obj, nil
 	}

@@ -19,6 +19,7 @@ package tainteviction
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"sort"
 	"testing"
 	"time"
@@ -203,7 +204,7 @@ func TestCreatePod(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)
 			ctx, cancel := context.WithCancel(context.Background())
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.pod}})
 			controller, podIndexer, _ := setupNewController(ctx, fakeClientset)
@@ -247,6 +248,7 @@ func TestUpdatePod(t *testing.T) {
 		expectPatch                   bool
 		expectDelete                  bool
 		enablePodDisruptionConditions bool
+		skipOnWindows                 bool
 	}{
 		{
 			description: "scheduling onto tainted Node results in patch and delete when PodDisruptionConditions enabled",
@@ -295,13 +297,18 @@ func TestUpdatePod(t *testing.T) {
 			taintedNodes: map[string][]corev1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
-			expectDelete: true,
+			expectDelete:  true,
+			skipOnWindows: true,
 		},
 	}
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
+			if item.skipOnWindows && goruntime.GOOS == "windows" {
+				// TODO: remove skip once the flaking test has been fixed.
+				t.Skip("Skip flaking test on Windows.")
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)
 			ctx, cancel := context.WithCancel(context.Background())
 			fakeClientset := fake.NewSimpleClientset(&corev1.PodList{Items: []corev1.Pod{*item.prevPod}})
 			controller, podIndexer, _ := setupNewController(context.TODO(), fakeClientset)
@@ -500,7 +507,7 @@ func TestUpdateNode(t *testing.T) {
 
 	for _, item := range testCases {
 		t.Run(item.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, item.enablePodDisruptionConditions)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 

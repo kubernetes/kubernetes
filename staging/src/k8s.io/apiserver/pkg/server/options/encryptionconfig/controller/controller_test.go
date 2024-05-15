@@ -41,7 +41,7 @@ func TestController(t *testing.T) {
 	t.Cleanup(func() { minKMSPluginCloseGracePeriod = origMinKMSPluginCloseGracePeriod })
 	minKMSPluginCloseGracePeriod = 300 * time.Millisecond
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	const expectedSuccessMetricValue = `
 # HELP apiserver_encryption_config_controller_automatic_reload_success_total [ALPHA] Total number of successful automatic reloads of encryption configuration split by apiserver identity.
@@ -349,7 +349,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 }
 
 type mockWorkQueue struct {
-	workqueue.RateLimitingInterface // will panic if any unexpected method is called
+	workqueue.TypedRateLimitingInterface[string] // will panic if any unexpected method is called
 
 	closeOnce sync.Once
 	addCalled chan struct{}
@@ -362,33 +362,33 @@ type mockWorkQueue struct {
 	addRateLimitedCount atomic.Uint64
 }
 
-func (m *mockWorkQueue) Done(item interface{}) {
+func (m *mockWorkQueue) Done(item string) {
 	m.count.Add(1)
 	m.wasCanceled = m.ctx.Err() != nil
 	m.cancel()
 }
 
-func (m *mockWorkQueue) Get() (item interface{}, shutdown bool) {
+func (m *mockWorkQueue) Get() (item string, shutdown bool) {
 	<-m.addCalled
 
 	switch m.count.Load() {
 	case 0:
-		return nil, false
+		return "", false
 	case 1:
-		return nil, true
+		return "", true
 	default:
 		panic("too many calls to Get")
 	}
 }
 
-func (m *mockWorkQueue) Add(item interface{}) {
+func (m *mockWorkQueue) Add(item string) {
 	m.closeOnce.Do(func() {
 		close(m.addCalled)
 	})
 }
 
-func (m *mockWorkQueue) ShutDown()                       {}
-func (m *mockWorkQueue) AddRateLimited(item interface{}) { m.addRateLimitedCount.Add(1) }
+func (m *mockWorkQueue) ShutDown()                  {}
+func (m *mockWorkQueue) AddRateLimited(item string) { m.addRateLimitedCount.Add(1) }
 
 type mockHealthChecker struct {
 	pluginName string

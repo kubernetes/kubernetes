@@ -39,9 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -138,6 +141,9 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return storage.GetCurrentResourceVersionFromStorage(ctx, s, newListFunc, resourcePrefix, w.objectType)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
 	return s
 }

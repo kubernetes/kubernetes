@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
@@ -57,9 +58,12 @@ var (
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
 func NewWaitControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name:   "wait-control-plane",
-		Run:    runWaitControlPlanePhase,
+		Name:  "wait-control-plane",
+		Short: "Wait for the control plane to start",
+		// TODO: unhide this phase once WaitForAllControlPlaneComponents goes GA:
+		// https://github.com/kubernetes/kubeadm/issues/2907
 		Hidden: true,
+		Run:    runWaitControlPlanePhase,
 	}
 	return phase
 }
@@ -112,7 +116,12 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
-	if err := waiter.WaitForAPI(); err != nil {
+	if features.Enabled(data.Cfg().ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
+		err = waiter.WaitForControlPlaneComponents(&data.Cfg().ClusterConfiguration)
+	} else {
+		err = waiter.WaitForAPI()
+	}
+	if err != nil {
 		return handleError(err)
 	}
 

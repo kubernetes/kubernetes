@@ -18,6 +18,7 @@ package apiclient
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,16 +29,22 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
 type Waiter interface {
+	// WaitForControlPlaneComponents waits for all control plane components to report "ok" on /healthz
+	WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error
 	// WaitForAPI waits for the API Server's /healthz endpoint to become "ok"
+	// TODO: remove WaitForAPI once WaitForAllControlPlaneComponents goes GA:
+	// https://github.com/kubernetes/kubeadm/issues/2907
 	WaitForAPI() error
 	// WaitForPodsWithLabel waits for Pods in the kube-system namespace to become Ready
 	WaitForPodsWithLabel(kvLabel string) error
@@ -70,6 +77,95 @@ func NewKubeWaiter(client clientset.Interface, timeout time.Duration, writer io.
 		timeout: timeout,
 		writer:  writer,
 	}
+}
+
+type controlPlaneComponent struct {
+	name string
+	url  string
+}
+
+// getControlPlaneComponents takes a ClusterConfiguration and returns a slice of
+// control plane components and their secure ports.
+func getControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) []controlPlaneComponent {
+	portArg := "secure-port"
+	portAPIServer, idx := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, portArg, -1)
+	if idx == -1 {
+		portAPIServer = "6443"
+	}
+	portKCM, idx := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, portArg, -1)
+	if idx == -1 {
+		portKCM = "10257"
+	}
+	portScheduler, idx := kubeadmapi.GetArgValue(cfg.Scheduler.ExtraArgs, portArg, -1)
+	if idx == -1 {
+		portScheduler = "10259"
+	}
+	urlFormat := "https://127.0.0.1:%s/healthz"
+	return []controlPlaneComponent{
+		{name: "kube-apiserver", url: fmt.Sprintf(urlFormat, portAPIServer)},
+		{name: "kube-controller-manager", url: fmt.Sprintf(urlFormat, portKCM)},
+		{name: "kube-scheduler", url: fmt.Sprintf(urlFormat, portScheduler)},
+	}
+}
+
+// WaitForControlPlaneComponents waits for all control plane components to report "ok" on /healthz
+func (w *KubeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
+	fmt.Printf("[control-plane-check] Waiting for healthy control plane components."+
+		" This can take up to %v\n", w.timeout)
+
+	components := getControlPlaneComponents(cfg)
+
+	var errs []error
+	errChan := make(chan error, len(components))
+
+	for _, comp := range components {
+		fmt.Printf("[control-plane-check] Checking %s at %s\n", comp.name, comp.url)
+
+		go func(comp controlPlaneComponent) {
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := &http.Client{Transport: tr}
+			start := time.Now()
+			var lastError error
+
+			err := wait.PollUntilContextTimeout(
+				context.Background(),
+				constants.KubernetesAPICallRetryInterval,
+				w.timeout,
+				true, func(ctx context.Context) (bool, error) {
+					resp, err := client.Get(comp.url)
+					if err != nil {
+						lastError = errors.WithMessagef(err, "%s /healthz check failed", comp.name)
+						return false, nil
+					}
+
+					defer func() {
+						_ = resp.Body.Close()
+					}()
+					if resp.StatusCode != http.StatusOK {
+						lastError = errors.Errorf("%s /healthz check failed with status: %d", comp.name, resp.StatusCode)
+						return false, nil
+					}
+
+					return true, nil
+				})
+			if err != nil {
+				fmt.Printf("[control-plane-check] %s is not healthy after %v\n", comp.name, time.Since(start))
+				errChan <- lastError
+				return
+			}
+			fmt.Printf("[control-plane-check] %s is healthy after %v\n", comp.name, time.Since(start))
+			errChan <- nil
+		}(comp)
+	}
+
+	for i := 0; i < len(components); i++ {
+		if err := <-errChan; err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"

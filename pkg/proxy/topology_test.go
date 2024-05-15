@@ -47,12 +47,13 @@ func checkExpectedEndpoints(expected sets.Set[string], actual []Endpoint) error 
 
 func TestCategorizeEndpoints(t *testing.T) {
 	testCases := []struct {
-		name         string
-		hintsEnabled bool
-		pteEnabled   bool
-		nodeLabels   map[string]string
-		serviceInfo  ServicePort
-		endpoints    []Endpoint
+		name                      string
+		hintsEnabled              bool
+		trafficDistFeatureEnabled bool
+		pteEnabled                bool
+		nodeLabels                map[string]string
+		serviceInfo               ServicePort
+		endpoints                 []Endpoint
 
 		// We distinguish `nil` ("service doesn't use this kind of endpoints") from
 		// `sets.Set[string]()` ("service uses this kind of endpoints but has no endpoints").
@@ -131,10 +132,39 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: sets.New[string]("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
 		localEndpoints:   nil,
 	}, {
-		name:         "externalTrafficPolicy: Local, topology ignored for Local endpoints",
-		hintsEnabled: true,
-		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:  &BaseServicePortInfo{externalPolicyLocal: true, nodePort: 8080, hintsAnnotation: "auto"},
+		name:                      "hints, hints annotation empty but trafficDist feature gate enabled, hints are not ignored",
+		hintsEnabled:              true,
+		trafficDistFeatureEnabled: true,
+		nodeLabels:                map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:               &BaseServicePortInfo{},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), ready: true},
+			&BaseEndpointInfo{endpoint: "10.1.2.4:80", zoneHints: sets.New[string]("zone-b"), ready: true},
+			&BaseEndpointInfo{endpoint: "10.1.2.5:80", zoneHints: sets.New[string]("zone-c"), ready: true},
+			&BaseEndpointInfo{endpoint: "10.1.2.6:80", zoneHints: sets.New[string]("zone-a"), ready: true},
+		},
+		clusterEndpoints: sets.New[string]("10.1.2.3:80", "10.1.2.6:80"),
+		localEndpoints:   nil,
+	}, {
+		name:                      "hints disabled, trafficDist feature gate enabled, hints are not ignored",
+		hintsEnabled:              false,
+		trafficDistFeatureEnabled: true,
+		nodeLabels:                map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:               &BaseServicePortInfo{},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), ready: true},
+			&BaseEndpointInfo{endpoint: "10.1.2.4:80", zoneHints: sets.New[string]("zone-b"), ready: true},
+			&BaseEndpointInfo{endpoint: "10.1.2.5:80", zoneHints: sets.New[string]("zone-c"), ready: true},
+			&BaseEndpointInfo{endpoint: "10.1.2.6:80", zoneHints: sets.New[string]("zone-a"), ready: true},
+		},
+		clusterEndpoints: sets.New[string]("10.1.2.3:80", "10.1.2.6:80"),
+		localEndpoints:   nil,
+	}, {
+		name:                      "externalTrafficPolicy: Local, topology ignored for Local endpoints",
+		hintsEnabled:              true,
+		trafficDistFeatureEnabled: true,
+		nodeLabels:                map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:               &BaseServicePortInfo{externalPolicyLocal: true, nodePort: 8080, hintsAnnotation: "auto"},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), ready: true, isLocal: true},
 			&BaseEndpointInfo{endpoint: "10.1.2.4:80", zoneHints: sets.New[string]("zone-b"), ready: true, isLocal: true},
@@ -145,10 +175,11 @@ func TestCategorizeEndpoints(t *testing.T) {
 		localEndpoints:   sets.New[string]("10.1.2.3:80", "10.1.2.4:80"),
 		allEndpoints:     sets.New[string]("10.1.2.3:80", "10.1.2.4:80", "10.1.2.6:80"),
 	}, {
-		name:         "internalTrafficPolicy: Local, topology ignored for Local endpoints",
-		hintsEnabled: true,
-		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:  &BaseServicePortInfo{internalPolicyLocal: true, hintsAnnotation: "auto", externalPolicyLocal: false, nodePort: 8080},
+		name:                      "internalTrafficPolicy: Local, topology ignored for Local endpoints",
+		hintsEnabled:              true,
+		trafficDistFeatureEnabled: true,
+		nodeLabels:                map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:               &BaseServicePortInfo{internalPolicyLocal: true, hintsAnnotation: "auto", externalPolicyLocal: false, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.1.2.3:80", zoneHints: sets.New[string]("zone-a"), ready: true, isLocal: true},
 			&BaseEndpointInfo{endpoint: "10.1.2.4:80", zoneHints: sets.New[string]("zone-b"), ready: true, isLocal: true},
@@ -457,7 +488,8 @@ func TestCategorizeEndpoints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, tc.hintsEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, tc.hintsEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, tc.trafficDistFeatureEnabled)
 
 			clusterEndpoints, localEndpoints, allEndpoints, hasAnyEndpoints := CategorizeEndpoints(tc.endpoints, tc.serviceInfo, tc.nodeLabels)
 

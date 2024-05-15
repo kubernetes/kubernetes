@@ -1184,6 +1184,66 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 
 }
 
+func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
+	podToAllocate := "podToAllocate"
+	containerToAllocate := "containerToAllocate"
+	podToRemove := "podToRemove"
+	containerToRemove := "containerToRemove"
+	deviceID := "deviceID"
+	resourceName := "domain1.com/resource"
+
+	socket := filepath.Join(os.TempDir(), esocketName())
+	devs := []*pluginapi.Device{
+		{ID: deviceID, Health: pluginapi.Healthy},
+	}
+	p, e := esetup(t, devs, socket, resourceName, func(n string, d []pluginapi.Device) {})
+
+	waitUpdateAllocatedDevicesChan := make(chan struct{})
+	waitSetGetPreferredAllocChan := make(chan struct{})
+
+	p.SetGetPreferredAllocFunc(func(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+		waitSetGetPreferredAllocChan <- struct{}{}
+		<-waitUpdateAllocatedDevicesChan
+		return &pluginapi.PreferredAllocationResponse{
+			ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
+				{
+					DeviceIDs: []string{deviceID},
+				},
+			},
+		}, nil
+	})
+
+	testManager := &ManagerImpl{
+		endpoints:             make(map[string]endpointInfo),
+		healthyDevices:        make(map[string]sets.Set[string]),
+		unhealthyDevices:      make(map[string]sets.Set[string]),
+		allocatedDevices:      make(map[string]sets.Set[string]),
+		podDevices:            newPodDevices(),
+		activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(),
+	}
+
+	testManager.endpoints[resourceName] = endpointInfo{
+		e: e,
+		opts: &pluginapi.DevicePluginOptions{
+			GetPreferredAllocationAvailable: true,
+		},
+	}
+	testManager.healthyDevices[resourceName] = sets.New[string](deviceID)
+	testManager.podDevices.insert(podToRemove, containerToRemove, resourceName, nil, nil)
+
+	go func() {
+		<-waitSetGetPreferredAllocChan
+		testManager.UpdateAllocatedDevices()
+		waitUpdateAllocatedDevicesChan <- struct{}{}
+	}()
+
+	set, err := testManager.devicesToAllocate(podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
+	assert.NoError(t, err)
+	assert.Equal(t, set, sets.New[string](deviceID))
+}
+
 func TestGetDeviceRunContainerOptions(t *testing.T) {
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
@@ -1709,28 +1769,6 @@ func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]p
 		}
 	}
 	return res
-}
-
-const deviceManagerCheckpointFilename = "kubelet_internal_checkpoint"
-
-var oldCheckpoint string = `{"Data":{"PodDeviceEntries":[{"PodUID":"13ac2284-0d19-44b7-b94f-055b032dba9b","ContainerName":"centos","ResourceName":"example.com/deviceA","DeviceIDs":["DevA3"],"AllocResp":"CiIKHUVYQU1QTEVDT01ERVZJQ0VBX0RFVkEzX1RUWTEwEgEwGhwKCi9kZXYvdHR5MTASCi9kZXYvdHR5MTAaAnJ3"},{"PodUID":"86b9a017-c9ca-4069-815f-46ca3e53c1e4","ContainerName":"centos","ResourceName":"example.com/deviceA","DeviceIDs":["DevA4"],"AllocResp":"CiIKHUVYQU1QTEVDT01ERVZJQ0VBX0RFVkE0X1RUWTExEgEwGhwKCi9kZXYvdHR5MTESCi9kZXYvdHR5MTEaAnJ3"}],"RegisteredDevices":{"example.com/deviceA":["DevA1","DevA2","DevA3","DevA4"]}},"Checksum":405612085}`
-
-func TestReadPreNUMACheckpoint(t *testing.T) {
-	socketDir, socketName, _, err := tmpSocketDir()
-	require.NoError(t, err)
-	defer os.RemoveAll(socketDir)
-
-	err = os.WriteFile(filepath.Join(socketDir, deviceManagerCheckpointFilename), []byte(oldCheckpoint), 0644)
-	require.NoError(t, err)
-
-	topologyStore := topologymanager.NewFakeManager()
-	nodes := []cadvisorapi.Node{{Id: 0}}
-	m, err := newManagerImpl(socketName, nodes, topologyStore)
-	require.NoError(t, err)
-
-	// TODO: we should not calling private methods, but among the existing tests we do anyway
-	err = m.readCheckpoint()
-	require.NoError(t, err)
 }
 
 func TestGetTopologyHintsWithUpdates(t *testing.T) {

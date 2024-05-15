@@ -108,6 +108,17 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.EncryptionAlgorithm = DefaultEncryptionAlgorithm
 	}
 
+	if obj.CertificateValidityPeriod == nil {
+		obj.CertificateValidityPeriod = &metav1.Duration{
+			Duration: constants.CertificateValidityPeriod,
+		}
+	}
+	if obj.CACertificateValidityPeriod == nil {
+		obj.CACertificateValidityPeriod = &metav1.Duration{
+			Duration: constants.CACertificateValidityPeriod,
+		}
+	}
+
 	SetDefaults_Etcd(obj)
 }
 
@@ -255,4 +266,32 @@ func SetDefaults_Timeouts(obj *Timeouts) {
 			Duration: constants.DiscoveryTimeout,
 		}
 	}
+	if obj.UpgradeManifests == nil {
+		obj.UpgradeManifests = &metav1.Duration{
+			Duration: constants.UpgradeManifestsTimeout,
+		}
+	}
+}
+
+// SetDefaults_UpgradeConfiguration assigns default values for the UpgradeConfiguration
+func SetDefaults_UpgradeConfiguration(obj *UpgradeConfiguration) {
+	if obj.Node.EtcdUpgrade == nil {
+		obj.Node.EtcdUpgrade = ptr.To(true)
+	}
+
+	if obj.Node.CertificateRenewal == nil {
+		obj.Node.CertificateRenewal = ptr.To(true)
+	}
+
+	if obj.Apply.EtcdUpgrade == nil {
+		obj.Apply.EtcdUpgrade = ptr.To(true)
+	}
+
+	if obj.Apply.CertificateRenewal == nil {
+		obj.Apply.CertificateRenewal = ptr.To(true)
+	}
+	if obj.Timeouts == nil {
+		obj.Timeouts = &Timeouts{}
+	}
+	SetDefaults_Timeouts(obj.Timeouts)
 }

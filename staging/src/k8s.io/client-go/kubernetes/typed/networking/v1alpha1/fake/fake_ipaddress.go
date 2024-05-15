@@ -43,20 +43,22 @@ var ipaddressesKind = v1alpha1.SchemeGroupVersion.WithKind("IPAddress")
 
 // Get takes name of the iPAddress, and returns the corresponding iPAddress object, and an error if there is any.
 func (c *FakeIPAddresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.IPAddress, err error) {
+	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(ipaddressesResource, name), &v1alpha1.IPAddress{})
+		Invokes(testing.NewRootGetAction(ipaddressesResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.IPAddress), err
 }
 
 // List takes label and field selectors, and returns the list of IPAddresses that match those selectors.
 func (c *FakeIPAddresses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.IPAddressList, err error) {
+	emptyResult := &v1alpha1.IPAddressList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(ipaddressesResource, ipaddressesKind, opts), &v1alpha1.IPAddressList{})
+		Invokes(testing.NewRootListAction(ipaddressesResource, ipaddressesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,20 +82,22 @@ func (c *FakeIPAddresses) Watch(ctx context.Context, opts v1.ListOptions) (watch
 
 // Create takes the representation of a iPAddress and creates it.  Returns the server's representation of the iPAddress, and an error, if there is any.
 func (c *FakeIPAddresses) Create(ctx context.Context, iPAddress *v1alpha1.IPAddress, opts v1.CreateOptions) (result *v1alpha1.IPAddress, err error) {
+	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(ipaddressesResource, iPAddress), &v1alpha1.IPAddress{})
+		Invokes(testing.NewRootCreateAction(ipaddressesResource, iPAddress), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.IPAddress), err
 }
 
 // Update takes the representation of a iPAddress and updates it. Returns the server's representation of the iPAddress, and an error, if there is any.
 func (c *FakeIPAddresses) Update(ctx context.Context, iPAddress *v1alpha1.IPAddress, opts v1.UpdateOptions) (result *v1alpha1.IPAddress, err error) {
+	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(ipaddressesResource, iPAddress), &v1alpha1.IPAddress{})
+		Invokes(testing.NewRootUpdateAction(ipaddressesResource, iPAddress), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.IPAddress), err
 }
@@ -115,10 +119,11 @@ func (c *FakeIPAddresses) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 
 // Patch applies the patch and returns the patched iPAddress.
 func (c *FakeIPAddresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.IPAddress, err error) {
+	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ipaddressesResource, name, pt, data, subresources...), &v1alpha1.IPAddress{})
+		Invokes(testing.NewRootPatchSubresourceAction(ipaddressesResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.IPAddress), err
 }
@@ -136,10 +141,11 @@ func (c *FakeIPAddresses) Apply(ctx context.Context, iPAddress *networkingv1alph
 	if name == nil {
 		return nil, fmt.Errorf("iPAddress.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ipaddressesResource, *name, types.ApplyPatchType, data), &v1alpha1.IPAddress{})
+		Invokes(testing.NewRootPatchSubresourceAction(ipaddressesResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.IPAddress), err
 }

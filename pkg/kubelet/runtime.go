@@ -35,7 +35,7 @@ type runtimeState struct {
 	storageError             error
 	cidr                     string
 	healthChecks             []*healthCheck
-	rtHandlers               map[string]kubecontainer.RuntimeHandler
+	rtHandlers               []kubecontainer.RuntimeHandler
 }
 
 // A health check function should be efficient and not rely on external
@@ -71,13 +71,13 @@ func (s *runtimeState) setRuntimeState(err error) {
 	s.runtimeError = err
 }
 
-func (s *runtimeState) setRuntimeHandlers(rtHandlers map[string]kubecontainer.RuntimeHandler) {
+func (s *runtimeState) setRuntimeHandlers(rtHandlers []kubecontainer.RuntimeHandler) {
 	s.Lock()
 	defer s.Unlock()
 	s.rtHandlers = rtHandlers
 }
 
-func (s *runtimeState) runtimeHandlers() map[string]kubecontainer.RuntimeHandler {
+func (s *runtimeState) runtimeHandlers() []kubecontainer.RuntimeHandler {
 	s.RLock()
 	defer s.RUnlock()
 	return s.rtHandlers

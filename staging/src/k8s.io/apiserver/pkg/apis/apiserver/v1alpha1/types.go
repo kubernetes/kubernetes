@@ -176,6 +176,14 @@ type AuthenticationConfiguration struct {
 	// authenticators is neither defined nor stable across releases.  Since
 	// each JWT authenticator must have a unique issuer URL, at most one
 	// JWT authenticator will attempt to cryptographically validate the token.
+	//
+	// The minimum valid JWT payload must contain the following claims:
+	// {
+	//		"iss": "https://issuer.example.com",
+	//		"aud": ["audience"],
+	//		"exp": 1234567890,
+	//		"<username claim>": "username"
+	// }
 	JWT []JWTAuthenticator `json:"jwt"`
 }
 
@@ -201,16 +209,44 @@ type JWTAuthenticator struct {
 	UserValidationRules []UserValidationRule `json:"userValidationRules,omitempty"`
 }
 
-// Issuer provides the configuration for a external provider specific settings.
+// Issuer provides the configuration for an external provider's specific settings.
 type Issuer struct {
 	// url points to the issuer URL in a format https://url or https://url/path.
 	// This must match the "iss" claim in the presented JWT, and the issuer returned from discovery.
 	// Same value as the --oidc-issuer-url flag.
-	// Used to fetch discovery information unless overridden by discoveryURL.
-	// Required to be unique.
+	// Discovery information is fetched from "{url}/.well-known/openid-configuration" unless overridden by discoveryURL.
+	// Required to be unique across all JWT authenticators.
 	// Note that egress selection configuration is not used for this network connection.
 	// +required
 	URL string `json:"url"`
+
+	// discoveryURL, if specified, overrides the URL used to fetch discovery
+	// information instead of using "{url}/.well-known/openid-configuration".
+	// The exact value specified is used, so "/.well-known/openid-configuration"
+	// must be included in discoveryURL if needed.
+	//
+	// The "issuer" field in the fetched discovery information must match the "issuer.url" field
+	// in the AuthenticationConfiguration and will be used to validate the "iss" claim in the presented JWT.
+	// This is for scenarios where the well-known and jwks endpoints are hosted at a different
+	// location than the issuer (such as locally in the cluster).
+	//
+	// Example:
+	// A discovery url that is exposed using kubernetes service 'oidc' in namespace 'oidc-namespace'
+	// and discovery information is available at '/.well-known/openid-configuration'.
+	// discoveryURL: "https://oidc.oidc-namespace/.well-known/openid-configuration"
+	// certificateAuthority is used to verify the TLS connection and the hostname on the leaf certificate
+	// must be set to 'oidc.oidc-namespace'.
+	//
+	// curl https://oidc.oidc-namespace/.well-known/openid-configuration (.discoveryURL field)
+	// {
+	//     issuer: "https://oidc.example.com" (.url field)
+	// }
+	//
+	// discoveryURL must be different from url.
+	// Required to be unique across all JWT authenticators.
+	// Note that egress selection configuration is not used for this network connection.
+	// +optional
+	DiscoveryURL *string `json:"discoveryURL,omitempty"`
 
 	// certificateAuthority contains PEM-encoded certificate authority certificates
 	// used to validate the connection when fetching discovery information.
@@ -273,7 +309,7 @@ type ClaimValidationRule struct {
 	// CEL expressions have access to the contents of the token claims, organized into CEL variable:
 	// - 'claims' is a map of claim names to claim values.
 	//   For example, a variable named 'sub' can be accessed as 'claims.sub'.
-	//   Nested claims can be accessed using dot notation, e.g. 'claims.email.verified'.
+	//   Nested claims can be accessed using dot notation, e.g. 'claims.foo.bar'.
 	// Must return true for the validation to pass.
 	//
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
@@ -294,6 +330,10 @@ type ClaimMappings struct {
 	// The claim's value must be a singular string.
 	// Same as the --oidc-username-claim and --oidc-username-prefix flags.
 	// If username.expression is set, the expression must produce a string value.
+	// If username.expression uses 'claims.email', then 'claims.email_verified' must be used in
+	// username.expression or extra[*].valueExpression or claimValidationRules[*].expression.
+	// An example claim validation rule expression that matches the validation automatically
+	// applied when username.claim is set to 'email' is 'claims.?email_verified.orValue(true)'.
 	//
 	// In the flag based approach, the --oidc-username-claim and --oidc-username-prefix are optional. If --oidc-username-claim is not set,
 	// the default value is "sub". For the authentication config, there is no defaulting for claim or prefix. The claim and prefix must be set explicitly.
@@ -303,7 +343,7 @@ type ClaimMappings struct {
 	//         set username.prefix=""
 	//     (2) --oidc-username-prefix="" and  --oidc-username-claim != "email", prefix was "<value of --oidc-issuer-url>#". For the same
 	//         behavior using authentication config, set username.prefix="<value of issuer.url>#"
-	//	   (3) --oidc-username-prefix="<value>". For the same behavior using authentication config, set username.prefix="<value>"
+	//     (3) --oidc-username-prefix="<value>". For the same behavior using authentication config, set username.prefix="<value>"
 	// +required
 	Username PrefixedClaimOrExpression `json:"username"`
 	// groups represents an option for the groups attribute.
@@ -362,7 +402,7 @@ type PrefixedClaimOrExpression struct {
 	// CEL expressions have access to the contents of the token claims, organized into CEL variable:
 	// - 'claims' is a map of claim names to claim values.
 	//   For example, a variable named 'sub' can be accessed as 'claims.sub'.
-	//   Nested claims can be accessed using dot notation, e.g. 'claims.email.verified'.
+	//   Nested claims can be accessed using dot notation, e.g. 'claims.foo.bar'.
 	//
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	//
@@ -384,7 +424,7 @@ type ClaimOrExpression struct {
 	// CEL expressions have access to the contents of the token claims, organized into CEL variable:
 	// - 'claims' is a map of claim names to claim values.
 	//   For example, a variable named 'sub' can be accessed as 'claims.sub'.
-	//   Nested claims can be accessed using dot notation, e.g. 'claims.email.verified'.
+	//   Nested claims can be accessed using dot notation, e.g. 'claims.foo.bar'.
 	//
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	//
@@ -412,7 +452,7 @@ type ExtraMapping struct {
 	// CEL expressions have access to the contents of the token claims, organized into CEL variable:
 	// - 'claims' is a map of claim names to claim values.
 	//   For example, a variable named 'sub' can be accessed as 'claims.sub'.
-	//   Nested claims can be accessed using dot notation, e.g. 'claims.email.verified'.
+	//   Nested claims can be accessed using dot notation, e.g. 'claims.foo.bar'.
 	//
 	// Documentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/
 	//

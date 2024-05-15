@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apis/storagemigration"
 	"k8s.io/kubernetes/pkg/printers"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -2527,8 +2528,8 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job1", "1/2", "", "0s"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job1", "Running", "1/2", "", "0s"}}},
 		},
 		// Generate table rows for Job with generate options "Wide".
 		{
@@ -2560,10 +2561,10 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Completions, Duration, Age, Containers, Images, Selectors
+			// Columns: Name, Status, Completions, Duration, Age, Containers, Images, Selectors
 			expected: []metav1.TableRow{
 				{
-					Cells: []interface{}{"job1", "1/2", "", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "job-label=job-label-value"},
+					Cells: []interface{}{"job1", "Running", "1/2", "", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "job-label=job-label-value"},
 				},
 			},
 		},
@@ -2582,8 +2583,8 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job2", "0/1", "", "10y"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job2", "Running", "0/1", "", "10y"}}},
 		},
 		// Job with duration.
 		{
@@ -2602,8 +2603,8 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job3", "0/1", "30m", "10y"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job3", "Running", "0/1", "30m", "10y"}}},
 		},
 		{
 			job: batch.Job{
@@ -2620,8 +2621,115 @@ func TestPrintJob(t *testing.T) {
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Completions, Duration, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "0/1", "20m", "10y"}}},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job4", "Running", "0/1", "20m", "10y"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job5",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job5", "Complete", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job6",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job6", "Failed", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job7",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuspended,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job7", "Suspended", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job8",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job8", "FailureTarget", "0/1", "", "0s"}}},
+		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job9",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					DeletionTimestamp: &metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job9", "Terminating", "0/1", "", "0s"}}},
 		},
 	}
 
@@ -2701,10 +2809,10 @@ func TestPrintJobList(t *testing.T) {
 		},
 	}
 
-	// Columns: Name, Completions, Duration, Age
+	// Columns: Name, Status, Completions, Duration, Age
 	expectedRows := []metav1.TableRow{
-		{Cells: []interface{}{"job1", "1/2", "", "0s"}},
-		{Cells: []interface{}{"job2", "2/2", "20m", "0s"}},
+		{Cells: []interface{}{"job1", "Running", "1/2", "", "0s"}},
+		{Cells: []interface{}{"job2", "Running", "2/2", "20m", "0s"}},
 	}
 
 	rows, err := printJobList(&jobList, printers.GenerateOptions{})
@@ -6572,7 +6680,7 @@ func TestPrintIPAddressList(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "192.168.2.2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+					CreationTimestamp: metav1.Time{},
 				},
 				Spec: networking.IPAddressSpec{
 					ParentRef: &networking.ParentReference{
@@ -6585,7 +6693,7 @@ func TestPrintIPAddressList(t *testing.T) {
 			}, {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "2001:db8::2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-5, 0, 0)},
+					CreationTimestamp: metav1.Time{},
 				},
 				Spec: networking.IPAddressSpec{
 					ParentRef: &networking.ParentReference{
@@ -6600,8 +6708,8 @@ func TestPrintIPAddressList(t *testing.T) {
 	}
 	// Columns: Name, ParentRef, Age
 	expected := []metav1.TableRow{
-		{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "10y"}},
-		{Cells: []interface{}{"2001:db8::2", "myresource2.mygroup2/mynamespace2/myname2", "5y1d"}},
+		{Cells: []interface{}{"192.168.2.2", "myresource.mygroup/mynamespace/myname", "<unknown>"}},
+		{Cells: []interface{}{"2001:db8::2", "myresource2.mygroup2/mynamespace2/myname2", "<unknown>"}},
 	}
 
 	rows, err := printIPAddressList(&ipList, printers.GenerateOptions{})
@@ -6732,5 +6840,94 @@ func TestPrintServiceCIDRList(t *testing.T) {
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
 		}
+	}
+}
+
+func TestPrintStorageVersionMigration(t *testing.T) {
+	storageVersionMigration := storagemigration.StorageVersionMigration{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageVersionMigration",
+			APIVersion: "storagemigration.k8s.io/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "print-test",
+		},
+		Spec: storagemigration.StorageVersionMigrationSpec{
+			Resource: storagemigration.GroupVersionResource{
+				Group:    "test-group",
+				Version:  "test-version",
+				Resource: "test-resource",
+			},
+		},
+	}
+
+	// Columns: Name, GVRTOMIGRATE
+	expected := []metav1.TableRow{{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}}}
+
+	rows, err := printStorageVersionMigration(&storageVersionMigration, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for StorageVersionMigration: %#v", err)
+	}
+	rows[0].Object.Object = nil
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
+func TestPrintStorageVersionMigrationList(t *testing.T) {
+	storageVersionMigrationList := storagemigration.StorageVersionMigrationList{
+		Items: []storagemigration.StorageVersionMigration{
+			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "StorageVersionMigration",
+					APIVersion: "storagemigration.k8s.io/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "print-test",
+				},
+				Spec: storagemigration.StorageVersionMigrationSpec{
+					Resource: storagemigration.GroupVersionResource{
+						Group:    "test-group",
+						Version:  "test-version",
+						Resource: "test-resource",
+					},
+				},
+			},
+			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "StorageVersionMigration",
+					APIVersion: "storagemigration.k8s.io/v1alpha1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "print-test2",
+				},
+				Spec: storagemigration.StorageVersionMigrationSpec{
+					Resource: storagemigration.GroupVersionResource{
+						Group:    "test-group2",
+						Version:  "test-version2",
+						Resource: "test-resource2",
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, GVRTOMIGRATE
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"print-test", "test-resource.test-version.test-group"}},
+		{Cells: []interface{}{"print-test2", "test-resource2.test-version2.test-group2"}},
+	}
+
+	rows, err := printStorageVersionMigrationList(&storageVersionMigrationList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for StorageVersionMigration: %#v", err)
+	}
+
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
 	}
 }

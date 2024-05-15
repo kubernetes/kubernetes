@@ -241,7 +241,7 @@ func waitForAdded(q DelayingInterface, depth int) error {
 
 func waitForWaitingQueueToFill(q DelayingInterface) error {
 	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		if len(q.(*delayingType).waitingForAddCh) == 0 {
+		if len(q.(*delayingType[any]).waitingForAddCh) == 0 {
 			return true, nil
 		}
 

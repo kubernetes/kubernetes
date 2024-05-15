@@ -24,7 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	clientset "k8s.io/client-go/kubernetes"
+	"github.com/spf13/pflag"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -53,25 +54,18 @@ users:
     client-certificate-data:
 `
 
-func fakeLoadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error) {
-	return &kubeadmapi.InitConfiguration{}, false, nil
-}
-
 func TestEnforceRequirements(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
-
 	fullPath := filepath.Join(tmpDir, "test-config-file")
 	f, err := os.Create(fullPath)
 	if err != nil {
 		t.Errorf("Unable to create test file %q: %v", fullPath, err)
 	}
 	defer f.Close()
-
 	if _, err = f.WriteString(testConfigToken); err != nil {
 		t.Errorf("Unable to write test file %q: %v", fullPath, err)
 	}
-
 	tcases := []struct {
 		name               string
 		newK8sVersion      string
@@ -106,8 +100,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false, &output.TextPrinter{}, fakeLoadConfig)
-
+			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
 			if err == nil && len(tt.expectedErr) != 0 {
 				t.Error("Expected error, but got success")
 			}
@@ -123,7 +116,6 @@ func TestEnforceRequirements(t *testing.T) {
 			if err != nil && !strings.Contains(err.Error(), expErr) {
 				t.Fatalf("enforceRequirements returned unexpected error, expected: %s, got %v", expErr, err)
 			}
-
 		})
 	}
 }
@@ -208,55 +200,6 @@ func TestPrintConfiguration(t *testing.T) {
 					string(rt.expectedBytes),
 					string(actualBytes),
 				)
-			}
-		})
-	}
-}
-
-func TestIsKubeadmConfigPresent(t *testing.T) {
-	var tcases = []struct {
-		name     string
-		gvkmap   kubeadmapi.DocumentMap
-		expected bool
-	}{
-		{
-			name: " Wrong Group value",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: []byte(`kind: Foo`),
-			},
-			expected: false,
-		},
-		{
-			name: "Empty Group value",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: "", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
-			},
-			expected: false,
-		},
-		{
-			name:     "Nil value",
-			gvkmap:   nil,
-			expected: false,
-		},
-		{
-			name: "Correct Group value 1",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: "kubeadm.k8s.io", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
-			},
-			expected: true,
-		},
-		{
-			name: "Correct Group value 2",
-			gvkmap: kubeadmapi.DocumentMap{
-				{Group: kubeadmapi.GroupName, Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
-			},
-			expected: true,
-		},
-	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			if isKubeadmConfigPresent(tt.gvkmap) != tt.expected {
-				t.Error("unexpected result")
 			}
 		})
 	}

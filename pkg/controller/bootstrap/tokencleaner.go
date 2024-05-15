@@ -68,7 +68,7 @@ type TokenCleaner struct {
 	// secretSynced returns true if the secret shared informer has been synced at least once.
 	secretSynced cache.InformerSynced
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewTokenCleaner returns a new *NewTokenCleaner.
@@ -78,7 +78,12 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		secretLister:         secrets.Lister(),
 		secretSynced:         secrets.Informer().HasSynced,
 		tokenSecretNamespace: options.TokenSecretNamespace,
-		queue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "token_cleaner"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "token_cleaner",
+			},
+		),
 	}
 
 	secrets.Informer().AddEventHandlerWithResyncPeriod(
@@ -144,7 +149,7 @@ func (tc *TokenCleaner) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer tc.queue.Done(key)
 
-	if err := tc.syncFunc(ctx, key.(string)); err != nil {
+	if err := tc.syncFunc(ctx, key); err != nil {
 		tc.queue.AddRateLimited(key)
 		utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", key, err))
 		return true

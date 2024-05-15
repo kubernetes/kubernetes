@@ -15,18 +15,20 @@ import (
 // protobuf module that accept a Message, except where otherwise specified.
 //
 // This is the v2 interface definition for protobuf messages.
-// The v1 interface definition is "github.com/golang/protobuf/proto".Message.
+// The v1 interface definition is [github.com/golang/protobuf/proto.Message].
 //
-// To convert a v1 message to a v2 message,
-// use "github.com/golang/protobuf/proto".MessageV2.
-// To convert a v2 message to a v1 message,
-// use "github.com/golang/protobuf/proto".MessageV1.
+//   - To convert a v1 message to a v2 message,
+//     use [google.golang.org/protobuf/protoadapt.MessageV2Of].
+//   - To convert a v2 message to a v1 message,
+//     use [google.golang.org/protobuf/protoadapt.MessageV1Of].
 type Message = protoreflect.ProtoMessage
 
-// Error matches all errors produced by packages in the protobuf module.
+// Error matches all errors produced by packages in the protobuf module
+// according to [errors.Is].
 //
-// That is, errors.Is(err, Error) reports whether an error is produced
-// by this module.
+// Example usage:
+//
+//	if errors.Is(err, proto.Error) { ... }
 var Error error
 
 func init() {

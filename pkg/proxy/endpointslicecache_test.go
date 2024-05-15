@@ -370,7 +370,7 @@ func TestEsDataChanged(t *testing.T) {
 				ObjectMeta: objMeta,
 				Ports:      []discovery.EndpointPort{port80, port443},
 			},
-			expectChanged: false,
+			expectChanged: true,
 		},
 		"port removed": {
 			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
@@ -422,7 +422,7 @@ func TestEsDataChanged(t *testing.T) {
 				Ports:      []discovery.EndpointPort{port443},
 				Endpoints:  []discovery.Endpoint{endpoint2, endpoint1},
 			},
-			expectChanged: false,
+			expectChanged: true,
 		},
 		"identical with endpoint added": {
 			cache: NewEndpointSliceCache("", v1.IPv4Protocol, nil, nil),
@@ -454,7 +454,7 @@ func TestEsDataChanged(t *testing.T) {
 				t.Fatalf("Expected no error calling endpointSliceCacheKeys(): %v", err)
 			}
 
-			esData := newEndpointSliceData(tc.updatedSlice, false)
+			esData := &endpointSliceData{tc.updatedSlice, false}
 			changed := tc.cache.esDataChanged(serviceKey, sliceKey, esData)
 
 			if tc.expectChanged != changed {

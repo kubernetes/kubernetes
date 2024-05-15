@@ -93,6 +93,9 @@ type PersistentVolumeConfig struct {
 	// [Optional] Labels contains information used to organize and categorize
 	// objects
 	Labels labels.Set
+	// [Optional] Annotations contains information used to organize and categorize
+	// objects
+	Annotations map[string]string
 	// PVSource contains the details of the underlying volume and must be set
 	PVSource v1.PersistentVolumeSource
 	// [Optional] Prebind lets you specify a PVC to bind this PV to before
@@ -595,13 +598,18 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 		}
 	}
 
+	annotations := map[string]string{
+		volumeGidAnnotationKey: "777",
+	}
+	for k, v := range pvConfig.Annotations {
+		annotations[k] = v
+	}
+
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: pvConfig.NamePrefix,
 			Labels:       pvConfig.Labels,
-			Annotations: map[string]string{
-				volumeGidAnnotationKey: "777",
-			},
+			Annotations:  annotations,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: pvConfig.ReclaimPolicy,

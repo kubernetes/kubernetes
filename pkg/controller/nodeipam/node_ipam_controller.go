@@ -19,9 +19,6 @@ package nodeipam
 import (
 	"context"
 	"fmt"
-	"net"
-	"time"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -33,18 +30,7 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-)
-
-const (
-	// ipamResyncInterval is the amount of time between when the cloud and node
-	// CIDR range assignments are synchronized.
-	ipamResyncInterval = 30 * time.Second
-	// ipamMaxBackoff is the maximum backoff for retrying synchronization of a
-	// given in the error state.
-	ipamMaxBackoff = 10 * time.Second
-	// ipamInitialRetry is the initial retry interval for retrying synchronization of a
-	// given in the error state.
-	ipamInitialBackoff = 250 * time.Millisecond
+	"net"
 )
 
 // ipamController is an interface abstracting an interface for
@@ -88,7 +74,6 @@ func NewNodeIpamController(
 	nodeCIDRMaskSizes []int,
 	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 
-	logger := klog.FromContext(ctx)
 	if kubeClient == nil {
 		return nil, fmt.Errorf("kubeClient is nil when starting Controller")
 	}
@@ -110,7 +95,7 @@ func NewNodeIpamController(
 	ic := &Controller{
 		cloud:                cloud,
 		kubeClient:           kubeClient,
-		eventBroadcaster:     record.NewBroadcaster(),
+		eventBroadcaster:     record.NewBroadcaster(record.WithContext(ctx)),
 		clusterCIDRs:         clusterCIDRs,
 		serviceCIDR:          serviceCIDR,
 		secondaryServiceCIDR: secondaryServiceCIDR,
@@ -120,7 +105,7 @@ func NewNodeIpamController(
 	// TODO: Abstract this check into a generic controller manager should run method.
 	if ic.allocatorType == ipam.IPAMFromClusterAllocatorType || ic.allocatorType == ipam.IPAMFromCloudAllocatorType {
 		var err error
-		ic.legacyIPAM, err = createLegacyIPAM(logger, ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
+		ic.legacyIPAM, err = createLegacyIPAM(ctx, ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSizes)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +136,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
-	nc.eventBroadcaster.StartStructuredLogging(0)
+	nc.eventBroadcaster.StartStructuredLogging(3)
 	nc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: nc.kubeClient.CoreV1().Events("")})
 	defer nc.eventBroadcaster.Shutdown()
 	klog.FromContext(ctx).Info("Starting ipam controller")

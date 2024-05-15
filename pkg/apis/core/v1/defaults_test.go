@@ -50,7 +50,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 	allFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
 	for feature, featureSpec := range allFeatures {
 		if !featureSpec.LockToDefault {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
 		}
 	}
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
@@ -208,14 +208,8 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 				".Spec.HostNetwork":                          "true",
 				".Spec.Containers[0].Ports[0].ContainerPort": "12345",
 			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
-				m[".Spec.Containers"] = `[{"name":"","ports":[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
-				m[".Spec.Containers[0].Ports"] = `[{"hostPort":12345,"containerPort":12345,"protocol":"TCP"}]`
-				m[".Spec.Containers[0].Ports[0].HostPort"] = "12345"
-			} else {
-				m[".Spec.Containers"] = `[{"name":"","ports":[{"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
-				m[".Spec.Containers[0].Ports"] = `[{"containerPort":12345,"protocol":"TCP"}]`
-			}
+			m[".Spec.Containers"] = `[{"name":"","ports":[{"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
+			m[".Spec.Containers[0].Ports"] = `[{"containerPort":12345,"protocol":"TCP"}]`
 			for k, v := range expectedDefaults {
 				if _, found := m[k]; !found {
 					m[k] = v
@@ -240,7 +234,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
 	for feature, featureSpec := range features {
 		if !featureSpec.LockToDefault {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
 		}
 	}
 	pod := &v1.Pod{}
@@ -379,40 +373,23 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 func TestPodHostNetworkDefaults(t *testing.T) {
 	cases := []struct {
 		name                 string
-		gate                 bool
 		hostNet              bool
 		expectPodDefault     bool
 		expectPodSpecDefault bool
 	}{{
-		name:                 "gate disabled, hostNetwork=false",
-		gate:                 false,
+		name:                 "hostNetwork=false",
 		hostNet:              false,
 		expectPodDefault:     false,
 		expectPodSpecDefault: false,
 	}, {
-		name:                 "gate disabled, hostNetwork=true",
-		gate:                 false,
+		name:                 "hostNetwork=true",
 		hostNet:              true,
 		expectPodDefault:     true,
 		expectPodSpecDefault: false,
-	}, {
-		name:                 "gate enabled, hostNetwork=false",
-		gate:                 true,
-		hostNet:              false,
-		expectPodDefault:     false,
-		expectPodSpecDefault: false,
-	}, {
-		name:                 "gate enabled, hostNetwork=true",
-		gate:                 true,
-		hostNet:              true,
-		expectPodDefault:     true,
-		expectPodSpecDefault: true,
 	}}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DefaultHostNetworkHostPortsInPodTemplates, tc.gate)()
-
 			const portNum = 12345
 			spec := v1.PodSpec{
 				HostNetwork: tc.hostNet,
@@ -1275,7 +1252,7 @@ func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			obj := roundTrip(t, runtime.Object(tc.svc))
 			svc := obj.(*v1.Service)
 			for i, s := range svc.Status.LoadBalancer.Ingress {
@@ -2120,7 +2097,7 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 
 func TestSetDefaultResizePolicy(t *testing.T) {
 	// verify we default to NotRequired restart policy for resize when resources are specified
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	for desc, tc := range map[string]struct {
 		testContainer        v1.Container

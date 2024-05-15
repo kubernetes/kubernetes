@@ -158,7 +158,7 @@ func TestGCTerminated(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			creationTime := time.Unix(0, 0)
 			nodes := []*v1.Node{testutil.NewNode("node")}
 
@@ -198,7 +198,7 @@ func makePod(name string, nodeName string, phase v1.PodPhase) *v1.Pod {
 	}
 }
 
-func waitForAdded(q workqueue.DelayingInterface, depth int) error {
+func waitForAdded(q workqueue.TypedDelayingInterface[string], depth int) error {
 	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 		if q.Len() == depth {
 			return true, nil
@@ -360,7 +360,7 @@ func TestGCOrphaned(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			nodes := make([]*v1.Node, 0, len(test.initialClientNodes))
 			for _, node := range test.initialClientNodes {
 				nodes = append(nodes, node)
@@ -380,7 +380,7 @@ func TestGCOrphaned(t *testing.T) {
 			// Overwrite queue
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			gcc.nodeQueue.ShutDown()
-			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
+			gcc.nodeQueue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{Clock: fakeClock, Name: "podgc_test_queue"})
 
 			// First GC of orphaned pods
 			gcc.gc(ctx)
@@ -475,7 +475,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			creationTime := time.Unix(0, 0)
 
 			pods := make([]*v1.Pod, 0, len(test.pods))
@@ -631,7 +631,7 @@ func TestGCTerminating(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 
 			creationTime := time.Unix(0, 0)
 			nodes := make([]*v1.Node, 0, len(test.nodes))
@@ -741,7 +741,7 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, true)
 
 			pods := []*v1.Pod{test.pod}
 

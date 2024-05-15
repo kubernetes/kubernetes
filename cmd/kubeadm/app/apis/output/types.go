@@ -49,6 +49,7 @@ type ComponentUpgradePlan struct {
 	Name           string
 	CurrentVersion string
 	NewVersion     string
+	NodeName       string
 }
 
 // ComponentConfigVersionState describes the current and desired version of a component config
@@ -73,12 +74,23 @@ type ComponentConfigVersionState struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// AvailableUpgrade represents information for a single available upgrade.
+type AvailableUpgrade struct {
+	metav1.TypeMeta
+
+	Description string
+
+	Components []ComponentUpgradePlan
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // UpgradePlan represents information about upgrade plan for the output
 // produced by 'kubeadm upgrade plan'
 type UpgradePlan struct {
 	metav1.TypeMeta
 
-	Components []ComponentUpgradePlan
+	AvailableUpgrades []AvailableUpgrade
 
 	ConfigVersions []ComponentConfigVersionState
 }

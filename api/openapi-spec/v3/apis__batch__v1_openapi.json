@@ -344,6 +344,10 @@
             "format": "int32",
             "type": "integer"
           },
+          "managedBy": {
+            "description": "ManagedBy field indicates the controller that manages a Job. The k8s Job controller reconciles jobs which don't have this field at all or the field value is the reserved string `kubernetes.io/job-controller`, but skips reconciling Jobs with a custom value for this field. The value must be a valid domain-prefixed path (e.g. acme.io/foo) - all characters before the first \"/\" must be a valid subdomain as defined by RFC 1123. All characters trailing the first \"/\" must be valid HTTP Path characters as defined by RFC 3986. The value cannot exceed 64 characters.\n\nThis field is alpha-level. The job controller accepts setting the field when the feature gate JobManagedBy is enabled (disabled by default).",
+            "type": "string"
+          },
           "manualSelector": {
             "description": "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#specifying-your-own-pod-selector",
             "type": "boolean"
@@ -378,6 +382,14 @@
             ],
             "description": "A label query over pods that should match the pod count. Normally, the system sets this field for you. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors"
           },
+          "successPolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.batch.v1.SuccessPolicy"
+              }
+            ],
+            "description": "successPolicy specifies the policy when the Job can be declared as succeeded. If empty, the default behavior applies - the Job is declared as succeeded only when the number of succeeded pods equals to the completions. When the field is specified, it must be immutable and works only for the Indexed Jobs. Once the Job meets the SuccessPolicy, the lingering pods are terminated.\n\nThis field  is alpha-level. To use this field, you must enable the `JobSuccessPolicy` feature gate (disabled by default)."
+          },
           "suspend": {
             "description": "suspend specifies whether the Job controller should create Pods or not. If a Job is created with suspend set to true, no Pods are created by the Job controller. If a Job is suspended after creation (i.e. the flag goes from false to true), the Job controller will delete all active Pods associated with this Job. Users must design their workload to gracefully handle this. Suspending a Job will reset the StartTime field of the Job, effectively resetting the ActiveDeadlineSeconds timer too. Defaults to false.",
             "type": "boolean"
@@ -406,7 +418,7 @@
         "description": "JobStatus represents the current state of a Job.",
         "properties": {
           "active": {
-            "description": "The number of pending and running pods which are not terminating (without a deletionTimestamp).",
+            "description": "The number of pending and running pods which are not terminating (without a deletionTimestamp). The value is zero for finished jobs.",
             "format": "int32",
             "type": "integer"
           },
@@ -420,10 +432,10 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC. The completion time is only set when the job finishes successfully."
+            "description": "Represents time when the job was completed. It is not guaranteed to be set in happens-before order across separate operations. It is represented in RFC3339 form and is in UTC. The completion time is set when the job finishes successfully, and only then. The value cannot be updated or removed. The value indicates the same or later point in time as the startTime field."
           },
           "conditions": {
-            "description": "The latest available observations of an object's current state. When a Job fails, one of the conditions will have type \"Failed\" and status true. When a Job is suspended, one of the conditions will have type \"Suspended\" and status true; when the Job is resumed, the status of this condition will become false. When a Job is completed, one of the conditions will have type \"Complete\" and status true. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
+            "description": "The latest available observations of an object's current state. When a Job fails, one of the conditions will have type \"Failed\" and status true. When a Job is suspended, one of the conditions will have type \"Suspended\" and status true; when the Job is resumed, the status of this condition will become false. When a Job is completed, one of the conditions will have type \"Complete\" and status true.\n\nA job is considered finished when it is in a terminal condition, either \"Complete\" or \"Failed\". A Job cannot have both the \"Complete\" and \"Failed\" conditions. Additionally, it cannot be in the \"Complete\" and \"FailureTarget\" conditions. The \"Complete\", \"Failed\" and \"FailureTarget\" conditions cannot be disabled.\n\nMore info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
             "items": {
               "allOf": [
                 {
@@ -438,12 +450,12 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "failed": {
-            "description": "The number of pods which reached phase Failed.",
+            "description": "The number of pods which reached phase Failed. The value increases monotonically.",
             "format": "int32",
             "type": "integer"
           },
           "failedIndexes": {
-            "description": "FailedIndexes holds the failed indexes when backoffLimitPerIndex=true. The indexes are represented in the text format analogous as for the `completedIndexes` field, ie. they are kept as decimal integers separated by commas. The numbers are listed in increasing order. Three or more consecutive numbers are compressed and represented by the first and last element of the series, separated by a hyphen. For example, if the failed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". This field is beta-level. It can be used when the `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).",
+            "description": "FailedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set. The indexes are represented in the text format analogous as for the `completedIndexes` field, ie. they are kept as decimal integers separated by commas. The numbers are listed in increasing order. Three or more consecutive numbers are compressed and represented by the first and last element of the series, separated by a hyphen. For example, if the failed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". The set of failed indexes cannot overlap with the set of completed indexes.\n\nThis field is beta-level. It can be used when the `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).",
             "type": "string"
           },
           "ready": {
@@ -457,10 +469,10 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "Represents time when the job controller started processing a job. When a Job is created in the suspended state, this field is not set until the first time it is resumed. This field is reset every time a Job is resumed from suspension. It is represented in RFC3339 form and is in UTC."
+            "description": "Represents time when the job controller started processing a job. When a Job is created in the suspended state, this field is not set until the first time it is resumed. This field is reset every time a Job is resumed from suspension. It is represented in RFC3339 form and is in UTC.\n\nOnce set, the field can only be removed when the job is suspended. The field cannot be modified while the job is unsuspended or finished."
           },
           "succeeded": {
-            "description": "The number of pods which reached phase Succeeded.",
+            "description": "The number of pods which reached phase Succeeded. The value increases monotonically for a given spec. However, it may decrease in reaction to scale down of elastic indexed jobs.",
             "format": "int32",
             "type": "integer"
           },
@@ -475,7 +487,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.batch.v1.UncountedTerminatedPods"
               }
             ],
-            "description": "uncountedTerminatedPods holds the UIDs of Pods that have terminated but the job controller hasn't yet accounted for in the status counters.\n\nThe job controller creates pods with a finalizer. When a pod terminates (succeeded or failed), the controller does three steps to account for it in the job status:\n\n1. Add the pod UID to the arrays in this field. 2. Remove the pod finalizer. 3. Remove the pod UID from the arrays while increasing the corresponding\n    counter.\n\nOld jobs might not be tracked using this field, in which case the field remains null."
+            "description": "uncountedTerminatedPods holds the UIDs of Pods that have terminated but the job controller hasn't yet accounted for in the status counters.\n\nThe job controller creates pods with a finalizer. When a pod terminates (succeeded or failed), the controller does three steps to account for it in the job status:\n\n1. Add the pod UID to the arrays in this field. 2. Remove the pod finalizer. 3. Remove the pod UID from the arrays while increasing the corresponding\n    counter.\n\nOld jobs might not be tracked using this field, in which case the field remains null. The structure is empty for finished jobs."
           }
         },
         "type": "object"
@@ -610,6 +622,43 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.batch.v1.SuccessPolicy": {
+        "description": "SuccessPolicy describes when a Job can be declared as succeeded based on the success of some indexes.",
+        "properties": {
+          "rules": {
+            "description": "rules represents the list of alternative rules for the declaring the Jobs as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met, the \"SucceededCriteriaMet\" condition is added, and the lingering pods are removed. The terminal state for such a Job has the \"Complete\" condition. Additionally, these rules are evaluated in order; Once the Job meets one of the rules, other rules are ignored. At most 20 elements are allowed.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.batch.v1.SuccessPolicyRule"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.batch.v1.SuccessPolicyRule": {
+        "description": "SuccessPolicyRule describes rule for declaring a Job as succeeded. Each rule must have at least one of the \"succeededIndexes\" or \"succeededCount\" specified.",
+        "properties": {
+          "succeededCount": {
+            "description": "succeededCount specifies the minimal required size of the actual set of the succeeded indexes for the Job. When succeededCount is used along with succeededIndexes, the check is constrained only to the set of indexes specified by succeededIndexes. For example, given that succeededIndexes is \"1-4\", succeededCount is \"3\", and completed indexes are \"1\", \"3\", and \"5\", the Job isn't declared as succeeded because only \"1\" and \"3\" indexes are considered in that rules. When this field is null, this doesn't default to any value and is never evaluated at any time. When specified it needs to be a positive integer.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "succeededIndexes": {
+            "description": "succeededIndexes specifies the set of indexes which need to be contained in the actual set of the succeeded indexes for the Job. The list of indexes must be within 0 to \".spec.completions-1\" and must not contain duplicates. At least one element is required. The indexes are represented as intervals separated by commas. The intervals can be a decimal integer or a pair of decimal integers separated by a hyphen. The number are listed in represented by the first and last element of the series, separated by a hyphen. For example, if the completed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". When this field is null, this field doesn't default to any value and is never evaluated at any time.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.batch.v1.UncountedTerminatedPods": {
         "description": "UncountedTerminatedPods holds UIDs of Pods that have terminated but haven't been accounted in Job status counters.",
         "properties": {
@@ -690,6 +739,32 @@
           }
         },
         "type": "object"
+      },
+      "io.k8s.api.core.v1.AppArmorProfile": {
+        "description": "AppArmorProfile defines a pod or container's AppArmor settings.",
+        "properties": {
+          "localhostProfile": {
+            "description": "localhostProfile indicates a profile loaded on the node that should be used. The profile must be preconfigured on the node to work. Must match the loaded name of the profile. Must be set if and only if type is \"Localhost\".",
+            "type": "string"
+          },
+          "type": {
+            "default": "",
+            "description": "type indicates which kind of AppArmor profile will be applied. Valid options are:\n  Localhost - a profile pre-loaded on the node.\n  RuntimeDefault - the container runtime's default profile.\n  Unconfined - no AppArmor enforcement.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "x-kubernetes-unions": [
+          {
+            "discriminator": "type",
+            "fields-to-discriminateBy": {
+              "localhostProfile": "LocalhostProfile"
+            }
+          }
+        ]
       },
       "io.k8s.api.core.v1.AzureDiskVolumeSource": {
         "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
@@ -937,7 +1012,8 @@
         "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
         "properties": {
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "optional": {
@@ -956,7 +1032,8 @@
             "type": "string"
           },
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "optional": {
@@ -987,7 +1064,8 @@
             "x-kubernetes-list-type": "atomic"
           },
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "optional": {
@@ -1019,7 +1097,8 @@
             "x-kubernetes-list-type": "atomic"
           },
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "optional": {
@@ -1326,7 +1405,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ObjectFieldSelector"
               }
             ],
-            "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+            "description": "Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported."
           },
           "mode": {
             "description": "Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
@@ -1989,10 +2068,14 @@
             "x-kubernetes-list-type": "atomic"
           },
           "ip": {
+            "default": "",
             "description": "IP address of the host file entry.",
             "type": "string"
           }
         },
+        "required": [
+          "ip"
+        ],
         "type": "object"
       },
       "io.k8s.api.core.v1.HostPathVolumeSource": {
@@ -2170,7 +2253,8 @@
         "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
         "properties": {
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           }
         },
@@ -2538,7 +2622,7 @@
             "description": "A label query over a set of resources, in this case pods. If it's null, this PodAffinityTerm matches with no Pods."
           },
           "matchLabelKeys": {
-            "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+            "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
             "items": {
               "default": "",
               "type": "string"
@@ -2547,7 +2631,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "mismatchLabelKeys": {
-            "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+            "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn't set. This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).",
             "items": {
               "default": "",
               "type": "string"
@@ -2733,6 +2817,14 @@
       "io.k8s.api.core.v1.PodSecurityContext": {
         "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
         "properties": {
+          "appArmorProfile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.AppArmorProfile"
+              }
+            ],
+            "description": "appArmorProfile is the AppArmor options to use by the containers in this pod. Note that this field cannot be set when spec.os.name is windows."
+          },
           "fsGroup": {
             "description": "A special supplemental group that applies to all containers in a pod. Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod:\n\n1. The owning GID will be the FSGroup 2. The setgid bit is set (new files created in the volume will be owned by FSGroup) 3. The permission bits are OR'd with rw-rw----\n\nIf unset, the Kubelet will not modify the ownership and permissions of any volume. Note that this field cannot be set when spec.os.name is windows.",
             "format": "int64",
@@ -2879,7 +2971,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "hostAliases": {
-            "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
+            "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified.",
             "items": {
               "allOf": [
                 {
@@ -2953,7 +3045,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "nodeName": {
-            "description": "NodeName is a request to schedule this pod onto a specific node. If it is non-empty, the scheduler simply schedules this pod onto that node, assuming that it fits resource requirements.",
+            "description": "NodeName indicates in which node this pod is scheduled. If empty, this pod is a candidate for scheduling by the scheduler defined in schedulerName. Once this field is set, the kubelet for this node becomes responsible for the lifecycle of this pod. This field should not be used to express a desire for the pod to be scheduled on a specific node. https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename",
             "type": "string"
           },
           "nodeSelector": {
@@ -2971,7 +3063,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodOS"
               }
             ],
-            "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
+            "description": "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.appArmorProfile - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.appArmorProfile - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup"
           },
           "overhead": {
             "additionalProperties": {
@@ -3037,7 +3129,7 @@
             "type": "string"
           },
           "schedulingGates": {
-            "description": "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the scheduler will not attempt to schedule the pod.\n\nSchedulingGates can only be set at pod creation time, and be removed only afterwards.\n\nThis is a beta feature enabled by the PodSchedulingReadiness feature gate.",
+            "description": "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. If schedulingGates is not empty, the pod will stay in the SchedulingGated state and the scheduler will not attempt to schedule the pod.\n\nSchedulingGates can only be set at pod creation time, and be removed only afterwards.",
             "items": {
               "allOf": [
                 {
@@ -3580,7 +3672,8 @@
         "description": "SecretEnvSource selects a Secret to populate the environment variables with.\n\nThe contents of the target Secret's Data field will represent the key-value pairs as environment variables.",
         "properties": {
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "optional": {
@@ -3599,7 +3692,8 @@
             "type": "string"
           },
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "optional": {
@@ -3630,7 +3724,8 @@
             "x-kubernetes-list-type": "atomic"
           },
           "name": {
-            "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+            "default": "",
+            "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
             "type": "string"
           },
           "optional": {
@@ -3678,6 +3773,14 @@
           "allowPrivilegeEscalation": {
             "description": "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when spec.os.name is windows.",
             "type": "boolean"
+          },
+          "appArmorProfile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.AppArmorProfile"
+              }
+            ],
+            "description": "appArmorProfile is the AppArmor options to use by this container. If set, this profile overrides the pod's appArmorProfile. Note that this field cannot be set when spec.os.name is windows."
           },
           "capabilities": {
             "allOf": [
@@ -3903,7 +4006,7 @@
             "type": "integer"
           },
           "minDomains": {
-            "description": "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.\n\nThis is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).",
+            "description": "MinDomains indicates a minimum number of eligible domains. When the number of eligible domains with matching topology keys is less than minDomains, Pod Topology Spread treats \"global minimum\" as 0, and then the calculation of Skew is performed. And when the number of eligible domains with matching topology keys equals or greater than minDomains, this value has no effect on scheduling. As a result, when the number of eligible domains is less than minDomains, scheduler won't schedule more than maxSkew Pods to those domains. If value is nil, the constraint behaves as if MinDomains is equal to 1. Valid values are integers greater than 0. When value is not nil, WhenUnsatisfiable must be DoNotSchedule.\n\nFor example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same labelSelector spread as 2/2/2: | zone1 | zone2 | zone3 | |  P P  |  P P  |  P P  | The number of domains is less than 5(MinDomains), so \"global minimum\" is treated as 0. In this situation, new pod with the same labelSelector cannot be scheduled, because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones, it will violate MaxSkew.",
             "format": "int32",
             "type": "integer"
           },
@@ -4260,7 +4363,7 @@
             "type": "string"
           },
           "mountPropagation": {
-            "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.",
+            "description": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10. When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified (which defaults to None).",
             "type": "string"
           },
           "name": {
@@ -4271,6 +4374,10 @@
           "readOnly": {
             "description": "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
             "type": "boolean"
+          },
+          "recursiveReadOnly": {
+            "description": "RecursiveReadOnly specifies whether read-only mounts should be handled recursively.\n\nIf ReadOnly is false, this field has no meaning and must be unspecified.\n\nIf ReadOnly is true, and this field is set to Disabled, the mount is not made recursively read-only.  If this field is set to IfPossible, the mount is made recursively read-only, if it is supported by the container runtime.  If this field is set to Enabled, the mount is made recursively read-only if it is supported by the container runtime, otherwise the pod will not be started and an error will be generated to indicate the reason.\n\nIf this field is set to IfPossible or Enabled, MountPropagation must be set to None (or be unspecified, which defaults to None).\n\nIf this field is not specified, it is treated as an equivalent of Disabled.",
+            "type": "string"
           },
           "subPath": {
             "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
@@ -4884,6 +4991,11 @@
             "group": "storage.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
           }
         ]
       },
@@ -5620,6 +5732,11 @@
             "group": "storage.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
           }
         ]
       },

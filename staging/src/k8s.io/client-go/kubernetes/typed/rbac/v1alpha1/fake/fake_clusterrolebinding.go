@@ -43,20 +43,22 @@ var clusterrolebindingsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterRoleB
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
 func (c *FakeClusterRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
+	emptyResult := &v1alpha1.ClusterRoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterrolebindingsResource, name), &v1alpha1.ClusterRoleBinding{})
+		Invokes(testing.NewRootGetAction(clusterrolebindingsResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
 func (c *FakeClusterRoleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleBindingList, err error) {
+	emptyResult := &v1alpha1.ClusterRoleBindingList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterrolebindingsResource, clusterrolebindingsKind, opts), &v1alpha1.ClusterRoleBindingList{})
+		Invokes(testing.NewRootListAction(clusterrolebindingsResource, clusterrolebindingsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,20 +82,22 @@ func (c *FakeClusterRoleBindings) Watch(ctx context.Context, opts v1.ListOptions
 
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
 func (c *FakeClusterRoleBindings) Create(ctx context.Context, clusterRoleBinding *v1alpha1.ClusterRoleBinding, opts v1.CreateOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
+	emptyResult := &v1alpha1.ClusterRoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterrolebindingsResource, clusterRoleBinding), &v1alpha1.ClusterRoleBinding{})
+		Invokes(testing.NewRootCreateAction(clusterrolebindingsResource, clusterRoleBinding), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }
 
 // Update takes the representation of a clusterRoleBinding and updates it. Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
 func (c *FakeClusterRoleBindings) Update(ctx context.Context, clusterRoleBinding *v1alpha1.ClusterRoleBinding, opts v1.UpdateOptions) (result *v1alpha1.ClusterRoleBinding, err error) {
+	emptyResult := &v1alpha1.ClusterRoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterrolebindingsResource, clusterRoleBinding), &v1alpha1.ClusterRoleBinding{})
+		Invokes(testing.NewRootUpdateAction(clusterrolebindingsResource, clusterRoleBinding), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }
@@ -115,10 +119,11 @@ func (c *FakeClusterRoleBindings) DeleteCollection(ctx context.Context, opts v1.
 
 // Patch applies the patch and returns the patched clusterRoleBinding.
 func (c *FakeClusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRoleBinding, err error) {
+	emptyResult := &v1alpha1.ClusterRoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, pt, data, subresources...), &v1alpha1.ClusterRoleBinding{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }
@@ -136,10 +141,11 @@ func (c *FakeClusterRoleBindings) Apply(ctx context.Context, clusterRoleBinding 
 	if name == nil {
 		return nil, fmt.Errorf("clusterRoleBinding.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha1.ClusterRoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, *name, types.ApplyPatchType, data), &v1alpha1.ClusterRoleBinding{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha1.ClusterRoleBinding), err
 }

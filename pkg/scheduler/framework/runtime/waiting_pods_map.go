@@ -32,8 +32,8 @@ type waitingPodsMap struct {
 	mu   sync.RWMutex
 }
 
-// NewWaitingPodsMap returns a new waitingPodsMap.
-func NewWaitingPodsMap() *waitingPodsMap {
+// newWaitingPodsMap returns a new waitingPodsMap.
+func newWaitingPodsMap() *waitingPodsMap {
 	return &waitingPodsMap{
 		pods: make(map[types.UID]*waitingPod),
 	}

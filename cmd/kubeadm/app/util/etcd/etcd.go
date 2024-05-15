@@ -172,7 +172,7 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 // getEtcdEndpoints returns the list of etcd endpoints.
 func getEtcdEndpoints(client clientset.Interface) ([]string, error) {
 	return getEtcdEndpointsWithRetry(client,
-		constants.StaticPodMirroringRetryInterval, constants.StaticPodMirroringTimeout)
+		constants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration)
 }
 
 func getEtcdEndpointsWithRetry(client clientset.Interface, interval, timeout time.Duration) ([]string, error) {

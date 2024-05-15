@@ -112,6 +112,13 @@ export LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import
 export UBUNTU_INSTALL_CONTAINERD_VERSION=${KUBE_UBUNTU_INSTALL_CONTAINERD_VERSION:-}
 export UBUNTU_INSTALL_RUNC_VERSION=${KUBE_UBUNTU_INSTALL_RUNC_VERSION:-}
 
+# Ability to inject custom versions (COS images ONLY)
+# if KUBE_COS_INSTALL_CONTAINERD_VERSION or KUBE_COS_INSTALL_RUNC_VERSION
+# is set to empty then we do not override the version(s) and just
+# use whatever is in the default installation of containerd package
+export COS_INSTALL_CONTAINERD_VERSION=${KUBE_COS_INSTALL_CONTAINERD_VERSION:-}
+export COS_INSTALL_RUNC_VERSION=${KUBE_COS_INSTALL_RUNC_VERSION:-}
+
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
 export MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
@@ -483,7 +490,7 @@ ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 
 # The number of services that are allowed to sync concurrently. Will be passed
 # into kube-controller-manager via `--concurrent-service-syncs`
-CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"
+CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-5}"
 
 export SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
 

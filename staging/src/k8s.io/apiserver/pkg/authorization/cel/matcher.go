@@ -19,6 +19,7 @@ package cel
 import (
 	"context"
 	"fmt"
+	"time"
 
 	celgo "github.com/google/cel-go/cel"
 
@@ -28,11 +29,29 @@ import (
 
 type CELMatcher struct {
 	CompilationResults []CompilationResult
+
+	// These are optional fields which can be populated if metrics reporting is desired
+	Metrics        MatcherMetrics
+	AuthorizerType string
+	AuthorizerName string
 }
 
 // eval evaluates the given SubjectAccessReview against all cel matchCondition expression
 func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error) {
 	var evalErrors []error
+
+	metrics := c.Metrics
+	if metrics == nil {
+		metrics = NoopMatcherMetrics{}
+	}
+	start := time.Now()
+	defer func() {
+		metrics.RecordAuthorizationMatchConditionEvaluation(ctx, c.AuthorizerType, c.AuthorizerName, time.Since(start))
+		if len(evalErrors) > 0 {
+			metrics.RecordAuthorizationMatchConditionEvaluationFailure(ctx, c.AuthorizerType, c.AuthorizerName)
+		}
+	}()
+
 	va := map[string]interface{}{
 		"request": convertObjectToUnstructured(&r.Spec),
 	}
@@ -54,6 +73,7 @@ func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessR
 		// If at least one matchCondition successfully evaluates to FALSE,
 		// return early
 		if !match {
+			metrics.RecordAuthorizationMatchConditionExclusion(ctx, c.AuthorizerType, c.AuthorizerName)
 			return false, nil
 		}
 	}

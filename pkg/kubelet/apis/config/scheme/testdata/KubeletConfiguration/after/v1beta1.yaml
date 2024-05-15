@@ -73,6 +73,7 @@ nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
+podLogsDir: /var/log/pods
 podPidsLimit: -1
 port: 10250
 registerNode: true

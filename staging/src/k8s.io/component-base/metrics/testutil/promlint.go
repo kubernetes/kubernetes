@@ -30,13 +30,13 @@ import (
 // We setup this list for allow and not fail on the current violations.
 // Generally speaking, you need to fix the problem for a new metric rather than add it into the list.
 var exceptionMetrics = []string{
-	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/egressselector
+	// k8s.io/apiserver/pkg/server/egressselector
 	"apiserver_egress_dialer_dial_failure_count", // counter metrics should have "_total" suffix
 
-	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/healthz
+	// k8s.io/apiserver/pkg/server/healthz
 	"apiserver_request_total", // label names should be written in 'snake_case' not 'camelCase'
 
-	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/filters
+	// k8s.io/apiserver/pkg/endpoints/filters
 	"authenticated_user_requests", // counter metrics should have "_total" suffix
 	"authentication_attempts",     // counter metrics should have "_total" suffix
 

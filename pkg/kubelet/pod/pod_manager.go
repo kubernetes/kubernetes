@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate mockgen -destination=testing/mock_manager.go -package=testing -build_flags=-mod=mod . Manager
+//go:generate mockgen -source=pod_manager.go -destination=testing/mock_manager.go -package=testing Manager
 package pod
 
 import (

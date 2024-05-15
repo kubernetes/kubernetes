@@ -37,7 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
-	jobutil "k8s.io/kubernetes/pkg/controller/job"
+	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished/metrics"
 	"k8s.io/utils/clock"
 )
@@ -62,7 +62,7 @@ type Controller struct {
 	jListerSynced cache.InformerSynced
 
 	// Jobs that the controller will check its TTL and attempt to delete when the TTL expires.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// The clock for tracking time
 	clock clock.Clock
@@ -70,8 +70,8 @@ type Controller struct {
 
 // New creates an instance of Controller
 func New(ctx context.Context, jobInformer batchinformers.JobInformer, client clientset.Interface) *Controller {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	eventBroadcaster.StartStructuredLogging(3)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	metrics.Register()
@@ -79,7 +79,10 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 	tc := &Controller{
 		client:   client,
 		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ttl_jobs_to_delete"},
+		),
 	}
 
 	logger := klog.FromContext(ctx)
@@ -172,13 +175,13 @@ func (tc *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer tc.queue.Done(key)
 
-	err := tc.processJob(ctx, key.(string))
+	err := tc.processJob(ctx, key)
 	tc.handleErr(err, key)
 
 	return true
 }
 
-func (tc *Controller) handleErr(err error, key interface{}) {
+func (tc *Controller) handleErr(err error, key string) {
 	if err == nil {
 		tc.queue.Forget(key)
 		return

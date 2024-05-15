@@ -541,7 +541,7 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 	// tests the wiring from the pod control to that method.
 	testFn := func(t *testing.T) {
 		_, ctx := ktesting.NewTestContext(t)
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 		fakeClient := &fake.Clientset{}
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
@@ -578,11 +578,11 @@ func TestStatefulPodControlUpdatePodClaimForRetentionPolicy(t *testing.T) {
 		}
 	}
 	t.Run("StatefulSetAutoDeletePVCEnabled", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 		testFn(t)
 	})
 	t.Run("StatefulSetAutoDeletePVCDisabled", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
 		testFn(t)
 	})
 }
@@ -735,11 +735,11 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 		}
 	}
 	t.Run("StatefulSetAutoDeletePVCEnabled", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 		testFn(t)
 	})
 	t.Run("StatefulSetAutoDeletePVCDisabled", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
 		testFn(t)
 	})
 }
@@ -747,7 +747,7 @@ func TestStatefulPodControlRetainDeletionPolicyUpdate(t *testing.T) {
 func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	// Only applicable when the feature gate is on; the off case is tested in TestStatefulPodControlRetainRetentionPolicyUpdate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(1)
@@ -796,7 +796,7 @@ func TestStatefulPodControlRetentionPolicyUpdate(t *testing.T) {
 func TestStatefulPodControlRetentionPolicyUpdateMissingClaims(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	// Only applicable when the feature gate is on.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(1)

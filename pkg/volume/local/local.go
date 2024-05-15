@@ -92,10 +92,6 @@ func (plugin *localVolumePlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *localVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *localVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

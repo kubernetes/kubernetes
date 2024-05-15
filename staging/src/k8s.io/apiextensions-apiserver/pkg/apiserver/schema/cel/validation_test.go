@@ -61,6 +61,7 @@ func TestValidationExpressions(t *testing.T) {
 		costBudget    int64
 		isRoot        bool
 		expectSkipped bool
+		expectedCost  int64
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -2006,6 +2007,38 @@ func TestValidationExpressions(t *testing.T) {
 				`quantity(self.val1).isInteger()`,
 			},
 		},
+		{name: "cost for extended lib calculated correctly: isSorted",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"[1,2,3,4].isSorted()",
+			},
+			expectedCost: 4,
+		},
+		{name: "cost for extended lib calculated correctly: url",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"url('https:://kubernetes.io/').getHostname() != 'test'",
+			},
+			expectedCost: 4,
+		},
+		{name: "cost for extended lib calculated correctly: split",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"size('abc 123 def 123'.split(' ')) > 0",
+			},
+			expectedCost: 5,
+		},
+		{name: "cost for extended lib calculated correctly: join",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"size(['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join(' ')) > 0",
+			},
+			expectedCost: 7,
+		},
 	}
 
 	for i := range tests {
@@ -2013,7 +2046,9 @@ func TestValidationExpressions(t *testing.T) {
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
-			tt.costBudget = celconfig.RuntimeCELCostBudget
+			if tt.costBudget == 0 {
+				tt.costBudget = celconfig.RuntimeCELCostBudget
+			}
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -2031,6 +2066,13 @@ func TestValidationExpressions(t *testing.T) {
 					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
+					}
+
+					if tt.expectedCost != 0 {
+						if remainingBudget != tt.costBudget-tt.expectedCost {
+							t.Errorf("expected cost to be %d, but got %d", tt.expectedCost, tt.costBudget-remainingBudget)
+						}
+						return
 					}
 					if tt.expectSkipped {
 						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
@@ -3119,7 +3161,7 @@ func TestValidateFieldPath(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			validField, err := ValidFieldPath(tc.fieldPath, tc.schema)
+			validField, _, err := ValidFieldPath(tc.fieldPath, tc.schema)
 
 			if err == nil && tc.errDetail != "" {
 				t.Errorf("expected err contains: %v but get nil", tc.errDetail)
@@ -3824,7 +3866,7 @@ func TestRatcheting(t *testing.T) {
 
 // Runs transition rule cases with OptionalOldSelf set to true on the schema
 func TestOptionalOldSelf(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	tests := []struct {
 		name   string
@@ -3979,7 +4021,7 @@ func TestOptionalOldSelf(t *testing.T) {
 // Shows that type(oldSelf) == null_type works for all supported OpenAPI types
 // both when oldSelf is null and when it is not null
 func TestOptionalOldSelfCheckForNull(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	tests := []struct {
 		name   string
@@ -4121,7 +4163,7 @@ func TestOptionalOldSelfCheckForNull(t *testing.T) {
 
 // Show that we cant just use oldSelf as if it was unwrapped
 func TestOptionalOldSelfIsOptionalType(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, true)
 
 	cases := []struct {
 		name   string
@@ -4135,7 +4177,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf + self > 5
 			`),
 			obj:    5,
-			errors: []string{"no matching overload for '_+_' applied to '(optional(int), int)"},
+			errors: []string{"no matching overload for '_+_' applied to '(optional_type(int), int)"},
 		},
 		{
 			name: "forbid direct usage of optional string",
@@ -4143,7 +4185,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf == "foo"
 			`),
 			obj:    "bar",
-			errors: []string{"no matching overload for '_==_' applied to '(optional(string), string)"},
+			errors: []string{"no matching overload for '_==_' applied to '(optional_type(string), string)"},
 		},
 		{
 			name: "forbid direct usage of optional array",
@@ -4151,7 +4193,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf.all(x, x == x)
 			`),
 			obj:    []interface{}{"bar"},
-			errors: []string{"expression of type 'optional(list(string))' cannot be range of a comprehension"},
+			errors: []string{"expression of type 'optional_type(list(string))' cannot be range of a comprehension"},
 		},
 		{
 			name: "forbid direct usage of optional array element",
@@ -4159,7 +4201,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				oldSelf[0] == "foo"
 			`),
 			obj:    []interface{}{"bar"},
-			errors: []string{"found no matching overload for '_==_' applied to '(optional(string), string)"},
+			errors: []string{"found no matching overload for '_==_' applied to '(optional_type(string), string)"},
 		},
 		{
 			name: "forbid direct usage of optional struct",
@@ -4566,6 +4608,14 @@ func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
 		s.ValueValidation = &schema.ValueValidation{}
 	}
 	s.ValueValidation.MaxItems = maxItems
+	return s
+}
+
+func withMaxProperties(s schema.Structural, maxProperties *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxProperties = maxProperties
 	return s
 }
 

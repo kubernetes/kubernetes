@@ -38,6 +38,7 @@ var (
 		EnforceNodeAllocatable:          enforceNodeAllocatable,
 		SystemReservedCgroup:            "/system.slice",
 		KubeReservedCgroup:              "/kubelet.service",
+		PodLogsDir:                      "/logs",
 		SystemCgroups:                   "",
 		CgroupRoot:                      "",
 		EventBurst:                      10,
@@ -366,7 +367,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			conf.MemorySwap.SwapBehavior = "invalid-behavior"
 			return conf
 		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\", or \"UnlimitedSwap\"",
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
 	}, {
 		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -569,7 +570,36 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s",
-	}}
+	}, {
+		name: "pod logs path must be not empty",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = ""
+			return config
+		},
+		errMsg: "invalid configuration: podLogsDir was not specified",
+	}, {
+		name: "pod logs path must be absolute",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = "./test"
+			return config
+		},
+		errMsg: `invalid configuration: pod logs path "./test" must be absolute path`,
+	}, {
+		name: "pod logs path must be normalized",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = "/path/../"
+			return config
+		},
+		errMsg: `invalid configuration: pod logs path "/path/../" must be normalized`,
+	}, {
+		name: "pod logs path is ascii only",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = "/🧪"
+			return config
+		},
+		errMsg: `invalid configuration: pod logs path "/🧪" mut contains ASCII characters only`,
+	},
+	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

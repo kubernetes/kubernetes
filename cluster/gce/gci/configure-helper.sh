@@ -1753,24 +1753,35 @@ function prepare-kube-proxy-manifest-variables {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
-  if [[ "${KUBE_PROXY_MODE:-}" == "ipvs" ]];then
-    # use 'nf_conntrack' instead of 'nf_conntrack_ipv4' for linux kernel >= 4.19
-    # https://github.com/kubernetes/kubernetes/pull/70398
-    local -r kernel_version=$(uname -r | cut -d\. -f1,2)
-    local conntrack_module="nf_conntrack"
-    if [[ $(printf '%s\n4.18\n' "${kernel_version}" | sort -V | tail -1) == "4.18" ]]; then
-      conntrack_module="nf_conntrack_ipv4"
-    fi
 
-    if sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}; then
-      params+=" --proxy-mode=ipvs"
-    else
-      # If IPVS modules are not present, make sure the node does not come up as
-      # healthy.
-      exit 1
-    fi
-  fi
-  params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
+  case "${KUBE_PROXY_MODE:-iptables}" in
+    iptables)
+      params+=" --proxy-mode=iptables --iptables-sync-period=1m --iptables-min-sync-period=10s"
+      ;;
+    ipvs)
+      # use 'nf_conntrack' instead of 'nf_conntrack_ipv4' for linux kernel >= 4.19
+      # https://github.com/kubernetes/kubernetes/pull/70398
+      local -r kernel_version=$(uname -r | cut -d\. -f1,2)
+      local conntrack_module="nf_conntrack"
+      if [[ $(printf '%s\n4.18\n' "${kernel_version}" | sort -V | tail -1) == "4.18" ]]; then
+        conntrack_module="nf_conntrack_ipv4"
+      fi
+
+      if ! sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}; then
+        # If IPVS modules are not present, make sure the node does not come up as
+        # healthy.
+        exit 1
+      fi
+      params+=" --proxy-mode=ipvs --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
+      ;;
+    nftables)
+      # Pass --conntrack-tcp-be-liberal so we can test that this makes the
+      # "proxy implementation should not be vulnerable to the invalid conntrack state bug"
+      # test pass. https://issues.k8s.io/122663#issuecomment-1885024015
+      params+=" --proxy-mode=nftables --conntrack-tcp-be-liberal"
+      ;;
+  esac
+
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
@@ -2178,7 +2189,7 @@ function start-kube-controller-manager {
   create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
   prepare-log-file /var/log/kube-controller-manager.log "${KUBE_CONTROLLER_MANAGER_RUNASUSER:-0}"
   # Calculate variables and assemble the command line.
-  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${KUBE_CONTROLLER_MANAGER_TEST_ARGS:-}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
+  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=4"}" "${KUBE_CONTROLLER_MANAGER_TEST_ARGS:-}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
   local config_path='/etc/srv/kubernetes/kube-controller-manager/kubeconfig'
   params+=("--use-service-account-credentials")
   params+=("--cloud-provider=${CLOUD_PROVIDER_FLAG:-external}")
@@ -2301,6 +2312,7 @@ function start-cloud-controller-manager {
   params+=("--secure-port=10258")
   params+=("--use-service-account-credentials")
   params+=("--cloud-provider=gce")
+  params+=("--concurrent-node-syncs=10")
   params+=("--kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
   params+=("--authorization-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
   params+=("--authentication-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
@@ -2972,6 +2984,9 @@ EOF
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
   fi
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "kube-network-policies" ]]; then
+    setup-addon-manifests "addons" "kube-network-policies"
+  fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
@@ -3172,7 +3187,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.1
+    image: registry.k8s.io/build-image/debian-base:bookworm-v1.0.2
     command:
     - /bin/sh
     args:
@@ -3237,8 +3252,8 @@ function setup-containerd {
 }
 EOF
   if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
-    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
-      # Use Kubernetes cni daemonset on node if network policy provider is specified
+    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
+      # Use Kubernetes cni daemonset on node if network policy provider calico is specified
       # or netd is enabled.
       cni_template_path=""
     fi

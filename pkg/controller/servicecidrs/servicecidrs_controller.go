@@ -67,15 +67,19 @@ const (
 
 // NewController returns a new *Controller.
 func NewController(
+	ctx context.Context,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
 	ipAddressInformer networkinginformers.IPAddressInformer,
 	client clientset.Interface,
 ) *Controller {
-	broadcaster := record.NewBroadcaster()
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 	c := &Controller{
-		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ipaddresses"),
+		client: client,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ipaddresses"},
+		),
 		tree:             iptree.New[sets.Set[string]](),
 		workerLoopPeriod: time.Second,
 	}
@@ -114,7 +118,7 @@ type Controller struct {
 	ipAddressLister networkinglisters.IPAddressLister
 	ipAddressSynced cache.InformerSynced
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and ipRange changes.
 	workerLoopPeriod time.Duration
@@ -129,7 +133,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	c.eventBroadcaster.StartStructuredLogging(0)
+	c.eventBroadcaster.StartStructuredLogging(3)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
@@ -263,13 +267,12 @@ func (c *Controller) worker(ctx context.Context) {
 }
 
 func (c *Controller) processNext(ctx context.Context) bool {
-	eKey, quit := c.queue.Get()
+	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
-	defer c.queue.Done(eKey)
+	defer c.queue.Done(key)
 
-	key := eKey.(string)
 	err := c.sync(ctx, key)
 	if err == nil {
 		c.queue.Forget(key)

@@ -203,6 +203,7 @@ func CreateGCController(ctx context.Context, tb ktesting.TB, restConfig restclie
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
+		ctx,
 		clientSet,
 		metadataClient,
 		restMapper,
@@ -503,11 +504,10 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 // It registers cleanup functions to t.Cleanup(), they will be called when the test completes,
 // no need to do this again.
 func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	testCtx := &TestContext{Ctx: ctx}
+	tCtx := ktesting.Init(t)
+	testCtx := &TestContext{Ctx: tCtx}
 
-	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
 			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
@@ -518,7 +518,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			if admission != nil {
-				config.GenericConfig.AdmissionControl = admission
+				config.ControlPlane.Generic.AdmissionControl = admission
 			}
 		},
 	})
@@ -535,7 +535,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 
 	oldCloseFn := testCtx.CloseFn
 	testCtx.CloseFn = func() {
-		cancel()
+		tCtx.Cancel("tearing down apiserver")
 		oldCloseFn()
 	}
 
@@ -660,7 +660,6 @@ func PodScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // InitDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
 func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.DisruptionController {
-	_, ctx := ktesting.NewTestContext(t)
 	informers := informers.NewSharedInformerFactory(testCtx.ClientSet, 12*time.Hour)
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.ClientSet.Discovery())
@@ -674,7 +673,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 	}
 
 	dc := disruption.NewDisruptionController(
-		ctx,
+		testCtx.Ctx,
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
@@ -1160,6 +1159,8 @@ func NextPodOrDie(t *testing.T, testCtx *TestContext) *schedulerframework.Queued
 }
 
 // NextPod returns the next Pod in the scheduler queue, with a 5 seconds timeout.
+// Note that this function leaks goroutines in the case of timeout; even after this function returns after timeout,
+// the goroutine made by this function keep waiting to pop a pod from the queue.
 func NextPod(t *testing.T, testCtx *TestContext) *schedulerframework.QueuedPodInfo {
 	t.Helper()
 

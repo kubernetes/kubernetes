@@ -282,7 +282,7 @@ func compileRule(s *schema.Structural, rule apiextensions.ValidationRule, envSet
 		compilationResult.MessageExpressionMaxCost = costEst.Max
 	}
 	if rule.FieldPath != "" {
-		validFieldPath, err := ValidFieldPath(rule.FieldPath, s)
+		validFieldPath, _, err := ValidFieldPath(rule.FieldPath, s)
 		if err == nil {
 			compilationResult.NormalizedRuleFieldPath = validFieldPath.String()
 		}

@@ -76,7 +76,7 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
 	logger := klog.FromContext(ctx)
-	broadcaster := record.NewBroadcaster()
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-mirroring-controller"})
 
 	metrics.RegisterMetrics()
@@ -88,12 +88,16 @@ func NewController(ctx context.Context, endpointsInformer coreinformers.Endpoint
 		// processes events that can require significant EndpointSlice changes.
 		// A more significant rate limit back off here helps ensure that the
 		// Controller does not overwhelm the API Server.
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
-			workqueue.NewItemExponentialFailureRateLimiter(defaultSyncBackOff, maxSyncBackOff),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedMaxOfRateLimiter(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](defaultSyncBackOff, maxSyncBackOff),
 			// 10 qps, 100 bucket size. This is only for retry speed and its
 			// only the overall factor (not per item).
-			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
-		), "endpoint_slice_mirroring"),
+			&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "endpoint_slice_mirroring",
+			},
+		),
 		workerLoopPeriod: time.Second,
 	}
 
@@ -192,7 +196,7 @@ type Controller struct {
 	// more often than Endpoints with few addresses; it also would cause an
 	// Endpoints resource that's inserted multiple times to be processed more
 	// than necessary.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// maxEndpointsPerSubset references the maximum number of endpoints that
 	// should be added to an EndpointSlice for an EndpointSubset.
@@ -251,13 +255,13 @@ func (c *Controller) processNextWorkItem(logger klog.Logger) bool {
 	}
 	defer c.queue.Done(cKey)
 
-	err := c.syncEndpoints(logger, cKey.(string))
+	err := c.syncEndpoints(logger, cKey)
 	c.handleErr(logger, err, cKey)
 
 	return true
 }
 
-func (c *Controller) handleErr(logger klog.Logger, err error, key interface{}) {
+func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 	if err == nil {
 		c.queue.Forget(key)
 		return
@@ -464,8 +468,8 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 // version in the endpointSliceTracker or the managed-by value of the
 // EndpointSlice has changed from or to this controller.
 func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj interface{}) {
-	prevEndpointSlice := obj.(*discovery.EndpointSlice)
-	endpointSlice := prevObj.(*discovery.EndpointSlice)
+	endpointSlice := obj.(*discovery.EndpointSlice)
+	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj))
 		return

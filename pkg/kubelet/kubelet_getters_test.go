@@ -36,6 +36,9 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pods")
 	assert.Equal(t, exp, got)
 
+	got = kubelet.getPodLogsDir()
+	assert.Equal(t, kubelet.podLogsDirectory, got)
+
 	got = kubelet.getPluginsDir()
 	exp = filepath.Join(root, "plugins")
 	assert.Equal(t, exp, got)
@@ -106,13 +109,13 @@ func TestHandlerSupportsUserNamespaces(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	kubelet.runtimeState.setRuntimeHandlers(map[string]kubecontainer.RuntimeHandler{
-		"has-support": {
+	kubelet.runtimeState.setRuntimeHandlers([]kubecontainer.RuntimeHandler{
+		{
 			Name:                   "has-support",
 			SupportsUserNamespaces: true,
 		},
-		"has-no-support": {
-			Name:                   "has-support",
+		{
+			Name:                   "has-no-support",
 			SupportsUserNamespaces: false,
 		},
 	})

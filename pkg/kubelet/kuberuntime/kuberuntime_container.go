@@ -218,7 +218,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		// We are checking to see if the log directory exists, and find
 		// the latest restartCount by checking the log name -
 		// {restartCount}.log - and adding 1 to it.
-		logDir := BuildContainerLogsDirectory(pod.Namespace, pod.Name, pod.UID, container.Name)
+		logDir := BuildContainerLogsDirectory(m.podLogsDirectory, pod.Namespace, pod.Name, pod.UID, container.Name)
 		restartCount, err = calcRestartCountByLogDir(logDir)
 		if err != nil {
 			klog.InfoS("Cannot calculate restartCount from the log directory", "logDir", logDir, "err", err)
@@ -333,7 +333,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
-	logDir := BuildContainerLogsDirectory(pod.Namespace, pod.Name, pod.UID, container.Name)
+	logDir := BuildContainerLogsDirectory(m.podLogsDirectory, pod.Namespace, pod.Name, pod.UID, container.Name)
 	err = m.osInterface.MkdirAll(logDir, 0755)
 	if err != nil {
 		return nil, cleanupAction, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
@@ -429,11 +429,12 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 		v := opts.Mounts[idx]
 		selinuxRelabel := v.SELinuxRelabel && selinux.GetEnabled()
 		mount := &runtimeapi.Mount{
-			HostPath:       v.HostPath,
-			ContainerPath:  v.ContainerPath,
-			Readonly:       v.ReadOnly,
-			SelinuxRelabel: selinuxRelabel,
-			Propagation:    v.Propagation,
+			HostPath:          v.HostPath,
+			ContainerPath:     v.ContainerPath,
+			Readonly:          v.ReadOnly,
+			SelinuxRelabel:    selinuxRelabel,
+			Propagation:       v.Propagation,
+			RecursiveReadOnly: v.RecursiveReadOnly,
 		}
 
 		volumeMounts = append(volumeMounts, mount)
@@ -608,6 +609,13 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		// If runtime reports cpu & memory resources info, add it to container status
 		cStatusResources = toKubeContainerResources(status.Resources)
 	}
+
+	// Keep backwards compatibility to older runtimes, status.ImageId has been added in v1.30
+	imageID := status.ImageRef
+	if status.ImageId != "" {
+		imageID = status.ImageId
+	}
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
@@ -615,7 +623,8 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		},
 		Name:                 labeledInfo.ContainerName,
 		Image:                status.Image.Image,
-		ImageID:              status.ImageRef,
+		ImageID:              imageID,
+		ImageRef:             status.ImageRef,
 		ImageRuntimeHandler:  status.Image.RuntimeHandler,
 		Hash:                 annotatedInfo.Hash,
 		HashWithoutResources: annotatedInfo.HashWithoutResources,

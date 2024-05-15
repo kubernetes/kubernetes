@@ -37,14 +37,68 @@ func TestDecode(t *testing.T) {
 		return b
 	}
 
-	for _, tc := range []struct {
+	type test struct {
 		name          string
-		modes         []cbor.DecMode
+		modes         []cbor.DecMode // most tests should run for all modes
 		in            []byte
 		into          interface{} // prototype for concrete destination type. if nil, decode into empty interface value.
 		want          interface{}
 		assertOnError func(t *testing.T, e error)
-	}{
+	}
+
+	// Test cases are grouped by the kind of the CBOR data item being decoded, as enumerated in
+	// https://www.rfc-editor.org/rfc/rfc8949.html#section-2.
+	group := func(t *testing.T, name string, tests []test) {
+		t.Run(name, func(t *testing.T) {
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					decModes := test.modes
+					if len(decModes) == 0 {
+						decModes = allDecModes
+					}
+
+					for _, decMode := range decModes {
+						modeName, ok := decModeNames[decMode]
+						if !ok {
+							t.Fatal("test case configured to run against unrecognized mode")
+						}
+
+						t.Run(fmt.Sprintf("%s/mode=%s", test.name, modeName), func(t *testing.T) {
+							var dst reflect.Value
+							if test.into == nil {
+								var i interface{}
+								dst = reflect.ValueOf(&i)
+							} else {
+								dst = reflect.New(reflect.TypeOf(test.into))
+							}
+							err := decMode.Unmarshal(test.in, dst.Interface())
+							test.assertOnError(t, err)
+							if test.want != nil {
+								if diff := cmp.Diff(test.want, dst.Elem().Interface()); diff != "" {
+									t.Errorf("unexpected output:\n%s", diff)
+								}
+							}
+						})
+					}
+				})
+			}
+		})
+	}
+
+	group(t, "unsigned integer", []test{
+		{
+			name:          "unsigned integer decodes to interface{} as int64",
+			in:            hex("0a"), // 10
+			want:          int64(10),
+			assertOnError: assertNilError,
+		},
+	})
+
+	group(t, "negative integer", []test{})
+
+	group(t, "byte string", []test{})
+
+	group(t, "text string", []test{
 		{
 			name: "reject text string containing invalid utf-8 sequence",
 			in:   hex("6180"), // text string beginning with continuation byte 0x80
@@ -56,9 +110,195 @@ func TestDecode(t *testing.T) {
 			}),
 		},
 		{
-			name:          "unsigned integer decodes to interface{} as int64",
-			in:            hex("0a"), // 10
-			want:          int64(10),
+			name:          "indefinite-length text string",
+			in:            hex("7f616161626163ff"), // (_ "a", "b", "c")
+			want:          "abc",
+			assertOnError: assertNilError,
+		},
+	})
+
+	group(t, "array", []test{
+		{
+			name: "nested indefinite-length array",
+			in:   hex("9f9f8080ff9f8080ffff"), // [_ [_ [] []] [_ [][]]]
+			want: []interface{}{
+				[]interface{}{[]interface{}{}, []interface{}{}},
+				[]interface{}{[]interface{}{}, []interface{}{}},
+			},
+			assertOnError: assertNilError,
+		},
+	})
+
+	group(t, "map", []test{
+		{
+			name:          "reject duplicate negative int keys into struct",
+			modes:         []cbor.DecMode{modes.DecodeLax},
+			in:            hex("a220012002"), // {-1: 1, -1: 2}
+			into:          struct{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(-1), Index: 1}),
+		},
+		{
+			name:          "reject duplicate negative int keys into map",
+			in:            hex("a220012002"), // {-1: 1, -1: 2}
+			into:          map[int64]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(-1), Index: 1}),
+		},
+		{
+			name:          "reject duplicate positive int keys into struct",
+			modes:         []cbor.DecMode{modes.DecodeLax},
+			in:            hex("a201010102"), // {1: 1, 1: 2}
+			into:          struct{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(1), Index: 1}),
+		},
+		{
+			name:          "reject duplicate positive int keys into map",
+			in:            hex("a201010102"), // {1: 1, 1: 2}
+			into:          map[int64]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: int64(1), Index: 1}),
+		},
+		{
+			name: "reject duplicate text string keys into struct",
+			in:   hex("a2614101614102"), // {"A": 1, "A": 2}
+			into: struct {
+				A int `json:"A"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name:          "reject duplicate text string keys into map",
+			in:            hex("a2614101614102"), // {"A": 1, "A": 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name:          "reject duplicate byte string keys into map",
+			in:            hex("a2414101414102"), // {'A': 1, 'A': 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name: "reject duplicate byte string keys into struct",
+			in:   hex("a2414101414102"), // {'A': 1, 'A': 2}
+			into: struct {
+				A int `json:"A"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name:          "reject duplicate byte string and text string keys into map",
+			in:            hex("a2414101614102"), // {'A': 1, "A": 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name: "reject duplicate byte string and text string keys into struct",
+			in:   hex("a2414101614102"), // {'A': 1, "A": 2}
+			into: struct {
+				A int `json:"A"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("A"), Index: 1}),
+		},
+		{
+			name: "reject two identical indefinite-length byte string keys split into chunks differently into struct",
+			in:   hex("a25f426865436c6c6fff015f416844656c6c6fff02"), // {(_ 'he', 'llo'): 1, (_ 'h', 'ello'): 2}
+			into: struct {
+				Hello int `json:"hello"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name:          "reject two identical indefinite-length byte string keys split into chunks differently into map",
+			in:            hex("a25f426865436c6c6fff015f416844656c6c6fff02"), // {(_ 'he', 'llo'): 1, (_ 'h', 'ello'): 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name: "reject two identical indefinite-length text string keys split into chunks differently into struct",
+			in:   hex("a27f626865636c6c6fff017f616864656c6c6fff02"), // {(_ "he", "llo"): 1, (_ "h", "ello"): 2}
+			into: struct {
+				Hello int `json:"hello"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name:          "reject two identical indefinite-length text string keys split into chunks differently into map",
+			modes:         []cbor.DecMode{modes.DecodeLax},
+			in:            hex("a27f626865636c6c6fff017f616864656c6c6fff02"), // {(_ "he", "llo"): 1, (_ "h", "ello"): 2}
+			into:          map[string]interface{}{},
+			assertOnError: assertIdenticalError(&cbor.DupMapKeyError{Key: string("hello"), Index: 1}),
+		},
+		{
+			name:  "case-insensitive match treated as unknown field",
+			modes: []cbor.DecMode{modes.Decode},
+			in:    hex("a1614101"), // {"A": 1}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.UnknownFieldError{Index: 0}),
+		},
+		{
+			name:  "case-insensitive match ignored in lax mode",
+			modes: []cbor.DecMode{modes.DecodeLax},
+			in:    hex("a1614101"), // {"A": 1}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 0,
+			},
+			assertOnError: assertNilError,
+		},
+		{
+			name:  "case-insensitive match after exact match treated as unknown field",
+			modes: []cbor.DecMode{modes.Decode},
+			in:    hex("a2616101614102"), // {"a": 1, "A": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 1,
+			},
+			assertOnError: assertIdenticalError(&cbor.UnknownFieldError{Index: 1}),
+		},
+		{
+			name:  "case-insensitive match after exact match ignored in lax mode",
+			modes: []cbor.DecMode{modes.DecodeLax},
+			in:    hex("a2616101614102"), // {"a": 1, "A": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 1,
+			},
+			assertOnError: assertNilError,
+		},
+		{
+			name:  "case-insensitive match before exact match treated as unknown field",
+			modes: []cbor.DecMode{modes.Decode},
+			in:    hex("a2614101616102"), // {"A": 1, "a": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			assertOnError: assertIdenticalError(&cbor.UnknownFieldError{Index: 0}),
+		},
+		{
+			name:  "case-insensitive match before exact match ignored in lax mode",
+			modes: []cbor.DecMode{modes.DecodeLax},
+			in:    hex("a2614101616102"), // {"A": 1, "a": 2}
+			into: struct {
+				A int `json:"a"`
+			}{},
+			want: struct {
+				A int `json:"a"`
+			}{
+				A: 2,
+			},
 			assertOnError: assertNilError,
 		},
 		{
@@ -81,21 +321,6 @@ func TestDecode(t *testing.T) {
 			assertOnError: assertNilError,
 		},
 		{
-			name:          "indefinite-length text string",
-			in:            hex("7f616161626163ff"), // (_ "a", "b", "c")
-			want:          "abc",
-			assertOnError: assertNilError,
-		},
-		{
-			name: "nested indefinite-length array",
-			in:   hex("9f9f8080ff9f8080ffff"), // [_ [_ [] []] [_ [][]]]
-			want: []interface{}{
-				[]interface{}{[]interface{}{}, []interface{}{}},
-				[]interface{}{[]interface{}{}, []interface{}{}},
-			},
-			assertOnError: assertNilError,
-		},
-		{
 			name: "nested indefinite-length map",
 			in:   hex("bf6141bf616101616202ff6142bf616901616a02ffff"), // {_ "A": {_ "a": 1, "b": 2}, "B": {_ "i": 1, "j": 2}}
 			want: map[string]interface{}{
@@ -104,34 +329,21 @@ func TestDecode(t *testing.T) {
 			},
 			assertOnError: assertNilError,
 		},
-	} {
-		ms := tc.modes
-		if len(ms) == 0 {
-			ms = allDecModes
-		}
+	})
 
-		for _, dm := range ms {
-			modeName, ok := decModeNames[dm]
-			if !ok {
-				t.Fatal("test case configured to run against unrecognized mode")
-			}
+	group(t, "floating-point number", []test{})
 
-			t.Run(fmt.Sprintf("mode=%s/%s", modeName, tc.name), func(t *testing.T) {
-				var dst reflect.Value
-				if tc.into == nil {
-					var i interface{}
-					dst = reflect.ValueOf(&i)
-				} else {
-					dst = reflect.New(reflect.TypeOf(tc.into))
-				}
-				err := dm.Unmarshal(tc.in, dst.Interface())
-				tc.assertOnError(t, err)
-				if tc.want != nil {
-					if diff := cmp.Diff(tc.want, dst.Elem().Interface()); diff != "" {
-						t.Errorf("unexpected output:\n%s", diff)
-					}
-				}
-			})
-		}
-	}
+	group(t, "simple value", []test{})
+
+	t.Run("tag", func(t *testing.T) {
+		group(t, "rfc3339 time", []test{})
+
+		group(t, "epoch time", []test{})
+
+		group(t, "unsigned bignum", []test{})
+
+		group(t, "negative bignum", []test{})
+
+		group(t, "unrecognized", []test{})
+	})
 }

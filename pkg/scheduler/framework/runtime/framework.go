@@ -132,7 +132,6 @@ type frameworkOptions struct {
 	extenders              []framework.Extender
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
-	waitingPods            *waitingPodsMap
 	logger                 *klog.Logger
 }
 
@@ -222,13 +221,6 @@ func WithMetricsRecorder(r *metrics.MetricAsyncRecorder) Option {
 	}
 }
 
-// WithWaitingPods sets waitingPods for the scheduling frameworkImpl.
-func WithWaitingPods(wp *waitingPodsMap) Option {
-	return func(o *frameworkOptions) {
-		o.waitingPods = wp
-	}
-}
-
 // WithLogger overrides the default logger from k8s.io/klog.
 func WithLogger(logger klog.Logger) Option {
 	return func(o *frameworkOptions) {
@@ -262,7 +254,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
 		scorePluginWeight:    make(map[string]int),
-		waitingPods:          options.waitingPods,
+		waitingPods:          newWaitingPodsMap(),
 		clientSet:            options.clientSet,
 		kubeConfig:           options.kubeConfig,
 		eventRecorder:        options.eventRecorder,

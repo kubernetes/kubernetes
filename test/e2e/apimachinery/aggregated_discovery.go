@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -34,8 +34,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("AggregatedDiscovery", func() {
@@ -143,20 +141,20 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		},
 	}
 
-	const aggregatedAccept = "application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
+	const aggregatedAccept = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 
 	/*
 		Release : v1.30
 		Testname: Aggregated Discovery Endpoint Accept Headers
 		Description: An apiserver MUST support the Aggregated Discovery endpoint Accept headers. Built-in resources MUST all be present.
 	*/
-	ginkgo.It("should support raw aggregated discovery endpoint Accept headers", func(ctx context.Context) {
+	framework.ConformanceIt("should support raw aggregated discovery endpoint Accept headers", func(ctx context.Context) {
 		d, err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis").SetHeader("Accept", aggregatedAccept).Do(ctx).Raw()
 		if err != nil {
 			framework.Failf("Failed to get raw aggregated discovery document")
 		}
 
-		groupList := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+		groupList := apidiscoveryv2.APIGroupDiscoveryList{}
 		err = json.Unmarshal(d, &groupList)
 		if err != nil {
 			framework.Failf("Failed to parse discovery: %v", err)
@@ -174,7 +172,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 			framework.Failf("Failed to get raw aggregated discovery document")
 		}
 
-		groupListLegacy := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+		groupListLegacy := apidiscoveryv2.APIGroupDiscoveryList{}
 		err = json.Unmarshal(d2, &groupListLegacy)
 		if err != nil {
 			framework.Failf("Failed to parse discovery: %v", err)
@@ -193,7 +191,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		Description: An apiserver MUST support the Aggregated Discovery endpoint Accept headers.
 		Add a CRD to the apiserver. The CRD MUST appear in the discovery document.
 	*/
-	ginkgo.It("should support raw aggregated discovery request for CRDs", func(ctx context.Context) {
+	framework.ConformanceIt("should support raw aggregated discovery request for CRDs", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
@@ -238,7 +236,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 				framework.Failf("Failed to get raw aggregated discovery document")
 			}
 
-			groupList := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+			groupList := apidiscoveryv2.APIGroupDiscoveryList{}
 			err = json.Unmarshal(d, &groupList)
 			if err != nil {
 				framework.Failf("Failed to parse discovery: %v", err)
@@ -258,7 +256,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		Testname: Aggregated Discovery Interface
 		Description: An apiserver MUST support the Aggregated Discovery client interface. Built-in resources MUST all be present.
 	*/
-	ginkgo.It("should support aggregated discovery interface", func(ctx context.Context) {
+	framework.ConformanceIt("should support aggregated discovery interface", func(ctx context.Context) {
 		d := f.ClientSet.Discovery()
 
 		ad, ok := d.(clientdiscovery.AggregatedDiscoveryInterface)
@@ -302,7 +300,7 @@ var _ = SIGDescribe("AggregatedDiscovery", func() {
 		Description: An apiserver MUST support the Aggregated Discovery client interface.
 		Add a CRD to the apiserver. The CRD resource MUST be present in the discovery document.
 	*/
-	ginkgo.It("should support aggregated discovery interface for CRDs", func(ctx context.Context) {
+	framework.ConformanceIt("should support aggregated discovery interface for CRDs", func(ctx context.Context) {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err)
 		apiExtensionClient, err := apiextensionclientset.NewForConfig(config)
@@ -392,7 +390,7 @@ func isGVPresent(gvs *metav1.APIGroupList, gv schema.GroupVersion) bool {
 	return false
 }
 
-func isGVRPresentAPIDiscovery(apidiscovery apidiscoveryv2beta1.APIGroupDiscoveryList, gvr schema.GroupVersionResource) bool {
+func isGVRPresentAPIDiscovery(apidiscovery apidiscoveryv2.APIGroupDiscoveryList, gvr schema.GroupVersionResource) bool {
 	for _, group := range apidiscovery.Items {
 		if gvr.Group == group.Name {
 			for _, version := range group.Versions {

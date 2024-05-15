@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,6 +44,7 @@ var (
 	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
 	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
 	createNode                   = testutils.CreateNode
+	updateNode                   = testutils.UpdateNode
 	createPausePod               = testutils.CreatePausePod
 	deletePod                    = testutils.DeletePod
 	getPod                       = testutils.GetPod
@@ -1070,7 +1072,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enableMatchLabelKeysInAffinity)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enableMatchLabelKeysInAffinity)
 			_, ctx := ktesting.NewTestContext(t)
 
 			testCtx := initTest(t, "")
@@ -1363,7 +1365,6 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 		fits                      bool
 		nodes                     []*v1.Node
 		candidateNodes            []string // nodes expected to schedule onto
-		enableMinDomains          bool
 		enableNodeInclusionPolicy bool
 		enableMatchLabelKeys      bool
 	}{
@@ -1483,10 +1484,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().ZeroTerminationGracePeriod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().ZeroTerminationGracePeriod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-3"},
 		},
 		{
 			name: "pods spread across nodes as 2/2/1, maxSkew is 2, and the number of domains > minDomains, then the all nodes fit",
@@ -1510,10 +1510,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().ZeroTerminationGracePeriod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().ZeroTerminationGracePeriod().Name("p3").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-1", "node-2", "node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-1", "node-2", "node-3"},
 		},
 		{
 			name: "pods spread across zone as 2/1, maxSkew is 2 and the number of domains < minDomains, then the third and fourth nodes fit",
@@ -1533,10 +1532,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().Name("p2a").Node("node-1").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().Name("p3a").Node("node-2").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-2", "node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-2", "node-3"},
 		},
 		{
 			name: "pods spread across zone as 2/1, maxSkew is 2 and the number of domains < minDomains, then the all nodes fit",
@@ -1556,10 +1554,9 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
 				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
 			},
-			fits:             true,
-			nodes:            defaultNodes,
-			candidateNodes:   []string{"node-0", "node-1", "node-2", "node-3"},
-			enableMinDomains: true,
+			fits:           true,
+			nodes:          defaultNodes,
+			candidateNodes: []string{"node-0", "node-1", "node-2", "node-3"},
 		},
 		{
 			name: "NodeAffinityPolicy honored with labelSelectors, pods spread across zone as 2/1",
@@ -1772,9 +1769,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, tt.enableMinDomains)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTest(t, "pts-predicate")
 			cs := testCtx.ClientSet
@@ -2042,6 +2038,111 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				return deletePod(cs, "pod-to-be-deleted", ns)
 			},
 		},
+		{
+			name: "pod with pvc has node-affinity to non-existent/illegal nodes",
+			init: func(cs kubernetes.Interface, ns string) error {
+				storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+				volType := v1.HostPathDirectoryOrCreate
+				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+					Name("pv-has-non-existent-nodes").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Capacity(storage.Requests).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					NodeAffinityIn("kubernetes.io/hostname", []string{"node-available", "non-existing"}). // one node exist, one doesn't
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pv: %w", err)
+				}
+				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+					Name("pvc-has-non-existent-nodes").
+					Namespace(ns).
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName(pv.Name).
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(storage).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pvc: %w", err)
+				}
+				return nil
+			},
+			pod: &testutils.PausePodConfig{
+				Name: "pod-with-pvc-has-non-existent-nodes",
+				Volumes: []v1.Volume{{
+					Name: "volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-has-non-existent-nodes",
+						},
+					},
+				}},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				_, err := createNode(cs, st.MakeNode().Label("kubernetes.io/hostname", "node-available").Name("node-available").Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create node: %w", err)
+				}
+				return nil
+			},
+		},
+		{
+			name: "pod with pvc got scheduled after node updated it's label",
+			init: func(cs kubernetes.Interface, ns string) error {
+				_, err := createNode(cs, st.MakeNode().Label("foo", "foo").Name("node-foo").Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create node: %w", err)
+				}
+				storage := v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+				volType := v1.HostPathDirectoryOrCreate
+				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+					Name("pv-foo").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Capacity(storage.Requests).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/tmp", Type: &volType}).
+					NodeAffinityIn("foo", []string{"bar"}).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pv: %w", err)
+				}
+				_, err = testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+					Name("pvc-foo").
+					Namespace(ns).
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName(pv.Name).
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(storage).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pvc: %w", err)
+				}
+				return nil
+			},
+			pod: &testutils.PausePodConfig{
+				Name: "pod-with-pvc-foo",
+				Volumes: []v1.Volume{{
+					Name: "volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-foo",
+						},
+					},
+				}},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				_, err := updateNode(cs, &v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-foo",
+						Labels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				})
+				if err != nil {
+					return fmt.Errorf("cannot update node: %w", err)
+				}
+				return nil
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2073,4 +2174,143 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPodAffinityMatchLabelKeyEnablement tests the Pod is correctly mutated by MatchLabelKeysInPodAffinity feature,
+// even if turing the feature gate enabled or disabled.
+func TestPodAffinityMatchLabelKeyEnablement(t *testing.T) {
+	// enable the feature gate
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, true)
+	testCtx := initTest(t, "matchlabelkey")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test",
+			Namespace:    testCtx.NS.Name,
+			Labels:       map[string]string{"foo": "", "bar": "a"},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "container",
+					Image: imageutils.GetPauseImageName(),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1G"),
+						},
+					},
+				},
+			},
+			Affinity: &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							TopologyKey: "node",
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+							MatchLabelKeys: []string{"bar"},
+						},
+					},
+				},
+			},
+		},
+	}
+	expectedLabelSelector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "foo",
+				Operator: metav1.LabelSelectorOpExists,
+			},
+			{
+				Key:      "bar",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"a"},
+			},
+		},
+	}
+
+	p1, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be changed from the original one because the feature gate is enabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
+	}
+
+	// disable the feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+
+	p2, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be the same as the original one because the feature gate is disabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
+	}
+
+	// check the pod, which was created when the feature gate is enabled, still has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be changed from the original one because the feature gate is enabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
+	}
+
+	// Again, enable the feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, true)
+
+	p3, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p3.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be changed from the original one because the feature gate is enabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector shouldn't get changed because the feature gate was disabled at its creation.
+	// Even if the feature gate is enabled now, matchLabelKeys don't get applied to the pod.
+	// (it's only handled when the pod is created)
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
+	}
+
 }

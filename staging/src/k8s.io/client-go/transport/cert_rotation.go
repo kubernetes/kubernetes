@@ -47,14 +47,17 @@ type dynamicClientCert struct {
 	connDialer *connrotation.Dialer
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 func certRotatingDialer(reload reloadFunc, dial utilnet.DialFunc) *dynamicClientCert {
 	d := &dynamicClientCert{
 		reload:     reload,
 		connDialer: connrotation.NewDialer(connrotation.DialFunc(dial)),
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DynamicClientCertificate"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "DynamicClientCertificate"},
+		),
 	}
 
 	return d

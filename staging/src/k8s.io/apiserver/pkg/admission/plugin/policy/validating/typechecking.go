@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -39,6 +39,8 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -57,7 +59,7 @@ type TypeCheckingContext struct {
 	paramGVK      schema.GroupVersionKind
 	paramDeclType *apiservercel.DeclType
 
-	variables []v1beta1.Variable
+	variables []v1.Variable
 }
 
 type typeOverwrite struct {
@@ -105,18 +107,18 @@ func (r *TypeCheckingResult) String() string {
 // as []ExpressionWarning that is ready to be set in policy.Status
 // The result is nil if type checking returns no warning.
 // The policy object is NOT mutated. The caller should update Status accordingly
-func (c *TypeChecker) Check(policy *v1beta1.ValidatingAdmissionPolicy) []v1beta1.ExpressionWarning {
+func (c *TypeChecker) Check(policy *v1.ValidatingAdmissionPolicy) []v1.ExpressionWarning {
 	ctx := c.CreateContext(policy)
 
 	// warnings to return, note that the capacity is optimistically set to zero
-	var warnings []v1beta1.ExpressionWarning // intentionally not setting capacity
+	var warnings []v1.ExpressionWarning // intentionally not setting capacity
 
 	// check main validation expressions and their message expressions, located in spec.validations[*]
 	fieldRef := field.NewPath("spec", "validations")
 	for i, v := range policy.Spec.Validations {
 		results := c.CheckExpression(ctx, v.Expression)
 		if len(results) != 0 {
-			warnings = append(warnings, v1beta1.ExpressionWarning{
+			warnings = append(warnings, v1.ExpressionWarning{
 				FieldRef: fieldRef.Index(i).Child("expression").String(),
 				Warning:  results.String(),
 			})
@@ -127,7 +129,7 @@ func (c *TypeChecker) Check(policy *v1beta1.ValidatingAdmissionPolicy) []v1beta1
 		}
 		results = c.CheckExpression(ctx, v.MessageExpression)
 		if len(results) != 0 {
-			warnings = append(warnings, v1beta1.ExpressionWarning{
+			warnings = append(warnings, v1.ExpressionWarning{
 				FieldRef: fieldRef.Index(i).Child("messageExpression").String(),
 				Warning:  results.String(),
 			})
@@ -138,7 +140,7 @@ func (c *TypeChecker) Check(policy *v1beta1.ValidatingAdmissionPolicy) []v1beta1
 }
 
 // CreateContext resolves all types and their schemas from a policy definition and creates the context.
-func (c *TypeChecker) CreateContext(policy *v1beta1.ValidatingAdmissionPolicy) *TypeCheckingContext {
+func (c *TypeChecker) CreateContext(policy *v1.ValidatingAdmissionPolicy) *TypeCheckingContext {
 	ctx := new(TypeCheckingContext)
 	allGvks := c.typesToCheck(policy)
 	gvks := make([]schema.GroupVersionKind, 0, len(allGvks))
@@ -210,6 +212,7 @@ func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression strin
 		options := plugincel.OptionalVariableDeclarations{
 			HasParams:     ctx.paramDeclType != nil,
 			HasAuthorizer: true,
+			StrictCost:    utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP),
 		}
 		compiler.CompileAndStoreVariables(convertv1beta1Variables(ctx.variables), options, environment.StoredExpressions)
 		result := compiler.CompileCELExpression(celExpression(expression), options, environment.StoredExpressions)
@@ -250,7 +253,7 @@ func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclT
 	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
 }
 
-func (c *TypeChecker) paramsGVK(policy *v1beta1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
+func (c *TypeChecker) paramsGVK(policy *v1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
 	if policy.Spec.ParamKind == nil {
 		return schema.GroupVersionKind{}
 	}
@@ -263,7 +266,7 @@ func (c *TypeChecker) paramsGVK(policy *v1beta1.ValidatingAdmissionPolicy) schem
 
 // typesToCheck extracts a list of GVKs that needs type checking from the policy
 // the result is sorted in the order of Group, Version, and Kind
-func (c *TypeChecker) typesToCheck(p *v1beta1.ValidatingAdmissionPolicy) []schema.GroupVersionKind {
+func (c *TypeChecker) typesToCheck(p *v1.ValidatingAdmissionPolicy) []schema.GroupVersionKind {
 	gvks := sets.New[schema.GroupVersionKind]()
 	if p.Spec.MatchConstraints == nil || len(p.Spec.MatchConstraints.ResourceRules) == 0 {
 		return nil
@@ -333,7 +336,7 @@ func (c *TypeChecker) typesToCheck(p *v1beta1.ValidatingAdmissionPolicy) []schem
 	return sortGVKList(gvks.UnsortedList())
 }
 
-func extractGroups(rule *v1beta1.Rule) []string {
+func extractGroups(rule *v1.Rule) []string {
 	groups := make([]string, 0, len(rule.APIGroups))
 	for _, group := range rule.APIGroups {
 		// give up if wildcard
@@ -345,7 +348,7 @@ func extractGroups(rule *v1beta1.Rule) []string {
 	return groups
 }
 
-func extractVersions(rule *v1beta1.Rule) []string {
+func extractVersions(rule *v1.Rule) []string {
 	versions := make([]string, 0, len(rule.APIVersions))
 	for _, version := range rule.APIVersions {
 		if strings.ContainsAny(version, "*") {
@@ -356,7 +359,7 @@ func extractVersions(rule *v1beta1.Rule) []string {
 	return versions
 }
 
-func extractResources(rule *v1beta1.Rule) []string {
+func extractResources(rule *v1.Rule) []string {
 	resources := make([]string, 0, len(rule.Resources))
 	for _, resource := range rule.Resources {
 		// skip wildcard and subresources
@@ -391,7 +394,7 @@ func (c *TypeChecker) tryRefreshRESTMapper() {
 }
 
 func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*environment.EnvSet, error) {
-	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP))
 	requestType := plugincel.BuildRequestType()
 	namespaceType := plugincel.BuildNamespaceType()
 

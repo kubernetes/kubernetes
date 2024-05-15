@@ -206,43 +206,6 @@ type Config struct {
 	Overlay map[string][]byte
 }
 
-// driver is the type for functions that query the build system for the
-// packages named by the patterns.
-type driver func(cfg *Config, patterns ...string) (*driverResponse, error)
-
-// driverResponse contains the results for a driver query.
-type driverResponse struct {
-	// NotHandled is returned if the request can't be handled by the current
-	// driver. If an external driver returns a response with NotHandled, the
-	// rest of the driverResponse is ignored, and go/packages will fallback
-	// to the next driver. If go/packages is extended in the future to support
-	// lists of multiple drivers, go/packages will fall back to the next driver.
-	NotHandled bool
-
-	// Compiler and Arch are the arguments pass of types.SizesFor
-	// to get a types.Sizes to use when type checking.
-	Compiler string
-	Arch     string
-
-	// Roots is the set of package IDs that make up the root packages.
-	// We have to encode this separately because when we encode a single package
-	// we cannot know if it is one of the roots as that requires knowledge of the
-	// graph it is part of.
-	Roots []string `json:",omitempty"`
-
-	// Packages is the full set of packages in the graph.
-	// The packages are not connected into a graph.
-	// The Imports if populated will be stubs that only have their ID set.
-	// Imports will be connected and then type and syntax information added in a
-	// later pass (see refine).
-	Packages []*Package
-
-	// GoVersion is the minor version number used by the driver
-	// (e.g. the go command on the PATH) when selecting .go files.
-	// Zero means unknown.
-	GoVersion int
-}
-
 // Load loads and returns the Go packages named by the given patterns.
 //
 // Config specifies loading options;
@@ -291,7 +254,7 @@ func Load(cfg *Config, patterns ...string) ([]*Package, error) {
 // no external driver, or the driver returns a response with NotHandled set,
 // defaultDriver will fall back to the go list driver.
 // The boolean result indicates that an external driver handled the request.
-func defaultDriver(cfg *Config, patterns ...string) (*driverResponse, bool, error) {
+func defaultDriver(cfg *Config, patterns ...string) (*DriverResponse, bool, error) {
 	if driver := findExternalDriver(cfg); driver != nil {
 		response, err := driver(cfg, patterns...)
 		if err != nil {
@@ -303,7 +266,10 @@ func defaultDriver(cfg *Config, patterns ...string) (*driverResponse, bool, erro
 	}
 
 	response, err := goListDriver(cfg, patterns...)
-	return response, false, err
+	if err != nil {
+		return nil, false, err
+	}
+	return response, false, nil
 }
 
 // A Package describes a loaded Go package.
@@ -648,7 +614,7 @@ func newLoader(cfg *Config) *loader {
 
 // refine connects the supplied packages into a graph and then adds type
 // and syntax information as requested by the LoadMode.
-func (ld *loader) refine(response *driverResponse) ([]*Package, error) {
+func (ld *loader) refine(response *DriverResponse) ([]*Package, error) {
 	roots := response.Roots
 	rootMap := make(map[string]int, len(roots))
 	for i, root := range roots {

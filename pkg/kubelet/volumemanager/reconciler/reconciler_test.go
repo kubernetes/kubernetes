@@ -2382,7 +2382,7 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 	reconciler.volumesNeedUpdateFromNodeStatus = append(reconciler.volumesNeedUpdateFromNodeStatus, volumeName1, volumeName2)
 	// Act - run reconcile loop just once.
 	// "volumesNeedUpdateFromNodeStatus" is not empty, so no unmount will be triggered.
-	reconciler.reconcileNew()
+	reconciler.reconcile()
 
 	// Assert
 	assert.True(t, reconciler.StatesHasBeenSynced())

@@ -32,11 +32,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
+	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -142,6 +144,8 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				*r.initialConfig.WebhookRetryBackoff,
 				decisionOnError,
 				configuredAuthorizer.Webhook.MatchConditions,
+				configuredAuthorizer.Name,
+				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: cel.NewMatcherMetrics()},
 			)
 			if err != nil {
 				return nil, nil, err
@@ -160,6 +164,15 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 	}
 
 	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
+}
+
+type kubeapiserverWebhookMetrics struct {
+	// kube-apiserver doesn't report request metrics
+	webhookmetrics.NoopRequestMetrics
+	// kube-apiserver does report webhook metrics
+	webhookmetrics.WebhookMetrics
+	// kube-apiserver does report matchCondition metrics
+	cel.MatcherMetrics
 }
 
 // runReload starts checking the config file for changes and reloads the authorizer when it changes.

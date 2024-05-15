@@ -145,11 +145,8 @@ func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Att
 // Secondarily, this test also checks the observed seat utilizations against values derived from expecting that
 // the throughput observed by the client equals the execution throughput observed by the server.
 func TestConcurrencyIsolation(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	_, kubeConfig, closeFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	_, kubeConfig, closeFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure all clients are allowed to send requests.
 			opts.Authorization.Modes = []string{"AlwaysAllow"}
@@ -158,7 +155,7 @@ func TestConcurrencyIsolation(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Wrap default authorizer with one that delays requests from noxu clients
-			config.GenericConfig.Authorization.Authorizer = &noxuDelayingAuthorizer{config.GenericConfig.Authorization.Authorizer}
+			config.ControlPlane.Generic.Authorization.Authorizer = &noxuDelayingAuthorizer{config.ControlPlane.Generic.Authorization.Authorizer}
 		},
 	})
 	defer closeFn()
@@ -190,7 +187,7 @@ func TestConcurrencyIsolation(t *testing.T) {
 	wg.Add(noxu1NumGoroutines)
 	streamRequests(noxu1NumGoroutines, func() {
 		start := time.Now()
-		_, err := noxu1Client.CoreV1().Namespaces().Get(ctx, "default", metav1.GetOptions{})
+		_, err := noxu1Client.CoreV1().Namespaces().Get(tCtx, "default", metav1.GetOptions{})
 		duration := time.Since(start).Seconds()
 		noxu1LatMeasure.update(duration)
 		if err != nil {
@@ -203,7 +200,7 @@ func TestConcurrencyIsolation(t *testing.T) {
 	wg.Add(noxu2NumGoroutines)
 	streamRequests(noxu2NumGoroutines, func() {
 		start := time.Now()
-		_, err := noxu2Client.CoreV1().Namespaces().Get(ctx, "default", metav1.GetOptions{})
+		_, err := noxu2Client.CoreV1().Namespaces().Get(tCtx, "default", metav1.GetOptions{})
 		duration := time.Since(start).Seconds()
 		noxu2LatMeasure.update(duration)
 		if err != nil {
@@ -317,7 +314,7 @@ func getRequestMetricsSnapshot(c clientset.Interface) (metricSnapshot, error) {
 		return nil, err
 	}
 
-	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
+	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.NewFormat(expfmt.TypeTextPlain))
 	decoder := expfmt.SampleDecoder{
 		Dec:  dec,
 		Opts: &expfmt.DecodeOptions{},

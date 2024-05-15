@@ -118,6 +118,7 @@ type SchedulingQueue interface {
 	AssignedPodAdded(logger klog.Logger, pod *v1.Pod)
 	AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod)
 	PendingPods() ([]*v1.Pod, string)
+	PodsInActiveQ() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
@@ -1174,6 +1175,11 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	activated := false
 	for _, pInfo := range podInfoList {
+		// Since there may be many gated pods and they will not move from the
+		// unschedulable pool, we skip calling the expensive isPodWorthRequeueing.
+		if pInfo.Gated {
+			continue
+		}
 		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
 		if schedulingHint == queueSkip {
 			// QueueingHintFn determined that this Pod isn't worth putting to activeQ or backoffQ by this event.
@@ -1225,6 +1231,18 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(logger klog
 
 	}
 	return podsToMove
+}
+
+// PodsInActiveQ returns all the Pods in the activeQ.
+// This function is only used in tests.
+func (p *PriorityQueue) PodsInActiveQ() []*v1.Pod {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	var result []*v1.Pod
+	for _, pInfo := range p.activeQ.List() {
+		result = append(result, pInfo.(*framework.QueuedPodInfo).Pod)
+	}
+	return result
 }
 
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"

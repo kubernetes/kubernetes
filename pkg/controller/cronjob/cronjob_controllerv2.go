@@ -38,7 +38,7 @@ import (
 	batchv1informers "k8s.io/client-go/informers/batch/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	covev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -47,6 +47,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
+	jobutil "k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/utils/pointer"
 )
 
@@ -60,7 +61,7 @@ var (
 // ControllerV2 is a controller for CronJobs.
 // Refactored Cronjob controller that uses DelayingQueue and informers
 type ControllerV2 struct {
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	kubeClient  clientset.Interface
 	recorder    record.EventRecorder
@@ -82,10 +83,15 @@ type ControllerV2 struct {
 // NewControllerV2 creates and initializes a new Controller.
 func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
 	logger := klog.FromContext(ctx)
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 
 	jm := &ControllerV2{
-		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "cronjob",
+			},
+		),
 		kubeClient:  kubeClient,
 		broadcaster: eventBroadcaster,
 		recorder:    eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
@@ -129,8 +135,8 @@ func (jm *ControllerV2) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
-	jm.broadcaster.StartStructuredLogging(0)
-	jm.broadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: jm.kubeClient.CoreV1().Events("")})
+	jm.broadcaster.StartStructuredLogging(3)
+	jm.broadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: jm.kubeClient.CoreV1().Events("")})
 	defer jm.broadcaster.Shutdown()
 
 	defer jm.queue.ShutDown()
@@ -162,10 +168,10 @@ func (jm *ControllerV2) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer jm.queue.Done(key)
 
-	requeueAfter, err := jm.sync(ctx, key.(string))
+	requeueAfter, err := jm.sync(ctx, key)
 	switch {
 	case err != nil:
-		utilruntime.HandleError(fmt.Errorf("error syncing CronJobController %v, requeuing: %v", key.(string), err))
+		utilruntime.HandleError(fmt.Errorf("error syncing CronJobController %v, requeuing: %w", key, err))
 		jm.queue.AddRateLimited(key)
 	case requeueAfter != nil:
 		jm.queue.Forget(key)
@@ -424,7 +430,7 @@ func (jm *ControllerV2) syncCronJob(
 	for _, j := range jobs {
 		childrenJobs[j.ObjectMeta.UID] = true
 		found := inActiveList(cronJob, j.ObjectMeta.UID)
-		if !found && !IsJobFinished(j) {
+		if !found && !jobutil.IsJobFinished(j) {
 			cjCopy, err := jm.cronJobControl.GetCronJob(ctx, cronJob.Namespace, cronJob.Name)
 			if err != nil {
 				return nil, updateStatus, err
@@ -438,12 +444,12 @@ func (jm *ControllerV2) syncCronJob(
 			// This could happen if we crashed right after creating the Job and before updating the status,
 			// or if our jobs list is newer than our cj status after a relist, or if someone intentionally created
 			// a job that they wanted us to adopt.
-		} else if found && IsJobFinished(j) {
-			_, status := getFinishedStatus(j)
+		} else if found && jobutil.IsJobFinished(j) {
+			_, condition := jobutil.FinishedCondition(j)
 			deleteFromActiveList(cronJob, j.ObjectMeta.UID)
-			jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, status: %v", j.Name, status)
+			jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, condition: %v", j.Name, condition)
 			updateStatus = true
-		} else if IsJobSucceeded(j) {
+		} else if jobutil.IsJobSucceeded(j) {
 			// a job does not have to be in active list, as long as it has completed successfully, we will process the timestamp
 			if cronJob.Status.LastSuccessfulTime == nil {
 				cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime

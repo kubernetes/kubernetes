@@ -41,7 +41,7 @@ option go_package = "k8s.io/api/certificates/v1";
 // or to obtain certificates from custom non-Kubernetes signers.
 message CertificateSigningRequest {
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the certificate request, and is immutable after creation.
   // Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
@@ -87,19 +87,19 @@ message CertificateSigningRequestCondition {
 
   // lastUpdateTime is the time of the last update to this condition
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 4;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastUpdateTime = 4;
 
   // lastTransitionTime is the time the condition last transitioned from one status to another.
   // If unset, when a new condition type is added or an existing condition's status is changed,
   // the server defaults this to the current time.
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 5;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 5;
 }
 
 // CertificateSigningRequestList is a collection of CertificateSigningRequest objects
 message CertificateSigningRequestList {
   // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a collection of CertificateSigningRequest objects
   repeated CertificateSigningRequest items = 2;

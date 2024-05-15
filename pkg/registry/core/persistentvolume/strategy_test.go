@@ -18,6 +18,7 @@ package persistentvolume
 
 import (
 	"context"
+
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -363,7 +364,7 @@ func TestStatusUpdate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeLastPhaseTransitionTime, tc.fg)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeLastPhaseTransitionTime, tc.fg)
 
 			obj := tc.newObj.DeepCopy()
 			StatusStrategy.PrepareForUpdate(context.TODO(), obj, tc.oldObj.DeepCopy())
@@ -423,7 +424,7 @@ func TestStatusCreate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeLastPhaseTransitionTime, tc.fg)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PersistentVolumeLastPhaseTransitionTime, tc.fg)
 			obj := tc.newObj.DeepCopy()
 			StatusStrategy.PrepareForCreate(context.TODO(), obj)
 			if !reflect.DeepEqual(obj, tc.expectedObj) {

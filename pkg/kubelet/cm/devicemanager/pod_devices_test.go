@@ -272,7 +272,7 @@ func TestDeviceRunContainerOptions(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			as := assert.New(t)
 
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DevicePluginCDIDevices, tc.gate)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DevicePluginCDIDevices, tc.gate)
 			podDevices := newPodDevices()
 			for resourceName, response := range tc.responsesPerResource {
 				podDevices.insert("pod", "container", resourceName,

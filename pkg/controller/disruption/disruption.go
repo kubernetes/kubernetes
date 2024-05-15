@@ -103,11 +103,11 @@ type DisruptionController struct {
 	ssListerSynced cache.InformerSynced
 
 	// PodDisruptionBudget keys that need to be synced.
-	queue        workqueue.RateLimitingInterface
-	recheckQueue workqueue.DelayingInterface
+	queue        workqueue.TypedRateLimitingInterface[string]
+	recheckQueue workqueue.TypedDelayingInterface[string]
 
 	// pod keys that need to be synced due to a stale DisruptionTarget condition.
-	stalePodDisruptionQueue   workqueue.RateLimitingInterface
+	stalePodDisruptionQueue   workqueue.TypedRateLimitingInterface[string]
 	stalePodDisruptionTimeout time.Duration
 
 	broadcaster record.EventBroadcaster
@@ -177,11 +177,30 @@ func NewDisruptionControllerInternal(ctx context.Context,
 ) *DisruptionController {
 	logger := klog.FromContext(ctx)
 	dc := &DisruptionController{
-		kubeClient:                kubeClient,
-		queue:                     workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "disruption"), workqueue.DefaultControllerRateLimiter()),
-		recheckQueue:              workqueue.NewDelayingQueueWithCustomClock(clock, "disruption_recheck"),
-		stalePodDisruptionQueue:   workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "stale_pod_disruption"), workqueue.DefaultControllerRateLimiter()),
-		broadcaster:               record.NewBroadcaster(),
+		kubeClient: kubeClient,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
+					Clock: clock,
+					Name:  "disruption",
+				}),
+			},
+		),
+		recheckQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
+			Clock: clock,
+			Name:  "disruption_recheck",
+		}),
+		stalePodDisruptionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
+					Clock: clock,
+					Name:  "stale_pod_disruption",
+				}),
+			},
+		),
+		broadcaster:               record.NewBroadcaster(record.WithContext(ctx)),
 		stalePodDisruptionTimeout: stalePodDisruptionTimeout,
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
@@ -617,13 +636,13 @@ func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer dc.queue.Done(dKey)
 
-	err := dc.sync(ctx, dKey.(string))
+	err := dc.sync(ctx, dKey)
 	if err == nil {
 		dc.queue.Forget(dKey)
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %v", dKey.(string), err))
+	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %w", dKey, err)) //nolint:stylecheck
 	dc.queue.AddRateLimited(dKey)
 
 	return true
@@ -655,12 +674,12 @@ func (dc *DisruptionController) processNextStalePodDisruptionWorkItem(ctx contex
 		return false
 	}
 	defer dc.stalePodDisruptionQueue.Done(key)
-	err := dc.syncStalePodDisruption(ctx, key.(string))
+	err := dc.syncStalePodDisruption(ctx, key)
 	if err == nil {
 		dc.stalePodDisruptionQueue.Forget(key)
 		return true
 	}
-	utilruntime.HandleError(fmt.Errorf("error syncing Pod %v to clear DisruptionTarget condition, requeueing: %v", key.(string), err))
+	utilruntime.HandleError(fmt.Errorf("error syncing Pod %v to clear DisruptionTarget condition, requeueing: %w", key, err))
 	dc.stalePodDisruptionQueue.AddRateLimited(key)
 	return true
 }
@@ -994,6 +1013,7 @@ func (dc *DisruptionController) updatePdbStatus(ctx context.Context, pdb *policy
 		DisruptionsAllowed: disruptionsAllowed,
 		DisruptedPods:      disruptedPods,
 		ObservedGeneration: pdb.Generation,
+		Conditions:         newPdb.Status.Conditions,
 	}
 
 	pdbhelper.UpdateDisruptionAllowedCondition(newPdb)

@@ -111,12 +111,13 @@ type ReplicaSetController struct {
 	podListerSynced cache.InformerSynced
 
 	// Controllers that need to be synced
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
-	eventBroadcaster := record.NewBroadcaster()
+func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+	logger := klog.FromContext(ctx)
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	if err := metrics.Register(legacyregistry.Register); err != nil {
 		logger.Error(err, "unable to register metrics")
 	}
@@ -144,7 +145,10 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		eventBroadcaster: eventBroadcaster,
 		burstReplicas:    burstReplicas,
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
+		),
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -202,7 +206,7 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	// Start events processing pipeline.
-	rsc.eventBroadcaster.StartStructuredLogging(0)
+	rsc.eventBroadcaster.StartStructuredLogging(3)
 	rsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: rsc.kubeClient.CoreV1().Events("")})
 	defer rsc.eventBroadcaster.Shutdown()
 
@@ -547,7 +551,7 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer rsc.queue.Done(key)
 
-	err := rsc.syncHandler(ctx, key.(string))
+	err := rsc.syncHandler(ctx, key)
 	if err == nil {
 		rsc.queue.Forget(key)
 		return true

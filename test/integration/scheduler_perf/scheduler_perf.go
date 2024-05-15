@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -90,22 +91,64 @@ const (
 	configFile               = "config/performance-config.yaml"
 	extensionPointsLabelName = "extension_point"
 	resultLabelName          = "result"
+	pluginLabelName          = "plugin"
 )
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: map[string]*labelValues{
+		Metrics: map[string][]*labelValues{
 			"scheduler_framework_extension_point_duration_seconds": {
-				label:  extensionPointsLabelName,
-				values: []string{"Filter", "Score"},
+				{
+					label:  extensionPointsLabelName,
+					values: metrics.ExtentionPoints,
+				},
 			},
 			"scheduler_scheduling_attempt_duration_seconds": {
-				label:  resultLabelName,
-				values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+				{
+					label:  resultLabelName,
+					values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+				},
 			},
-			"scheduler_pod_scheduling_duration_seconds":     nil,
-			"scheduler_pod_scheduling_sli_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds": nil,
+			"scheduler_plugin_execution_duration_seconds": {
+				{
+					label:  pluginLabelName,
+					values: PluginNames,
+				},
+				{
+					label:  extensionPointsLabelName,
+					values: metrics.ExtentionPoints,
+				},
+			},
 		},
+	}
+
+	// PluginNames is the names of the plugins that scheduler_perf collects metrics for.
+	// We export this variable because people outside k/k may want to put their custom plugins.
+	PluginNames = []string{
+		names.PrioritySort,
+		names.DefaultBinder,
+		names.DefaultPreemption,
+		names.DynamicResources,
+		names.ImageLocality,
+		names.InterPodAffinity,
+		names.NodeAffinity,
+		names.NodeName,
+		names.NodePorts,
+		names.NodeResourcesBalancedAllocation,
+		names.NodeResourcesFit,
+		names.NodeUnschedulable,
+		names.NodeVolumeLimits,
+		names.AzureDiskLimits,
+		names.CinderLimits,
+		names.EBSLimits,
+		names.GCEPDLimits,
+		names.PodTopologySpread,
+		names.SchedulingGates,
+		names.TaintToleration,
+		names.VolumeBinding,
+		names.VolumeRestrictions,
+		names.VolumeZone,
 	}
 )
 
@@ -641,10 +684,36 @@ func initTestOutput(tb testing.TB) io.Writer {
 	return output
 }
 
+type cleanupKeyType struct{}
+
+var cleanupKey = cleanupKeyType{}
+
+// shouldCleanup returns true if a function should clean up resource in the
+// apiserver when the test is done. This is true for unit tests (etcd and
+// apiserver get reused) and false for benchmarks (each benchmark starts with a
+// clean state, so cleaning up just wastes time).
+//
+// The default if not explicitly set in the context is true.
+func shouldCleanup(ctx context.Context) bool {
+	val := ctx.Value(cleanupKey)
+	if enabled, ok := val.(bool); ok {
+		return enabled
+	}
+	return true
+}
+
+// withCleanup sets whether cleaning up resources in the apiserver
+// should be done. The default is true.
+func withCleanup(tCtx ktesting.TContext, enabled bool) ktesting.TContext {
+	return ktesting.WithValue(tCtx, cleanupKey, enabled)
+}
+
 var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
 
 // RunBenchmarkPerfScheduling runs the scheduler performance tests.
-// Optionally, you can pass your own scheduler plugin via outOfTreePluginRegistry.
+//
+// You can pass your own scheduler plugins via outOfTreePluginRegistry.
+// Also, you may want to put your plugins in PluginNames variable in this package.
 func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkruntime.Registry) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
@@ -692,10 +761,15 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 					tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
 					for feature, flag := range tc.FeatureGates {
-						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
+						featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)
 					}
 					informerFactory, tCtx := setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, tc.FeatureGates, outOfTreePluginRegistry)
-					results := runWorkload(tCtx, tc, w, informerFactory, false)
+
+					// No need to clean up, each benchmark testcase starts with an empty
+					// etcd database.
+					tCtx = withCleanup(tCtx, false)
+
+					results := runWorkload(tCtx, tc, w, informerFactory)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
 
 					if len(results) > 0 {
@@ -799,7 +873,7 @@ func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureG
 	return mustSetupCluster(tCtx, cfg, featureGates, outOfTreePluginRegistry)
 }
 
-func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory, cleanup bool) []DataItem {
+func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory) []DataItem {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -811,6 +885,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 			b.ReportMetric(duration.Seconds(), "runtime_seconds")
 		})
 	}
+	cleanup := shouldCleanup(tCtx)
 
 	// Disable error checking of the sampling interval length in the
 	// throughput collector by default. When running benchmarks, report

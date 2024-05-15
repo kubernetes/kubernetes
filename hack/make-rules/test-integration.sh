@@ -46,11 +46,12 @@ KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-""}
 kube::test::find_integration_test_dirs() {
   (
     cd "${KUBE_ROOT}"
-    find test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+    # The "./" syntax here produces Go-compatible package names.
+    find ./test/integration/ -name '*_test.go' -print0 \
+      | xargs -0n1 dirname \
       | LC_ALL=C sort -u
-    find vendor/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
-      | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
+    find ./staging/src/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
+      | xargs -0n1 dirname \
       | LC_ALL=C sort -u
   )
 }

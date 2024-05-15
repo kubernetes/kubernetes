@@ -23,7 +23,7 @@ import (
 )
 
 // ProcStatus provides status information about the process,
-// read from /proc/[pid]/stat.
+// read from /proc/[pid]/status.
 type ProcStatus struct {
 	// The process ID.
 	PID int
@@ -32,6 +32,8 @@ type ProcStatus struct {
 
 	// Thread group ID.
 	TGID int
+	// List of Pid namespace.
+	NSpids []uint64
 
 	// Peak virtual memory size.
 	VmPeak uint64 // nolint:revive
@@ -127,6 +129,8 @@ func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintByt
 		copy(s.UIDs[:], strings.Split(vString, "\t"))
 	case "Gid":
 		copy(s.GIDs[:], strings.Split(vString, "\t"))
+	case "NSpid":
+		s.NSpids = calcNSPidsList(vString)
 	case "VmPeak":
 		s.VmPeak = vUintBytes
 	case "VmSize":
@@ -199,4 +203,19 @@ func calcCpusAllowedList(cpuString string) []uint64 {
 
 	sort.Slice(g, func(i, j int) bool { return g[i] < g[j] })
 	return g
+}
+
+func calcNSPidsList(nspidsString string) []uint64 {
+	s := strings.Split(nspidsString, " ")
+	var nspids []uint64
+
+	for _, nspid := range s {
+		nspid, _ := strconv.ParseUint(nspid, 10, 64)
+		if nspid == 0 {
+			continue
+		}
+		nspids = append(nspids, nspid)
+	}
+
+	return nspids
 }

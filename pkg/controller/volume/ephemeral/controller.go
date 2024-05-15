@@ -71,11 +71,12 @@ type ephemeralController struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewController creates an ephemeral volume controller.
 func NewController(
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer) (Controller, error) {
@@ -87,12 +88,15 @@ func NewController(
 		podSynced:  podInformer.Informer().HasSynced,
 		pvcLister:  pvcInformer.Lister(),
 		pvcsSynced: pvcInformer.Informer().HasSynced,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ephemeral_volume"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ephemeral_volume"},
+		),
 	}
 
 	ephemeralvolumemetrics.RegisterMetrics()
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
@@ -192,7 +196,7 @@ func (ec *ephemeralController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer ec.queue.Done(key)
 
-	err := ec.syncHandler(ctx, key.(string))
+	err := ec.syncHandler(ctx, key)
 	if err == nil {
 		ec.queue.Forget(key)
 		return true

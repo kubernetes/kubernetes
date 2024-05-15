@@ -123,7 +123,7 @@ type DaemonSetsController struct {
 	nodeStoreSynced cache.InformerSynced
 
 	// DaemonSet keys that need to be synced.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	failedPodsBackoff *flowcontrol.Backoff
 }
@@ -138,7 +138,7 @@ func NewDaemonSetsController(
 	kubeClient clientset.Interface,
 	failedPodsBackoff *flowcontrol.Backoff,
 ) (*DaemonSetsController, error) {
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dsc := &DaemonSetsController{
 		kubeClient:       kubeClient,
@@ -153,7 +153,12 @@ func NewDaemonSetsController(
 		},
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "daemonset",
+			},
+		),
 	}
 
 	daemonSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -279,7 +284,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
-	dsc.eventBroadcaster.StartStructuredLogging(0)
+	dsc.eventBroadcaster.StartStructuredLogging(3)
 	dsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dsc.kubeClient.CoreV1().Events("")})
 	defer dsc.eventBroadcaster.Shutdown()
 
@@ -315,7 +320,7 @@ func (dsc *DaemonSetsController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer dsc.queue.Done(dsKey)
 
-	err := dsc.syncHandler(ctx, dsKey.(string))
+	err := dsc.syncHandler(ctx, dsKey)
 	if err == nil {
 		dsc.queue.Forget(dsKey)
 		return true

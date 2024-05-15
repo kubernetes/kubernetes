@@ -212,7 +212,6 @@ var _ volume.RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.AttachableVolumePlugin = &FakeVolumePlugin{}
-var _ volume.VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ volume.DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.NodeExpandableVolumePlugin = &FakeVolumePlugin{}
 
@@ -289,10 +288,6 @@ func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 
 func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
 	return true
-}
-
-func (plugin *FakeVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return false
 }
 
 func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
@@ -565,10 +560,6 @@ func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return f.Plugin.RequiresRemount(spec)
 }
 
-func (f *FakeBasicVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return f.Plugin.SupportsBulkVolumeVerification()
-}
-
 func (f *FakeBasicVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return f.Plugin.SupportsSELinuxContextMount(spec)
 }
@@ -647,10 +638,6 @@ func (plugin *FakeFileVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 }
 
 func (plugin *FakeFileVolumePlugin) SupportsMountOption() bool {
-	return false
-}
-
-func (plugin *FakeFileVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 

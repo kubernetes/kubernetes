@@ -2148,7 +2148,7 @@
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
-    queue an d might involve multiple scheduling attempts.
+    queue and might involve multiple scheduling attempts.
   type: Histogram
   stabilityLevel: BETA
   labels:
@@ -3209,7 +3209,7 @@
   type: Custom
   stabilityLevel: ALPHA
   labels:
-  - cluster
+  - storage_cluster_id
 - name: terminated_watchers_total
   namespace: apiserver
   help: Counter of watchers closed due to unresponsiveness broken by resource type.

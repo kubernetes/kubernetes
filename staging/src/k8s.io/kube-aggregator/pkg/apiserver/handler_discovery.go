@@ -23,10 +23,15 @@ import (
 	"sync"
 	"time"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -34,11 +39,11 @@ import (
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
+	"k8s.io/kube-aggregator/pkg/apiserver/scheme"
 )
 
 var APIRegistrationGroupVersion metav1.GroupVersion = metav1.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1"}
@@ -51,6 +56,12 @@ var APIRegistrationGroupPriority int = 20001
 var v2Beta1GVK = schema.GroupVersionKind{
 	Group:   "apidiscovery.k8s.io",
 	Version: "v2beta1",
+	Kind:    "APIGroupDiscoveryList",
+}
+
+var v2GVK = schema.GroupVersionKind{
+	Group:   "apidiscovery.k8s.io",
+	Version: "v2",
 	Kind:    "APIGroupDiscoveryList",
 }
 
@@ -92,10 +103,13 @@ type discoveryManager struct {
 	// It is important that the reconciler for this queue does not excessively
 	// contact the apiserver if a key was enqueued before the server was last
 	// contacted.
-	dirtyAPIServiceQueue workqueue.RateLimitingInterface
+	dirtyAPIServiceQueue workqueue.TypedRateLimitingInterface[string]
 
 	// Merged handler which stores all known groupversions
 	mergedDiscoveryHandler discoveryendpoint.ResourceManager
+
+	// Codecs is the serializer used for decoding aggregated apiserver responses
+	codecs serializer.CodecFactory
 }
 
 // Version of Service/Spec with relevant fields for use as a cache key
@@ -129,7 +143,7 @@ func newServiceKey(service apiregistrationv1.ServiceReference) serviceKey {
 type cachedResult struct {
 	// Currently cached discovery document for this service
 	// Map from group name to version name to
-	discovery map[metav1.GroupVersion]apidiscoveryv2beta1.APIVersionDiscovery
+	discovery map[metav1.GroupVersion]apidiscoveryv2.APIVersionDiscovery
 
 	// ETag hash of the cached discoveryDocument
 	etag string
@@ -172,11 +186,22 @@ var _ DiscoveryAggregationController = &discoveryManager{}
 func NewDiscoveryManager(
 	target discoveryendpoint.ResourceManager,
 ) DiscoveryAggregationController {
+	discoveryScheme := runtime.NewScheme()
+	utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
+	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(discoveryScheme))
+	// Register conversion for apidiscovery
+	utilruntime.Must(apidiscoveryv2conversion.RegisterConversions(discoveryScheme))
+	codecs := serializer.NewCodecFactory(discoveryScheme)
+
 	return &discoveryManager{
 		mergedDiscoveryHandler: target,
 		apiServices:            make(map[string]groupVersionInfo),
 		cachedResults:          make(map[serviceKey]cachedResult),
-		dirtyAPIServiceQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "discovery-manager"),
+		dirtyAPIServiceQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "discovery-manager"},
+		),
+		codecs: codecs,
 	}
 }
 
@@ -214,7 +239,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 		Path:              req.URL.Path,
 		IsResourceRequest: false,
 	}))
-	req.Header.Add("Accept", discovery.AcceptV2Beta1)
+	req.Header.Add("Accept", discovery.AcceptV2+","+discovery.AcceptV2Beta1)
 
 	if exists && len(cached.etag) > 0 {
 		req.Header.Add("If-None-Match", cached.etag)
@@ -228,6 +253,8 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 	handler.ServeHTTP(writer, req)
 
 	isV2Beta1GVK, _ := discovery.ContentTypeIsGVK(writer.Header().Get("Content-Type"), v2Beta1GVK)
+	isV2GVK, _ := discovery.ContentTypeIsGVK(writer.Header().Get("Content-Type"), v2GVK)
+
 	switch {
 	case writer.respCode == http.StatusNotModified:
 		// Keep old entry, update timestamp
@@ -242,16 +269,16 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 	case writer.respCode == http.StatusServiceUnavailable:
 		return nil, fmt.Errorf("service %s returned non-success response code: %v",
 			info.service.String(), writer.respCode)
-	case writer.respCode == http.StatusOK && isV2Beta1GVK:
-		parsed := &apidiscoveryv2beta1.APIGroupDiscoveryList{}
-		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), writer.data, parsed); err != nil {
+	case writer.respCode == http.StatusOK && (isV2GVK || isV2Beta1GVK):
+		parsed := &apidiscoveryv2.APIGroupDiscoveryList{}
+		if err := runtime.DecodeInto(dm.codecs.UniversalDecoder(), writer.data, parsed); err != nil {
 			return nil, err
 		}
 
 		klog.V(3).Infof("DiscoveryManager: Successfully downloaded discovery for %s", info.service.String())
 
 		// Convert discovery info into a map for convenient lookup later
-		discoMap := map[metav1.GroupVersion]apidiscoveryv2beta1.APIVersionDiscovery{}
+		discoMap := map[metav1.GroupVersion]apidiscoveryv2.APIVersionDiscovery{}
 		for _, g := range parsed.Items {
 			for _, v := range g.Versions {
 				discoMap[metav1.GroupVersion{Group: g.Name, Version: v.Version}] = v
@@ -330,7 +357,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 		}
 		klog.V(3).Infof("DiscoveryManager: Successfully downloaded legacy discovery for %s", info.service.String())
 
-		discoMap := map[metav1.GroupVersion]apidiscoveryv2beta1.APIVersionDiscovery{
+		discoMap := map[metav1.GroupVersion]apidiscoveryv2.APIVersionDiscovery{
 			// Convert old-style APIGroupList to new information
 			gv: {
 				Version:   gv.Version,
@@ -366,7 +393,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	// Lookup last cached result for this apiservice's service.
 	cached, err := dm.fetchFreshDiscoveryForService(mgv, info)
 
-	var entry apidiscoveryv2beta1.APIVersionDiscovery
+	var entry apidiscoveryv2.APIVersionDiscovery
 
 	// Extract the APIService's specific resource information from the
 	// groupversion
@@ -377,7 +404,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 		// Just use empty GV to mark that GV exists, but no resources.
 		// Also mark that it is stale to indicate the fetch failed
 		// TODO: Maybe also stick in a status for the version the error?
-		entry = apidiscoveryv2beta1.APIVersionDiscovery{
+		entry = apidiscoveryv2.APIVersionDiscovery{
 			Version: gv.Version,
 		}
 	} else {
@@ -388,7 +415,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 		} else {
 			// Successfully fetched discovery information from the server, but
 			// the server did not include this groupversion?
-			entry = apidiscoveryv2beta1.APIVersionDiscovery{
+			entry = apidiscoveryv2.APIVersionDiscovery{
 				Version: gv.Version,
 			}
 		}
@@ -397,9 +424,9 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	// The entry's staleness depends upon if `fetchFreshDiscoveryForService`
 	// returned an error or not.
 	if err == nil {
-		entry.Freshness = apidiscoveryv2beta1.DiscoveryFreshnessCurrent
+		entry.Freshness = apidiscoveryv2.DiscoveryFreshnessCurrent
 	} else {
-		entry.Freshness = apidiscoveryv2beta1.DiscoveryFreshnessStale
+		entry.Freshness = apidiscoveryv2.DiscoveryFreshnessStale
 	}
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
@@ -464,7 +491,7 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}, discoverySyncedCh chan<-
 				func() {
 					defer dm.dirtyAPIServiceQueue.Done(next)
 
-					if err := dm.syncAPIService(next.(string)); err != nil {
+					if err := dm.syncAPIService(next); err != nil {
 						dm.dirtyAPIServiceQueue.AddRateLimited(next)
 					} else {
 						dm.dirtyAPIServiceQueue.Forget(next)

@@ -12,7 +12,7 @@ go_library(
     ],
     importpath = "github.com/google/cel-go/common/containers",
     deps = [
-        "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
+        "//common/ast:go_default_library",
     ],
 )
 
@@ -26,6 +26,6 @@ go_test(
         ":go_default_library",
     ],
     deps = [
-        "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
+        "//common/ast:go_default_library",
     ],
 )

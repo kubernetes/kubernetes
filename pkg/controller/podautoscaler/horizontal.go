@@ -104,7 +104,7 @@ type HorizontalController struct {
 	podListerSynced cache.InformerSynced
 
 	// Controllers that need to be synced
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// Latest unstabilized recommendations for each autoscaler.
 	recommendations     map[string][]timestampedRecommendation
@@ -119,13 +119,11 @@ type HorizontalController struct {
 	// Storage of HPAs and their selectors.
 	hpaSelectors    *selectors.BiMultimap
 	hpaSelectorsMux sync.Mutex
-
-	// feature gates
-	containerResourceMetricsEnabled bool
 }
 
 // NewHorizontalController creates a new HorizontalController.
 func NewHorizontalController(
+	ctx context.Context,
 	evtNamespacer v1core.EventsGetter,
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
@@ -138,29 +136,32 @@ func NewHorizontalController(
 	tolerance float64,
 	cpuInitializationPeriod,
 	delayOfInitialReadinessStatus time.Duration,
-	containerResourceMetricsEnabled bool,
 ) *HorizontalController {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
-		eventRecorder:                   recorder,
-		scaleNamespacer:                 scaleNamespacer,
-		hpaNamespacer:                   hpaNamespacer,
-		downscaleStabilisationWindow:    downscaleStabilisationWindow,
-		monitor:                         monitor.New(),
-		queue:                           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
-		mapper:                          mapper,
-		recommendations:                 map[string][]timestampedRecommendation{},
-		recommendationsLock:             sync.Mutex{},
-		scaleUpEvents:                   map[string][]timestampedScaleEvent{},
-		scaleUpEventsLock:               sync.RWMutex{},
-		scaleDownEvents:                 map[string][]timestampedScaleEvent{},
-		scaleDownEventsLock:             sync.RWMutex{},
-		hpaSelectors:                    selectors.NewBiMultimap(),
-		containerResourceMetricsEnabled: containerResourceMetricsEnabled,
+		eventRecorder:                recorder,
+		scaleNamespacer:              scaleNamespacer,
+		hpaNamespacer:                hpaNamespacer,
+		downscaleStabilisationWindow: downscaleStabilisationWindow,
+		monitor:                      monitor.New(),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			NewDefaultHPARateLimiter(resyncPeriod),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "horizontalpodautoscaler",
+			},
+		),
+		mapper:              mapper,
+		recommendations:     map[string][]timestampedRecommendation{},
+		recommendationsLock: sync.Mutex{},
+		scaleUpEvents:       map[string][]timestampedScaleEvent{},
+		scaleUpEventsLock:   sync.RWMutex{},
+		scaleDownEvents:     map[string][]timestampedScaleEvent{},
+		scaleDownEventsLock: sync.RWMutex{},
+		hpaSelectors:        selectors.NewBiMultimap(),
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -269,7 +270,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer a.queue.Done(key)
 
-	deleted, err := a.reconcileKey(ctx, key.(string))
+	deleted, err := a.reconcileKey(ctx, key)
 	if err != nil {
 		utilruntime.HandleError(err)
 	}
@@ -475,12 +476,6 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get %s resource metric value: %v", spec.Resource.Name, err)
 		}
 	case autoscalingv2.ContainerResourceMetricSourceType:
-		if !a.containerResourceMetricsEnabled {
-			// If the container resource metrics feature is disabled but the object has the one,
-			// that means the user enabled the feature once,
-			// created some HPAs with the container resource metrics, and disabled it finally.
-			return 0, "", time.Time{}, condition, fmt.Errorf("ContainerResource metric type is not supported: disabled by the feature gate")
-		}
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForContainerResourceMetric(ctx, specReplicas, spec, hpa, selector, status)
 		if err != nil {
 			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get %s container metric value: %v", spec.ContainerResource.Container, err)

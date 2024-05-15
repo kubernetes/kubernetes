@@ -156,7 +156,7 @@ func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoverFeatureGate)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, test.recoverFeatureGate)
 			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			fakePlugin.DisableNodeExpansion = test.disableNodeExpansion
 			pvc := test.pvc
@@ -273,7 +273,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, true)
 			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			test.pv.Spec.ClaimRef = &v1.ObjectReference{
 				Namespace: test.pvc.Namespace,

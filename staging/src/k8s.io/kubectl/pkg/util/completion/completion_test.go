@@ -23,6 +23,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -110,7 +113,8 @@ func TestUserCompletionFunc(t *testing.T) {
 
 func TestResourceTypeAndNameCompletionFuncOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := ResourceTypeAndNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod"}, "b")
@@ -119,7 +123,8 @@ func TestResourceTypeAndNameCompletionFuncOneArg(t *testing.T) {
 
 func TestResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := ResourceTypeAndNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod", "bar"}, "")
@@ -129,7 +134,8 @@ func TestResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
 
 func TestResourceTypeAndNameCompletionFuncJointForm(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := ResourceTypeAndNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "pod/b")
@@ -138,7 +144,8 @@ func TestResourceTypeAndNameCompletionFuncJointForm(t *testing.T) {
 
 func TestResourceTypeAndNameCompletionFuncJointFormRepeating(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := ResourceTypeAndNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod/bar"}, "pod/")
@@ -148,7 +155,8 @@ func TestResourceTypeAndNameCompletionFuncJointFormRepeating(t *testing.T) {
 
 func TestSpecifiedResourceTypeAndNameCompletionFuncNoArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod", "service", "statefulset"})
 	comps, directive := compFunc(cmd, []string{}, "s")
@@ -157,7 +165,8 @@ func TestSpecifiedResourceTypeAndNameCompletionFuncNoArgs(t *testing.T) {
 
 func TestSpecifiedResourceTypeAndNameCompletionFuncOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod"}, "b")
@@ -166,7 +175,8 @@ func TestSpecifiedResourceTypeAndNameCompletionFuncOneArg(t *testing.T) {
 
 func TestSpecifiedResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod", "bar"}, "")
@@ -176,7 +186,8 @@ func TestSpecifiedResourceTypeAndNameCompletionFuncRepeating(t *testing.T) {
 
 func TestSpecifiedResourceTypeAndNameCompletionFuncJointFormOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{}, "pod/b")
@@ -185,7 +196,8 @@ func TestSpecifiedResourceTypeAndNameCompletionFuncJointFormOneArg(t *testing.T)
 
 func TestSpecifiedResourceTypeAndNameCompletionFuncJointFormRepeating(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod/bar"}, "pod/")
@@ -194,7 +206,8 @@ func TestSpecifiedResourceTypeAndNameCompletionFuncJointFormRepeating(t *testing
 }
 func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod"}, "b")
@@ -203,7 +216,8 @@ func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncOneArg(t *testing.T) 
 
 func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncMultiArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod", "bar"}, "")
@@ -213,7 +227,8 @@ func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncMultiArg(t *testing.T
 
 func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncJointFormOneArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{}, "pod/b")
@@ -222,7 +237,8 @@ func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncJointFormOneArg(t *te
 
 func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncJointFormMultiArg(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(tf, []string{"pod"})
 	comps, directive := compFunc(cmd, []string{"pod/bar"}, "pod/")
@@ -232,7 +248,8 @@ func TestSpecifiedResourceTypeAndNameCompletionNoRepeatFuncJointFormMultiArg(t *
 
 func TestResourceNameCompletionFuncNoArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := ResourceNameCompletionFunc(tf, "pod")
 	comps, directive := compFunc(cmd, []string{}, "b")
@@ -241,7 +258,8 @@ func TestResourceNameCompletionFuncNoArgs(t *testing.T) {
 
 func TestResourceNameCompletionFuncTooManyArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := ResourceNameCompletionFunc(tf, "pod")
 	comps, directive := compFunc(cmd, []string{"pod-name"}, "")
@@ -250,7 +268,8 @@ func TestResourceNameCompletionFuncTooManyArgs(t *testing.T) {
 
 func TestResourceNameCompletionFuncJointFormNoArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := ResourceNameCompletionFunc(tf, "pod")
 	comps, directive := compFunc(cmd, []string{}, "pod/b")
@@ -260,7 +279,8 @@ func TestResourceNameCompletionFuncJointFormNoArgs(t *testing.T) {
 
 func TestPodResourceNameCompletionFuncNoArgsPodName(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "b")
@@ -269,7 +289,8 @@ func TestPodResourceNameCompletionFuncNoArgsPodName(t *testing.T) {
 
 func TestPodResourceNameCompletionFuncNoArgsResources(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "d")
@@ -280,7 +301,8 @@ func TestPodResourceNameCompletionFuncNoArgsResources(t *testing.T) {
 
 func TestPodResourceNameCompletionFuncTooManyArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod-name"}, "")
@@ -289,7 +311,8 @@ func TestPodResourceNameCompletionFuncTooManyArgs(t *testing.T) {
 
 func TestPodResourceNameCompletionFuncJointFormNoArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "pod/b")
@@ -299,7 +322,8 @@ func TestPodResourceNameCompletionFuncJointFormNoArgs(t *testing.T) {
 
 func TestPodResourceNameCompletionFuncJointFormTooManyArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod/name"}, "pod/b")
@@ -308,7 +332,8 @@ func TestPodResourceNameCompletionFuncJointFormTooManyArgs(t *testing.T) {
 
 func TestPodResourceNameAndContainerCompletionFuncNoArgsPodName(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "b")
@@ -317,7 +342,8 @@ func TestPodResourceNameAndContainerCompletionFuncNoArgsPodName(t *testing.T) {
 
 func TestPodResourceNameAndContainerCompletionFuncNoArgsResources(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "s")
@@ -329,7 +355,8 @@ func TestPodResourceNameAndContainerCompletionFuncNoArgsResources(t *testing.T) 
 
 func TestPodResourceNameAndContainerCompletionFuncTooManyArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod-name", "container-name"}, "")
@@ -338,7 +365,8 @@ func TestPodResourceNameAndContainerCompletionFuncTooManyArgs(t *testing.T) {
 
 func TestPodResourceNameAndContainerCompletionFuncJointFormNoArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{}, "pod/b")
@@ -347,11 +375,109 @@ func TestPodResourceNameAndContainerCompletionFuncJointFormNoArgs(t *testing.T) 
 
 func TestPodResourceNameAndContainerCompletionFuncJointFormTooManyArgs(t *testing.T) {
 	tf, cmd := prepareCompletionTest()
-	addPodsToFactory(tf)
+	pods, _, _ := cmdtesting.TestData()
+	addResourceToFactory(tf, pods)
 
 	compFunc := PodResourceNameAndContainerCompletionFunc(tf)
 	comps, directive := compFunc(cmd, []string{"pod/pod-name", "container-name"}, "")
 	checkCompletion(t, comps, []string{}, directive, cobra.ShellCompDirectiveNoFileComp)
+}
+
+func TestResourceAndPortCompletionFunc(t *testing.T) {
+	barPod := getTestPod()
+	bazService := getTestService()
+
+	testCases := []struct {
+		name              string
+		obj               runtime.Object
+		args              []string
+		toComplete        string
+		expectedComps     []string
+		expectedDirective cobra.ShellCompDirective
+	}{
+		{
+			name:              "no args pod name",
+			obj:               barPod,
+			args:              []string{},
+			toComplete:        "b",
+			expectedComps:     []string{"bar"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "no args resources",
+			obj:               barPod,
+			args:              []string{},
+			toComplete:        "s",
+			expectedComps:     []string{"services/", "statefulsets/"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace,
+		},
+		{
+			name:              "too many args",
+			obj:               barPod,
+			args:              []string{"pod-name", "port-number"},
+			toComplete:        "",
+			expectedComps:     []string{},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "joint from no args",
+			obj:               barPod,
+			args:              []string{},
+			toComplete:        "pod/b",
+			expectedComps:     []string{"pod/bar"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "joint from too many args",
+			obj:               barPod,
+			args:              []string{"pod/pod-name", "port-number"},
+			toComplete:        "",
+			expectedComps:     []string{},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "complete container port with default exposed port",
+			obj:               barPod,
+			args:              []string{"bar"},
+			toComplete:        "",
+			expectedComps:     []string{"80:80", "81:81"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "complete container port with custom exposed port",
+			obj:               barPod,
+			args:              []string{"bar"},
+			toComplete:        "90",
+			expectedComps:     []string{"90:80", "90:81"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "complete service port with default exposed port",
+			obj:               bazService,
+			args:              []string{"service/baz"},
+			toComplete:        "",
+			expectedComps:     []string{"8080:8080", "8081:8081"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "complete container port with custom exposed port",
+			obj:               bazService,
+			args:              []string{"service/baz"},
+			toComplete:        "9090",
+			expectedComps:     []string{"9090:8080", "9090:8081"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tf, cmd := prepareCompletionTest()
+			addResourceToFactory(tf, tc.obj)
+			compFunc := ResourceAndPortCompletionFunc(tf)
+			comps, directive := compFunc(cmd, tc.args, tc.toComplete)
+			checkCompletion(t, comps, tc.expectedComps, directive, tc.expectedDirective)
+		})
+	}
 }
 
 func setMockFactory(config api.Config) {
@@ -369,12 +495,11 @@ func prepareCompletionTest() (*cmdtesting.TestFactory, *cobra.Command) {
 	return tf, cmd
 }
 
-func addPodsToFactory(tf *cmdtesting.TestFactory) {
-	pods, _, _ := cmdtesting.TestData()
+func addResourceToFactory(tf *cmdtesting.TestFactory, obj runtime.Object) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)},
 	}
 }
 
@@ -395,5 +520,42 @@ func checkCompletion(t *testing.T, comps, expectedComps []string, directive, exp
 			t.Errorf("expected completions\n%v\nbut got\n%v", expectedComps, comps)
 			break
 		}
+	}
+}
+
+func getTestPod() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "bar",
+					Ports: []corev1.ContainerPort{
+						{
+							ContainerPort: 80,
+						},
+						{
+							ContainerPort: 81,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getTestService() *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port: 8080,
+				},
+				{
+					Port: 8081,
+				},
+			},
+		},
 	}
 }

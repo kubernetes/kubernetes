@@ -72,17 +72,28 @@ const (
 	//           - a Pod that is deleted
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
-	Pod                   GVK = "Pod"
-	Node                  GVK = "Node"
-	PersistentVolume      GVK = "PersistentVolume"
-	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
-	CSINode               GVK = "storage.k8s.io/CSINode"
-	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
-	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
-	StorageClass          GVK = "storage.k8s.io/StorageClass"
-	PodSchedulingContext  GVK = "PodSchedulingContext"
-	ResourceClaim         GVK = "ResourceClaim"
-	ResourceClass         GVK = "ResourceClass"
+	Pod GVK = "Pod"
+	// A note about NodeAdd event and UpdateNodeTaint event:
+	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
+	// It's definitely not something expected for plugin developers,
+	// and registering UpdateNodeTaint event is the only mitigation for now.
+	// So, kube-scheduler registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
+	// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuck in the
+	// unschedulable pod pool.
+	// This behavior will be removed when we remove the preCheck feature.
+	// See: https://github.com/kubernetes/kubernetes/issues/110175
+	Node                    GVK = "Node"
+	PersistentVolume        GVK = "PersistentVolume"
+	PersistentVolumeClaim   GVK = "PersistentVolumeClaim"
+	CSINode                 GVK = "storage.k8s.io/CSINode"
+	CSIDriver               GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity      GVK = "storage.k8s.io/CSIStorageCapacity"
+	StorageClass            GVK = "storage.k8s.io/StorageClass"
+	PodSchedulingContext    GVK = "PodSchedulingContext"
+	ResourceClaim           GVK = "ResourceClaim"
+	ResourceClass           GVK = "ResourceClass"
+	ResourceClaimParameters GVK = "ResourceClaimParameters"
+	ResourceClassParameters GVK = "ResourceClassParameters"
 
 	// WildCard is a special GVK to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -176,6 +187,8 @@ func UnrollWildCardResource() []ClusterEventWithHint {
 		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
 		{Event: ClusterEvent{Resource: ResourceClaim, ActionType: All}},
 		{Event: ClusterEvent{Resource: ResourceClass, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClaimParameters, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClassParameters, ActionType: All}},
 	}
 }
 
@@ -259,12 +272,12 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 
 	// Attempt to parse the affinity terms
 	var parseErrs []error
-	requiredAffinityTerms, err := getAffinityTerms(pod, getPodAffinityTerms(pod.Spec.Affinity))
+	requiredAffinityTerms, err := GetAffinityTerms(pod, GetPodAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
 	}
-	requiredAntiAffinityTerms, err := getAffinityTerms(pod,
-		getPodAntiAffinityTerms(pod.Spec.Affinity))
+	requiredAntiAffinityTerms, err := GetAffinityTerms(pod,
+		GetPodAntiAffinityTerms(pod.Spec.Affinity))
 	if err != nil {
 		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
 	}
@@ -324,6 +337,9 @@ type Diagnosis struct {
 	PreFilterMsg string
 	// PostFilterMsg records the messages returned from PostFilter plugins.
 	PostFilterMsg string
+	// EvaluatedNodes records the number of nodes evaluated by Filter stage.
+	// It is used for debugging purposes only.
+	EvaluatedNodes int
 }
 
 // FitError describes a fit error of a pod.
@@ -420,9 +436,9 @@ func newAffinityTerm(pod *v1.Pod, term *v1.PodAffinityTerm) (*AffinityTerm, erro
 	return &AffinityTerm{Namespaces: namespaces, Selector: selector, TopologyKey: term.TopologyKey, NamespaceSelector: nsSelector}, nil
 }
 
-// getAffinityTerms receives a Pod and affinity terms and returns the namespaces and
+// GetAffinityTerms receives a Pod and affinity terms and returns the namespaces and
 // selectors of the terms.
-func getAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm, error) {
+func GetAffinityTerms(pod *v1.Pod, v1Terms []v1.PodAffinityTerm) ([]AffinityTerm, error) {
 	if v1Terms == nil {
 		return nil, nil
 	}
@@ -464,7 +480,7 @@ func NewPodInfo(pod *v1.Pod) (*PodInfo, error) {
 	return pInfo, err
 }
 
-func getPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+func GetPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
 	if affinity != nil && affinity.PodAffinity != nil {
 		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
@@ -477,7 +493,7 @@ func getPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
 	return terms
 }
 
-func getPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+func GetPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
 	if affinity != nil && affinity.PodAntiAffinity != nil {
 		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution

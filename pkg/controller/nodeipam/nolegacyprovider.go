@@ -1,6 +1,3 @@
-//go:build providerless
-// +build providerless
-
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -27,7 +24,6 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog/v2"
 )
 
 type fakeController struct {
@@ -38,7 +34,7 @@ func (f *fakeController) Run(ctx context.Context) {
 }
 
 func createLegacyIPAM(
-	logger klog.Logger,
+	ctx context.Context,
 	ic *Controller,
 	nodeInformer coreinformers.NodeInformer,
 	cloud cloudprovider.Interface,

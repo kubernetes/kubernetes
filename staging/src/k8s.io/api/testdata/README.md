@@ -83,7 +83,7 @@ to ensure we are not breaking backwards compatibility with serialized data from 
 To see the diff between the original JSON/YAML data and the `...after_roundtrip...` files:
 
 ```sh
-cd vendor/k8s.io/api/testdata/v1.14.0/
+cd staging/src/k8s.io/api/testdata/v1.14.0/
 diff -u admission.k8s.io.v1beta1.AdmissionReview.json admission.k8s.io.v1beta1.AdmissionReview.after_roundtrip.json
 diff -u admission.k8s.io.v1beta1.AdmissionReview.yaml admission.k8s.io.v1beta1.AdmissionReview.after_roundtrip.yaml
 ```
@@ -120,7 +120,7 @@ To see the diff between the original proto data and the `...after_roundtrip...` 
 and strip off the leading four-byte kubernetes protobuf header to get standard protobuf that can be decoded:
 
 ```sh
-cd vendor/k8s.io/api/testdata/v1.14.0/
+cd staging/src/k8s.io/api/testdata/v1.14.0/
 diff -u \
   <(tail -c +5 admission.k8s.io.v1beta1.AdmissionReview.pb | protoc --decode_raw) \
   <(tail -c +5 admission.k8s.io.v1beta1.AdmissionReview.after_roundtrip.pb | protoc --decode_raw)

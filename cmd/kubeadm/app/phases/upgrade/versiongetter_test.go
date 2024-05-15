@@ -148,7 +148,7 @@ func TestKubeVersionGetterKubeletVersions(t *testing.T) {
 	tests := []struct {
 		name    string
 		nodes   *v1.NodeList
-		want    map[string]uint16
+		want    map[string][]string
 		wantErr bool
 	}{
 		{
@@ -181,9 +181,9 @@ func TestKubeVersionGetterKubeletVersions(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]uint16{
-				"v1.28.0": 1,
-				"v1.28.1": 2,
+			want: map[string][]string{
+				"v1.28.0": {"node1"},
+				"v1.28.1": {"node2", "node3"},
 			},
 			wantErr: false,
 		},
@@ -201,15 +201,15 @@ func TestKubeVersionGetterKubeletVersions(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]uint16{
-				"": 2,
+			want: map[string][]string{
+				"": {"node2", "node3"},
 			},
 			wantErr: false,
 		},
 		{
 			name:    "node list is empty",
 			nodes:   &v1.NodeList{},
-			want:    map[string]uint16{},
+			want:    map[string][]string{},
 			wantErr: false,
 		},
 	}

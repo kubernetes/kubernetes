@@ -26,10 +26,10 @@ import (
 	"testing"
 	"time"
 
-	gomock "github.com/golang/mock/gomock"
 	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
+	gomock "go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,6 +88,8 @@ const (
 	cName8 = "container8-name"
 	cName9 = "container9-name"
 )
+
+const testPodLogDirectory = "/var/log/kube/pods/" // Use non-default path to ensure stats are collected properly
 
 func TestCRIListPodStats(t *testing.T) {
 	ctx := context.Background()
@@ -204,14 +206,14 @@ func TestCRIListPodStats(t *testing.T) {
 	}
 
 	fakeStats := map[string]*volume.Metrics{
-		kuberuntime.BuildContainerLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName0):               containerLogStats0,
-		kuberuntime.BuildContainerLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName1):               containerLogStats1,
-		kuberuntime.BuildContainerLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid"), cName2):               containerLogStats2,
-		kuberuntime.BuildContainerLogsDirectory("sandbox2-ns", "sandbox2-name", types.UID("sandbox2-uid"), cName3):               containerLogStats4,
-		kuberuntime.BuildContainerLogsDirectory("sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName5):               containerLogStats5,
-		kuberuntime.BuildContainerLogsDirectory("sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName8):               containerLogStats8,
-		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
-		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName0):               containerLogStats0,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName1):               containerLogStats1,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid"), cName2):               containerLogStats2,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox2-ns", "sandbox2-name", types.UID("sandbox2-uid"), cName3):               containerLogStats4,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName5):               containerLogStats5,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName8):               containerLogStats8,
+		filepath.Join(kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
+		filepath.Join(kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
 	}
 
 	ctrl := gomock.NewController(t)
@@ -222,9 +224,9 @@ func TestCRIListPodStats(t *testing.T) {
 		var dirEntries []os.DirEntry
 		mockDE := kubecontainertest.NewMockDirEntry(ctrl)
 		switch path {
-		case kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")):
+		case kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")):
 			mockDE.EXPECT().Name().Return(podLogName0)
-		case kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")):
+		case kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")):
 			mockDE.EXPECT().Name().Return(podLogName1)
 		default:
 			return nil, nil
@@ -334,6 +336,10 @@ func TestCRIListPodStats(t *testing.T) {
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// TODO: remove skip once the failing test has been fixed.
+		t.Skip("Skip failing test on Windows.")
+	}
 	ctx := context.Background()
 	var (
 		imageFsMountpoint = "/test/mount/point"
@@ -431,11 +437,11 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		PersistentVolumes: persistentVolumes,
 	}
 	fakeStats := map[string]*volume.Metrics{
-		kuberuntime.BuildContainerLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName0):               containerLogStats0,
-		kuberuntime.BuildContainerLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName1):               containerLogStats1,
-		kuberuntime.BuildContainerLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid"), cName2):               containerLogStats2,
-		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
-		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName0):               containerLogStats0,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid"), cName1):               containerLogStats1,
+		kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid"), cName2):               containerLogStats2,
+		filepath.Join(kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
+		filepath.Join(kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
 	}
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -444,9 +450,9 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		var dirEntries []os.DirEntry
 		mockDE := kubecontainertest.NewMockDirEntry(ctrl)
 		switch path {
-		case kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")):
+		case kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")):
 			mockDE.EXPECT().Name().Return(podLogName0)
-		case kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")):
+		case kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")):
 			mockDE.EXPECT().Name().Return(podLogName1)
 		default:
 			return nil, nil

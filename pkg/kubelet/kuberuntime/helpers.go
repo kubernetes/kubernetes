@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 type podsByID []*kubecontainer.Pod
@@ -92,11 +94,18 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeapi.Container) (*k
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
 
+	// Keep backwards compatibility to older runtimes, c.ImageId has been added in v1.30
+	imageID := c.ImageRef
+	if c.ImageId != "" {
+		imageID = c.ImageId
+	}
+
 	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
 	return &kubecontainer.Container{
 		ID:                   kubecontainer.ContainerID{Type: m.runtimeName, ID: c.Id},
 		Name:                 c.GetMetadata().GetName(),
-		ImageID:              c.ImageRef,
+		ImageID:              imageID,
+		ImageRef:             c.ImageRef,
 		ImageRuntimeHandler:  c.Image.RuntimeHandler,
 		Image:                c.Image.Image,
 		Hash:                 annotatedInfo.Hash,
@@ -181,13 +190,13 @@ func buildContainerLogsPath(containerName string, restartCount int) string {
 }
 
 // BuildContainerLogsDirectory builds absolute log directory path for a container in pod.
-func BuildContainerLogsDirectory(podNamespace, podName string, podUID types.UID, containerName string) string {
-	return filepath.Join(BuildPodLogsDirectory(podNamespace, podName, podUID), containerName)
+func BuildContainerLogsDirectory(podLogsDir, podNamespace, podName string, podUID types.UID, containerName string) string {
+	return filepath.Join(BuildPodLogsDirectory(podLogsDir, podNamespace, podName, podUID), containerName)
 }
 
 // BuildPodLogsDirectory builds absolute log directory path for a pod sandbox.
-func BuildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
-	return filepath.Join(podLogsRootDirectory, strings.Join([]string{podNamespace, podName,
+func BuildPodLogsDirectory(podLogsDir, podNamespace, podName string, podUID types.UID) string {
+	return filepath.Join(podLogsDir, strings.Join([]string{podNamespace, podName,
 		string(podUID)}, logPathDelimiter))
 }
 
@@ -210,15 +219,18 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 			Message: c.Message,
 		})
 	}
-	retHandlers := make(map[string]kubecontainer.RuntimeHandler)
-	for _, h := range handlers {
+	retHandlers := make([]kubecontainer.RuntimeHandler, len(handlers))
+	for i, h := range handlers {
+		supportsRRO := false
 		supportsUserns := false
 		if h.Features != nil {
+			supportsRRO = h.Features.RecursiveReadOnlyMounts
 			supportsUserns = h.Features.UserNamespaces
 		}
-		retHandlers[h.Name] = kubecontainer.RuntimeHandler{
-			Name:                   h.Name,
-			SupportsUserNamespaces: supportsUserns,
+		retHandlers[i] = kubecontainer.RuntimeHandler{
+			Name:                            h.Name,
+			SupportsRecursiveReadOnlyMounts: supportsRRO,
+			SupportsUserNamespaces:          supportsUserns,
 		}
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers}
@@ -277,4 +289,46 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
 	}, nil
+}
+
+func getAppArmorProfile(pod *v1.Pod, container *v1.Container) (*runtimeapi.SecurityProfile, string, error) {
+	profile := apparmor.GetProfile(pod, container)
+	if profile == nil {
+		return nil, "", nil
+	}
+
+	var (
+		securityProfile   *runtimeapi.SecurityProfile
+		deprecatedProfile string // Deprecated apparmor profile format, still provided for backwards compatibility with older runtimes.
+	)
+
+	switch profile.Type {
+	case v1.AppArmorProfileTypeRuntimeDefault:
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileRuntimeDefault
+
+	case v1.AppArmorProfileTypeUnconfined:
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNameUnconfined
+
+	case v1.AppArmorProfileTypeLocalhost:
+		if profile.LocalhostProfile == nil {
+			return nil, "", errors.New("missing localhost apparmor profile name")
+		}
+		securityProfile = &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: *profile.LocalhostProfile,
+		}
+		deprecatedProfile = v1.DeprecatedAppArmorBetaProfileNamePrefix + *profile.LocalhostProfile
+
+	default:
+		// Shouldn't happen.
+		return nil, "", fmt.Errorf("unknown apparmor profile type: %q", profile.Type)
+	}
+
+	return securityProfile, deprecatedProfile, nil
 }
