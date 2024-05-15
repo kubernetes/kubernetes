@@ -46,6 +46,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	"k8s.io/kubernetes/test/e2e/scheduling"
+	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -176,6 +178,71 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+	})
+
+	ginkgo.It("iholder resize test", func() {
+		runPodAndWaitUntilScheduled := func(f *framework.Framework, pod *v1.Pod) *v1.Pod {
+			ginkgo.By("running swap test pod")
+			podClient := e2epod.NewPodClient(f)
+
+			pod = podClient.CreateSync(context.Background(), pod)
+			pod, err := podClient.Get(context.Background(), pod.Name, metav1.GetOptions{})
+
+			framework.ExpectNoError(err)
+			isReady, err := testutils.PodRunningReady(pod)
+			framework.ExpectNoError(err)
+			gomega.ExpectWithOffset(1, isReady).To(gomega.BeTrue(), "pod should be ready")
+
+			return pod
+		}
+
+		initialResources := v1.ResourceRequirements{
+			Requests: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+			},
+		}
+
+		resourcesAfterResize := v1.ResourceRequirements{
+			Requests: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:    resource.MustParse("150m"),
+				v1.ResourceMemory: resource.MustParse("150Mi"),
+			},
+		}
+
+		ginkgo.By("Creating a pod")
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-resize",
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyAlways,
+				Containers: []v1.Container{
+					{
+						Name:      "busybox-container",
+						Image:     imageutils.GetE2EImage(imageutils.BusyBox),
+						Command:   []string{"sleep", "600"},
+						Resources: initialResources,
+					},
+				},
+			},
+		}
+
+		pod = runPodAndWaitUntilScheduled(f, pod)
+
+		resize := &v1.Resize{
+			Spec: v1.ResizeOptionsSpec{
+				Resize: map[string]v1.ResourceRequirements{
+					"busybox-container": resourcesAfterResize,
+				},
+			},
+		}
+		resize, err := f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(context.Background(), pod.Name, resize, metav1.UpdateOptions{})
+		//resize, err := f.ClientSet.CoreV1().Pods(pod.Namespace).GetResize(context.Background(), pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		gomega.Expect(resize).To(gomega.BeNil())
 	})
 
 	/*

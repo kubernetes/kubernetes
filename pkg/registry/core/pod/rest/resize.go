@@ -38,7 +38,7 @@ type ResizeREST struct {
 var _ = rest.GroupVersionKindProvider(&ResizeREST{})
 
 func (r *ResizeREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
-	return core.SchemeGroupVersion.WithKind("Scale")
+	return core.SchemeGroupVersion.WithKind("Resize")
 }
 
 // New returns an empty podPortForwardOptions object
