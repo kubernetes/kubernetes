@@ -298,7 +298,7 @@ func getExpectedGVKFromObject(expectedType interface{}) *schema.GroupVersionKind
 
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
 // call chains to NewReflector, so they'd be low entropy names for reflectors
-var internalPackages = []string{"client-go/tools/cache/"}
+var internalPackages = []string{"k8s.io/client-go/tools/cache/reflector.go"}
 
 // Run repeatedly uses the reflector's ListAndWatch to fetch all the
 // objects and subsequent deltas.
