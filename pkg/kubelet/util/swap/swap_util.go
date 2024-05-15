@@ -21,7 +21,9 @@ import (
 	sysruntime "runtime"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/mount-utils"
 )
 
@@ -36,6 +38,16 @@ func IsTmpfsNoswapOptionSupported(mounter mount.Interface) bool {
 	isTmpfsNoswapOptionSupportedHelper := func() bool {
 		if sysruntime.GOOS == "windows" {
 			return false
+		}
+
+		kernelVersion, err := utilkernel.GetVersion()
+		if err != nil {
+			klog.ErrorS(err, "cannot determine kernel version, unable to determine is tmpfs noswap is supported")
+			return false
+		}
+
+		if kernelVersion.AtLeast(version.MustParseGeneric(utilkernel.TmpfsNoswapSupportKernelVersion)) {
+			return true
 		}
 
 		mountDir, err := os.MkdirTemp("", "tmpfs-noswap-test-")
