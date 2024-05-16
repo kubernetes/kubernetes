@@ -4245,6 +4245,7 @@ type PodSecurityContext struct {
 	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
 	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
 	// and the container runtime must implement support for this feature.
+	// Note that this field cannot be set when spec.os.name is windows.
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	SupplementalGroupsPolicy *SupplementalGroupsPolicy `json:"supplementalGroupsPolicy,omitempty" protobuf:"bytes,12,opt,name=supplementalGroupsPolicy"`
