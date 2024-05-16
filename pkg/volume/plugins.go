@@ -82,8 +82,6 @@ type VolumeOptions struct {
 	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
 	// so on.
 	PVC *v1.PersistentVolumeClaim
-	// Unique name of Kubernetes cluster.
-	ClusterName string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
 }

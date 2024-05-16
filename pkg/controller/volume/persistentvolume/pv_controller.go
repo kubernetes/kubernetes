@@ -156,7 +156,6 @@ type PersistentVolumeController struct {
 	eventRecorder             record.EventRecorder
 	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
-	clusterName               string
 	resyncPeriod              time.Duration
 
 	// Cache of the last known version of volumes and claims. This cache is
@@ -1642,7 +1641,6 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	options := vol.VolumeOptions{
 		PersistentVolumeReclaimPolicy: *storageClass.ReclaimPolicy,
 		MountOptions:                  storageClass.MountOptions,
-		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
 		PVC:                           claim,
 		Parameters:                    storageClass.Parameters,
