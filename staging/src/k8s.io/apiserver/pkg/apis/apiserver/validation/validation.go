@@ -78,6 +78,15 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, dis
 		}
 	}
 
+	if c.Anonymous != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.AnonymousAuthConfigurableEndpoints) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("anonymous"), "anonymous is not supported when when AnonymousAuthConfigurableEnpoints feature gate is disabled"))
+		}
+		if !c.Anonymous.Enabled && len(c.Anonymous.Conditions) > 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("anonymous", "conditions"), c.Anonymous.Conditions, "enabled should be set to true when conditions are defined"))
+		}
+	}
+
 	return allErrs
 }
 

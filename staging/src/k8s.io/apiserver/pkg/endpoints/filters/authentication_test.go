@@ -487,7 +487,7 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 			case "error":
 				return nil, false, errors.New("authn err")
 			case "anonymous":
-				return anonymous.NewAuthenticator().AuthenticateRequest(r)
+				return anonymous.NewAuthenticator(nil).AuthenticateRequest(r)
 			case "anonymous_group":
 				return &authenticator.Response{User: &user.DefaultInfo{Groups: []string{user.AllUnauthenticated}}}, true, nil
 			default:
