@@ -19,25 +19,44 @@ package anonymous
 import (
 	"net/http"
 
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 const (
-	anonymousUser = user.Anonymous
-
+	anonymousUser        = user.Anonymous
 	unauthenticatedGroup = user.AllUnauthenticated
 )
 
-func NewAuthenticator() authenticator.Request {
-	return authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-		auds, _ := authenticator.AudiencesFrom(req.Context())
-		return &authenticator.Response{
-			User: &user.DefaultInfo{
-				Name:   anonymousUser,
-				Groups: []string{unauthenticatedGroup},
-			},
-			Audiences: auds,
-		}, true, nil
-	})
+type Authenticator struct {
+	allowedPaths map[string]bool
+}
+
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+	if len(a.allowedPaths) > 0 && !a.allowedPaths[req.URL.Path] {
+		return nil, false, nil
+	}
+
+	auds, _ := authenticator.AudiencesFrom(req.Context())
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name:   anonymousUser,
+			Groups: []string{unauthenticatedGroup},
+		},
+		Audiences: auds,
+	}, true, nil
+}
+
+// NewAuthenticator returns a new anonymous authenticator.
+// When conditions is empty all requests are authenticated as anonymous.
+// When conditions are non-empty only those requests that match the at-least one
+// condition are authenticated as anonymous.
+func NewAuthenticator(conditions []apiserver.AnonymousAuthCondition) authenticator.Request {
+	allowedPaths := make(map[string]bool)
+	for _, c := range conditions {
+		allowedPaths[c.Path] = true
+	}
+
+	return &Authenticator{allowedPaths: allowedPaths}
 }

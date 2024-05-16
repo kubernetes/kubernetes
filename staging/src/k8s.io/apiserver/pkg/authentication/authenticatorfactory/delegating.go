@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
@@ -39,7 +40,7 @@ import (
 // DelegatingAuthenticatorConfig is the minimal configuration needed to create an authenticator
 // built to delegate authentication to a kube API server
 type DelegatingAuthenticatorConfig struct {
-	Anonymous bool
+	Anonymous *apiserver.AnonymousAuthConfig
 
 	// TokenAccessReviewClient is a client to do token review. It can be nil. Then every token is ignored.
 	TokenAccessReviewClient authenticationclient.AuthenticationV1Interface
@@ -112,15 +113,15 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	}
 
 	if len(authenticators) == 0 {
-		if c.Anonymous {
-			return anonymous.NewAuthenticator(), &securityDefinitions, nil
+		if c.Anonymous != nil && c.Anonymous.Enabled {
+			return anonymous.NewAuthenticator(c.Anonymous.Conditions), &securityDefinitions, nil
 		}
-		return nil, nil, errors.New("No authentication method configured")
+		return nil, nil, errors.New("no authentication method configured")
 	}
 
 	authenticator := group.NewAuthenticatedGroupAdder(unionauth.New(authenticators...))
-	if c.Anonymous {
-		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+	if c.Anonymous != nil && c.Anonymous.Enabled {
+		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator(c.Anonymous.Conditions))
 	}
 	return authenticator, &securityDefinitions, nil
 }

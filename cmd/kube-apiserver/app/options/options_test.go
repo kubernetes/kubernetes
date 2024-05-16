@@ -243,9 +243,7 @@ func TestAddFlags(t *testing.T) {
 				EnableContentionProfiling: true,
 			},
 			Authentication: &kubeoptions.BuiltInAuthenticationOptions{
-				Anonymous: &kubeoptions.AnonymousAuthenticationOptions{
-					Allow: false,
-				},
+				Anonymous: s.Authentication.Anonymous,
 				ClientCert: &apiserveroptions.ClientCertAuthenticationOptions{
 					ClientCA: "/client-ca",
 				},
@@ -335,6 +333,6 @@ func TestAddFlags(t *testing.T) {
 	s.Authorization.AreLegacyFlagsSet = nil
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{}, kubeoptions.AnonymousAuthenticationOptions{})))
 	}
 }
