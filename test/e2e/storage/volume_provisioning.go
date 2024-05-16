@@ -552,7 +552,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// The claim should timeout phase:Pending
 			err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
-			framework.ExpectError(err)
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("not all in phase Bound")))
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -591,7 +591,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// The claim should timeout phase:Pending
 			err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
-			framework.ExpectError(err)
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("not all in phase Bound")))
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -720,7 +720,7 @@ func waitForProvisionedVolumesDeleted(ctx context.Context, c clientset.Interface
 		return true, nil // No PVs remain
 	})
 	if err != nil {
-		return remainingPVs, fmt.Errorf("Error waiting for PVs to be deleted: %w", err)
+		return remainingPVs, fmt.Errorf("error waiting for PVs to be deleted: %w", err)
 	}
 	return nil, nil
 }

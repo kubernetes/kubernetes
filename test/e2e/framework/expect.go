@@ -293,15 +293,6 @@ func (f *FailureError) backtrace() {
 //	}
 var ErrFailure error = FailureError{}
 
-// ExpectError expects an error happens, otherwise an exception raises
-//
-// Deprecated: use gomega.Expect().To(gomega.HaveOccurred()) or (better!) check
-// specifically for the error that is expected with
-// gomega.Expect().To(gomega.MatchError(gomega.ContainSubstring()))
-func ExpectError(err error, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, err).To(gomega.HaveOccurred(), explain...)
-}
-
 // ExpectNoError checks if "err" is set, and if so, fails assertion while logging the error.
 func ExpectNoError(err error, explain ...interface{}) {
 	ExpectNoErrorWithOffset(1, err, explain...)

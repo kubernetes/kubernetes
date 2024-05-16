@@ -325,10 +325,10 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 			}
 			ginkgo.By("Creating local PVC and PV")
 			createLocalPVCsPVs(ctx, config, []*localTestVolume{testVol}, immediateMode)
-			pod, err := createLocalPod(ctx, config, testVol, nil)
-			framework.ExpectError(err)
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, config.client, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-			framework.ExpectError(err)
+			// createLocalPod will create a pod and wait for it to be running. In this case,
+			// It's expected that the Pod fails to start.
+			_, err := createLocalPod(ctx, config, testVol, nil)
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("is not Running")))
 			cleanupLocalPVCsPVs(ctx, config, []*localTestVolume{testVol})
 		})
 
@@ -348,8 +348,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(ctx, pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, config.client, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-			framework.ExpectError(err)
+			getPod := e2epod.Get(f.ClientSet, pod)
+			gomega.Consistently(ctx, getPod, f.Timeouts.PodStart, 2*time.Second).ShouldNot(e2epod.BeInPhase(v1.PodRunning))
 
 			cleanupLocalVolumes(ctx, config, []*localTestVolume{testVol})
 		})
