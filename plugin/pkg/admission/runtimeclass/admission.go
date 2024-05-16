@@ -228,7 +228,7 @@ func validateOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1
 		}
 	} else {
 		// If RuntimeClass with Overhead is not defined but an Overhead is set for pod, reject the pod
-		if pod.Spec.Overhead != nil {
+		if pod.Spec.Overhead != nil && len(pod.Spec.Overhead) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("pod rejected: Pod Overhead set without corresponding RuntimeClass defined Overhead"))
 		}
 	}

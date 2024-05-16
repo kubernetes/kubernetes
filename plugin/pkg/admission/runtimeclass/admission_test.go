@@ -51,6 +51,8 @@ func newOverheadValidPod(name string, numContainers int, resources core.Resource
 		})
 	}
 
+	pod.Spec.Overhead = core.ResourceList{}
+
 	if setOverhead {
 		pod.Spec.Overhead = core.ResourceList{
 			core.ResourceName(core.ResourceCPU):    resource.MustParse("100m"),
