@@ -3695,6 +3695,7 @@ message PodExecOptions {
 // PodIP represents a single IP address allocated to the pod.
 message PodIP {
   // IP is the IP address assigned to the pod
+  // +required
   optional string ip = 1;
 }
 
