@@ -75,8 +75,12 @@ func (ps *patchSet) String() string {
 	)
 }
 
-// KubeletConfiguration defines the kubeletconfiguration patch target.
-const KubeletConfiguration = "kubeletconfiguration"
+const (
+	// KubeletConfiguration defines the kubeletconfiguration patch target.
+	KubeletConfiguration = "kubeletconfiguration"
+	// CoreDNSDeployment defines the corednsdeployment patch target.
+	CoreDNSDeployment = "corednsdeployment"
+)
 
 var (
 	pathLock  = &sync.RWMutex{}
@@ -100,6 +104,7 @@ var (
 		kubeadmconstants.KubeControllerManager,
 		kubeadmconstants.KubeScheduler,
 		KubeletConfiguration,
+		CoreDNSDeployment,
 	}
 )
 

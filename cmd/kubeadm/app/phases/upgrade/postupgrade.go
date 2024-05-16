@@ -105,7 +105,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	if err := PerformAddonsUpgrade(client, cfg, out); err != nil {
+	if err := PerformAddonsUpgrade(client, cfg, patchesDir, out); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -113,7 +113,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 }
 
 // PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
-func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) error {
+func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, out io.Writer) error {
 	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
@@ -147,7 +147,7 @@ func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfig
 			metav1.NamespaceSystem)
 	} else {
 		// Upgrade CoreDNS
-		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, out, false); err != nil {
+		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
