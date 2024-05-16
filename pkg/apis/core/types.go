@@ -2741,7 +2741,7 @@ type ContainerStatus struct {
 	// +optional
 	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus
-	// User represents user identitiy information of the first process in the container
+	// User represents user identitiy information initially attached to the first process of the container
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	User *ContainerUser
@@ -2749,8 +2749,9 @@ type ContainerStatus struct {
 
 // ContainerUser represents user identity information
 type ContainerUser struct {
-	// Linux holds user identity information of the first process of the containers in Linux.
-	// Note that this field cannot be set when spec.os.name is windows.
+	// Linux holds user identity information initially attached to the first process of the containers in Linux.
+	// Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls
+	// +optional
 	Linux *LinuxContainerUser
 
 	// Windows holds user identity information of the first process of the containers in Windows
@@ -2760,11 +2761,11 @@ type ContainerUser struct {
 
 // LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUser struct {
-	// UID is the primary uid of the first process in the container
+	// UID is the primary uid initially attached to the first process in the container
 	UID int64
-	// GID is the primary gid of the first process in the container
+	// GID is the primary gid initially attached to the first process in the container
 	GID int64
-	// SupplementalGroups are the supplemental groups attached to the first process in the container
+	// SupplementalGroups are the supplemental groups initially attached to the first process in the container
 	SupplementalGroups []int64
 }
 

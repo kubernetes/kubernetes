@@ -482,7 +482,7 @@ var map_ContainerStatus = map[string]string{
 	"allocatedResources": "AllocatedResources represents the compute resources allocated for this container by the node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission and after successfully admitting desired pod resize.",
 	"resources":          "Resources represents the compute resource requests and limits that have been successfully enacted on the running container after it has been started or has been successfully resized.",
 	"volumeMounts":       "Status of volume mounts.",
-	"user":               "User represents user identitiy information of the first process in the container",
+	"user":               "User represents user identitiy information initially attached to the first process of the container",
 }
 
 func (ContainerStatus) SwaggerDoc() map[string]string {
@@ -491,7 +491,7 @@ func (ContainerStatus) SwaggerDoc() map[string]string {
 
 var map_ContainerUser = map[string]string{
 	"":      "ContainerUser represents user identity information",
-	"linux": "Linux holds user identity information of the first process of the containers in Linux. Note that this field cannot be set when spec.os.name is windows.",
+	"linux": "Linux holds user identity information initially attached to the first process of the containers in Linux. Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls",
 }
 
 func (ContainerUser) SwaggerDoc() map[string]string {
@@ -1021,9 +1021,9 @@ func (LimitRangeSpec) SwaggerDoc() map[string]string {
 
 var map_LinuxContainerUser = map[string]string{
 	"":                   "LinuxContainerUser represents user identity information in Linux containers",
-	"uid":                "UID is the primary uid of the first process in the container",
-	"gid":                "GID is the primary gid of the first process in the container",
-	"supplementalGroups": "SupplementalGroups are the supplemental groups attached to the first process in the container",
+	"uid":                "UID is the primary uid initially attached to the first process in the container",
+	"gid":                "GID is the primary gid initially attached to the first process in the container",
+	"supplementalGroups": "SupplementalGroups are the supplemental groups initially attached to the first process in the container",
 }
 
 func (LinuxContainerUser) SwaggerDoc() map[string]string {

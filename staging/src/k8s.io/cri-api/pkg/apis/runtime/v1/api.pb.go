@@ -4294,11 +4294,11 @@ func (m *LinuxContainerConfig) GetSecurityContext() *LinuxContainerSecurityConte
 }
 
 type LinuxContainerUser struct {
-	// uid is the primary uid of the container process
+	// uid is the primary uid initially attached to the first process in the container
 	Uid int64 `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
-	// gid is the primary gid of the container process
+	// gid is the primary gid initially attached to the first process in the container
 	Gid int64 `protobuf:"varint,2,opt,name=gid,proto3" json:"gid,omitempty"`
-	// supplemental_groups are the supplemental groups attached to the container process
+	// supplemental_groups are the supplemental groups initially attached to the first process in the container
 	SupplementalGroups   []int64  `protobuf:"varint,3,rep,packed,name=supplemental_groups,json=supplementalGroups,proto3" json:"supplemental_groups,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -5961,7 +5961,7 @@ type ContainerStatus struct {
 	// misusage, we now introduce the image_id field, which should always refer
 	// to a unique image identifier on the node.
 	ImageId string `protobuf:"bytes,17,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
-	// User identities attached to the container
+	// User identities initially attached to the container
 	User                 *ContainerUser `protobuf:"bytes,18,opt,name=user,proto3" json:"user,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
 	XXX_sizecache        int32          `json:"-"`
@@ -6240,7 +6240,8 @@ func (m *ContainerResources) GetWindows() *WindowsContainerResources {
 }
 
 type ContainerUser struct {
-	// User identities attached to the Linux container
+	// User identities initially attached to first process in the Linux container.
+	// Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls.
 	Linux                *LinuxContainerUser `protobuf:"bytes,1,opt,name=linux,proto3" json:"linux,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_sizecache        int32               `json:"-"`

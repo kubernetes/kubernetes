@@ -6521,7 +6521,7 @@
         },
         "user": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ContainerUser",
-          "description": "User represents user identitiy information of the first process in the container"
+          "description": "User represents user identitiy information initially attached to the first process of the container"
         },
         "volumeMounts": {
           "description": "Status of volume mounts.",
@@ -6551,7 +6551,7 @@
       "properties": {
         "linux": {
           "$ref": "#/definitions/io.k8s.api.core.v1.LinuxContainerUser",
-          "description": "Linux holds user identity information of the first process of the containers in Linux. Note that this field cannot be set when spec.os.name is windows."
+          "description": "Linux holds user identity information initially attached to the first process of the containers in Linux. Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls"
         }
       },
       "type": "object"
@@ -7827,12 +7827,12 @@
       "description": "LinuxContainerUser represents user identity information in Linux containers",
       "properties": {
         "gid": {
-          "description": "GID is the primary gid of the first process in the container",
+          "description": "GID is the primary gid initially attached to the first process in the container",
           "format": "int64",
           "type": "integer"
         },
         "supplementalGroups": {
-          "description": "SupplementalGroups are the supplemental groups attached to the first process in the container",
+          "description": "SupplementalGroups are the supplemental groups initially attached to the first process in the container",
           "items": {
             "format": "int64",
             "type": "integer"
@@ -7841,7 +7841,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "uid": {
-          "description": "UID is the primary uid of the first process in the container",
+          "description": "UID is the primary uid initially attached to the first process in the container",
           "format": "int64",
           "type": "integer"
         }

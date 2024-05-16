@@ -3030,7 +3030,7 @@ type ContainerStatus struct {
 	// +listMapKey=mountPath
 	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,12,rep,name=volumeMounts"`
-	// User represents user identitiy information of the first process in the container
+	// User represents user identitiy information initially attached to the first process of the container
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	User *ContainerUser `json:"user,omitempty" protobuf:"bytes,13,opt,name=user,casttype=ContainerUser"`
@@ -3038,22 +3038,23 @@ type ContainerStatus struct {
 
 // ContainerUser represents user identity information
 type ContainerUser struct {
-	// Linux holds user identity information of the first process of the containers in Linux.
-	// Note that this field cannot be set when spec.os.name is windows.
+	// Linux holds user identity information initially attached to the first process of the containers in Linux.
+	// Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls
+	// +optional
 	Linux *LinuxContainerUser `json:"linux,omitempty" protobuf:"bytes,1,opt,name=linux,casttype=LinuxContainerUser"`
 
-	// Windows holds user identity information of the first process of the containers in Windows
+	// Windows holds user identity information initially attached to the first process of the containers in Windows
 	// This is just reserved for future use.
 	// Windows *WindowsContainerUser
 }
 
 // LinuxContainerUser represents user identity information in Linux containers
 type LinuxContainerUser struct {
-	// UID is the primary uid of the first process in the container
+	// UID is the primary uid initially attached to the first process in the container
 	UID int64 `json:"uid" protobuf:"varint,1,name=uid"`
-	// GID is the primary gid of the first process in the container
+	// GID is the primary gid initially attached to the first process in the container
 	GID int64 `json:"gid" protobuf:"varint,2,name=gid"`
-	// SupplementalGroups are the supplemental groups attached to the first process in the container
+	// SupplementalGroups are the supplemental groups initially attached to the first process in the container
 	// +optional
 	// +listType=atomic
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,3,rep,name=supplementalGroups"`

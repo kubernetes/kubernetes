@@ -20995,7 +20995,7 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User represents user identitiy information of the first process in the container",
+							Description: "User represents user identitiy information initially attached to the first process of the container",
 							Ref:         ref("k8s.io/api/core/v1.ContainerUser"),
 						},
 					},
@@ -21017,7 +21017,7 @@ func schema_k8sio_api_core_v1_ContainerUser(ref common.ReferenceCallback) common
 				Properties: map[string]spec.Schema{
 					"linux": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Linux holds user identity information of the first process of the containers in Linux. Note that this field cannot be set when spec.os.name is windows.",
+							Description: "Linux holds user identity information initially attached to the first process of the containers in Linux. Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls",
 							Ref:         ref("k8s.io/api/core/v1.LinuxContainerUser"),
 						},
 					},
@@ -23630,7 +23630,7 @@ func schema_k8sio_api_core_v1_LinuxContainerUser(ref common.ReferenceCallback) c
 				Properties: map[string]spec.Schema{
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UID is the primary uid of the first process in the container",
+							Description: "UID is the primary uid initially attached to the first process in the container",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",
@@ -23638,7 +23638,7 @@ func schema_k8sio_api_core_v1_LinuxContainerUser(ref common.ReferenceCallback) c
 					},
 					"gid": {
 						SchemaProps: spec.SchemaProps{
-							Description: "GID is the primary gid of the first process in the container",
+							Description: "GID is the primary gid initially attached to the first process in the container",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int64",
@@ -23651,7 +23651,7 @@ func schema_k8sio_api_core_v1_LinuxContainerUser(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SupplementalGroups are the supplemental groups attached to the first process in the container",
+							Description: "SupplementalGroups are the supplemental groups initially attached to the first process in the container",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
