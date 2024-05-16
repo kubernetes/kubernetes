@@ -24,10 +24,13 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
+	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -35,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -96,10 +100,10 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		// Pods may fail because of missing or mis-configured storage class
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
 		// schedulable upon StorageClass Add or Update events.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterStorageClassChange},
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
 		// Pods may fail to find available PVs because the node labels do not
 		// match the storage class's allowed topologies or PV's node affinity.
 		// A new or updated node may make pods schedulable.
@@ -118,9 +122,212 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
 		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}},
-		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIStorageCapacityChange},
 	}
 	return events
+}
+
+func (pl *VolumeBinding) isSchedulableAfterStorageClassChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	oldSC, newSC, err := util.As[*storagev1.StorageClass](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"StorageClass", klog.KObj(newSC),
+	)
+
+	result, err := processPodVolumesForQHint(pod, func(pvcName string, isEphemeral bool) (bool, error) {
+		pvc, err := pl.PVCLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			if isEphemeral && apierrors.IsNotFound(err) {
+				err = fmt.Errorf("waiting for ephemeral volume controller to create the persistentvolumeclaim %q", pvcName)
+				return false, err
+			}
+			return false, err
+		}
+
+		className := volume.GetPersistentVolumeClaimClass(pvc)
+		if className == "" {
+			return false, fmt.Errorf("no class for claim %q", pvcName)
+		}
+
+		if className == newSC.Name {
+			if oldSC == nil {
+				logger.V(4).Info("StorageClass was created")
+				return true, nil
+			}
+
+			if !apiequality.Semantic.DeepEqual(newSC.AllowedTopologies, oldSC.AllowedTopologies) {
+				logger.V(4).Info("StorageClass was created or updated, and changed Provisioner", "AllowedTopologies", newSC.AllowedTopologies)
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	if result {
+		return framework.Queue, nil
+	}
+
+	logger.V(4).Info("StorageClass was created or updated, but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
+func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	oldPVC, newPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"PersistentVolumeClaim", klog.KObj(newPVC),
+	)
+
+	result, err := processPodVolumesForQHint(pod, func(pvcName string, isEphemeral bool) (bool, error) {
+		if pvcName == newPVC.Name {
+			if oldPVC == nil {
+				logger.V(4).Info("PersistentVolumeClaim was created")
+				return true, nil
+			}
+
+			if newPVC.Status.Phase != oldPVC.Status.Phase {
+				logger.V(4).Info("PersistentVolumeClaim referenced by the Pod was created or updated, and changed Provisioner", "Phase", newPVC.Status.Phase)
+				return true, nil
+			}
+
+			if !apiequality.Semantic.DeepEqual(newPVC.Annotations, oldPVC.Annotations) {
+				logger.V(4).Info("PersistentVolumeClaim referenced by the Pod was created or updated, and changed Annotations")
+				return true, nil
+			}
+
+			if !apiequality.Semantic.DeepEqual(newPVC.Spec, oldPVC.Spec) {
+				logger.V(4).Info("PersistentVolumeClaim referenced by the Pod was created or updated, and changed Spec")
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	if result {
+		return framework.Queue, nil
+	}
+
+	logger.V(4).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
+func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, newPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"PersistentVolume", klog.KObj(newPV),
+	)
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.Name == newPV.Name {
+			logger.V(4).Info("PersistentVolume referenced by the Pod was created or updated")
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(4).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
+func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	oldCap, newCap, err := util.As[*storagev1.CSIStorageCapacity](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"CSIStorageCapacity", klog.KObj(newCap),
+	)
+
+	result, err := processPodVolumesForQHint(pod, func(pvcName string, isEphemeral bool) (bool, error) {
+		pvc, err := pl.PVCLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			if isEphemeral && apierrors.IsNotFound(err) {
+				err = fmt.Errorf("waiting for ephemeral volume controller to create the persistentvolumeclaim %q", pvcName)
+				return true, err
+			}
+			return true, err
+		}
+
+		className := volume.GetPersistentVolumeClaimClass(pvc)
+		if className == "" {
+			return true, fmt.Errorf("no class for claim %q", pvcName)
+		}
+
+		if newCap.StorageClassName == className {
+			if oldCap == nil {
+				logger.V(4).Info("CSIStorageCapacity was created")
+				return true, nil
+			}
+
+			if newCap.Capacity != oldCap.Capacity {
+				logger.V(4).Info("CSIStorageCapacity referenced by the Pod was created or updated, and changed Capacity", "Capacity", newCap.Capacity)
+				return true, nil
+			}
+
+			if newCap.MaximumVolumeSize != oldCap.MaximumVolumeSize {
+				logger.V(4).Info("CSIStorageCapacity referenced by the Pod was created or updated, and changed MaximumVolumeSize", "MaximumVolumeSize", newCap.MaximumVolumeSize)
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	if result {
+		return framework.Queue, nil
+	}
+
+	logger.V(4).Info("CSIStorageCapacity was created or updated, but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
+func processPodVolumesForQHint(pod *v1.Pod, fn func(string, bool) (bool, error)) (bool, error) {
+	for _, vol := range pod.Spec.Volumes {
+		hasPVC, pvcName, isEphemeral := getVolumeClaimName(pod, &vol)
+		if !hasPVC {
+			continue
+		}
+		result, err := fn(pvcName, isEphemeral)
+		if err != nil {
+			return false, err
+		}
+		if result {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // podHasPVCs returns 2 values:
@@ -129,16 +336,8 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 	hasPVC := false
 	for _, vol := range pod.Spec.Volumes {
-		var pvcName string
-		isEphemeral := false
-		switch {
-		case vol.PersistentVolumeClaim != nil:
-			pvcName = vol.PersistentVolumeClaim.ClaimName
-		case vol.Ephemeral != nil:
-			pvcName = ephemeral.VolumeClaimName(pod, &vol)
-			isEphemeral = true
-		default:
-			// Volume is not using a PVC, ignore
+		hasPVC2, pvcName, isEphemeral := getVolumeClaimName(pod, &vol)
+		if !hasPVC2 {
 			continue
 		}
 		hasPVC = true
@@ -168,6 +367,16 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 		}
 	}
 	return hasPVC, nil
+}
+
+func getVolumeClaimName(pod *v1.Pod, vol *v1.Volume) (bool, string, bool) {
+	switch {
+	case vol.PersistentVolumeClaim != nil:
+		return true, vol.PersistentVolumeClaim.ClaimName, false
+	case vol.Ephemeral != nil:
+		return true, ephemeral.VolumeClaimName(pod, vol), true
+	}
+	return false, "", false
 }
 
 // PreFilter invoked at the prefilter extension point to check if pod has all
