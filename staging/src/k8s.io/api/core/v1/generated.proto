@@ -1990,6 +1990,7 @@ message HostAlias {
 // HostIP represents a single IP address allocated to the host.
 message HostIP {
   // IP is the IP address assigned to the host
+  // +required
   optional string ip = 1;
 }
 
@@ -3702,6 +3703,7 @@ message PodExecOptions {
 // PodIP represents a single IP address allocated to the pod.
 message PodIP {
   // IP is the IP address assigned to the pod
+  // +required
   optional string ip = 1;
 }
 
