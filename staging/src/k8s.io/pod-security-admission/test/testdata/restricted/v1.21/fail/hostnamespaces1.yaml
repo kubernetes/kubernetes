@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostnamespaces1
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+  hostNetwork: true
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault

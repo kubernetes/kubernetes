@@ -1,0 +1,7 @@
+linux/amd64=registry.k8s.io/build-image/debian-base-amd64:bookworm-v1.0.2
+linux/arm=registry.k8s.io/build-image/debian-base-arm:bookworm-v1.0.2
+linux/arm64=registry.k8s.io/build-image/debian-base-arm64:bookworm-v1.0.2
+linux/ppc64le=registry.k8s.io/build-image/debian-base-ppc64le:bookworm-v1.0.2
+linux/s390x=registry.k8s.io/build-image/debian-base-s390x:bookworm-v1.0.2
+windows/amd64/1809=mcr.microsoft.com/windows/nanoserver:1809
+windows/amd64/ltsc2022=mcr.microsoft.com/windows/nanoserver:ltsc2022

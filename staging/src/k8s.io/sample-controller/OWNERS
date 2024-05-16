@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - deads2k
+  - sttts
+  - munnerz
+reviewers:
+  - deads2k
+  - sttts
+  - munnerz
+  - nikhita
+labels:
+  - sig/api-machinery

@@ -1,0 +1,621 @@
+- name: current_executing_requests
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests in initial (for a WATCH) or any (for a non-WATCH) execution
+    stage in the API Priority and Fairness subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: current_executing_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Concurrency (number of seats) occupied by the currently executing (initial
+    stage for a WATCH, any stage otherwise) requests in the API Priority and Fairness
+    subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: current_inqueue_requests
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests currently pending in queues of the API Priority and Fairness
+    subsystem
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: dispatched_requests_total
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests executed by API Priority and Fairness subsystem
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+- name: nominal_limit_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Nominal number of execution seats configured for each priority level
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - priority_level
+- name: rejected_requests_total
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Number of requests rejected by API Priority and Fairness subsystem
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - flow_schema
+  - priority_level
+  - reason
+- name: request_wait_duration_seconds
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Length of time a request spent waiting in its queue
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - execute
+  - flow_schema
+  - priority_level
+  buckets:
+  - 0
+  - 0.005
+  - 0.02
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.5
+  - 1
+  - 2
+  - 5
+  - 10
+  - 15
+  - 30
+- name: disabled_metrics_total
+  help: The count of disabled metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: hidden_metrics_total
+  help: The count of hidden metrics.
+  type: Counter
+  stabilityLevel: BETA
+- name: feature_enabled
+  namespace: kubernetes
+  help: This metric records the data about the stage and enablement of a k8s feature.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - name
+  - stage
+- name: registered_metrics_total
+  help: The count of registered metrics broken by stability level and deprecation
+    version.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - deprecated_version
+  - stability_level
+- name: pod_scheduling_sli_duration_seconds
+  subsystem: scheduler
+  help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
+    queue and might involve multiple scheduling attempts.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - attempts
+  buckets:
+  - 0.01
+  - 0.02
+  - 0.04
+  - 0.08
+  - 0.16
+  - 0.32
+  - 0.64
+  - 1.28
+  - 2.56
+  - 5.12
+  - 10.24
+  - 20.48
+  - 40.96
+  - 81.92
+  - 163.84
+  - 327.68
+  - 655.36
+  - 1310.72
+  - 2621.44
+  - 5242.88
+- name: controller_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission controller latency histogram in seconds, identified by name and
+    broken out for each operation and API resource and type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: step_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission sub-step latency histogram in seconds, broken out for each operation
+    and API resource and step type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+- name: webhook_admission_duration_seconds
+  subsystem: admission
+  namespace: apiserver
+  help: Admission webhook latency histogram in seconds, identified by name and broken
+    out for each operation and API resource and type (validate or admit).
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - operation
+  - rejected
+  - type
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  - 25
+- name: current_inflight_requests
+  subsystem: apiserver
+  help: Maximal number of currently used inflight request limit of this apiserver
+    per request kind in last second.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - request_kind
+- name: longrunning_requests
+  subsystem: apiserver
+  help: Gauge of all active long-running apiserver requests broken out by verb, group,
+    version, resource, scope and component. Not all requests are tracked this way.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+- name: request_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution in seconds for each verb, dry run value, group,
+    version, resource, subresource, scope and component.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - component
+  - dry_run
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
+- name: request_total
+  subsystem: apiserver
+  help: Counter of apiserver requests broken out for each verb, dry run value, group,
+    version, resource, scope, component, and HTTP response code.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - code
+  - component
+  - dry_run
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+- name: requested_deprecated_apis
+  subsystem: apiserver
+  help: Gauge of deprecated APIs that have been requested, broken out by API group,
+    version, resource, subresource, and removed_release.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - group
+  - removed_release
+  - resource
+  - subresource
+  - version
+- name: response_sizes
+  subsystem: apiserver
+  help: Response size distribution in bytes for each group, version, verb, resource,
+    subresource, scope and component.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 1000
+  - 10000
+  - 100000
+  - 1e+06
+  - 1e+07
+  - 1e+08
+  - 1e+09
+- name: apiserver_storage_objects
+  help: Number of stored objects at the time of last check split by kind. In case
+    of a fetching error, the value will be -1.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - resource
+- name: apiserver_storage_size_bytes
+  help: Size of the storage database file physically allocated in bytes.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - storage_cluster_id
+- name: container_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the container in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_memory_working_set_bytes
+  help: Current working set of the container in bytes
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_start_time_seconds
+  help: Start time of the container since unix epoch in seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - container
+  - pod
+  - namespace
+- name: job_creation_skew_duration_seconds
+  subsystem: cronjob_controller
+  help: Time between when a cronjob is scheduled to be run, and when the corresponding
+    job is created
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+- name: job_pods_finished_total
+  subsystem: job_controller
+  help: The number of finished Pods that are fully tracked
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - completion_mode
+  - result
+- name: job_sync_duration_seconds
+  subsystem: job_controller
+  help: The time it took to sync a job
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - action
+  - completion_mode
+  - result
+  buckets:
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  - 32.768
+  - 65.536
+- name: job_syncs_total
+  subsystem: job_controller
+  help: The number of job syncs
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - action
+  - completion_mode
+  - result
+- name: jobs_finished_total
+  subsystem: job_controller
+  help: The number of finished jobs
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - completion_mode
+  - reason
+  - result
+- name: kube_pod_resource_limit
+  help: Resources limit for workloads on the cluster, broken down by pod. This shows
+    the resource usage the scheduler and kubelet expect per pod for resources along
+    with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
+- name: kube_pod_resource_request
+  help: Resources requested by workloads on the cluster, broken down by pod. This
+    shows the resource usage the scheduler and kubelet expect per pod for resources
+    along with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - name
+  - status
+  - type
+- name: evictions_total
+  subsystem: node_collector
+  help: Number of Node evictions that happened since current instance of NodeController
+    started.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - zone
+- name: node_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the node in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+- name: node_memory_working_set_bytes
+  help: Current working set of the node in bytes
+  type: Custom
+  stabilityLevel: STABLE
+- name: pod_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the pod in core-seconds
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - pod
+  - namespace
+- name: pod_memory_working_set_bytes
+  help: Current working set of the pod in bytes
+  type: Custom
+  stabilityLevel: STABLE
+  labels:
+  - pod
+  - namespace
+- name: resource_scrape_error
+  help: 1 if there was an error while getting container metrics, 0 otherwise
+  type: Custom
+  stabilityLevel: STABLE
+- name: framework_extension_point_duration_seconds
+  subsystem: scheduler
+  help: Latency for running all plugins of a specific extension point.
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - extension_point
+  - profile
+  - status
+  buckets:
+  - 0.0001
+  - 0.0002
+  - 0.0004
+  - 0.0008
+  - 0.0016
+  - 0.0032
+  - 0.0064
+  - 0.0128
+  - 0.0256
+  - 0.0512
+  - 0.1024
+  - 0.2048
+- name: pending_pods
+  subsystem: scheduler
+  help: Number of pending pods, by the queue type. 'active' means number of pods in
+    activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
+    of pods in unschedulablePods that the scheduler attempted to schedule and failed;
+    'gated' is the number of unschedulable pods that the scheduler never attempted
+    to schedule because they are gated.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - queue
+- name: pod_scheduling_attempts
+  subsystem: scheduler
+  help: Number of attempts to successfully schedule a pod.
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+- name: pod_scheduling_duration_seconds
+  subsystem: scheduler
+  help: E2e latency for a pod being scheduled which may include multiple scheduling
+    attempts.
+  type: Histogram
+  deprecatedVersion: 1.29.0
+  stabilityLevel: STABLE
+  labels:
+  - attempts
+  buckets:
+  - 0.01
+  - 0.02
+  - 0.04
+  - 0.08
+  - 0.16
+  - 0.32
+  - 0.64
+  - 1.28
+  - 2.56
+  - 5.12
+  - 10.24
+  - 20.48
+  - 40.96
+  - 81.92
+  - 163.84
+  - 327.68
+  - 655.36
+  - 1310.72
+  - 2621.44
+  - 5242.88
+- name: preemption_attempts_total
+  subsystem: scheduler
+  help: Total preemption attempts in the cluster till now
+  type: Counter
+  stabilityLevel: STABLE
+- name: preemption_victims
+  subsystem: scheduler
+  help: Number of selected preemption victims
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+- name: queue_incoming_pods_total
+  subsystem: scheduler
+  help: Number of pods added to scheduling queues by event and queue type.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - event
+  - queue
+- name: schedule_attempts_total
+  subsystem: scheduler
+  help: Number of attempts to schedule pods, by the result. 'unschedulable' means
+    a pod could not be scheduled, while 'error' means an internal scheduler problem.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - profile
+  - result
+- name: scheduling_attempt_duration_seconds
+  subsystem: scheduler
+  help: Scheduling attempt latency in seconds (scheduling algorithm + binding)
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - profile
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384

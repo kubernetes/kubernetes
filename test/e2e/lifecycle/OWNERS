@@ -1,0 +1,18 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - neolit123
+  - SataQiu
+  - pacoxu
+reviewers:
+  - neolit123
+  - SataQiu
+  - pacoxu
+labels:
+  - sig/cluster-lifecycle
+emeritus_approvers:
+  - fabriziopandini
+  - rosti
+  - ereslibre
+  - timothysc
+  - luxas

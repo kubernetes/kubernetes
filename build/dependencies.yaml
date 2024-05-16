@@ -1,0 +1,278 @@
+dependencies:
+  # zeitgeist (https://github.com/kubernetes-sigs/zeitgeist) was inspired by
+  # (and now replaces) the cmd/verifydependencies tool to verify external
+  # dependencies across the repo.
+  #
+  # The zeitgeist dependencies.yaml file format is intended to be
+  # backwards-compatible with the original tooling.
+  #
+  # In instances where the file format may change across versions, this meta
+  # dependency check exists to ensure we're pinned to a known good version.
+  #
+  # ref: https://github.com/kubernetes/kubernetes/pull/98845
+  - name: "zeitgeist"
+    version: "v0.5.3"
+    refPaths:
+    - path: hack/verify-external-dependencies-version.sh
+      match: sigs.k8s.io/zeitgeist@v.*
+
+  # CNI plugins
+  - name: "cni"
+    version: 1.4.1
+    refPaths:
+    - path: cluster/gce/config-common.sh
+      match: WINDOWS_CNI_VERSION=
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CNI_VERSION=
+    - path: test/e2e_node/remote/utils.go
+      match: cniVersion[\t\n\f\r ]*=
+    - path: hack/local-up-cluster.sh
+      match: CNI_PLUGINS_VERSION=
+
+  # CoreDNS
+  - name: "coredns-kube-up"
+    version: 1.11.1
+    refPaths:
+    - path: cluster/addons/dns/coredns/coredns.yaml.base
+      match: registry.k8s.io/coredns
+    - path: cluster/addons/dns/coredns/coredns.yaml.in
+      match: registry.k8s.io/coredns
+    - path: cluster/addons/dns/coredns/coredns.yaml.sed
+      match: registry.k8s.io/coredns
+
+  - name: "coredns-kubeadm"
+    version: 1.11.1
+    refPaths:
+    - path: cmd/kubeadm/app/constants/constants.go
+      match: CoreDNSVersion =
+
+  # CRI Tools
+  - name: "crictl"
+    version: 1.30.0
+    refPaths:
+    - path: cluster/gce/windows/k8s-node-setup.psm1
+      match: CRICTL_VERSION =
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_CRICTL_VERSION=
+
+  # protoc
+  - name: "protoc"
+    version: 23.4
+    refPaths:
+    - path: hack/lib/protoc.sh
+      match: PROTOC_VERSION=
+
+  # etcd
+  - name: "etcd"
+    version: 3.5.13
+    refPaths:
+    - path: cluster/gce/manifests/etcd.manifest
+      match: etcd_docker_tag|etcd_version
+    - path: cluster/gce/upgrade-aliases.sh
+      match: ETCD_IMAGE|ETCD_VERSION
+    - path: cmd/kubeadm/app/constants/constants.go
+      match: DefaultEtcdVersion =
+    - path: hack/lib/etcd.sh
+      match: ETCD_VERSION=
+    - path: staging/src/k8s.io/sample-apiserver/artifacts/example/deployment.yaml
+      match: gcr.io/etcd-development/etcd
+    - path: test/utils/image/manifest.go
+      match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
+
+  - name: "etcd-image"
+    version: 3.5.13
+    refPaths:
+    - path: cluster/images/etcd/Makefile
+      match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
+    - path: cluster/images/etcd/migrate/options.go
+
+  - name: "node-problem-detector"
+    version: 0.8.16
+    refPaths:
+    - path: test/e2e_node/image_list.go
+      match: const defaultImage
+    - path: test/kubemark/resources/hollow-node_template.yaml
+      match: registry.k8s.io/node-problem-detector/node-problem-detector
+    - path: cluster/addons/node-problem-detector/npd.yaml
+      match: registry.k8s.io/node-problem-detector/node-problem-detector
+    - path: cluster/addons/node-problem-detector/npd.yaml
+      match: app.kubernetes.io/version
+    # TODO(dims): Ensure newer versions get uploaded to
+    # - https://console.cloud.google.com/storage/browser/gke-release/winnode/node-problem-detector
+    # - https://gcsweb.k8s.io/gcs/kubernetes-release/node-problem-detector/
+    # and then the following references get fixed.
+    #
+    - path: cluster/gce/gci/configure.sh
+      match: DEFAULT_NPD_VERSION=
+    #- path: cluster/gce/windows/k8s-node-setup.psm1
+    #  match: DEFAULT_NPD_VERSION
+
+  # From https://github.com/etcd-io/etcd/blob/main/Makefile
+  - name: "golang: etcd release version"
+    version: 1.21.8 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
+    refPaths:
+    - path: cluster/images/etcd/Makefile
+      match: 'GOLANG_VERSION := \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
+
+  # Golang
+  - name: "golang: upstream version"
+    version: 1.22.3
+    refPaths:
+    - path: .go-version
+    - path: build/build-image/cross/VERSION
+    - path: staging/publishing/rules.yaml
+      match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
+    - path: test/images/Makefile
+      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
+
+  # Golang pre-releases are denoted as `1.y<pre-release stage>`
+  # Example: go1.16rc1
+  #
+  # This entry is a stub of the major version to allow dependency checks to
+  # pass when building Kubernetes using a pre-release of Golang.
+  - name: "golang: 1.<major>"
+    version: 1.22
+    refPaths:
+    - path: build/build-image/cross/VERSION
+    - path: hack/lib/golang.sh
+      match: minimum_go_version=go([0-9]+\.[0-9]+)
+
+  - name: "registry.k8s.io/kube-cross: dependents"
+    version: v1.31.0-go1.22.3-bullseye.0
+    refPaths:
+    - path: build/build-image/cross/VERSION
+
+  # Base images
+  - name: "registry.k8s.io/debian-base: dependents"
+    version: bookworm-v1.0.2
+    refPaths:
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-arm:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-arm64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: cluster/images/etcd/Makefile
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/conformance/image/Makefile
+      match: BASE_IMAGE_VERSION\?=
+    - path: test/images/pets/peer-finder/BASEIMAGE
+      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/images/resource-consumer/BASEIMAGE
+      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/images/pets/zookeeper-installer/BASEIMAGE
+      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/images/nonroot/BASEIMAGE
+      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/images/regression-issue-74839/BASEIMAGE
+      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/images/pets/redis-installer/BASEIMAGE
+      match: registry\.k8s\.io\/build-image\/debian-base-amd64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: cluster/gce/gci/configure-helper.sh
+      match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: pkg/volume/plugins.go
+      match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+
+  - name: "registry.k8s.io/distroless-iptables: dependents"
+    version: v0.5.4
+    refPaths:
+    - path: build/common.sh
+      match: __default_distroless_iptables_version=
+    - path: test/utils/image/manifest.go
+      match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
+
+  - name: "registry.k8s.io/go-runner: dependents"
+    version: v2.3.1-go1.22.3-bookworm.0
+    refPaths:
+    - path: build/common.sh
+      match: __default_go_runner_version=
+
+  - name: "registry.k8s.io/pause"
+    version: 3.9
+    refPaths:
+    - path: build/pause/Makefile
+      match: TAG\s*\?=
+
+  - name: "registry.k8s.io/pause: dependents"
+    version: 3.9
+    refPaths:
+    - path: cluster/gce/config-common.sh
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: cluster/gce/gci/configure-helper.sh
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: cluster/gce/windows/smoke-test.sh
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: cmd/kubeadm/app/constants/constants.go
+      match: PauseVersion\s+=
+    - path: cmd/kubeadm/app/util/template_test.go
+      match: validTmpl\s+=
+    - path: cmd/kubeadm/app/util/template_test.go
+      match: validTmplOut\s+=
+    - path: cmd/kubeadm/app/util/template_test.go
+      match: doNothing\s+=
+    - path: cmd/kubelet/app/options/container_runtime.go
+      match: defaultPodSandboxImageVersion\s+=
+    - path: hack/testdata/pod-with-precision.json
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: staging/src/k8s.io/kubectl/testdata/set/multi-resource-yaml.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: staging/src/k8s.io/kubectl/testdata/set/namespaced-resource.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/cmd/core.sh
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/fixtures/pkg/kubectl/cmd/set/namespaced-resource.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/benchmark-controller.json
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-default.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-node-affinity.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-pod-affinity.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-pod-anti-affinity.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-affinity.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-anti-affinity.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-preferred-topology-spreading.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-secret-volume.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/integration/scheduler_perf/config/pod-with-topology-spreading.yaml
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/utils/runners.go
+      match: registry.k8s.io\/pause:\d+\.\d+
+    - path: test/utils/image/manifest.go
+      match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
+
+  - name: "registry.k8s.io/build-image/setcap: dependents"
+    version: bookworm-v1.0.2
+    refPaths:
+    - path: build/common.sh
+      match: __default_setcap_version=
+
+  # cadvisor
+  - name: "gcr.io/cadvisor/cadvisor: dependents"
+    version: "v0.47.2"
+    refPaths:
+    - path: test/e2e_node/resource_collector.go
+      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+    - path: test/e2e_node/image_list.go
+      mathc: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+
+  # GCB docker gcloud image
+  - name: "gcb-docker-gcloud: dependents"
+    version: v20230623-56e06d7c18
+    refPaths:
+    - path: build/pause/cloudbuild.yaml
+      match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
+    - path: cluster/images/etcd/cloudbuild.yaml
+      match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud
+    - path: test/images/cloudbuild.yaml
+      match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud

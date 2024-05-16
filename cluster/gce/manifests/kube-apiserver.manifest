@@ -1,0 +1,158 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"kube-apiserver",
+  "namespace": "kube-system",
+  "labels": {
+    "tier": "control-plane",
+    "component": "kube-apiserver"
+  }
+},
+"spec":{
+"securityContext": {
+    {{runAsUser}}
+    {{runAsGroup}}
+    {{supplementalGroups}}
+    "seccompProfile": {
+        "type": "RuntimeDefault"
+    }
+},
+"priorityClassName": "system-node-critical",
+"priority": 2000001000,
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-apiserver",
+    {{containerSecurityContext}}
+    "image": "{{pillar['kube_docker_registry']}}/kube-apiserver-amd64:{{pillar['kube-apiserver_docker_tag']}}",
+    "resources": {
+      "requests": {
+        "cpu": "250m"
+      }
+    },
+    "command": [
+                 "/go-runner", "--log-file=/var/log/kube-apiserver.log", "--also-stdout=false", "--redirect-stderr=true",
+                 "/usr/local/bin/kube-apiserver",
+                 "--allow-privileged={{pillar['allow_privileged']}}",
+                 {{params}}
+               ],
+    {{container_env}}
+    "livenessProbe": {
+      "httpGet": {
+        "scheme": "HTTPS",
+        "host": "{{healthcheck_ip}}",
+        "port": {{secure_port}},
+        "path": "/livez?exclude=etcd&exclude=kms-provider-0&exclude=kms-provider-1"
+      },
+      "initialDelaySeconds": {{liveness_probe_initial_delay}},
+      "timeoutSeconds": 15
+    },
+    "readinessProbe": {
+      "httpGet": {
+        "scheme": "HTTPS",
+        "host": "{{healthcheck_ip}}",
+        "port": {{secure_port}},
+        "path": "/readyz"
+      },
+      "periodSeconds": 1,
+      "timeoutSeconds": 15
+    },
+    "ports":[
+      {{insecure_port_mapping}}
+      { "name": "https",
+      "containerPort": {{secure_port}},
+      "hostPort": {{secure_port}}}
+    ],
+    "volumeMounts": [
+        {{kms_socket_mount}}
+        {{encryption_provider_mount}}
+        {{cloud_config_mount}}
+        {{additional_cloud_config_mount}}
+        {{webhook_config_mount}}
+        {{webhook_authn_config_mount}}
+        {{csc_config_mount}}
+        {{audit_policy_config_mount}}
+        {{audit_webhook_config_mount}}
+        {{konnectivity_socket_mount}}
+        { "name": "srvkube",
+        "mountPath": "/etc/srv/kubernetes",
+        "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-apiserver.log",
+        "readOnly": false},
+        { "name": "auditlogfile",
+        "mountPath": "/var/log/kube-apiserver-audit.log",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharecacerts",
+        "mountPath": "/usr/share/ca-certificates",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpki",
+        "mountPath": "/etc/srv/pki",
+        "readOnly": true},
+        { "name": "srvsshproxy",
+        "mountPath": "{{srv_sshproxy_path}}",
+        "readOnly": false}
+      ]
+    }
+],
+"volumes":[
+  {{kms_socket_volume}}
+  {{encryption_provider_volume}}
+  {{cloud_config_volume}}
+  {{additional_cloud_config_volume}}
+  {{webhook_config_volume}}
+  {{webhook_authn_config_volume}}
+  {{csc_config_volume}}
+  {{audit_policy_config_volume}}
+  {{audit_webhook_config_volume}}
+  {{konnectivity_socket_volume}}
+  { "name": "srvkube",
+    "hostPath": {
+        "path": "/etc/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-apiserver.log",
+        "type": "FileOrCreate"}
+  },
+  { "name": "auditlogfile",
+    "hostPath": {
+        "path": "/var/log/kube-apiserver-audit.log",
+        "type": "FileOrCreate"}
+  },
+  { "name": "etcssl",
+    "hostPath": {
+        "path": "/etc/ssl"}
+  },
+  { "name": "usrsharecacerts",
+    "hostPath": {
+        "path": "/usr/share/ca-certificates"}
+  },
+  { "name": "varssl",
+    "hostPath": {
+        "path": "/var/ssl"}
+  },
+  { "name": "etcopenssl",
+    "hostPath": {
+        "path": "/etc/openssl"}
+  },
+  { "name": "etcpki",
+    "hostPath": {
+        "path": "/etc/srv/pki"}
+  },
+  { "name": "srvsshproxy",
+    "hostPath": {
+        "path": "{{srv_sshproxy_path}}"}
+  }
+]
+}}

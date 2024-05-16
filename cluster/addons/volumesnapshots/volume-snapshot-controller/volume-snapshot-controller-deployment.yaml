@@ -1,0 +1,29 @@
+# This YAML file shows how to deploy the volume snapshot controller 
+
+---
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: volume-snapshot-controller
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  serviceName: "volume-snapshot-controller"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: volume-snapshot-controller
+  template:
+    metadata:
+      labels:
+        app: volume-snapshot-controller
+    spec:
+      serviceAccount: volume-snapshot-controller
+      containers:
+        - name: volume-snapshot-controller
+          image: registry.k8s.io/sig-storage/snapshot-controller:v6.3.3
+          args:
+            - "--v=5"
+            - "--metrics-path=/metrics"
+            - "--http-endpoint=:9102"

@@ -1,0 +1,5 @@
+linux/amd64=alpine:3.14
+linux/arm=arm32v6/alpine:3.14
+linux/arm64=arm64v8/alpine:3.14
+linux/ppc64le=ppc64le/alpine:3.14
+linux/s390x=s390x/alpine:3.14

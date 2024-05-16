@@ -1,0 +1,89 @@
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    labels:
+      test-cmd: auth
+    name: testing-CR
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
+
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    name: valid-pod
+    labels:
+      name: valid-pod
+  spec:
+    containers:
+    - name: kubernetes-serve-hostname
+      image: registry.k8s.io/e2e-test-images/agnhost:2.32
+      command: ["/agnhost", "serve-hostname"]
+      resources:
+        limits:
+          cpu: "1"
+          memory: 512Mi
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    labels:
+      test-cmd: auth
+    name: testing-CRB
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: testing-CR
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:masters
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    labels:
+      test-cmd: auth
+    name: testing-RB
+    namespace: some-other-random
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: testing-CR
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:masters
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    labels:
+      test-cmd: auth
+    name: testing-R
+    namespace: some-other-random
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
+    - list
+    - watch
+
+kind: List
+metadata: {}

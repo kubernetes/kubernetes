@@ -1,0 +1,35 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-mockplugin-attacher
+spec:
+  selector:
+    matchLabels:
+      app: csi-mockplugin-attacher
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: csi-mockplugin-attacher
+    spec:
+      serviceAccountName: csi-mock
+      containers:
+        - name: csi-attacher
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.5.0
+          args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          securityContext:
+            privileged: true
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-mock
+            type: DirectoryOrCreate
+          name: socket-dir
+

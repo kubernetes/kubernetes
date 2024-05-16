@@ -1,0 +1,93 @@
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-attacher/raw/v4.5.0/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path release-1.13
+# by ./update-hostpath.sh
+#
+# This YAML file contains all RBAC objects that are necessary to run external
+# CSI attacher.
+#
+# In production, each CSI driver deployment has to be customized:
+# - to avoid conflicts, use non-default namespace and different names
+#   for non-namespaced entities like the ClusterRole
+# - decide whether the deployment replicates the external CSI
+#   attacher, in which case leadership election must be enabled;
+#   this influences the RBAC setup, see below
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-attacher
+  # replace with non-default namespace name
+  namespace: default
+
+---
+# Attacher must be able to work with PVs, CSINodes and VolumeAttachments
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: external-attacher-runner
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
+#Secret permission is optional.
+#Enable it if you need value from secret.
+#For example, you have key `csi.storage.k8s.io/controller-publish-secret-name` in StorageClass.parameters
+#see https://kubernetes-csi.github.io/docs/secrets-and-credentials.html
+#  - apiGroups: [""]
+#    resources: ["secrets"]
+#    verbs: ["get", "list"]
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-attacher-role
+subjects:
+  - kind: ServiceAccount
+    name: csi-attacher
+    # replace with non-default namespace name
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: external-attacher-runner
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Attacher must be able to work with configmaps or leases in the current namespace
+# if (and only if) leadership election is enabled
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  # replace with non-default namespace name
+  namespace: default
+  name: external-attacher-cfg
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-attacher-role-cfg
+  # replace with non-default namespace name
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: csi-attacher
+    # replace with non-default namespace name
+    namespace: default
+roleRef:
+  kind: Role
+  name: external-attacher-cfg
+  apiGroup: rbac.authorization.k8s.io

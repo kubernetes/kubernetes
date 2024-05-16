@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-storage-approvers
+  - jingxu97
+  - pohly
+reviewers:
+  - sig-storage-reviewers
+  - pohly
+labels:
+  - sig/storage

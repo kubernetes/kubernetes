@@ -1,0 +1,13 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - caesarxuchao
+  - deads2k
+reviewers:
+  - caesarxuchao
+  - deads2k
+  - jpbetz
+labels:
+  - sig/api-machinery
+emeritus_approvers:
+  - lavalamp

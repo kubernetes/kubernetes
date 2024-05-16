@@ -1,0 +1,25 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+     "name": "test-controller",
+     "namespace": "test",
+     "labels": {"name": "test-controller"}
+  },
+  "spec": {
+    "replicas": 0,
+    "selector": {"name": "test-pod"},
+    "template": {
+       "metadata": {
+          "namespace": "test",
+          "labels": {"name": "test-pod"}
+       },
+       "spec": {
+           "containers": [{
+             "name": "test-container",
+             "image": "registry.k8s.io/pause:3.9"
+           }]
+       }
+    }
+  }
+}

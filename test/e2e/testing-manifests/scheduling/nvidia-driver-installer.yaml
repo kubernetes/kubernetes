@@ -1,0 +1,86 @@
+# This DaemonSet was originally referenced from
+# https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/master/daemonset.yaml
+
+# The Dockerfile and other source for this daemonset are in
+# https://github.com/GoogleCloudPlatform/cos-gpu-installer
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-driver-installer
+  namespace: kube-system
+  labels:
+    k8s-app: nvidia-driver-installer
+spec:
+  selector:
+    matchLabels:
+      k8s-app: nvidia-driver-installer
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-driver-installer
+        k8s-app: nvidia-driver-installer
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: cloud.google.com/gke-accelerator
+                operator: Exists
+      tolerations:
+      - operator: "Exists"
+      hostNetwork: true
+      hostPID: true
+      volumes:
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: vulkan-icd-mount
+        hostPath:
+          path: /home/kubernetes/bin/nvidia/vulkan/icd.d
+      - name: nvidia-install-dir-host
+        hostPath:
+          path: /home/kubernetes/bin/nvidia
+      - name: root-mount
+        hostPath:
+          path: /
+      initContainers:
+        # The COS GPU installer image version may be dependent on the version of COS being used.
+        # Refer to details about the installer in https://cos.googlesource.com/cos/tools/+/refs/heads/master/src/cmd/cos_gpu_installer/
+        # and the COS release notes (https://cloud.google.com/container-optimized-os/docs/release-notes) to determine version COS GPU installer for a given version of COS.
+
+        # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.1.10 - suitable for COS M109 as per https://cloud.google.com/container-optimized-os/docs/release-notes
+      - image: gcr.io/cos-cloud/cos-gpu-installer:v2.1.10
+        name: nvidia-driver-installer
+        resources:
+          requests:
+            cpu: 0.15
+        securityContext:
+          privileged: true
+        env:
+          - name: NVIDIA_INSTALL_DIR_HOST
+            value: /home/kubernetes/bin/nvidia
+          - name: NVIDIA_INSTALL_DIR_CONTAINER
+            value: /usr/local/nvidia
+          - name: VULKAN_ICD_DIR_HOST
+            value: /home/kubernetes/bin/nvidia/vulkan/icd.d
+          - name: VULKAN_ICD_DIR_CONTAINER
+            value: /etc/vulkan/icd.d
+          - name: ROOT_MOUNT_DIR
+            value: /root
+        volumeMounts:
+        - name: nvidia-install-dir-host
+          mountPath: /usr/local/nvidia
+        - name: vulkan-icd-mount
+          mountPath: /etc/vulkan/icd.d
+        - name: dev
+          mountPath: /dev
+        - name: root-mount
+          mountPath: /root
+      containers:
+      - image: "registry.k8s.io/pause:3.9"
+        name: pause
+

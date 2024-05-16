@@ -1,0 +1,23 @@
+#$ Used in:
+#$ - site-src/guides/multiple-ns.md
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: shared-gateway
+  namespace: infra-ns
+spec:
+  gatewayClassName: shared-gateway-class
+  listeners:
+  - name: https
+    hostname: "foo.example.com"
+    protocol: HTTPS
+    port: 443
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            shared-gateway-access: "true"
+    tls:
+      certificateRefs:
+      - name: foo-example-com

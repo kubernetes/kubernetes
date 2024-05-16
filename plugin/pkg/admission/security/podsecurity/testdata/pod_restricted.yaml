@@ -1,0 +1,676 @@
+# this pod fixture is used for benchmarks and should be kept updated to pass the latest restricted policy
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ""
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+  creationTimestamp: "2021-08-20T14:35:04Z"
+  generateName: kube-dns-76dbc85bd5-
+  labels:
+    k8s-app: kube-dns
+    pod-template-hash: 76dbc85bd5
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:scheduler.alpha.kubernetes.io/critical-pod: {}
+          f:seccomp.security.alpha.kubernetes.io/pod: {}
+        f:generateName: {}
+        f:labels:
+          .: {}
+          f:k8s-app: {}
+          f:pod-template-hash: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"901a2f14-52d5-468b-af25-6587b60f2887"}:
+            .: {}
+            f:apiVersion: {}
+            f:blockOwnerDeletion: {}
+            f:controller: {}
+            f:kind: {}
+            f:name: {}
+            f:uid: {}
+      f:spec:
+        f:affinity:
+          .: {}
+          f:podAntiAffinity:
+            .: {}
+            f:preferredDuringSchedulingIgnoredDuringExecution: {}
+        f:containers:
+          k:{"name":"dnsmasq"}:
+            .: {}
+            f:args: {}
+            f:image: image-name:tag-name
+            f:imagePullPolicy: {}
+            f:livenessProbe:
+              .: {}
+              f:failureThreshold: {}
+              f:httpGet:
+                .: {}
+                f:path: {}
+                f:port: {}
+                f:scheme: {}
+              f:initialDelaySeconds: {}
+              f:periodSeconds: {}
+              f:successThreshold: {}
+              f:timeoutSeconds: {}
+            f:name: {}
+            f:ports:
+              .: {}
+              k:{"containerPort":53,"protocol":"TCP"}:
+                .: {}
+                f:containerPort: {}
+                f:name: {}
+                f:protocol: {}
+              k:{"containerPort":53,"protocol":"UDP"}:
+                .: {}
+                f:containerPort: {}
+                f:name: {}
+                f:protocol: {}
+            f:resources:
+              .: {}
+              f:requests:
+                .: {}
+                f:cpu: {}
+                f:memory: {}
+            f:securityContext:
+              .: {}
+              f:capabilities:
+                .: {}
+                f:add: {}
+                f:drop: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+            f:volumeMounts:
+              .: {}
+              k:{"mountPath":"/etc/k8s/dns/dnsmasq-nanny"}:
+                .: {}
+                f:mountPath: {}
+                f:name: {}
+          k:{"name":"kubedns"}:
+            .: {}
+            f:args: {}
+            f:env:
+              .: {}
+              k:{"name":"PROMETHEUS_PORT"}:
+                .: {}
+                f:name: {}
+                f:value: {}
+            f:image: image-name:tag-name
+            f:imagePullPolicy: {}
+            f:livenessProbe:
+              .: {}
+              f:failureThreshold: {}
+              f:httpGet:
+                .: {}
+                f:path: {}
+                f:port: {}
+                f:scheme: {}
+              f:initialDelaySeconds: {}
+              f:periodSeconds: {}
+              f:successThreshold: {}
+              f:timeoutSeconds: {}
+            f:name: {}
+            f:ports:
+              .: {}
+              k:{"containerPort":10053,"protocol":"TCP"}:
+                .: {}
+                f:containerPort: {}
+                f:name: {}
+                f:protocol: {}
+              k:{"containerPort":10053,"protocol":"UDP"}:
+                .: {}
+                f:containerPort: {}
+                f:name: {}
+                f:protocol: {}
+              k:{"containerPort":10055,"protocol":"TCP"}:
+                .: {}
+                f:containerPort: {}
+                f:name: {}
+                f:protocol: {}
+            f:readinessProbe:
+              .: {}
+              f:failureThreshold: {}
+              f:httpGet:
+                .: {}
+                f:path: {}
+                f:port: {}
+                f:scheme: {}
+              f:initialDelaySeconds: {}
+              f:periodSeconds: {}
+              f:successThreshold: {}
+              f:timeoutSeconds: {}
+            f:resources:
+              .: {}
+              f:limits:
+                .: {}
+                f:memory: {}
+              f:requests:
+                .: {}
+                f:cpu: {}
+                f:memory: {}
+            f:securityContext:
+              .: {}
+              f:allowPrivilegeEscalation: {}
+              f:readOnlyRootFilesystem: {}
+              f:runAsGroup: {}
+              f:runAsUser: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+            f:volumeMounts:
+              .: {}
+              k:{"mountPath":"/kube-dns-config"}:
+                .: {}
+                f:mountPath: {}
+                f:name: {}
+          k:{"name":"prometheus-to-sd"}:
+            .: {}
+            f:command: {}
+            f:env:
+              .: {}
+              k:{"name":"POD_NAME"}:
+                .: {}
+                f:name: {}
+                f:valueFrom:
+                  .: {}
+                  f:fieldRef:
+                    .: {}
+                    f:apiVersion: {}
+                    f:fieldPath: {}
+              k:{"name":"POD_NAMESPACE"}:
+                .: {}
+                f:name: {}
+                f:valueFrom:
+                  .: {}
+                  f:fieldRef:
+                    .: {}
+                    f:apiVersion: {}
+                    f:fieldPath: {}
+            f:image: image-name:tag-name
+            f:imagePullPolicy: {}
+            f:name: {}
+            f:resources: {}
+            f:securityContext:
+              .: {}
+              f:allowPrivilegeEscalation: {}
+              f:readOnlyRootFilesystem: {}
+              f:runAsGroup: {}
+              f:runAsUser: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+          k:{"name":"sidecar"}:
+            .: {}
+            f:args: {}
+            f:image: image-name:tag-name
+            f:imagePullPolicy: {}
+            f:livenessProbe:
+              .: {}
+              f:failureThreshold: {}
+              f:httpGet:
+                .: {}
+                f:path: {}
+                f:port: {}
+                f:scheme: {}
+              f:initialDelaySeconds: {}
+              f:periodSeconds: {}
+              f:successThreshold: {}
+              f:timeoutSeconds: {}
+            f:name: {}
+            f:ports:
+              .: {}
+              k:{"containerPort":10054,"protocol":"TCP"}:
+                .: {}
+                f:containerPort: {}
+                f:name: {}
+                f:protocol: {}
+            f:resources:
+              .: {}
+              f:requests:
+                .: {}
+                f:cpu: {}
+                f:memory: {}
+            f:securityContext:
+              .: {}
+              f:allowPrivilegeEscalation: {}
+              f:readOnlyRootFilesystem: {}
+              f:runAsGroup: {}
+              f:runAsUser: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+        f:dnsPolicy: {}
+        f:enableServiceLinks: {}
+        f:nodeSelector:
+          .: {}
+          f:kubernetes.io/os: {}
+        f:priorityClassName: {}
+        f:restartPolicy: {}
+        f:schedulerName: {}
+        f:securityContext:
+          .: {}
+          f:fsGroup: {}
+          f:supplementalGroups: {}
+        f:serviceAccount: {}
+        f:serviceAccountName: {}
+        f:terminationGracePeriodSeconds: {}
+        f:tolerations: {}
+        f:volumes:
+          .: {}
+          k:{"name":"kube-dns-config"}:
+            .: {}
+            f:configMap:
+              .: {}
+              f:defaultMode: {}
+              f:name: {}
+              f:optional: {}
+            f:name: {}
+    manager: kube-controller-manager
+    operation: Update
+    time: "2021-08-20T14:35:04Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:conditions:
+          .: {}
+          k:{"type":"PodScheduled"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-scheduler
+    operation: Update
+    time: "2021-08-20T14:35:04Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:conditions:
+          k:{"type":"ContainersReady"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"Initialized"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"Ready"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:status: {}
+            f:type: {}
+        f:containerStatuses: {}
+        f:hostIP: {}
+        f:phase: {}
+        f:podIP: {}
+        f:podIPs:
+          .: {}
+          k:{"ip":"10..10.10"}:
+            .: {}
+            f:ip: {}
+        f:startTime: {}
+    manager: kubelet
+    operation: Update
+    time: "2021-08-20T14:36:10Z"
+  name: kube-dns-76dbc85bd5-zl5tr
+  namespace: kube-system
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: kube-dns-76dbc85bd5
+    uid: 901a2f14-52d5-468b-af25-6587b60f2887
+  resourceVersion: "1391"
+  uid: e98f0f22-0937-4495-8211-d5633e50fb8d
+spec:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: k8s-app
+              operator: In
+              values:
+              - kube-dns
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+  containers:
+  - args:
+    - --domain=cluster.local.
+    - --dns-port=10053
+    - --config-dir=/kube-dns-config
+    - --v=2
+    env:
+    - name: PROMETHEUS_PORT
+      value: "10055"
+    image: image-name:tag-name
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 5
+      httpGet:
+        path: /healthcheck/kubedns
+        port: 10054
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 5
+    name: kubedns
+    ports:
+    - containerPort: 10053
+      name: dns-local
+      protocol: UDP
+    - containerPort: 10053
+      name: dns-tcp-local
+      protocol: TCP
+    - containerPort: 10055
+      name: metrics
+      protocol: TCP
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: /readiness
+        port: 8081
+        scheme: HTTP
+      initialDelaySeconds: 3
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 5
+    resources:
+      limits:
+        memory: 210Mi
+      requests:
+        cpu: 100m
+        memory: 70Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsGroup: 1001
+      runAsUser: 1001
+      runAsNonRoot: true
+      capabilities:
+        add:
+        - NET_BIND_SERVICE
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /kube-dns-config
+      name: kube-dns-config
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-s8rz5
+      readOnly: true
+  - args:
+    - -v=2
+    - -logtostderr
+    - -configDir=/etc/k8s/dns/dnsmasq-nanny
+    - -restartDnsmasq=true
+    - --
+    - -k
+    - --cache-size=1000
+    - --no-negcache
+    - --dns-forward-max=1500
+    - --log-facility=-
+    - --server=/cluster.local/127.0.0.1#10053
+    - --server=/in-addr.arpa/127.0.0.1#10053
+    - --server=/ip6.arpa/127.0.0.1#10053
+    image: image-name:tag-name
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 5
+      httpGet:
+        path: /healthcheck/dnsmasq
+        port: 10054
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 5
+    name: dnsmasq
+    ports:
+    - containerPort: 53
+      name: dns
+      protocol: UDP
+    - containerPort: 53
+      name: dns-tcp
+      protocol: TCP
+    resources:
+      requests:
+        cpu: 150m
+        memory: 20Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities:
+        add:
+        - NET_BIND_SERVICE
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /etc/k8s/dns/dnsmasq-nanny
+      name: kube-dns-config
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-s8rz5
+      readOnly: true
+  - args:
+    - --v=2
+    - --logtostderr
+    - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.cluster.local,5,SRV
+    - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.cluster.local,5,SRV
+    image: image-name:tag-name
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 5
+      httpGet:
+        path: /metrics
+        port: 10054
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 5
+    name: sidecar
+    ports:
+    - containerPort: 10054
+      name: metrics
+      protocol: TCP
+    resources:
+      requests:
+        cpu: 10m
+        memory: 20Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsGroup: 1001
+      runAsUser: 1001
+      runAsNonRoot: true
+      capabilities:
+        add:
+        - NET_BIND_SERVICE
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-s8rz5
+      readOnly: true
+  - command:
+    - /monitor
+    - --stackdriver-prefix=container.googleapis.com/internal/addons
+    - --api-override=https://test-monitoring.sandbox.googleapis.com/
+    - --pod-id=$(POD_NAME)
+    - --namespace-id=$(POD_NAMESPACE)
+    - --v=2
+    env:
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.name
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.namespace
+    image: image-name:tag-name
+    imagePullPolicy: IfNotPresent
+    name: prometheus-to-sd
+    resources: {}
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsGroup: 1001
+      runAsUser: 1001
+      runAsNonRoot: true
+      capabilities:
+        add:
+        - NET_BIND_SERVICE
+        drop:
+        - ALL
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-s8rz5
+      readOnly: true
+  dnsPolicy: Default
+  enableServiceLinks: true
+  nodeName: mynode
+  nodeSelector:
+    kubernetes.io/os: linux
+  preemptionPolicy: PreemptLowerPriority
+  priority: 2000000000
+  priorityClassName: system-cluster-critical
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext:
+    fsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+    supplementalGroups:
+    - 65534
+  serviceAccount: kube-dns
+  serviceAccountName: kube-dns
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - configMap:
+      defaultMode: 420
+      name: kube-dns
+      optional: true
+    name: kube-dns-config
+  - name: kube-api-access-s8rz5
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2021-08-20T14:35:31Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2021-08-20T14:36:10Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2021-08-20T14:36:10Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2021-08-20T14:35:31Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://f21ec303caca266fa4b81ebe6c210b5aa2b8ea6a262d8038db2c4f57db127187
+    image: image-name:tag-name
+    imageID: imageid@sha256:8e2a7eaa7e6b1ede58d6361d0058a391260a46f0290b7f0368b709494e9e36bf
+    lastState: {}
+    name: dnsmasq
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2021-08-20T14:36:03Z"
+  - containerID: containerd://bf3db3f330364ba2af3763a3c0b0bcd137f0556a73fffd0e0dbda61035b696a9
+    image: image-name:tag-name
+    imageID: imageid@sha256:50a1d17afe48a4ae15c9321d8c16d8f1302358c92971884722514c4ed7315ca3
+    lastState: {}
+    name: kubedns
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2021-08-20T14:35:52Z"
+  - containerID: containerd://733304e5217f2c9827736e1226188b11488fd476d0b9f647bd098fe9db89460e
+    image: image-name:tag-name
+    imageID: imageid@sha256:aca8ef8aa7fae83e1f8583ed78dd4d11f655b9f22a0a76bda5edce6d8965bdf2
+    lastState: {}
+    name: prometheus-to-sd
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2021-08-20T14:36:09Z"
+  - containerID: containerd://4639ada29f769008d3b21eef48cd061534dfd7875b42d5103179d4f0258667e9
+    image: image-name:tag-name
+    imageID: imageid@sha256:3bb5033aefb3e3dee259ab3d357d38d16eacf9cf2e1542ad577e3796410033ca
+    lastState: {}
+    name: sidecar
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2021-08-20T14:36:06Z"
+  hostIP: 10.128.0.48
+  phase: Running
+  podIP: 10..10.10
+  podIPs:
+  - ip: 10..10.10
+  qosClass: Burstable
+  startTime: "2021-08-20T14:35:31Z"

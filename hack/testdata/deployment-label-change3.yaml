@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  resourceVersion: "99"
+  labels:
+    name: nginx
+spec:
+  selector:
+    matchLabels:
+      name: invalid
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        name: nginx3
+    spec:
+      containers:
+      - name: nginx
+        image: registry.k8s.io/nginx:test-cmd
+        ports:
+        - containerPort: 80

@@ -1,0 +1,328 @@
+{
+  "apiVersion": "v1",
+  "groups": [
+    {
+      "name": "apiregistration.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "apiregistration.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "apiregistration.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "apps",
+      "preferredVersion": {
+        "groupVersion": "apps/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "apps/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "events.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "events.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "events.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "authentication.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "authentication.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "authentication.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "authentication.k8s.io/v1beta1",
+          "version": "v1beta1"
+        },
+        {
+          "groupVersion": "authentication.k8s.io/v1alpha1",
+          "version": "v1alpha1"
+        }
+      ]
+    },
+    {
+      "name": "authorization.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "authorization.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "authorization.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "autoscaling",
+      "preferredVersion": {
+        "groupVersion": "autoscaling/v2",
+        "version": "v2"
+      },
+      "versions": [
+        {
+          "groupVersion": "autoscaling/v2",
+          "version": "v2"
+        },
+        {
+          "groupVersion": "autoscaling/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "batch",
+      "preferredVersion": {
+        "groupVersion": "batch/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "batch/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "certificates.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "certificates.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "certificates.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "certificates.k8s.io/v1alpha1",
+          "version": "v1alpha1"
+        }
+      ]
+    },
+    {
+      "name": "networking.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "networking.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "networking.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "networking.k8s.io/v1alpha1",
+          "version": "v1alpha1"
+        }
+      ]
+    },
+    {
+      "name": "policy",
+      "preferredVersion": {
+        "groupVersion": "policy/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "policy/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "rbac.authorization.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "rbac.authorization.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "rbac.authorization.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "storage.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "storage.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "storage.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "storage.k8s.io/v1alpha1",
+          "version": "v1alpha1"
+        }
+      ]
+    },
+    {
+      "name": "admissionregistration.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "admissionregistration.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "admissionregistration.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "admissionregistration.k8s.io/v1beta1",
+          "version": "v1beta1"
+        },
+        {
+          "groupVersion": "admissionregistration.k8s.io/v1alpha1",
+          "version": "v1alpha1"
+        }
+      ]
+    },
+    {
+      "name": "apiextensions.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "apiextensions.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "apiextensions.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "scheduling.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "scheduling.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "scheduling.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "coordination.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "coordination.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "coordination.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "node.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "node.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "node.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "discovery.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "discovery.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "discovery.k8s.io/v1",
+          "version": "v1"
+        }
+      ]
+    },
+    {
+      "name": "flowcontrol.apiserver.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "flowcontrol.apiserver.k8s.io/v1",
+        "version": "v1"
+      },
+      "versions": [
+        {
+          "groupVersion": "flowcontrol.apiserver.k8s.io/v1",
+          "version": "v1"
+        },
+        {
+          "groupVersion": "flowcontrol.apiserver.k8s.io/v1beta3",
+          "version": "v1beta3"
+        }
+      ]
+    },
+    {
+      "name": "internal.apiserver.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "internal.apiserver.k8s.io/v1alpha1",
+        "version": "v1alpha1"
+      },
+      "versions": [
+        {
+          "groupVersion": "internal.apiserver.k8s.io/v1alpha1",
+          "version": "v1alpha1"
+        }
+      ]
+    },
+    {
+      "name": "resource.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "resource.k8s.io/v1alpha2",
+        "version": "v1alpha2"
+      },
+      "versions": [
+        {
+          "groupVersion": "resource.k8s.io/v1alpha2",
+          "version": "v1alpha2"
+        }
+      ]
+    },
+    {
+      "name": "storagemigration.k8s.io",
+      "preferredVersion": {
+        "groupVersion": "storagemigration.k8s.io/v1alpha1",
+        "version": "v1alpha1"
+      },
+      "versions": [
+        {
+          "groupVersion": "storagemigration.k8s.io/v1alpha1",
+          "version": "v1alpha1"
+        }
+      ]
+    }
+  ],
+  "kind": "APIGroupList"
+}

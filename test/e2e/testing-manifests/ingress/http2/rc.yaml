@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echoheaders
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echoheaders
+  template:
+    metadata:
+      labels:
+        app: echoheaders
+    spec:
+      containers:
+      - name: echoheaders
+        image: registry.k8s.io/e2e-test-images/agnhost:2.39
+        command:
+        - /agnhost
+        - netexec
+        - --http-port=8443
+        - --tls-cert-file=/localhost.crt
+        - --tls-private-key-file=/localhost.key
+        ports:
+        - containerPort: 8443

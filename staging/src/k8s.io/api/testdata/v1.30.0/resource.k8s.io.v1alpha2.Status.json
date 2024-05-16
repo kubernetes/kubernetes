@@ -1,0 +1,28 @@
+{
+  "kind": "Status",
+  "apiVersion": "resource.k8s.io/v1alpha2",
+  "metadata": {
+    "selfLink": "selfLinkValue",
+    "resourceVersion": "resourceVersionValue",
+    "continue": "continueValue",
+    "remainingItemCount": 4
+  },
+  "status": "statusValue",
+  "message": "messageValue",
+  "reason": "reasonValue",
+  "details": {
+    "name": "nameValue",
+    "group": "groupValue",
+    "kind": "kindValue",
+    "uid": "uidValue",
+    "causes": [
+      {
+        "reason": "reasonValue",
+        "message": "messageValue",
+        "field": "fieldValue"
+      }
+    ],
+    "retryAfterSeconds": 5
+  },
+  "code": 6
+}

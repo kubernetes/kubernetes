@@ -1,0 +1,34 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-mockplugin-resizer
+spec:
+  selector:
+    matchLabels:
+      app: csi-mockplugin-resizer
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: csi-mockplugin-resizer
+    spec:
+      serviceAccountName: csi-mock
+      containers:
+        - name: csi-resizer
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.10.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          securityContext:
+            privileged: true
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-mock
+            type: DirectoryOrCreate
+          name: socket-dir

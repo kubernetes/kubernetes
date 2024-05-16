@@ -1,0 +1,152 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-gce-pd-controller
+spec:
+  serviceName: "csi-gce-pd"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gcp-compute-persistent-disk-csi-driver
+  template:
+    metadata:
+      labels:
+        app: gcp-compute-persistent-disk-csi-driver
+    spec:
+      # Host network must be used for interaction with Workload Identity in GKE
+      # since it replaces GCE Metadata Server with GKE Metadata Server. Remove
+      # this requirement when issue is resolved and before any exposure of
+      # metrics ports
+      hostNetwork: true
+      serviceAccountName: csi-gce-pd-controller-sa
+      containers:
+        - name: csi-snapshotter
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v5.0.1
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+            - "--metrics-address=:22014"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--timeout=300s"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.4.0
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+            - "--feature-gates=Topology=true"
+            - "--http-endpoint=:22011"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--timeout=250s"
+            - "--extra-create-metadata"
+          # - "--run-controller-service=false"  # disable the controller service of the CSI driver
+          # - "--run-node-service=false"        # disable the node service of the CSI driver
+            - "--leader-election"
+            - "--default-fstype=ext4"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 22011
+              name: http-endpoint
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /healthz/leader-election
+              port: http-endpoint
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-attacher
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.0.0
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+            - "--http-endpoint=:22012"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--timeout=250s"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 22012
+              name: http-endpoint
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /healthz/leader-election
+              port: http-endpoint
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-resizer
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.6.0
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+            - "--http-endpoint=:22013"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--handle-volume-inuse-error=false"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 22013
+              name: http-endpoint
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /healthz/leader-election
+              port: http-endpoint
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 20
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: gce-pd-driver
+          image: registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver:v1.4.0
+          args:
+            - "--v=5"
+            - "--endpoint=unix:/csi/csi.sock"
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/etc/cloud-sa/cloud-sa.json"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: cloud-sa-volume
+              readOnly: true
+              mountPath: "/etc/cloud-sa"
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+        - name: cloud-sa-volume
+          secret:
+            secretName: cloud-sa

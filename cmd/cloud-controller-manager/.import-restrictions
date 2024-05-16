@@ -1,0 +1,46 @@
+rules:
+  - selectorRegexp: k8s[.]io/kubernetes
+    allowedPrefixes:
+      - k8s.io/kubernetes/cmd/kube-controller-manager/app/options
+      - k8s.io/kubernetes/cmd/kube-controller-manager/app/config
+      - k8s.io/kubernetes/cmd/kube-controller-manager/names
+      - k8s.io/kubernetes/pkg/api/legacyscheme
+      - k8s.io/kubernetes/pkg/api/service
+      - k8s.io/kubernetes/pkg/api/v1/pod
+      - k8s.io/kubernetes/pkg/api/v1/service
+      - k8s.io/kubernetes/pkg/apis/apps
+      - k8s.io/kubernetes/pkg/apis/autoscaling
+      - k8s.io/kubernetes/pkg/apis/core
+      - k8s.io/kubernetes/pkg/apis/core/helper
+      - k8s.io/kubernetes/pkg/apis/core/install
+      - k8s.io/kubernetes/pkg/apis/core/pods
+      - k8s.io/kubernetes/pkg/apis/core/v1
+      - k8s.io/kubernetes/pkg/apis/core/v1/helper
+      - k8s.io/kubernetes/pkg/apis/core/validation
+      - k8s.io/kubernetes/pkg/apis/scheduling
+      - k8s.io/kubernetes/pkg/capabilities
+      - k8s.io/kubernetes/pkg/cluster/ports
+      - k8s.io/kubernetes/pkg/controller
+      - k8s.io/kubernetes/pkg/controller/nodeipam
+      - k8s.io/kubernetes/pkg/controller/nodeipam/config
+      - k8s.io/kubernetes/pkg/controller/nodeipam/ipam
+      - k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset
+      - k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync
+      - k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test
+      - k8s.io/kubernetes/pkg/controller/testutil
+      - k8s.io/kubernetes/pkg/controller/util/node
+      - k8s.io/kubernetes/pkg/features
+      - k8s.io/kubernetes/pkg/fieldpath
+      - k8s.io/kubernetes/pkg/kubelet/types
+      - k8s.io/kubernetes/pkg/kubelet/util/format
+      - k8s.io/kubernetes/pkg/security/apparmor
+      - k8s.io/kubernetes/pkg/securitycontext
+      - k8s.io/kubernetes/pkg/util/hash
+      - k8s.io/kubernetes/pkg/util/node
+      - k8s.io/kubernetes/pkg/util/parsers
+      - k8s.io/kubernetes/pkg/util/taints
+      - k8s.io/kubernetes/pkg/proxy/util
+      - k8s.io/kubernetes/pkg/proxy/util/testing
+      - k8s.io/kubernetes/pkg/util/slice
+      - k8s.io/kubernetes/pkg/util/sysctl
+      - k8s.io/kubernetes/test/utils/ktesting

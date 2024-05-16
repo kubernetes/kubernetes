@@ -1,0 +1,48 @@
+# See https://cloud.google.com/cloud-build/docs/build-config
+
+# this must be specified in seconds. If omitted, defaults to 600s (10 mins)
+# the timeout was increased because some images might take longer to build (e.g.: sample-apiserver, pets/redis-installer)
+timeout: 5400s
+# this prevents errors if you don't use both _GIT_TAG and _PULL_BASE_REF,
+# or any new substitutions added in the future.
+options:
+  substitution_option: ALLOW_LOOSE
+  machineType: 'N1_HIGHCPU_8'
+steps:
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20230623-56e06d7c18'
+    entrypoint: 'bash'
+    dir: ./test/images/
+    env:
+    - DOCKER_CLI_EXPERIMENTAL=enabled
+    - BASE_REF=$_PULL_BASE_REF
+    - GIT_COMMIT_ID=$_PULL_BASE_SHA
+    - WHAT=$_WHAT
+    - REGISTRY=$_REGISTRY
+    # The default cloudbuild has HOME=/builder/home and docker buildx is in /root/.docker/cli-plugins/docker-buildx
+    # We need to set the HOME to /root explicitly since we're using docker buildx
+    - HOME=/root
+    # NOTE(claudiub): we need to call register.sh before creating and bootstraping a docker buildx instance.
+    args:
+    - '-c'
+    - |
+      gcloud auth configure-docker \
+      && ../../third_party/multiarch/qemu-user-static/register/register.sh --reset -p yes \
+      && export DOCKER_CLI_EXPERIMENTAL=enabled \
+      && docker version \
+      && docker buildx version \
+      && docker buildx create --name img-builder --use \
+      && docker buildx inspect --bootstrap \
+      && make all-build-and-push
+substitutions:
+  # _GIT_TAG will be filled with a git-based tag for the image, of the form vYYYYMMDD-hash, and
+  # can be used as a substitution
+  _GIT_TAG: '12345'
+  # _PULL_BASE_REF will contain the ref that was pushed to to trigger this build -
+  # a branch like 'master' or 'release-0.2', or a tag like 'v0.2'.
+  _PULL_BASE_REF: 'master'
+  # _PULL_BASE_SHA will contain the git SHA from which the image will be built from.
+  _PULL_BASE_SHA: '12345'
+  # _REGISTRY will contain the staging registry.
+  _REGISTRY: 'gcr.io/k8s-staging-e2e-test-images'
+  # _WHAT will contain the image name to be built and published to the staging registry.
+  _WHAT: 'all-conformance'

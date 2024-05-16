@@ -1,0 +1,15 @@
+---
+linters:
+  enable:
+  - godot
+  - misspell
+  - revive
+
+linter-settings:
+  godot:
+    capital: true
+    exclude:
+    # Ignore "See: URL"
+    - 'See:'
+  misspell:
+    locale: US

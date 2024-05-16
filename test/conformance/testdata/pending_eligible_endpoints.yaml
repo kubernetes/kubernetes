@@ -1,0 +1,14 @@
+---
+- createCoreV1NamespacedServiceAccountToken
+- createCoreV1Node
+- createStorageV1CSINode
+- deleteCoreV1Node
+- deleteStorageV1CollectionCSINode
+- deleteStorageV1CSINode
+- listStorageV1CSINode
+- patchStorageV1CSINode
+- patchStorageV1VolumeAttachmentStatus
+- readStorageV1CSINode
+- readStorageV1VolumeAttachmentStatus
+- replaceStorageV1CSINode
+- replaceStorageV1VolumeAttachmentStatus

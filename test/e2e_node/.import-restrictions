@@ -1,0 +1,15 @@
+rules:
+  # prevent any k8s.io/kubernetes imports outside of this package
+  - selectorRegexp: k8s[.]io/kubernetes/test
+    allowedPrefixes:
+      - k8s.io/kubernetes/test/e2e/common
+      - k8s.io/kubernetes/test/e2e/dra/test-driver/app
+      - k8s.io/kubernetes/test/e2e/feature
+      - k8s.io/kubernetes/test/e2e/framework
+      - k8s.io/kubernetes/test/e2e/storage/utils
+      - k8s.io/kubernetes/test/e2e/network/common
+      - k8s.io/kubernetes/test/e2e/nodefeature
+      - k8s.io/kubernetes/test/e2e/perftype
+      - k8s.io/kubernetes/test/e2e/testing-manifests
+      - k8s.io/kubernetes/test/e2e_node
+      - k8s.io/kubernetes/test/utils

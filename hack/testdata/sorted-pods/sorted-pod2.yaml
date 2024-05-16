@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sorted-pod2
+  creationTimestamp: "2018-08-30T14:10:55Z"
+  labels:
+    name: sorted-pod2-label
+spec:
+  containers:
+  - name: kubernetes-pause1
+    image: registry.k8s.io/pause:3.9
+    resources: 
+      requests:
+        memory: "1G"
+        cpu: "0.5"
+      limits:
+        memory: "2G"
+        cpu: "1"
+

@@ -1,0 +1,104 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: csi-mockplugin
+spec:
+  selector:
+    matchLabels:
+      app: csi-mockplugin
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: csi-mockplugin
+    spec:
+      serviceAccountName: csi-mock
+      containers:
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v4.0.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            # Topology support is needed for the pod rescheduling test
+            # ("storage capacity" in csi_mock_volume.go).
+            - "--feature-gates=Topology=true"
+            - "-v=5"
+            # Needed for fsGroup support.
+            - "--default-fstype=ext4"
+            # We don't need much concurrency and having many gouroutines
+            # makes klog.Fatal during shutdown very long.
+            - "--worker-threads=5"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+        - name: driver-registrar
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.10.0
+          args:
+            - --v=5
+            - --csi-address=/csi/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-mock/csi.sock
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+          - mountPath: /registration
+            name: registration-dir
+        - name: mock
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.13.0
+          args:
+            - "--drivername=mock.storage.k8s.io"
+            - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--endpoint=/csi/csi.sock"
+            - "--statedir=/tmp/csi-hotpath-data"
+            - "-v=5" # enabled the gRPC call logging
+          env:
+            - name: CSI_ENDPOINT
+              value: /csi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: /var/lib/kubelet/pods
+              name: kubelet-pods-dir
+            - mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi
+              name: kubelet-csi-dir
+            - mountPath: /dev
+              name: dev-dir
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-mock
+            type: DirectoryOrCreate
+          name: socket-dir
+        - hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+            # mock driver doesn't make mounts and therefore doesn't need mount propagation.
+            # mountPropagation: Bidirectional
+          name: kubelet-pods-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins/kubernetes.io/csi
+            type: DirectoryOrCreate
+          name: kubelet-csi-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory
+          name: registration-dir
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev-dir

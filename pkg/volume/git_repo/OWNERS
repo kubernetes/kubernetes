@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - thockin
+  - saad-ali
+reviewers:
+  - saad-ali
+  - jsafrane
+  - jingxu97
+  - msau42

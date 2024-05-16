@@ -1,0 +1,18 @@
+# This is the role binding for the local kubectl, which is
+# used for listing hollow-nodes in start-kubemark.sh and
+# send resource creation requests, etc in run-e2e-tests.sh.
+# Also useful if you manually want to use local kubectl.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubecfg-cluster-admin
+  labels:
+    kubernetes.io/cluster-service: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: kubecfg

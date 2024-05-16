@@ -1,0 +1,136 @@
+#cloud-config
+
+write_files:
+  - path: /etc/systemd/system/kube-node-installation.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Download and install k8s binaries and configurations
+      After=network-online.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/mkdir -p /home/kubernetes/bin
+      ExecStartPre=/bin/mount --bind /home/kubernetes/bin /home/kubernetes/bin
+      ExecStartPre=/bin/mount -o remount,exec /home/kubernetes/bin
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure.sh
+      ExecStart=/home/kubernetes/bin/configure.sh
+      StandardOutput=journal+console
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-node-configuration.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Configure kubernetes node
+      After=kube-node-installation.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure-helper.sh
+      ExecStart=/home/kubernetes/bin/configure-helper.sh
+      StandardOutput=journal+console
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-container-runtime-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes health monitoring for container runtime
+      After=kube-node-configuration.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
+      ExecStart=/home/kubernetes/bin/health-monitor.sh container-runtime
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kubelet-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes health monitoring for kubelet
+      After=kube-node-configuration.service
+
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
+      ExecStart=/home/kubernetes/bin/health-monitor.sh kubelet
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-logrotate.timer
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Hourly kube-logrotate invocation
+
+      [Timer]
+      OnCalendar=hourly
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kube-logrotate.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes log rotation
+      After=kube-node-configuration.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=-/usr/sbin/logrotate /etc/logrotate.conf
+
+      [Install]
+      WantedBy=kubernetes.target
+
+  - path: /etc/systemd/system/kubernetes.target
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Kubernetes
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/modprobe.d/sunrpc.conf
+    permissions: 0644
+    owner: root
+    # The GKE metadata server uses ports 987-989, so the sunrpc range should be restricted to be below.
+    content: |
+      options sunrpc max_resvport=986
+
+runcmd:
+ - systemctl daemon-reload
+ - systemctl enable kube-node-installation.service
+ - systemctl enable kube-node-configuration.service
+ - systemctl enable kube-container-runtime-monitor.service
+ - systemctl enable kubelet-monitor.service
+ - systemctl enable kube-logrotate.timer
+ - systemctl enable kube-logrotate.service
+ - systemctl enable kubernetes.target
+ - systemctl start kubernetes.target

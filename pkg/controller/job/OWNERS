@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-apps-approvers
+  - alculquicondor
+reviewers:
+  - sig-apps-reviewers
+  - mimowo
+  - kannon92
+labels:
+  - sig/apps

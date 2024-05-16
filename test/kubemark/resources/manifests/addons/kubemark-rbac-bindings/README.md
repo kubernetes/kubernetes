@@ -1,0 +1,1 @@
+These resources are used to add extra (non-default) bindings to kubemark to match users and groups that are particular to the kubemark environment. These are not standard bootstrap bindings and not standard users they are bound to, and have been adapted from cluster/addons/e2e-rbac-bindings. Tighten/loosen these access rights as required in future.

@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: hostname
+  name: hostname
+spec:
+  minReadySeconds: 60
+  selector:
+    matchLabels:
+      run: hostname
+  template:
+    metadata:
+      labels:
+        run: hostname
+    spec:
+      containers:
+      - image: registry.k8s.io/e2e-test-images/agnhost:2.32
+        command: ["/agnhost", "serve-hostname"]
+        imagePullPolicy: IfNotPresent
+        name: hostname
+      terminationGracePeriodSeconds: 120

@@ -1,0 +1,30 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - deads2k
+  - smarterclayton
+  - wojtek-t
+  - liggitt
+reviewers:
+  - thockin
+  - smarterclayton
+  - wojtek-t
+  - deads2k
+  - yujuhong
+  - derekwaynecarr
+  - caesarxuchao
+  - mikedanese
+  - liggitt
+  - saad-ali
+  - luxas
+  - janetkuo
+  - justinsb
+  - pwittrock
+  - ncdc
+  - mwielgus
+  - soltysh
+  - dims
+  - enj
+  - jpbetz
+emeritus_approvers:
+  - lavalamp

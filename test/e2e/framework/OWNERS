@@ -1,0 +1,20 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - andrewsykim
+  - pohly
+  - oomichi
+  - neolit123
+  - SataQiu
+reviewers:
+  - sig-testing-reviewers
+  - andrewsykim
+  - pohly
+  - oomichi
+  - neolit123
+  - SataQiu
+labels:
+  - area/e2e-test-framework
+emeritus_approvers:
+  - fabriziopandini
+  - timothysc

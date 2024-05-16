@@ -1,0 +1,121 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"kube-controller-manager",
+  "namespace": "kube-system",
+  "labels": {
+    "tier": "control-plane",
+    "component": "kube-controller-manager"
+  }
+},
+"spec":{
+"securityContext": {
+  {{runAsUser}}
+  {{runAsGroup}}
+  {{supplementalGroups}}
+  "seccompProfile": {
+      "type": "RuntimeDefault"
+  }
+},
+"priorityClassName": "system-node-critical",
+"priority": 2000001000,
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-controller-manager",
+    "securityContext": {
+      "allowPrivilegeEscalation": false,
+      "capabilities": {
+        "drop": [
+          "all"
+        ]
+      }
+    },
+    "image": "{{pillar['kube_docker_registry']}}/kube-controller-manager-amd64:{{pillar['kube-controller-manager_docker_tag']}}",
+    "resources": {
+      "requests": {
+        "cpu": "{{cpurequest}}"
+      }
+    },
+    "command": [
+                 "/go-runner", "--log-file=/var/log/kube-controller-manager.log", "--also-stdout=false", "--redirect-stderr=true",
+                 "/usr/local/bin/kube-controller-manager",
+                 {{params}}
+               ],
+    {{container_env}}
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 10257,
+        "scheme": "HTTPS",
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
+    "volumeMounts": [
+        {{cloud_config_mount}}
+        {{additional_cloud_config_mount}}
+        {{pv_recycler_mount}}
+        { "name": "srvkube",
+        "mountPath": "/etc/srv/kubernetes",
+        "readOnly": true},
+        {{flexvolume_hostpath_mount}}
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-controller-manager.log",
+        "readOnly": false},
+        { "name": "etcssl",
+        "mountPath": "/etc/ssl",
+        "readOnly": true},
+        { "name": "usrsharecacerts",
+        "mountPath": "/usr/share/ca-certificates",
+        "readOnly": true},
+        { "name": "varssl",
+        "mountPath": "/var/ssl",
+        "readOnly": true},
+        { "name": "etcopenssl",
+        "mountPath": "/etc/openssl",
+        "readOnly": true},
+        { "name": "etcpki",
+        "mountPath": "/etc/pki",
+        "readOnly": true}
+      ]
+    }
+],
+"volumes":[
+  {{cloud_config_volume}}
+  {{additional_cloud_config_volume}}
+  {{pv_recycler_volume}}
+  { "name": "srvkube",
+    "hostPath": {
+        "path": "/etc/srv/kubernetes"}
+  },
+  {{flexvolume_hostpath}}
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-controller-manager.log",
+        "type": "FileOrCreate"}
+  },
+  { "name": "etcssl",
+    "hostPath": {
+        "path": "/etc/ssl"}
+  },
+  { "name": "usrsharecacerts",
+    "hostPath": {
+        "path": "/usr/share/ca-certificates"}
+  },
+  { "name": "varssl",
+    "hostPath": {
+        "path": "/var/ssl"}
+  },
+  { "name": "etcopenssl",
+    "hostPath": {
+        "path": "/etc/openssl"}
+  },
+  { "name": "etcpki",
+    "hostPath": {
+        "path": "/etc/pki"}
+  }
+]
+}}

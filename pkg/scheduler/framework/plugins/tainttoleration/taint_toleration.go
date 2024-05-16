@@ -1,0 +1,196 @@
+/*
+Copyright 2019 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package tainttoleration
+
+import (
+	"context"
+	"fmt"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
+)
+
+// TaintToleration is a plugin that checks if a pod tolerates a node's taints.
+type TaintToleration struct {
+	handle framework.Handle
+}
+
+var _ framework.FilterPlugin = &TaintToleration{}
+var _ framework.PreScorePlugin = &TaintToleration{}
+var _ framework.ScorePlugin = &TaintToleration{}
+var _ framework.EnqueueExtensions = &TaintToleration{}
+
+const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = names.TaintToleration
+	// preScoreStateKey is the key in CycleState to TaintToleration pre-computed data for Scoring.
+	preScoreStateKey = "PreScore" + Name
+	// ErrReasonNotMatch is the Filter reason status when not matching.
+	ErrReasonNotMatch = "node(s) had taints that the pod didn't tolerate"
+)
+
+// Name returns name of the plugin. It is used in logs, etc.
+func (pl *TaintToleration) Name() string {
+	return Name
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *TaintToleration) EventsToRegister() []framework.ClusterEventWithHint {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+	}
+}
+
+// isSchedulableAfterNodeChange is invoked for all node events reported by
+// an informer. It checks whether that change made a previously unschedulable
+// pod schedulable.
+func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	wasUntolerated := true
+	if originalNode != nil {
+		_, wasUntolerated = v1helper.FindMatchingUntoleratedTaint(originalNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+	}
+
+	_, isUntolerated := v1helper.FindMatchingUntoleratedTaint(modifiedNode.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+
+	if wasUntolerated && !isUntolerated {
+		logger.V(5).Info("node was created or updated, and this may make the Pod rejected by TaintToleration plugin in the previous scheduling cycle schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return framework.Queue, nil
+	}
+
+	logger.V(5).Info("node was created or updated, but it doesn't change the TaintToleration plugin's decision", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return framework.QueueSkip, nil
+}
+
+// Filter invoked at the filter extension point.
+func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	node := nodeInfo.Node()
+
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
+	if !isUntolerated {
+		return nil
+	}
+
+	errReason := fmt.Sprintf("node(s) had untolerated taint {%s: %s}", taint.Key, taint.Value)
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, errReason)
+}
+
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
+	tolerationsPreferNoSchedule []v1.Toleration
+}
+
+// Clone implements the mandatory Clone interface. We don't really copy the data since
+// there is no need for that.
+func (s *preScoreState) Clone() framework.StateData {
+	return s
+}
+
+// getAllTolerationEffectPreferNoSchedule gets the list of all Tolerations with Effect PreferNoSchedule or with no effect.
+func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationList []v1.Toleration) {
+	for _, toleration := range tolerations {
+		// Empty effect means all effects which includes PreferNoSchedule, so we need to collect it as well.
+		if len(toleration.Effect) == 0 || toleration.Effect == v1.TaintEffectPreferNoSchedule {
+			tolerationList = append(tolerationList, toleration)
+		}
+	}
+	return
+}
+
+// PreScore builds and writes cycle state used by Score and NormalizeScore.
+func (pl *TaintToleration) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+	if len(nodes) == 0 {
+		return nil
+	}
+	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
+	state := &preScoreState{
+		tolerationsPreferNoSchedule: tolerationsPreferNoSchedule,
+	}
+	cycleState.Write(preScoreStateKey, state)
+	return nil
+}
+
+func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+	c, err := cycleState.Read(preScoreStateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %q from cycleState: %w", preScoreStateKey, err)
+	}
+
+	s, ok := c.(*preScoreState)
+	if !ok {
+		return nil, fmt.Errorf("%+v convert to tainttoleration.preScoreState error", c)
+	}
+	return s, nil
+}
+
+// CountIntolerableTaintsPreferNoSchedule gives the count of intolerable taints of a pod with effect PreferNoSchedule
+func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.Toleration) (intolerableTaints int) {
+	for _, taint := range taints {
+		// check only on taints that have effect PreferNoSchedule
+		if taint.Effect != v1.TaintEffectPreferNoSchedule {
+			continue
+		}
+
+		if !v1helper.TolerationsTolerateTaint(tolerations, &taint) {
+			intolerableTaints++
+		}
+	}
+	return
+}
+
+// Score invoked at the Score extension point.
+func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
+	}
+	node := nodeInfo.Node()
+
+	s, err := getPreScoreState(state)
+	if err != nil {
+		return 0, framework.AsStatus(err)
+	}
+
+	score := int64(countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, s.tolerationsPreferNoSchedule))
+	return score, nil
+}
+
+// NormalizeScore invoked after scoring all nodes.
+func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	return helper.DefaultNormalizeScore(framework.MaxNodeScore, true, scores)
+}
+
+// ScoreExtensions of the Score plugin.
+func (pl *TaintToleration) ScoreExtensions() framework.ScoreExtensions {
+	return pl
+}
+
+// New initializes a new plugin and returns it.
+func New(_ context.Context, _ runtime.Object, h framework.Handle) (framework.Plugin, error) {
+	return &TaintToleration{handle: h}, nil
+}

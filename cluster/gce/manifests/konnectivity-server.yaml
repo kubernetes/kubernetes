@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: konnectivity-server
+  namespace: kube-system
+  component: konnectivity-server
+spec:
+  securityContext:
+    {{ run_as_user }}
+    {{ run_as_group }}
+    {{ supplemental_groups }}
+    seccompProfile:
+      type: RuntimeDefault
+  priorityClassName: system-node-critical
+  priority: 2000001000
+  hostNetwork: true
+  containers:
+  - name: konnectivity-server-container
+    {{ container_security_context }}:
+      {{ disallow_privilege_escalation}}
+      {{ capabilities }}
+        {{ drop_capabilities }}
+    image: registry.k8s.io/kas-network-proxy/proxy-server:v0.29.0
+    resources:
+      requests:
+        cpu: 25m
+    command: [ "/proxy-server"{{ konnectivity_args }} ]
+    livenessProbe:
+      httpGet:
+        scheme: HTTP
+        host: 127.0.0.1
+        port: {{ health_port }}
+        path: /healthz
+      initialDelaySeconds: {{ liveness_probe_initial_delay }}
+      timeoutSeconds: 60
+    ports:
+    - name: agentport
+      containerPort: {{ agent_port }}
+      hostPort: {{ agent_port }}
+    - name: healthport
+      containerPort: {{ health_port }}
+      hostPort: {{ health_port }}
+    - name: adminport
+      containerPort: {{ admin_port }}
+      hostPort: {{ admin_port }}
+    volumeMounts:
+    - name: varlogkonnectivityserver
+      mountPath: /var/log/konnectivity-server.log
+      readOnly: false
+    - name: pki
+      mountPath: /etc/srv/kubernetes/pki
+      readOnly: true
+    - name: konnectivity-uds
+      mountPath: /etc/srv/kubernetes/konnectivity-server
+      readOnly: false
+  volumes:
+  - name: varlogkonnectivityserver
+    hostPath:
+      path: /var/log/konnectivity-server.log
+      type: FileOrCreate
+  - name: pki
+    hostPath:
+      path: /etc/srv/kubernetes/pki
+  - name: konnectivity-uds
+    hostPath:
+      path: /etc/srv/kubernetes/konnectivity-server
+      type: DirectoryOrCreate

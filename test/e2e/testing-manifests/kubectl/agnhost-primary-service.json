@@ -1,0 +1,23 @@
+{
+   "kind": "Service",
+   "apiVersion": "v1",
+   "metadata": {
+      "name": "agnhost-primary",
+      "labels": {
+         "app": "agnhost",
+         "role": "primary"
+      }
+   },
+   "spec": {
+      "ports": [
+         {
+            "port": 6379,
+            "targetPort": "agnhost-server"
+         }
+      ],
+      "selector": {
+         "app": "agnhost",
+         "role": "primary"
+      }
+   }
+}

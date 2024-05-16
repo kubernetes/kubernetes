@@ -1,0 +1,3 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: JoinConfiguration
+caCertPath: relativepath

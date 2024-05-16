@@ -1,0 +1,30 @@
+# Test failures do not block the apply for valid resources.
+# pod-a and pod-c should apply, while POD-B is invalid
+# because of the capitialization.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-a
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.9
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: POD-B
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.9
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-c
+spec:
+  containers:
+  - name: kubernetes-pause
+    image: registry.k8s.io/pause:3.9
+

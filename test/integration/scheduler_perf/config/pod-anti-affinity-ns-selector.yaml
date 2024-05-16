@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: anti-affinity-pod-
+  labels:
+    color: green
+spec:
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            color: green
+        topologyKey: kubernetes.io/hostname
+        namespaceSelector:
+          matchLabels:
+            team: devops
+  containers:
+  - image: registry.k8s.io/pause:3.9
+    name: pause
+    ports:
+    - containerPort: 80
+    resources:
+      limits:
+        cpu: 100m
+        memory: 500Mi
+      requests:
+        cpu: 100m
+        memory: 500Mi

@@ -1,0 +1,927 @@
+# The following labels are used in this file:
+# - fast: short execution time, ideally less than 30 seconds
+# - integration-test: used to select workloads that
+#   run in pull-kubernetes-integration. Choosing those tests
+#   is a tradeoff between code coverage and overall runtime.
+# - performance: used to select workloads that run
+#   in ci-benchmark-scheduler-perf. Such workloads
+#   must run long enough (ideally, longer than 10 seconds)
+#   to provide meaningful samples for the pod scheduling
+#   rate.
+#
+# Combining "performance" and "fast" selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+- name: SchedulingBasic
+  defaultPodTemplatePath: config/pod-default.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [integration-test, fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 1000
+
+- name: SchedulingPodAntiAffinity
+  defaultPodTemplatePath: config/pod-with-pod-anti-affinity.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+    namespace: sched-1
+  workloads:
+  - name: 500Nodes
+    labels: [integration-test, fast]
+    params:
+      initNodes: 500
+      initPods: 100
+      measurePods: 400
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 1000
+
+- name: SchedulingSecrets
+  defaultPodTemplatePath: config/pod-with-secret-volume.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: SchedulingInTreePVs
+  labels: [performance]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    persistentVolumeTemplatePath: config/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    persistentVolumeTemplatePath: config/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: SchedulingMigratedInTreePVs
+  labels: [performance]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/node-default.yaml
+    nodeAllocatableStrategy:
+      nodeAllocatable:
+        attachable-volumes-csi-ebs.csi.aws.com: "39"
+      csiNodeAllocatable:
+        ebs.csi.aws.com:
+          count: 39
+      migratedPlugins:
+      - "kubernetes.io/aws-ebs"
+  - opcode: createPods
+    countParam: $initPods
+    persistentVolumeTemplatePath: config/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    persistentVolumeTemplatePath: config/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: SchedulingCSIPVs
+  labels: [performance]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/node-default.yaml
+    nodeAllocatableStrategy:
+      nodeAllocatable:
+        attachable-volumes-csi-ebs.csi.aws.com: "39"
+      csiNodeAllocatable:
+        ebs.csi.aws.com:
+          count: 39
+  - opcode: createPods
+    countParam: $initPods
+    persistentVolumeTemplatePath: config/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    persistentVolumeTemplatePath: config/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [integration-test, fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: SchedulingPodAffinity
+  defaultPodTemplatePath: config/pod-with-pod-affinity.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["zone1"]
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $measurePods
+    namespace: sched-1
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: SchedulingPreferredPodAffinity
+  labels: [performance]
+  defaultPodTemplatePath: config/pod-with-preferred-pod-affinity.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $measurePods
+    namespace: sched-1
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [integration-test, fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: SchedulingPreferredPodAntiAffinity
+  defaultPodTemplatePath: config/pod-with-preferred-pod-affinity.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: sched
+    count: 2
+  - opcode: createPods
+    countParam: $initPods
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $measurePods
+    namespace: sched-1
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: SchedulingNodeAffinity
+  defaultPodTemplatePath: config/pod-with-node-affinity.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["zone1"]
+  - opcode: createPods
+    countParam: $initPods
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+
+- name: TopologySpreading
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["moon-1", "moon-2", "moon-3"]
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-default.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-with-topology-spreading.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [integration-test, fast]
+    params:
+      initNodes: 500
+      initPods: 1000
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 2000
+
+- name: PreferredTopologySpreading
+  labels: [performance]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["moon-1", "moon-2", "moon-3"]
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-default.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-with-preferred-topology-spreading.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 1000
+      measurePods: 1000
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 2000
+
+- name: MixedSchedulingBasePod
+  labels: [performance]
+  defaultPodTemplatePath: config/pod-default.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["zone1"]
+  - opcode: createNamespaces
+    prefix: sched
+    count: 1
+  - opcode: createPods
+    countParam: $initPods
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-with-pod-affinity.yaml
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-with-pod-anti-affinity.yaml
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-with-preferred-pod-affinity.yaml
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-with-preferred-pod-anti-affinity.yaml
+    namespace: sched-0
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [integration-test, fast]
+    params:
+      initNodes: 500
+      initPods: 200
+      measurePods: 1000
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPods: 2000
+      measurePods: 1000
+
+- name: PreemptionBasic
+  labels: [performance]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-low-priority.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-high-priority.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 2000
+      measurePods: 500
+# This test case always seems to fail.
+# https://github.com/kubernetes/kubernetes/issues/108308
+#
+#  - name: 5000Nodes
+#    params:
+#      initNodes: 5000
+#      initPods: 20000
+#      measurePods: 5000
+
+- name: PreemptionPVs
+  labels: [performance]
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-low-priority.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-high-priority.yaml
+    persistentVolumeTemplatePath: config/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: config/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 2000
+      measurePods: 500
+# This test case always seems to fail.
+# https://github.com/kubernetes/kubernetes/issues/108308
+#
+#  - name: 5000Nodes
+#    params:
+#      initNodes: 5000
+#      initPods: 20000
+#      measurePods: 5000
+
+- name: Unschedulable
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: config/pod-large-cpu.yaml
+    skipWaitToCompletion: true
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes/200InitPods
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPods: 200
+      measurePods: 1000
+  - name: 5000Nodes/200InitPods
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      initPods: 200
+      measurePods: 5000
+  - name: 5000Nodes/2000InitPods
+    params:
+      initNodes: 5000
+      initPods: 2000
+      measurePods: 5000
+
+- name: SchedulingWithMixedChurn
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: churn
+    mode: recreate
+    number: 1
+    templatePaths:
+    - config/churn/node-default.yaml
+    - config/pod-high-priority-large-cpu.yaml
+    - config/churn/service-default.yaml
+    intervalMilliseconds: 1000
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: config/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 1000Nodes
+    labels: [integration-test, fast]
+    params:
+      initNodes: 1000
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 5000
+      measurePods: 2000
+
+- name: SchedulingRequiredPodAntiAffinityWithNSSelector
+  labels: [performance]
+  defaultPodTemplatePath: config/pod-anti-affinity-ns-selector.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 40
+      initNamespaces: 100
+      measurePods: 1000
+
+- name: SchedulingPreferredAntiAffinityWithNSSelector
+  labels: [performance]
+  defaultPodTemplatePath: config/pod-preferred-anti-affinity-ns-selector.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 40
+      initNamespaces: 100
+      measurePods: 1000
+
+- name: SchedulingRequiredPodAffinityWithNSSelector
+  labels: [performance]
+  defaultPodTemplatePath: config/pod-affinity-ns-selector.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["zone1"]
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 50
+      initNamespaces: 100
+      measurePods: 1000
+
+- name: SchedulingPreferredAffinityWithNSSelector
+  labels: [performance]
+  defaultPodTemplatePath: config/pod-preferred-affinity-ns-selector.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: init-ns
+    countParam: $initNamespaces
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createNamespaces
+    prefix: measure-ns
+    count: 1
+    namespaceTemplatePath: config/namespace-with-labels.yaml
+  - opcode: createPodSets
+    countParam: $initNamespaces
+    namespacePrefix: init-ns
+    createPodsOp:
+      opcode: createPods
+      countParam: $initPodsPerNamespace
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+    namespace: measure-ns-0
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      initNodes: 500
+      initPodsPerNamespace: 4
+      initNamespaces: 10
+      measurePods: 100
+  - name: 5000Nodes
+    params:
+      initNodes: 5000
+      initPodsPerNamespace: 50
+      initNamespaces: 100
+      measurePods: 1000
+
+- name: SchedulingWithNodeInclusionPolicy
+  featureGates:
+    NodeInclusionPolicyInPodTopologySpread: true
+  defaultPodTemplatePath: config/pod-with-node-inclusion-policy.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $normalNodes
+  - opcode: createNodes
+    nodeTemplatePath: config/node-with-taint.yaml
+    countParam: $taintNodes
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [fast]
+    params:
+      taintNodes: 100
+      normalNodes: 400
+      measurePods: 400
+  - name: 5000Nodes
+    labels: [performance, fast]
+    params:
+      taintNodes: 1000
+      normalNodes: 4000
+      measurePods: 4000
+
+# SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
+# and dynamically created ResourceClaim instances for each pod.
+- name: SchedulingWithResourceClaimTemplate
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/dra/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: config/dra/resourceclass.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, fast]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: 2000pods_100nodes
+    labels: [performance, fast]
+    params:
+      # In this testcase, the number of nodes is smaller
+      # than the limit for the PodScheduling slices.
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 20
+  - name: 2000pods_200nodes
+    params:
+      # In this testcase, the driver and scheduler must
+      # truncate the PotentialNodes and UnsuitableNodes
+      # slices.
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10
+
+# This similar to SchedulingWithResourceClaimTemplate, except
+# that it uses four claims per pod, from two different drivers.
+# This emphasizes a bit more the complexity of collaborative
+# scheduling via PodSchedulingContext.
+- name: SchedulingWithMultipleResourceClaims
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/dra/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createResourceDriver
+    driverName: another-test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: config/dra/resourceclass.yaml
+  - opcode: createAny
+    templatePath: config/dra/another-resourceclass.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createAny
+    templatePath: config/dra/another-resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/dra/pod-with-many-claim-templates.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createAny
+    templatePath: config/dra/another-resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/dra/pod-with-many-claim-templates.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 1
+      maxClaimsPerNode: 20
+  - name: 2000pods_100nodes
+    params:
+      # In this testcase, the number of nodes is smaller
+      # than the limit for the PodScheduling slices.
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 40
+  - name: 2000pods_200nodes
+    params:
+      # In this testcase, the driver and scheduler must
+      # truncate the PotentialNodes and UnsuitableNodes
+      # slices.
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 20
+
+# SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
+# and dynamically creates ResourceClaim instances for each pod.
+# The driver uses structured parameters.
+- name: SchedulingWithResourceClaimTemplateStructured
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/dra/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+    structuredParameters: true
+  - opcode: createAny
+    templatePath: config/dra/resourceclass-structured.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimparameters.yaml
+    namespace: init
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate-structured.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimparameters.yaml
+    namespace: test
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate-structured.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, fast]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: 2000pods_100nodes
+    labels: [performance, fast]
+    params:
+      # In this testcase, the number of nodes is smaller
+      # than the limit for the PodScheduling slices.
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 20
+  - name: 2000pods_200nodes
+    params:
+      # In this testcase, the driver and scheduler must
+      # truncate the PotentialNodes and UnsuitableNodes
+      # slices.
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10

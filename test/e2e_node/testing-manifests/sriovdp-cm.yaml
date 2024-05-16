@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sriovdp-config
+  namespace: kube-system
+data:
+  config.json: |
+    {
+        "resourceList": [{
+                "resourceName": "intel_sriov_netdevice",
+                "selectors": {
+                    "vendors": ["8086"],
+                    "devices": ["154c", "10ed"],
+                    "drivers": ["i40evf", "ixgbevf"]
+                }
+            },
+            {
+                "resourceName": "intel_sriov_dpdk",
+                "selectors": {
+                    "vendors": ["8086"],
+                    "devices": ["154c", "10ed"],
+                    "drivers": ["vfio-pci"],
+                    "pfNames": ["enp0s0f0","enp2s2f1"]
+                }
+            },
+            {
+                "resourceName": "mlnx_sriov_rdma",
+                "isRdma": true,
+                "selectors": {
+                    "vendors": ["15b3"],
+                    "devices": ["1018"],
+                    "drivers": ["mlx5_ib"]
+                }
+            }
+        ]
+    }

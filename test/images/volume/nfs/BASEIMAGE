@@ -1,0 +1,4 @@
+linux/amd64=centos:7
+linux/arm64=arm64v8/centos:7
+linux/ppc64le=ppc64le/centos:7
+linux/s390x=s390x/clefos:7

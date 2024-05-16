@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - jpbetz
+  - serathius
+approvers:
+  - jpbetz
+  - serathius
+labels:
+  - sig/api-machinery

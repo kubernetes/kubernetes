@@ -1,0 +1,5 @@
+vendor/
+/bin
+/lint.log
+/cover.out
+/cover.html

@@ -1,0 +1,9 @@
+PATCH /apis/flops/v1alpha1/namespaces/mops/flips/mips/fin?force=true HTTP/1.1
+Host: example.com
+Accept: application/json
+Accept-Encoding: gzip
+Content-Length: 29
+Content-Type: application/apply-patch+yaml
+User-Agent: TestGoldenRequest
+
+{"metadata":{"name":"mips"}}

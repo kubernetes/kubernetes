@@ -1,0 +1,34 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
+reviewers:
+  - bentheelder
+  - cblecker
+  - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
+  - dims
+  - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+  #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
+  - liggitt
+  - palnabarun # Release Manager
+  - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+  - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
+  - spiffxp
+  - thockin
+  - Verolop # Release Manager
+  - xmudrii # Release Manager
+approvers:
+  - bentheelder
+  - cblecker
+  - dims
+  - justaugustus
+  - liggitt
+  - mikedanese
+  - spiffxp
+  - thockin
+emeritus_approvers:
+  - fejta
+  - jbeda
+  - zmerlynn
+  - lavalamp
