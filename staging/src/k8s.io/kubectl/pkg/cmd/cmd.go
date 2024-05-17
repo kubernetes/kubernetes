@@ -26,8 +26,6 @@ import (
 	"strings"
 	"syscall"
 
-	"k8s.io/kubectl/pkg/kuberc"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -72,10 +70,10 @@ import (
 	"k8s.io/kubectl/pkg/cmd/set"
 	"k8s.io/kubectl/pkg/cmd/taint"
 	"k8s.io/kubectl/pkg/cmd/top"
-	"k8s.io/kubectl/pkg/cmd/util"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
+	"k8s.io/kubectl/pkg/kuberc"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -497,19 +495,17 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
-	if util.KubeRC.IsEnabled() {
-		var err error
-		o.Arguments, err = pref.ApplyAliases(cmds, o.Arguments, o.IOStreams.ErrOut)
-		if err != nil {
-			fmt.Fprintf(o.IOStreams.ErrOut, "applying alias errored out %v\n", err)
-			os.Exit(1)
-		}
-		os.Args = o.Arguments
-		err = pref.ApplyOverrides(cmds, o.Arguments, o.IOStreams.ErrOut)
-		if err != nil {
-			fmt.Fprintf(o.IOStreams.ErrOut, "applying command overrides errored out %v\n", err)
-			os.Exit(1)
-		}
+	var err error
+	o.Arguments, err = pref.ApplyAliases(cmds, o.Arguments, o.IOStreams.ErrOut)
+	if err != nil {
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying aliases %v\n", err)
+		os.Exit(1)
+	}
+	os.Args = o.Arguments
+	err = pref.ApplyOverrides(cmds, o.Arguments, o.IOStreams.ErrOut)
+	if err != nil {
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying command flag overrides %v\n", err)
+		os.Exit(1)
 	}
 
 	return cmds

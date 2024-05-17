@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+# Copyright 2018 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+run_kuberc_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kuberc"
+
+  # Enable KUBERC feature
+  export KUBECTL_KUBERC=true
+
+  cat > "${TMPDIR:-/tmp}"/kuberc_file << EOF
+apiVersion: config.k8s.io/v1alpha1
+kind: Preferences
+spec:
+  aliases:
+  - name: getall
+    command: get
+    args:
+     - pods
+    flags:
+     - name: selector
+       default: "what=database"
+  - name: subalias
+    command: create deployment
+    flags:
+     - name: image
+       default: busybox
+    args:
+     - my-dep
+  overrides:
+  - command: top nodes
+    flags:
+    - name: show-capacity
+      default: "true"
+  - command: delete
+    flags:
+    - name: interactive
+      default: "true"
+EOF
+
+  # TODO implement all kuberc integration tests in here
+
+  unset KUBECTL_KUBERC
+
+  set +o nounset
+  set +o errexit
+}

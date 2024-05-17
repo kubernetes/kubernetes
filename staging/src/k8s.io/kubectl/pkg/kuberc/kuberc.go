@@ -1,3 +1,19 @@
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package kuberc
 
 import (
@@ -62,10 +78,14 @@ func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errO
 		return nil
 	}
 
+	if !util.KubeRC.IsEnabled() {
+		return nil
+	}
+
 	kubercPath := getExplicitKuberc(args)
 	kuberc, err := p.GetPreferencesFunc(kubercPath)
 	if err != nil {
-		return fmt.Errorf("kuberc error %v\n", err)
+		return fmt.Errorf("kuberc error %w", err)
 	}
 
 	if kuberc == nil {
@@ -92,12 +112,10 @@ func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errO
 		}
 
 		if _, ok := p.aliases[cmd.Name()]; ok {
-			return fmt.Errorf("alias %s can not be overridden\n", cmd.Name())
+			return fmt.Errorf("alias %s can not be overridden", cmd.Name())
 		}
 
-		// In order to merge the persistent flags of the parents commands
-		// into this command. Otherwise, default flags would not find the persistent flags
-		// such as --namespaces, etc.
+		// This function triggers merging the persistent flags in the parent commands.
 		_ = cmd.InheritedFlags()
 
 		for _, fl := range c.Flags {
@@ -106,9 +124,9 @@ func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errO
 			if explicitFlagUse(fl.Name, args) {
 				continue
 			}
-			err = cmd.Flags().Set(fmt.Sprintf("%s", fl.Name), fl.Default)
+			err = cmd.Flags().Set(fl.Name, fl.Default)
 			if err != nil {
-				return fmt.Errorf("could not apply value %s to flag %s in command %s err: %v\n", fl.Default, fl.Name, c.Command, err)
+				return fmt.Errorf("could not apply value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
 			}
 		}
 	}
@@ -131,6 +149,10 @@ func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut
 		return args, nil
 	}
 
+	if !util.KubeRC.IsEnabled() {
+		return args, nil
+	}
+
 	_, _, err := rootCmd.Find(args[1:])
 	if err == nil {
 		// Command is found, no need to continue for aliasing
@@ -140,7 +162,7 @@ func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut
 	kubercPath := getExplicitKuberc(args)
 	kuberc, err := p.GetPreferencesFunc(kubercPath)
 	if err != nil {
-		return args, fmt.Errorf("kuberc error %v\n", err)
+		return args, fmt.Errorf("kuberc error %w", err)
 	}
 
 	if kuberc == nil {
@@ -206,9 +228,7 @@ func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut
 		return args, nil
 	}
 
-	// In order to merge the persistent flags of the parents commands
-	// into this command. Otherwise, default flags would not find the persistent flags
-	// such as --namespaces, etc.
+	// This function triggers merging the persistent flags in the parent commands.
 	_ = foundAliasCmd.InheritedFlags()
 
 	for _, fl := range aliasArgs.flags {
@@ -217,7 +237,7 @@ func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut
 		if explicitFlagUse(fl.Name, args) {
 			continue
 		}
-		err = foundAliasCmd.Flags().Set(fmt.Sprintf("%s", fl.Name), fl.Default)
+		err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
 		if err != nil {
 			fmt.Fprintf(errOut, "could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
 			return args, nil
