@@ -18,6 +18,7 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
+	go.uber.org/goleak v1.3.0
 	golang.org/x/net v0.25.0
 	golang.org/x/oauth2 v0.20.0
 	golang.org/x/term v0.20.0
@@ -37,6 +38,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.6.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -53,6 +55,7 @@ require (
 	github.com/onsi/gomega v1.33.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
