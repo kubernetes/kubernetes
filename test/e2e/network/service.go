@@ -474,7 +474,7 @@ const (
 	// Any time we add new errors, we should audit all callers of this.
 )
 
-// pokeUDP tries to connect to a host on a port and send the given request. Callers
+// PokeUDP tries to connect to a host on a port and send the given request. Callers
 // can specify additional success parameters, if desired.
 //
 // The result status will be characterized as precisely as possible, given the
@@ -484,7 +484,7 @@ const (
 //
 // The result response will be populated if the UDP transaction was completed, even
 // if the other test params make this a failure).
-func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPokeResult {
+func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPokeResult {
 	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
 	url := fmt.Sprintf("udp://%s", hostPort)
 
@@ -577,7 +577,7 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 // testReachableUDP tests that the given host serves UDP on the given port.
 func testReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
 	pollfn := func(ctx context.Context) (bool, error) {
-		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{
 			Timeout:  3 * time.Second,
 			Response: "hello",
 		})
@@ -595,7 +595,7 @@ func testReachableUDP(ctx context.Context, host string, port int, timeout time.D
 // testNotReachableUDP tests that the given host doesn't serve UDP on the given port.
 func testNotReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
 	pollfn := func(ctx context.Context) (bool, error) {
-		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
 		if result.Status != UDPSuccess && result.Status != UDPError {
 			return true, nil
 		}
