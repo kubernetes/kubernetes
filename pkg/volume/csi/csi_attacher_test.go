@@ -928,6 +928,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 
 func TestAttacherDetach(t *testing.T) {
 	nodeName := "fakeNode"
+	resyncPeriod := 10 * time.Second
 	testCases := []struct {
 		name         string
 		volID        string
@@ -935,10 +936,11 @@ func TestAttacherDetach(t *testing.T) {
 		shouldFail   bool
 		reactor      func(action core.Action) (handled bool, ret runtime.Object, err error)
 		watchTimeout time.Duration
+		resyncPeriod time.Duration
 	}{
-		{name: "normal test", volID: "vol-001", attachID: getAttachmentName("vol-001", testDriver, nodeName)},
-		{name: "normal test 2", volID: "vol-002", attachID: getAttachmentName("vol-002", testDriver, nodeName)},
-		{name: "object not found", volID: "vol-non-existing", attachID: getAttachmentName("vol-003", testDriver, nodeName)},
+		{name: "normal test", volID: "vol-001", attachID: getAttachmentName("vol-001", testDriver, nodeName), resyncPeriod: resyncPeriod},
+		{name: "normal test 2", volID: "vol-002", attachID: getAttachmentName("vol-002", testDriver, nodeName), resyncPeriod: resyncPeriod},
+		{name: "object not found", volID: "vol-non-existing", attachID: getAttachmentName("vol-003", testDriver, nodeName), resyncPeriod: resyncPeriod},
 		{
 			name:       "API error",
 			volID:      "vol-004",
@@ -951,6 +953,7 @@ func TestAttacherDetach(t *testing.T) {
 				}
 				return false, nil, nil
 			},
+			resyncPeriod: resyncPeriod,
 		},
 	}
 
@@ -958,7 +961,7 @@ func TestAttacherDetach(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("running test: %v", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
-			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
+			plug, tmpDir := newTestPluginWithAttachDetachVolumeHostWithResyncPeriod(t, fakeClient, resyncPeriod)
 			defer os.RemoveAll(tmpDir)
 
 			if tc.reactor != nil {
@@ -978,6 +981,7 @@ func TestAttacherDetach(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to attach: %v", err)
 			}
+			time.Sleep(tc.resyncPeriod)
 			volumeName, err := plug.GetVolumeName(spec)
 			if err != nil {
 				t.Errorf("test case %s failed: %v", tc.name, err)

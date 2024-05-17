@@ -448,7 +448,19 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	volID = parts[1]
 	attachID = getAttachmentName(volID, driverName, string(nodeName))
 
-	if err := c.k8s.StorageV1().VolumeAttachments().Delete(context.TODO(), attachID, metav1.DeleteOptions{}); err != nil {
+	// volumeAttachment deletion with resourceVersion to solve problem of concurrent operation with finalizers patch
+	volumeAttachment, err := c.plugin.volumeAttachmentLister.Get(attachID)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// object deleted or never existed, done
+			klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volID))
+			return nil
+		}
+		return errors.New(log("detacher.Detach failed to get VolumeAttachment [%s]: %v", attachID, err))
+	}
+	resourceVersion := volumeAttachment.GetResourceVersion()
+
+	if err := c.k8s.StorageV1().VolumeAttachments().Delete(context.TODO(), attachID, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &resourceVersion}}); err != nil {
 		if apierrors.IsNotFound(err) {
 			// object deleted or never existed, done
 			klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volID))
