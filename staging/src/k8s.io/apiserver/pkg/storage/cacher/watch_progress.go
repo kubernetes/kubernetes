@@ -24,6 +24,9 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/storage"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/klog/v2"
@@ -101,6 +104,24 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 				return pr.waiting > 0 && !pr.stopped
 			}()
 			if !shouldRequest {
+				continue
+			}
+			// There can exist an extremely unlikely scenario where the progress requester can
+			// repeatedly request progress notifications even when the feature might not be
+			// supported.
+			//
+			// The feature checker returns `true` if any node in an etcd cluster has the feature
+			// enabled. However, it may change this to `false` if it eventually detects a node
+			// which does not have this enabled. Ideally, till we detect `false` we work under the
+			// assumption that this feature is supported, however we should stop requesting progress
+			// notifications as soon as we get a `false` in order to prevent loading etcd with
+			// redundant requests.
+			if !etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
+				pr.mux.Lock()
+				pr.stopped = true
+				pr.mux.Unlock()
+
+				pr.cond.Signal()
 				continue
 			}
 			err := pr.requestWatchProgress(ctx)
