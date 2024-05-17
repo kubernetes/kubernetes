@@ -338,6 +338,79 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 	})
 }
 
+func TestPodReadyAfterRunningMetrics(t *testing.T) {
+
+	t.Run("pod starts in 30s and becomes ready after another 10s", func(t *testing.T) {
+
+		fakeClock := testingclock.NewFakeClock(frozenTime)
+
+		metrics.Register()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:  map[types.UID]*perPodState{},
+			clock: fakeClock,
+		}
+
+		podInitializing := buildInitializingPod()
+		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
+
+		// pod started
+		podStarted := buildRunningPod()
+		tracker.RecordStatusUpdated(podStarted)
+
+		// at 30s observe the same pod on watch
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
+
+		// pod full startup metric should be empty as the pod is not ready yet
+		wants := `
+		`
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_pod_full_startup_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// pod ready
+		podReady := buildReadyPod()
+		podReady.Name = "test-pod"
+		podReady.Namespace = "test-ns"
+		podReady.Spec.NodeName = "test-node"
+		tracker.RecordStatusUpdated(podReady)
+
+		// 10s later, observe the same pod on watch
+		tracker.ObservedPodOnWatch(podReady, frozenTime.Add(time.Second*40))
+
+		wants = `
+# HELP kubelet_pod_full_startup_duration_seconds [ALPHA] Duration in seconds to start a pod since creation, including time to pull images and run init containers, measured from pod creation timestamp to when the pod is reported as ready for the first time and observed via watch
+# TYPE kubelet_pod_full_startup_duration_seconds gauge
+kubelet_pod_full_startup_duration_seconds{namespace="test-ns", node="test-node", pod="test-pod", uid="3c1df8a9-11a8-4791-aeae-184c18cca686"} 40
+`
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_pod_full_startup_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// any new pod observations should not impact the metrics, as the pod should be recorder only once
+		tracker.ObservedPodOnWatch(podReady, frozenTime.Add(time.Second*45))
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_pod_full_startup_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// switch the pod status from ready to running and then running to ready, this should not impact the metric, as the
+		// metric should only record the time the pod becomes ready for the first time
+		tracker.RecordStatusUpdated(podStarted)
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*50))
+		tracker.RecordStatusUpdated(podReady)
+		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*55))
+		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_pod_full_startup_duration_seconds"); err != nil {
+			t.Fatal(err)
+		}
+
+		// cleanup
+		tracker.DeletePodStartupState(podReady.UID)
+
+		assert.Empty(t, tracker.pods)
+		metrics.PodFullStartupDuration.Reset()
+	})
+}
+
 func buildInitializingPod() *corev1.Pod {
 	return buildPodWithStatus([]corev1.ContainerStatus{
 		{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "PodInitializing"}}},
@@ -348,6 +421,17 @@ func buildRunningPod() *corev1.Pod {
 	return buildPodWithStatus([]corev1.ContainerStatus{
 		{State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(frozenTime)}}},
 	})
+}
+
+func buildReadyPod() *corev1.Pod {
+	// Ready pod will already be running
+	pod := buildPodWithStatus([]corev1.ContainerStatus{
+		{State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{StartedAt: metav1.NewTime(frozenTime)}}},
+	})
+	pod.Status.Conditions = []corev1.PodCondition{
+		{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+	}
+	return pod
 }
 
 func buildPodWithStatus(cs []corev1.ContainerStatus) *corev1.Pod {
