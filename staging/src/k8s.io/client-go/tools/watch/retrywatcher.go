@@ -187,7 +187,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				if !ok {
 					_ = rw.send(watch.Event{
 						Type:   watch.Error,
-						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %#v doesn't support resourceVersion", event.Object)).ErrStatus,
+						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %s doesn't support resourceVersion", dump.Pretty(event.Object))).ErrStatus,
 					})
 					// We have to abort here because this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 					return true, 0
@@ -197,7 +197,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				if resourceVersion == "" {
 					_ = rw.send(watch.Event{
 						Type:   watch.Error,
-						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %#v doesn't support resourceVersion", event.Object)).ErrStatus,
+						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %s doesn't support resourceVersion", dump.Pretty(event.Object))).ErrStatus,
 					})
 					// We have to abort here because this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 					return true, 0
@@ -258,7 +258,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				klog.ErrorS(nil, "Failed to recognize Event type", "eventType", event.Type, "eventObject", event.Object)
 				_ = rw.send(watch.Event{
 					Type:   watch.Error,
-					Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %#v failed to recognize Event type %q", event.Object, event.Type)).ErrStatus,
+					Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %s failed to recognize Event type %q", dump.Pretty(event.Object), event.Type)).ErrStatus,
 				})
 				// We are unable to restart the watch and have to stop the loop or this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 				return true, 0
