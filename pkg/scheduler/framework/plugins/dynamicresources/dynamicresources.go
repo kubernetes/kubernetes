@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/google/go-cmp/cmp"
@@ -1620,7 +1621,8 @@ func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourcev1alpha2.ResourceClaim, finalErr error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims[index]
-	allocationPatch := ""
+	driverName := ""
+	allocationObject := ""
 
 	allocation := state.informationsForClaim[index].allocation
 	logger.V(5).Info("preparing claim status patch", "claim", klog.KObj(state.claims[index]), "allocation", klog.Format(allocation))
@@ -1631,7 +1633,8 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		if err != nil {
 			return nil, fmt.Errorf("marshaling AllocationResult failed: %v", err)
 		}
-		allocationPatch = fmt.Sprintf(`"driverName": %q, "allocation": %s, `, state.informationsForClaim[index].allocationDriverName, string(buffer))
+		driverName = state.informationsForClaim[index].allocationDriverName
+		allocationObject = string(buffer)
 
 		// The finalizer needs to be added in a normal update. Using a simple update is fine
 		// because we don't expect concurrent modifications while the claim is not allocated
@@ -1659,20 +1662,51 @@ func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// Note that this also works when the allocation result gets added twice because
 	// two pods both started using a shared claim: the first pod to get here adds the
 	// allocation result. The second pod then only adds itself to reservedFor.
-	patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": {%s "reservedFor": [ {"resource": "pods", "name": %q, "uid": %q} ] }}`,
-		claim.UID,
-		allocationPatch,
-		pod.Name,
-		pod.UID,
+	//
+	// Because we allow concurrent updates, we don't check ResourceVersion
+	// in a precondition. What we *do* need to check is that the finalizer
+	// is still present. This implies using a JSON patch instead of a
+	// simpler strategic-merge-patch.
+	parts := make([]string, 0, 7)
+	parts = append(parts,
+		fmt.Sprintf(`{ "op": "test", "path": "/metadata/uid", "value": %q }`, claim.UID),
 	)
+	// Strictly speaking, we only need to check for existence of our finalizer.
+	// JSON patch does not support that, so we check for the stronger "array is equal".
+	if len(claim.Finalizers) > 0 {
+		parts = append(parts,
+			fmt.Sprintf(`{ "op": "test", "path": "/metadata/finalizers", "value": %q }`, claim.Finalizers),
+		)
+	}
+	// JSON patch can only append to a non-empty array. An empty reservedFor gets
+	// omitted and even if it didn't, it would be null and not an empty array.
+	// Therefore we have to test and add if it's currently empty.
+	reservedForEntry := fmt.Sprintf(`{"resource": "pods", "name": %q, "uid": %q}`, pod.Name, pod.UID)
+	if len(claim.Status.ReservedFor) == 0 {
+		parts = append(parts,
+			fmt.Sprintf(`{ "op": "test", "path": "/status/reservedFor", "value": null }`),
+			fmt.Sprintf(`{ "op": "add", "path": "/status/reservedFor", "value": [ %s ] }`, reservedForEntry),
+		)
+	} else {
+		parts = append(parts,
+			fmt.Sprintf(`{ "op": "add", "path": "/status/reservedFor/-", "value": %s }`, reservedForEntry),
+		)
+	}
+	if allocationObject != "" {
+		parts = append(parts,
+			fmt.Sprintf(`{ "op": "add", "path": "/status/driverName", "value": %q }`, driverName),
+			fmt.Sprintf(`{ "op": "add", "path": "/status/allocation", "value": %s }`, allocationObject),
+		)
+	}
+	patch := "[\n" + strings.Join(parts, ",\n") + "\n]"
 	if loggerV := logger.V(6); loggerV.Enabled() {
 		logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim), "patch", patch)
 	} else {
 		logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim))
 	}
-	claim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
+	claim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{}, "status")
 	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.Format(claim), "err", err)
-	if allocationPatch != "" {
+	if allocationObject != "" {
 		// The scheduler was handling allocation. Now that has
 		// completed, either successfully or with a failure.
 		if err == nil {
