@@ -480,6 +480,33 @@ func TestSchedulerInformers(t *testing.T) {
 			}),
 			preemptedPodIndexes: map[int]struct{}{2: {}},
 		},
+		{
+			name:         "The pod cannot be scheduled when nodeAffinity specifies a non-existent node.",
+			nodes:        []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
+			existingPods: []*v1.Pod{},
+			pod: testutils.InitPausePod(&testutils.PausePodConfig{
+				Name:      "unschedulable-pod",
+				Namespace: testCtx.NS.Name,
+				Affinity: &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchFields: []v1.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"invalid-node"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Resources: defaultPodRes,
+			}),
+		},
 	}
 
 	for _, test := range tests {
