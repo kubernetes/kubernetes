@@ -6,6 +6,11 @@ API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1al
 API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeHostCIDRDenylist
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,NodePortAddresses
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyIPVSConfiguration,ExcludeCIDRs
+API rule violation: list_type_missing,k8s.io/kubectl/pkg/config/v1alpha1,PreferencesAliasOverride,Arguments
+API rule violation: list_type_missing,k8s.io/kubectl/pkg/config/v1alpha1,PreferencesAliasOverride,Flags
+API rule violation: list_type_missing,k8s.io/kubectl/pkg/config/v1alpha1,PreferencesCommandOverride,Flags
+API rule violation: list_type_missing,k8s.io/kubectl/pkg/config/v1alpha1,PreferencesSpec,Aliases
+API rule violation: list_type_missing,k8s.io/kubectl/pkg/config/v1alpha1,PreferencesSpec,Overrides
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProvider,Args
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProvider,Env
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProvider,MatchImages
@@ -258,6 +263,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,V
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,PersistentVolumeRecyclerConfiguration
 API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,IPTables
 API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,NFTables
+API rule violation: names_match,k8s.io/kubectl/pkg/config/v1alpha1,PreferencesAliasOverride,Arguments
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig
