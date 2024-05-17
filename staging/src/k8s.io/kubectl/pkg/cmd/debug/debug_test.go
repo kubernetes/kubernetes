@@ -339,18 +339,24 @@ func TestGenerateDebugContainer(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
-			suffixCounter = 0
-
-			if tc.pod == nil {
-				tc.pod = &corev1.Pod{}
+			var err error
+			kflags := KeepFlags{
+				Labels:         tc.opts.KeepLabels,
+				Annotations:    tc.opts.KeepAnnotations,
+				Liveness:       tc.opts.KeepLiveness,
+				Readiness:      tc.opts.KeepReadiness,
+				Startup:        tc.opts.KeepStartup,
+				InitContainers: tc.opts.KeepInitContainers,
 			}
-
-			applier, err := NewProfileApplier(tc.opts.Profile)
+			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
 			if err != nil {
 				t.Fatalf("failed to create profile applier: %s: %v", tc.opts.Profile, err)
 			}
-			tc.opts.Applier = applier
+			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
+			suffixCounter = 0
+			if tc.pod == nil {
+				tc.pod = &corev1.Pod{}
+			}
 
 			_, debugContainer, err := tc.opts.generateDebugContainer(tc.pod)
 			if err != nil {
@@ -426,6 +432,9 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			havePod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "target",
+					Labels: map[string]string{
+						"app": "business",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -793,12 +802,62 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			},
 		},
 		{
+			name: "pod with probes",
+			opts: &DebugOptions{
+				CopyTo:        "debugger",
+				Container:     "debugger",
+				Image:         "busybox",
+				KeepLiveness:  true,
+				KeepReadiness: true,
+				KeepStartup:   true,
+				PullPolicy:    corev1.PullIfNotPresent,
+				Profile:       ProfileLegacy,
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:           "business",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
+					},
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:           "business",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
+						{
+							Name:                     "debugger",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "pod with init containers",
 			opts: &DebugOptions{
-				CopyTo:     "debugger",
-				Image:      "busybox",
-				PullPolicy: corev1.PullIfNotPresent,
-				Profile:    ProfileLegacy,
+				CopyTo:             "debugger",
+				Image:              "busybox",
+				KeepInitContainers: true,
+				PullPolicy:         corev1.PullIfNotPresent,
+				Profile:            ProfileLegacy,
 			},
 			havePod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1356,7 +1415,15 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
-			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile)
+			kflags := KeepFlags{
+				Labels:         tc.opts.KeepLabels,
+				Annotations:    tc.opts.KeepAnnotations,
+				Liveness:       tc.opts.KeepLiveness,
+				Readiness:      tc.opts.KeepReadiness,
+				Startup:        tc.opts.KeepStartup,
+				InitContainers: tc.opts.KeepInitContainers,
+			}
+			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
 			if err != nil {
 				t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
 			}
@@ -1739,7 +1806,15 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
-			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile)
+			kflags := KeepFlags{
+				Labels:         tc.opts.KeepLabels,
+				Annotations:    tc.opts.KeepAnnotations,
+				Liveness:       tc.opts.KeepLiveness,
+				Readiness:      tc.opts.KeepReadiness,
+				Startup:        tc.opts.KeepStartup,
+				InitContainers: tc.opts.KeepInitContainers,
+			}
+			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
 			if err != nil {
 				t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
 			}
@@ -2015,7 +2090,15 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.DebugCustomProfile}, t, func(t *testing.T) {
 				var err error
-				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile)
+				kflags := KeepFlags{
+					Labels:         tc.opts.KeepLabels,
+					Annotations:    tc.opts.KeepAnnotations,
+					Liveness:       tc.opts.KeepLiveness,
+					Readiness:      tc.opts.KeepReadiness,
+					Startup:        tc.opts.KeepStartup,
+					InitContainers: tc.opts.KeepInitContainers,
+				}
+				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
 				if err != nil {
 					t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
 				}
@@ -2215,7 +2298,15 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.DebugCustomProfile}, t, func(t *testing.T) {
 				var err error
-				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile)
+				kflags := KeepFlags{
+					Labels:         tc.opts.KeepLabels,
+					Annotations:    tc.opts.KeepAnnotations,
+					Liveness:       tc.opts.KeepLiveness,
+					Readiness:      tc.opts.KeepReadiness,
+					Startup:        tc.opts.KeepStartup,
+					InitContainers: tc.opts.KeepInitContainers,
+				}
+				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
 				if err != nil {
 					t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
 				}
@@ -2421,7 +2512,15 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.DebugCustomProfile}, t, func(t *testing.T) {
 				var err error
-				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile)
+				kflags := KeepFlags{
+					Labels:         tc.opts.KeepLabels,
+					Annotations:    tc.opts.KeepAnnotations,
+					Liveness:       tc.opts.KeepLiveness,
+					Readiness:      tc.opts.KeepReadiness,
+					Startup:        tc.opts.KeepStartup,
+					InitContainers: tc.opts.KeepInitContainers,
+				}
+				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
 				if err != nil {
 					t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
 				}
@@ -2486,94 +2585,101 @@ func TestCompleteAndValidate(t *testing.T) {
 			name: "Set image pull policy",
 			args: "--image=busybox --image-pull-policy=Always mypod",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Image:          "busybox",
-				Namespace:      "test",
-				PullPolicy:     corev1.PullPolicy("Always"),
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
+				Args:               []string{},
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				PullPolicy:         corev1.PullPolicy("Always"),
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
 			},
 		},
 		{
 			name: "Multiple targets",
 			args: "--image=busybox mypod1 mypod2",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Image:          "busybox",
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod1", "mypod2"},
+				Args:               []string{},
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod1", "mypod2"},
 			},
 		},
 		{
 			name: "Arguments with dash",
 			args: "--image=busybox mypod1 mypod2 -- echo 1 2",
 			wantOpts: &DebugOptions{
-				Args:           []string{"echo", "1", "2"},
-				Image:          "busybox",
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod1", "mypod2"},
+				Args:               []string{"echo", "1", "2"},
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod1", "mypod2"},
 			},
 		},
 		{
 			name: "Interactive no attach",
 			args: "-ti --image=busybox --attach=false mypod",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Attach:         false,
-				Image:          "busybox",
-				Interactive:    true,
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
-				TTY:            true,
+				Args:               []string{},
+				Attach:             false,
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Interactive:        true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
+				TTY:                true,
 			},
 		},
 		{
 			name: "Set environment variables",
 			args: "--image=busybox --env=FOO=BAR mypod",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Env:            []corev1.EnvVar{{Name: "FOO", Value: "BAR"}},
-				Image:          "busybox",
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
+				Args:               []string{},
+				Env:                []corev1.EnvVar{{Name: "FOO", Value: "BAR"}},
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
 			},
 		},
 		{
 			name: "Ephemeral container: interactive session minimal args",
 			args: "mypod -it --image=busybox",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Attach:         true,
-				Image:          "busybox",
-				Interactive:    true,
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
-				TTY:            true,
+				Args:               []string{},
+				Attach:             true,
+				Image:              "busybox",
+				Interactive:        true,
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
+				TTY:                true,
 			},
 		},
 		{
 			name: "Ephemeral container: non-interactive debugger with image and name",
 			args: "--image=myproj/debug-tools --image-pull-policy=Always -c debugger mypod",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Container:      "debugger",
-				Image:          "myproj/debug-tools",
-				Namespace:      "test",
-				PullPolicy:     corev1.PullPolicy("Always"),
-				Profile:        ProfileLegacy,
-				ShareProcesses: true,
-				TargetNames:    []string{"mypod"},
+				Args:               []string{},
+				Container:          "debugger",
+				Image:              "myproj/debug-tools",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				PullPolicy:         corev1.PullPolicy("Always"),
+				Profile:            ProfileLegacy,
+				ShareProcesses:     true,
+				TargetNames:        []string{"mypod"},
 			},
 		},
 		{
@@ -2605,67 +2711,72 @@ func TestCompleteAndValidate(t *testing.T) {
 			name: "Pod copy: interactive debug container minimal args",
 			args: "mypod -it --image=busybox --copy-to=my-debugger",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Attach:         true,
-				CopyTo:         "my-debugger",
-				Image:          "busybox",
-				Interactive:    true,
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
-				TTY:            true,
+				Args:               []string{},
+				Attach:             true,
+				CopyTo:             "my-debugger",
+				Image:              "busybox",
+				Interactive:        true,
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
+				TTY:                true,
 			},
 		},
 		{
 			name: "Pod copy: non-interactive with debug container, image name and command",
 			args: "mypod --image=busybox --container=my-container --copy-to=my-debugger -- sleep 1d",
 			wantOpts: &DebugOptions{
-				Args:           []string{"sleep", "1d"},
-				Container:      "my-container",
-				CopyTo:         "my-debugger",
-				Image:          "busybox",
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
+				Args:               []string{"sleep", "1d"},
+				Container:          "my-container",
+				CopyTo:             "my-debugger",
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
 			},
 		},
 		{
 			name: "Pod copy: explicit attach",
 			args: "mypod --image=busybox --copy-to=my-debugger --attach -- sleep 1d",
 			wantOpts: &DebugOptions{
-				Args:           []string{"sleep", "1d"},
-				Attach:         true,
-				CopyTo:         "my-debugger",
-				Image:          "busybox",
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
+				Args:               []string{"sleep", "1d"},
+				Attach:             true,
+				CopyTo:             "my-debugger",
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
 			},
 		},
 		{
 			name: "Pod copy: replace single image of existing container",
 			args: "mypod --image=busybox --container=my-container --copy-to=my-debugger",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Container:      "my-container",
-				CopyTo:         "my-debugger",
-				Image:          "busybox",
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
+				Args:               []string{},
+				Container:          "my-container",
+				CopyTo:             "my-debugger",
+				Image:              "busybox",
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
 			},
 		},
 		{
 			name: "Pod copy: mutate existing container images",
 			args: "mypod --set-image=*=busybox,app=app-debugger --copy-to=my-debugger",
 			wantOpts: &DebugOptions{
-				Args:      []string{},
-				CopyTo:    "my-debugger",
-				Namespace: "test",
+				Args:               []string{},
+				CopyTo:             "my-debugger",
+				KeepInitContainers: true,
+				Namespace:          "test",
 				SetImages: map[string]string{
 					"*":   "busybox",
 					"app": "app-debugger",
@@ -2679,12 +2790,13 @@ func TestCompleteAndValidate(t *testing.T) {
 			name: "Pod copy: add container and also mutate images",
 			args: "mypod -it --copy-to=my-debugger --image=debian --set-image=app=app:debug,sidecar=sidecar:debug",
 			wantOpts: &DebugOptions{
-				Args:        []string{},
-				Attach:      true,
-				CopyTo:      "my-debugger",
-				Image:       "debian",
-				Interactive: true,
-				Namespace:   "test",
+				Args:               []string{},
+				Attach:             true,
+				CopyTo:             "my-debugger",
+				Image:              "debian",
+				Interactive:        true,
+				KeepInitContainers: true,
+				Namespace:          "test",
 				SetImages: map[string]string{
 					"app":     "app:debug",
 					"sidecar": "sidecar:debug",
@@ -2699,16 +2811,39 @@ func TestCompleteAndValidate(t *testing.T) {
 			name: "Pod copy: change command",
 			args: "mypod -it --copy-to=my-debugger --container=mycontainer -- sh",
 			wantOpts: &DebugOptions{
-				Attach:         true,
-				Args:           []string{"sh"},
-				Container:      "mycontainer",
-				CopyTo:         "my-debugger",
-				Interactive:    true,
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"mypod"},
-				TTY:            true,
+				Attach:             true,
+				Args:               []string{"sh"},
+				Container:          "mycontainer",
+				CopyTo:             "my-debugger",
+				Interactive:        true,
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
+				TTY:                true,
+			},
+		},
+		{
+			name: "Pod copy: change keep options from defaults",
+			args: "mypod -it --image=busybox --copy-to=my-debugger --keep-labels=true --keep-annotations=true --keep-liveness=true --keep-readiness=true --keep-startup=true --keep-init-containers=false",
+			wantOpts: &DebugOptions{
+				Args:               []string{},
+				Attach:             true,
+				CopyTo:             "my-debugger",
+				Image:              "busybox",
+				Interactive:        true,
+				KeepLabels:         true,
+				KeepAnnotations:    true,
+				KeepLiveness:       true,
+				KeepReadiness:      true,
+				KeepStartup:        true,
+				KeepInitContainers: false,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"mypod"},
+				TTY:                true,
 			},
 		},
 		{
@@ -2740,15 +2875,16 @@ func TestCompleteAndValidate(t *testing.T) {
 			name: "Node: interactive session minimal args",
 			args: "node/mynode -it --image=busybox",
 			wantOpts: &DebugOptions{
-				Args:           []string{},
-				Attach:         true,
-				Image:          "busybox",
-				Interactive:    true,
-				Namespace:      "test",
-				ShareProcesses: true,
-				Profile:        ProfileLegacy,
-				TargetNames:    []string{"node/mynode"},
-				TTY:            true,
+				Args:               []string{},
+				Attach:             true,
+				Image:              "busybox",
+				Interactive:        true,
+				KeepInitContainers: true,
+				Namespace:          "test",
+				ShareProcesses:     true,
+				Profile:            ProfileLegacy,
+				TargetNames:        []string{"node/mynode"},
+				TTY:                true,
 			},
 		},
 		{
