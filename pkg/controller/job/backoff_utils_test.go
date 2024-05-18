@@ -355,6 +355,30 @@ func TestGetFinishedTime(t *testing.T) {
 			},
 			wantFinishTime: defaultTestTime,
 		},
+		// In this case, init container is stopped after the regular containers.
+		// This is because with the sidecar (restartable init) containers,
+		// sidecar containers will always finish later than regular containers.
+		"Pod with init container and all containers terminated": {
+			pod: v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{FinishedAt: metav1.NewTime(defaultTestTime.Add(-1 * time.Second))},
+							},
+						},
+					},
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{FinishedAt: metav1.NewTime(defaultTestTime)},
+							},
+						},
+					},
+				},
+			},
+			wantFinishTime: defaultTestTime,
+		},
 	}
 
 	for name, tc := range testCases {

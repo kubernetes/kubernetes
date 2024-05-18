@@ -183,12 +183,18 @@ func getFinishedTime(p *v1.Pod) time.Time {
 }
 
 func getFinishTimeFromContainers(p *v1.Pod) *time.Time {
-	var finishTime *time.Time
-	for _, containerState := range p.Status.ContainerStatuses {
-		if containerState.State.Terminated == nil {
-			return nil
-		}
-		if containerState.State.Terminated.FinishedAt.Time.IsZero() {
+	finishTime := latestFinishTime(nil, p.Status.ContainerStatuses)
+	// We need to check InitContainerStatuses here also,
+	// because with the sidecar (restartable init) containers,
+	// sidecar containers will always finish later than regular containers.
+	return latestFinishTime(finishTime, p.Status.InitContainerStatuses)
+}
+
+func latestFinishTime(prevFinishTime *time.Time, cs []v1.ContainerStatus) *time.Time {
+	var finishTime = prevFinishTime
+	for _, containerState := range cs {
+		if containerState.State.Terminated == nil ||
+			containerState.State.Terminated.FinishedAt.Time.IsZero() {
 			return nil
 		}
 		if finishTime == nil || finishTime.Before(containerState.State.Terminated.FinishedAt.Time) {
