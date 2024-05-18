@@ -27,7 +27,7 @@ spec:
       serviceAccountName: kube-network-policies
       containers:
       - name: kube-network-policies
-        image: registry.k8s.io/networking/kube-network-policies:v0.2.0
+        image: gcr.io/k8s-staging-networking/kube-network-policies:v20240518-081163b
         command:
         - /bin/sh
         - -c
