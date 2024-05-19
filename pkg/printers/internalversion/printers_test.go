@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var containerRestartPolicyAlways = api.ContainerRestartPolicyAlways
@@ -1716,6 +1718,32 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			// Test pod has container statuses for non-existent initContainers and containers
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test4"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{Name: "init1", Image: "initimage"},
+						{Name: "sidecar1", Image: "sidecarimage", RestartPolicy: ptr.To(api.ContainerRestartPolicyAlways)},
+					},
+					Containers: []api.Container{{Name: "container1", Image: "containerimage"}},
+				},
+				Status: api.PodStatus{
+					Phase: "Running",
+					InitContainerStatuses: []api.ContainerStatus{
+						{Name: "initinvalid"},
+						{Name: "init1"},
+						{Name: "sidecar1"},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{Name: "containerinvalid"},
+						{Name: "container1"},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test4", "0/2", "Init:0/2", "0", "<unknown>"}}},
 		},
 	}
 
