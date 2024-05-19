@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -1245,15 +1247,19 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 				// when we receive a running pod, we don't need status at all because we are
 				// guaranteed to be terminating and we skip updates to the pod
 			default:
-				// wait until we see the next refresh from the PLEG via the cache (max 2s)
-				// TODO: this adds ~1s of latency on all transitions from sync to terminating
-				//  to terminated, and on all termination retries (including evictions). We should
-				//  improve latency by making the pleg continuous and by allowing pod status
-				//  changes to be refreshed when key events happen (killPod, sync->terminating).
-				//  Improving this latency also reduces the possibility that a terminated
-				//  container's status is garbage collected before we have a chance to update the
-				//  API server (thus losing the exit code).
-				status, err = p.podCache.GetNewerThan(update.Options.Pod.UID, lastSyncTime)
+				if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+					status, err = p.podCache.Get(update.Options.Pod.UID)
+				} else {
+					// wait until we see the next refresh from the PLEG via the cache (max 2s)
+					// TODO: this adds ~1s of latency on all transitions from sync to terminating
+					//  to terminated, and on all termination retries (including evictions). We should
+					//  improve latency by making the pleg continuous and by allowing pod status
+					//  changes to be refreshed when key events happen (killPod, sync->terminating).
+					//  Improving this latency also reduces the possibility that a terminated
+					//  container's status is garbage collected before we have a chance to update the
+					//  API server (thus losing the exit code).
+					status, err = p.podCache.GetNewerThan(update.Options.Pod.UID, lastSyncTime)
+				}
 
 				if err != nil {
 					// This is the legacy event thrown by manage pod loop all other events are now dispatched
