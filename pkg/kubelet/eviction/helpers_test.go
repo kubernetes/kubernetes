@@ -3299,6 +3299,13 @@ func newContainer(name string, requests v1.ResourceList, limits v1.ResourceList)
 	}
 }
 
+func newRestartableInitContainer(name string, requests v1.ResourceList, limits v1.ResourceList) v1.Container {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	container := newContainer(name, requests, limits)
+	container.RestartPolicy = &restartAlways
+	return container
+}
+
 func newVolume(name string, volumeSource v1.VolumeSource) v1.Volume {
 	return v1.Volume{
 		Name:         name,
@@ -3319,6 +3326,12 @@ func newPod(name string, priority int32, containers []v1.Container, volumes []v1
 			Priority:   &priority,
 		},
 	}
+}
+
+func newPodWithInitContainers(name string, priority int32, initContainers []v1.Container, containers []v1.Container, volumes []v1.Volume) *v1.Pod {
+	pod := newPod(name, priority, containers, volumes)
+	pod.Spec.InitContainers = initContainers
+	return pod
 }
 
 // nodeConditionList is a simple alias to support equality checking independent of order
@@ -3445,6 +3458,263 @@ func TestStatsNotFoundForPod(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			assert.Equal(t, 0, test.compFunc(statsFn)(pod1, pod2), "unexpected default result")
+		})
+	}
+}
+
+func TestEvictionMessage(t *testing.T) {
+	type containerMemoryStat struct {
+		name  string
+		usage string
+	}
+	type memoryExceededContainer struct {
+		name    string
+		request string
+		usage   string
+	}
+	memoryExceededEvictionMessage := func(containers []memoryExceededContainer) string {
+		resourceToReclaim := v1.ResourceMemory
+		msg := fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim)
+		for _, container := range containers {
+			msg += fmt.Sprintf(containerMessageFmt, container.name, container.usage, container.request, resourceToReclaim)
+		}
+		return msg
+	}
+
+	const (
+		init1            = "init1"
+		init2            = "init2"
+		init3            = "init3"
+		restartableInit1 = "restartable-init1"
+		restartableInit2 = "restartable-init2"
+		restartableInit3 = "restartable-init3"
+		regular1         = "regular1"
+		regular2         = "regular2"
+		regular3         = "regular3"
+		ephemeral1       = "ephemeral1"
+	)
+
+	testcase := []struct {
+		name                     string
+		initContainers           []v1.Container
+		containers               []v1.Container
+		ephemeralContainers      []v1.EphemeralContainer
+		containerMemoryStats     []containerMemoryStat
+		expectedContainerMessage string
+		expectedAnnotations      map[string]string
+	}{
+		{
+			name: "No container exceeds memory usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			// Terminated init containers aren't included in the containerMemoryStats
+			containerMemoryStats: []containerMemoryStat{
+				{name: restartableInit1, usage: "150Mi"},
+				{name: regular1, usage: "100Mi"},
+			},
+			expectedContainerMessage: memoryExceededEvictionMessage(nil),
+		},
+		{
+			name: "Init container exceeds memory usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(init2, newResourceList("", "150Mi", ""), newResourceList("", "", "")),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			// An eviction occurred while the init container was running
+			containerMemoryStats: []containerMemoryStat{
+				{name: init1, usage: "150Mi"},
+			},
+			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+				{name: init1, request: "100Mi", usage: "150Mi"},
+			}),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      init1,
+				OffendingContainersUsageKey: "150Mi",
+			},
+		},
+		{
+			name: "Restartable init container exceeds memory usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			// Terminated init containers aren't included in the containerMemoryStats
+			containerMemoryStats: []containerMemoryStat{
+				{name: restartableInit1, usage: "250Mi"},
+				{name: restartableInit2, usage: "150Mi"},
+				{name: regular1, usage: "200Mi"},
+			},
+			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+				{name: restartableInit1, request: "200Mi", usage: "250Mi"},
+			}),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      restartableInit1,
+				OffendingContainersUsageKey: "250Mi",
+			},
+		},
+		{
+			name: "Regular container exceeds memory usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(regular2, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
+			},
+			// Terminated init containers aren't included in the containerMemoryStats
+			containerMemoryStats: []containerMemoryStat{
+				{name: restartableInit1, usage: "200Mi"},
+				{name: regular1, usage: "250Mi"},
+				{name: regular2, usage: "250Mi"},
+			},
+			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+				{name: regular1, request: "200Mi", usage: "250Mi"},
+			}),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      regular1,
+				OffendingContainersUsageKey: "250Mi",
+			},
+		},
+		{
+			name: "Ephemeral container exceeds memory usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+			},
+			ephemeralContainers: []v1.EphemeralContainer{
+				{TargetContainerName: regular1, EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: ephemeral1}},
+			},
+			// Terminated init containers aren't included in the containerMemoryStats
+			containerMemoryStats: []containerMemoryStat{
+				{name: restartableInit1, usage: "200Mi"},
+				{name: regular1, usage: "150Mi"},
+				{name: ephemeral1, usage: "250Mi"},
+			},
+			expectedContainerMessage: memoryExceededEvictionMessage(nil),
+		},
+		{
+			name: "Both regular and restartable init containers exceed memory usage due to missing memory requests",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
+			},
+			containers: []v1.Container{
+				newContainer("regular1", newResourceList("", "", ""), newResourceList("", "", "")),
+			},
+			// Terminated init containers aren't included in the containerMemoryStats
+			containerMemoryStats: []containerMemoryStat{
+				{name: restartableInit1, usage: "250Mi"},
+				{name: restartableInit2, usage: "250Mi"},
+				{name: regular1, usage: "200Mi"},
+			},
+			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+				{name: restartableInit1, request: "0", usage: "250Mi"},
+				{name: regular1, request: "0", usage: "200Mi"},
+			}),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      strings.Join([]string{restartableInit1, regular1}, ","),
+				OffendingContainersUsageKey: "250Mi,200Mi",
+			},
+		},
+		{
+			name: "Multiple regular and restartable init containers exceed memory usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newContainer(init2, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newContainer(init3, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newRestartableInitContainer(restartableInit3, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
+				newContainer(regular2, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(regular3, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+			},
+			// Terminated init containers aren't included in the containerMemoryStats
+			containerMemoryStats: []containerMemoryStat{
+				{name: restartableInit1, usage: "150Mi"},
+				{name: restartableInit2, usage: "250Mi"},
+				{name: restartableInit3, usage: "250Mi"},
+				{name: regular1, usage: "50Mi"},
+				{name: regular2, usage: "250Mi"},
+				{name: regular3, usage: "400Mi"},
+			},
+			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+				{name: restartableInit1, request: "100Mi", usage: "150Mi"},
+				{name: restartableInit2, request: "200Mi", usage: "250Mi"},
+				{name: regular2, request: "200Mi", usage: "250Mi"},
+				{name: regular3, request: "100Mi", usage: "400Mi"},
+			}),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      strings.Join([]string{restartableInit1, restartableInit2, regular2, regular3}, ","),
+				OffendingContainersUsageKey: "150Mi,250Mi,250Mi,400Mi",
+			},
+		},
+	}
+
+	threshold := []evictionapi.Threshold{}
+	observations := signalObservations{}
+	for _, tc := range testcase {
+		pod := newPodWithInitContainers("pod", 1, tc.initContainers, tc.containers, nil)
+		if len(tc.ephemeralContainers) > 0 {
+			pod.Spec.EphemeralContainers = tc.ephemeralContainers
+		}
+		// Create PodMemoryStats with dummy container memory
+		// and override container stats with the provided values.
+		dummyContainerMemory := resource.MustParse("1Mi")
+		podStats := newPodMemoryStats(pod, dummyContainerMemory)
+		podStats.Containers = make([]statsapi.ContainerStats, len(tc.containerMemoryStats))
+		for _, stat := range tc.containerMemoryStats {
+			memoryStat := resource.MustParse(stat.usage)
+			memoryBytes := uint64(memoryStat.Value())
+			podStats.Containers = append(podStats.Containers, statsapi.ContainerStats{
+				Name: stat.name,
+				Memory: &statsapi.MemoryStats{
+					WorkingSetBytes: &memoryBytes,
+				},
+			})
+		}
+		stats := map[*v1.Pod]statsapi.PodStats{
+			pod: podStats,
+		}
+		statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+			result, found := stats[pod]
+			return result, found
+		}
+
+		t.Run(tc.name, func(t *testing.T) {
+			msg, annotations := evictionMessage(v1.ResourceMemory, pod, statsFn, threshold, observations)
+			if msg != tc.expectedContainerMessage {
+				t.Errorf("Unexpected memory exceeded eviction message found, got: %s, want : %s", msg, tc.expectedContainerMessage)
+			}
+			for _, key := range []string{OffendingContainersKey, OffendingContainersUsageKey} {
+				val, ok := annotations[key]
+				if !ok {
+					t.Errorf("Expected annotation %s not found", key)
+				}
+				if val != tc.expectedAnnotations[key] {
+					t.Errorf("Unexpected annotation value for %s key found, got: %s, want: %s", key, val, tc.expectedAnnotations[key])
+				}
+			}
 		})
 	}
 }
