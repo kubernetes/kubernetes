@@ -685,7 +685,6 @@ function kube::codegen::gen_registers() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local v="${KUBE_VERBOSE:-0}"
-    local extra_peers=()
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
