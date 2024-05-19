@@ -117,9 +117,7 @@ var args = []string{
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
 	"--volume-host-cidr-denylist=127.0.0.1/28,feed::/16",
 	"--volume-host-allow-local-loopback=false",
-	"--horizontal-pod-autoscaler-downscale-delay=2m",
 	"--horizontal-pod-autoscaler-sync-period=45s",
-	"--horizontal-pod-autoscaler-upscale-delay=1m",
 	"--horizontal-pod-autoscaler-downscale-stabilization=3m",
 	"--horizontal-pod-autoscaler-cpu-initialization-period=90s",
 	"--horizontal-pod-autoscaler-initial-readiness-delay=50s",
@@ -316,8 +314,6 @@ func TestAddFlags(t *testing.T) {
 			&poautosclerconfig.HPAControllerConfiguration{
 				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
-				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
-				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
 				HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
@@ -579,8 +575,6 @@ func TestApplyTo(t *testing.T) {
 			HPAController: poautosclerconfig.HPAControllerConfiguration{
 				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
-				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
-				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
 				HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
@@ -1045,8 +1039,6 @@ func TestValidateControllersOptions(t *testing.T) {
 				&poautosclerconfig.HPAControllerConfiguration{
 					ConcurrentHorizontalPodAutoscalerSyncs:              0,
 					HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
-					HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
-					HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
 					HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
 					HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 					HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},

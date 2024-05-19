@@ -328,13 +328,9 @@ type HPAControllerConfiguration struct {
 	// HorizontalPodAutoscalerSyncPeriod is the period for syncing the number of
 	// pods in horizontal pod autoscaler.
 	HorizontalPodAutoscalerSyncPeriod metav1.Duration
-	// HorizontalPodAutoscalerUpscaleForbiddenWindow is a period after which next upscale allowed.
-	HorizontalPodAutoscalerUpscaleForbiddenWindow metav1.Duration
 	// HorizontalPodAutoscalerDowncaleStabilizationWindow is a period for which autoscaler will look
 	// backwards and not scale down below any recommendation it made during that period.
 	HorizontalPodAutoscalerDownscaleStabilizationWindow metav1.Duration
-	// HorizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.
-	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
 	// HorizontalPodAutoscalerTolerance is the tolerance for when
 	// resource usage suggests upscaling/downscaling
 	HorizontalPodAutoscalerTolerance float64

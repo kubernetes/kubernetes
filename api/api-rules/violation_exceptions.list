@@ -179,12 +179,10 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,G
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,GroupResource,Resource
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,ConcurrentHorizontalPodAutoscalerSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerCPUInitializationPeriod
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleForbiddenWindow
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleStabilizationWindow
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerInitialReadinessDelay
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUpscaleForbiddenWindow
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,AttachDetachController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController
