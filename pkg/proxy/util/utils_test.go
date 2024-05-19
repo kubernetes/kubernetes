@@ -21,9 +21,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	netutils "k8s.io/utils/net"
 )
 
@@ -700,6 +703,61 @@ func TestIsZeroCIDR(t *testing.T) {
 			if got := IsZeroCIDR(tc.input); tc.expected != got {
 				t.Errorf("IsZeroCIDR() = %t, want %t", got, tc.expected)
 			}
+		})
+	}
+}
+
+func TestFilterInterfaceAddrsByCIDRs(t *testing.T) {
+	networkInterfacer := proxyutiltest.NewFakeNetwork()
+	var itf net.Interface
+	var addrs []net.Addr
+	itf = net.Interface{Index: 0, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
+	addrs = []net.Addr{
+		&net.IPNet{IP: netutils.ParseIPSloppy("10.10.10.10"), Mask: net.CIDRMask(24, 32)},
+		&net.IPNet{IP: netutils.ParseIPSloppy("2001:db8::1"), Mask: net.CIDRMask(64, 128)},
+	}
+	networkInterfacer.AddInterfaceAddr(&itf, addrs)
+
+	itf = net.Interface{Index: 0, MTU: 0, Name: "eth2", HardwareAddr: nil, Flags: 0}
+	addrs = []net.Addr{
+		&net.IPNet{IP: netutils.ParseIPSloppy("192.168.0.2"), Mask: net.CIDRMask(24, 32)},
+		&net.IPNet{IP: netutils.ParseIPSloppy("fd00:4321::2"), Mask: net.CIDRMask(64, 128)},
+	}
+	networkInterfacer.AddInterfaceAddr(&itf, addrs)
+
+	testCases := []struct {
+		name        string
+		cidrStrings []string
+		expected    []string
+	}{
+		{
+			name:        "ipv4",
+			cidrStrings: []string{"192.168.0.0/24"},
+			expected:    []string{"192.168.0.2"},
+		},
+		{
+			name:        "ipv6",
+			cidrStrings: []string{"fd00:4321::/64"},
+			expected:    []string{"fd00:4321::2"},
+		},
+		{
+			name:        "dual stack",
+			cidrStrings: []string{"10.10.0.0/16", "2001:db8::/64"},
+			expected:    []string{"10.10.10.10", "2001:db8::1"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cidrs, err := netutils.ParseCIDRs(tc.cidrStrings)
+			require.NoError(t, err)
+
+			ips, err := FilterInterfaceAddrsByCIDRs(networkInterfacer, cidrs)
+			require.NoError(t, err)
+			var expected []net.IP
+			for i := range tc.expected {
+				expected = append(expected, netutils.ParseIPSloppy(tc.expected[i]))
+			}
+			require.Equal(t, expected, ips)
 		})
 	}
 }

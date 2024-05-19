@@ -241,3 +241,49 @@ func IsVIPMode(ing v1.LoadBalancerIngress) bool {
 	}
 	return *ing.IPMode == v1.LoadBalancerIPModeVIP
 }
+
+// FilterInterfaceAddrsByCIDRs filters the IP addresses of the provided NetworkInterfacer,
+// returning only those that belong to any of the CIDRs specified in the given list.
+func FilterInterfaceAddrsByCIDRs(nw NetworkInterfacer, cidrs []*net.IPNet) ([]net.IP, error) {
+	addrs, err := nw.InterfaceAddrs()
+	if err != nil {
+		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %w", err)
+	}
+
+	// Use a map to dedup matches
+	addresses := make(map[string]net.IP)
+	for _, cidr := range cidrs {
+		for _, addr := range addrs {
+			var ip net.IP
+			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
+			switch v := addr.(type) {
+			case *net.IPAddr:
+				ip = v.IP
+			case *net.IPNet:
+				ip = v.IP
+			default:
+				continue
+			}
+
+			if cidr.Contains(ip) {
+				addresses[ip.String()] = ip
+			}
+		}
+	}
+
+	ips := make([]net.IP, 0, len(addresses))
+	for _, ip := range addresses {
+		ips = append(ips, ip)
+	}
+
+	return ips, nil
+}
+
+// FilterInterfaceAddrsByCIDRStrings is a wrapper around FilterInterfaceAddrsByCIDRs which accepts CIDRs as list of strings.
+func FilterInterfaceAddrsByCIDRStrings(nw NetworkInterfacer, cidrStrings []string) ([]net.IP, error) {
+	cidrs, err := netutils.ParseCIDRs(cidrStrings)
+	if err != nil {
+		return nil, err
+	}
+	return FilterInterfaceAddrsByCIDRs(nw, cidrs)
+}
