@@ -830,6 +830,12 @@ const (
 	// Enables user namespace support for stateless pods.
 	UserNamespacesSupport featuregate.Feature = "UserNamespacesSupport"
 
+	// owner: @olderTaoist
+	// alpha: v1.30
+	//
+	// Enables validate unique toleration in pod template.
+	UniqueToleration featuregate.Feature = "UniqueToleration"
+
 	// owner: @mattcarry, @sunnylovestiramisu
 	// kep: https://kep.k8s.io/3751
 	// alpha: v1.29
@@ -1164,6 +1170,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	VolumeCapacityPriority: {Default: false, PreRelease: featuregate.Alpha},
 
+	UniqueToleration:      {Default: false, PreRelease: featuregate.Alpha},
 	UserNamespacesSupport: {Default: false, PreRelease: featuregate.Beta},
 
 	WinDSR: {Default: false, PreRelease: featuregate.Alpha},

@@ -10658,6 +10658,15 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
+		"pod tolerations with same key、operator、value、effect": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-forgiveness-invalid",
+				Namespace: "ns",
+			},
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{
+				{Key: "foo", Operator: "Equal", Effect: "NoExecute", Value: "bar1"},
+				{Key: "foo", Operator: "Equal", Effect: "NoExecute", Value: "bar1"}}),
+		},
 		"runtime default seccomp profile": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
@@ -12374,6 +12383,18 @@ func TestValidatePod(t *testing.T) {
 				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 			},
 		},
+		"pod tolerations must be unique with key and effect": {
+			expectedError: `spec.tolerations[1]: Duplicate value: core.Toleration{Key:"foo", Operator:"Exists", Value:"", Effect:"NoSchedule", TolerationSeconds:(*int64)(nil)}: tolerations must be unique by key、operator、value、effect`,
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-forgiveness-invalid",
+					Namespace: "ns",
+				},
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{
+					{Key: "foo", Operator: "Exists", Effect: "NoSchedule"},
+					{Key: "foo", Operator: "Exists", Effect: "NoSchedule"}}),
+			},
+		},
 		"must be a valid pod seccomp profile": {
 			expectedError: "must be a valid seccomp profile",
 			spec: core.Pod{
@@ -13162,6 +13183,7 @@ func TestValidatePod(t *testing.T) {
 	}
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UniqueToleration, true)
 			if errs := ValidatePodCreate(&v.spec, PodValidationOptions{}); len(errs) == 0 {
 				t.Errorf("expected failure")
 			} else if v.expectedError == "" {
@@ -13226,6 +13248,7 @@ func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
 
 func TestValidatePodUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UniqueToleration, true)
 	var (
 		activeDeadlineSecondsZero     = int64(0)
 		activeDeadlineSecondsNegative = int64(-30)
@@ -14336,6 +14359,28 @@ func TestValidatePodUpdate(t *testing.T) {
 					NodeName: "node1", Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				}},
 			err:  "spec.tolerations[1].effect",
+			test: "added invalid new toleration to existing tolerations in pod spec updates",
+		}, {
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{
+					NodeName: "node1",
+					Tolerations: []core.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute"},
+					},
+				}},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+					Tolerations: []core.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule"},
+					},
+				}},
+			err:  `spec.tolerations[1]: Duplicate value: core.Toleration{Key:"key1", Operator:"Equal", Value:"value1", Effect:"NoExecute", TolerationSeconds:(*int64)(nil)}: tolerations must be unique by key、operator、value、effect`,
 			test: "added invalid new toleration to existing tolerations in pod spec updates",
 		}, {
 			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},

@@ -3938,6 +3938,8 @@ func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) fiel
 // ValidateTolerations tests if given tolerations have valid data.
 func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
+
+	uniqueTaints := map[string]bool{}
 	for i, toleration := range tolerations {
 		idxPath := fldPath.Index(i)
 		// validate the toleration key
@@ -3976,6 +3978,18 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) fie
 		if len(toleration.Effect) > 0 {
 			allErrors = append(allErrors, validateTaintEffect(&toleration.Effect, true, idxPath.Child("effect"))...)
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.UniqueToleration) {
+			// validate if taint is unique by <key, operator, value, effect>
+			uniqueKey := fmt.Sprintf("%s%s%s%s", toleration.Key, toleration.Operator, toleration.Value, toleration.Effect)
+			if uniqueTaints[uniqueKey] {
+				duplicatedError := field.Duplicate(idxPath, toleration)
+				duplicatedError.Detail = "tolerations must be unique by key、operator、value、effect"
+				allErrors = append(allErrors, duplicatedError)
+				continue
+			}
+			uniqueTaints[uniqueKey] = true
+		}
+
 	}
 	return allErrors
 }
