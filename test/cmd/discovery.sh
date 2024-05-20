@@ -412,7 +412,7 @@ run_explain_crd_with_additional_properties_tests() {
   set -o nounset
   set -o errexit
 
-  # create_and_use_new_namespace
+  create_and_use_new_namespace
   kube::log::status "Testing explain with custom CRD that uses additionalProperties as non boolean field"
 
   output_message=$(kubectl apply -f hack/testdata/CRD/example-crd-with-additionalfields.yaml)
@@ -420,7 +420,7 @@ run_explain_crd_with_additional_properties_tests() {
 
   kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"mock-resources.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'mock-resources.test.com:'
 
-  # For some reason without this explain fails with message no resource found.
+  # Wait for 1 second before using explain
   sleep 1
 
   output_message=$(kubectl explain mock-resource)
