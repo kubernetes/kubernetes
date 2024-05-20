@@ -22,8 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// validateStructuralCompleteness checks that every specified field or array in s is also specified
-// outside of value validation.
+// validateStructuralCompleteness checks that all value validations in s have
+// a structural counterpart so that every value validation applies to a value
+// with a known schema:
+// - validations for specific properties must have that property (or additionalProperties under an option) structurally defined
+// - additionalProperties validations must have additionalProperties defined in the structural portion of the schema corresponding to that node
+// - Items validations must have also have a corresponding items structurally
+//
+// The "structural" portion of the schema refers to all nodes in the
+// schema traversible without following any NestedValueValidations.
 func validateStructuralCompleteness(s *Structural, fldPath *field.Path, opts ValidationOptions) field.ErrorList {
 	if s == nil {
 		return nil
@@ -69,17 +76,22 @@ func validateNestedValueValidationCompleteness(v *NestedValueValidation, s *Stru
 	allErrs = append(allErrs, validateValueValidationCompleteness(&v.ValueValidation, s, sPath, vPath, opts)...)
 	allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.Items, s.Items, sPath.Child("items"), vPath.Child("items"), opts)...)
 
-	var additionalPropertiesSchema *Structural
-	if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
-		additionalPropertiesSchema = s.AdditionalProperties.Structural
+	var sAdditionalPropertiesSchema *Structural
+	if s.AdditionalProperties != nil {
+		sAdditionalPropertiesSchema = s.AdditionalProperties.Structural
 	}
 
 	for k, vFld := range v.Properties {
 		if sFld, ok := s.Properties[k]; !ok {
-			if additionalPropertiesSchema == nil || !opts.AllowValidationPropertiesWithAdditionalProperties {
+			if sAdditionalPropertiesSchema == nil || !opts.AllowValidationPropertiesWithAdditionalProperties {
 				allErrs = append(allErrs, field.Required(sPath.Child("properties").Key(k), fmt.Sprintf("because it is defined in %s", vPath.Child("properties").Key(k))))
 			} else {
-				allErrs = append(allErrs, validateNestedValueValidationCompleteness(&vFld, additionalPropertiesSchema, sPath.Child("additionalProperties"), vPath.Child("properties").Key(k), opts)...)
+				// Allow validations on specific properties if there exists an
+				// additionalProperties structural schema specified instead of
+				// direct properties
+				// NOTE: This does not allow `additionalProperties: true` structural
+				// schema to be combined with specific property validations.
+				allErrs = append(allErrs, validateNestedValueValidationCompleteness(&vFld, sAdditionalPropertiesSchema, sPath.Child("additionalProperties"), vPath.Child("properties").Key(k), opts)...)
 			}
 		} else {
 			allErrs = append(allErrs, validateNestedValueValidationCompleteness(&vFld, &sFld, sPath.Child("properties").Key(k), vPath.Child("properties").Key(k), opts)...)

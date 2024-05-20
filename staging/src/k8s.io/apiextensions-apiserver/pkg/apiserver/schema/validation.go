@@ -78,7 +78,7 @@ type ValidationOptions struct {
 // * additionalProperties at the root is not allowed.
 func ValidateStructural(fldPath *field.Path, s *Structural) field.ErrorList {
 	return ValidateStructuralWithOptions(fldPath, s, ValidationOptions{
-		// This widens the schema for CRDs, so first few releases will still
+		// This would widen the schema for CRD if set to true, so first few releases will still
 		// not admit any. But it can still be used by libraries and
 		// declarative validation for native types
 		AllowNestedAdditionalProperties:                   false,

@@ -93,7 +93,6 @@ func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64
 // exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit from k8s.io/apiserver/pkg/apis/cel/config.go as input.
 func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot bool, declType *cel.DeclType, perCallLimit uint64) *Validator {
-
 	compilationSchema := *nodeSchema
 	compilationSchema.XValidations = validationSchema.XValidations
 	compiledRules, err := Compile(&compilationSchema, declType, perCallLimit, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true), StoredExpressionsEnvLoader())
@@ -291,7 +290,6 @@ func nestedToStructural(nested *schema.NestedValueValidation) *schema.Structural
 	}
 
 	return structuralConversion
-
 }
 
 func (s *Validator) validate(ctx context.Context, fldPath *field.Path, obj, oldObj interface{}, correlation ratchetingOptions, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
