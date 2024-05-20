@@ -168,18 +168,22 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		if svc.Name == "kubernetes" {
 			continue
 		}
+
+		if err := client1.CoreV1().Services(svc.Namespace).Delete(context.Background(), svc.Name, metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("got unexpected error: %v", err)
+		}
+		t.Logf("Deleted Service with IP %s", svc.Spec.ClusterIP)
+
 		// wipe the necessary fields so we can recreate the Service
 		svc.ResourceVersion = ""
 		svc.Spec.ClusterIP = ""
 		svc.Spec.ClusterIPs = nil
 		svc.Status = v1.ServiceStatus{}
-		if err := client1.CoreV1().Services(svc.Namespace).Delete(context.Background(), svc.Name, metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("got unexpected error: %v", err)
-		}
 		svc, err := client1.CoreV1().Services(svc.Namespace).Create(context.Background(), &svc, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("got unexpected error: %v", err)
 		}
+		t.Logf("Created Service with IP %s", svc.Spec.ClusterIP)
 		if !cidrContainsIP(cidr2, svc.Spec.ClusterIP) {
 			t.Fatalf("Service expected to have an ip in range 10.168.0.0/24, got %s", svc.Spec.ClusterIP)
 		}
@@ -233,19 +237,23 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		}
 
 		if len(cidr.Spec.CIDRs) == 0 {
+			t.Logf("No CIDR available")
 			return false, nil
 		}
 
 		if cidr.Spec.CIDRs[0] != cidr2 {
+			t.Logf("CIDR expected %s got %s", cidr2, cidr.Spec.CIDRs[0])
 			return false, nil
 		}
 
 		if len(cidr.Finalizers) == 0 {
+			t.Logf("Expected finalizer to be set")
 			return false, nil
 		}
 
 		for _, condition := range cidr.Status.Conditions {
 			if condition.Type == networkingv1alpha1.ServiceCIDRConditionReady {
+				t.Logf("Expected Condition %s to be %s", condition.Status, metav1.ConditionTrue)
 				return condition.Status == metav1.ConditionTrue, nil
 			}
 		}
