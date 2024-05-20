@@ -393,20 +393,6 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
-			// Shows that the typeguess template works with boolean additionalProperties
-			Name:        "True additionalProperties",
-			Subtemplate: "typeGuess",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":                 "string",
-					"additionalProperties": true,
-				},
-			},
-			Checks: []check{
-				checkEquals("string"),
-			},
-		},
-		{
 			// Show that a ref to a primitive type uses the referred type's type
 			Name:        "PrimitiveRef",
 			Subtemplate: "typeGuess",

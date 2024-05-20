@@ -1,0 +1,61 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mock-resources.test.com
+spec:
+  group: test.com
+  scope: Namespaced
+  names:
+    plural: mock-resources
+    singular: mock-resource
+    kind: MockResource
+    listKind: MockResources
+  versions:
+    - name: v1
+      storage: true
+      served: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            status:
+              type: object
+              properties:
+                statuses:
+                  type: object
+                  properties:
+                    status1:
+                      type: string
+                    status2:
+                      type: string
+                podStatuses:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                otherStatuses:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                customConditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      lastTransitionTime:
+                        type: string
+                      lastUpdateTime:
+                        type: string
+                otherCustomConditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      lastTransitionTime:
+                        type: string
+                      lastUpdateTime:
+                        type: string
+              additionalProperties: true
