@@ -23,17 +23,21 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
 func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
+	stats = append(stats, sp.getSystemPhysicalMemoryStats())
 	return stats
 }
 
 func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
+	stats = append(stats, sp.getSystemPhysicalMemoryStats())
 	return stats
 }
 
@@ -95,4 +99,26 @@ func (sp *summaryProviderImpl) getSystemPodsCPUAndMemoryStats(nodeConfig cm.Node
 	}
 
 	return podsSummary
+}
+
+func (sp *summaryProviderImpl) getSystemPhysicalMemoryStats() statsapi.ContainerStats {
+	now := metav1.NewTime(time.Now())
+	physicalMemorySummary := statsapi.ContainerStats{
+		StartTime: now,
+		Memory:    &statsapi.MemoryStats{},
+		Name:      statsapi.SystemContainerPhysicalMemory,
+	}
+
+	availablePhysMem, totalPhysMem, err := winstats.GetAvailableAndTotalPhysicalMemory()
+	if err != nil {
+		klog.Errorf("Failed to get physical memory stats: %v", err)
+		return physicalMemorySummary
+	}
+
+	usagePhysMem := totalPhysMem - availablePhysMem
+	physicalMemorySummary.Memory.Time = now
+	physicalMemorySummary.Memory.AvailableBytes = &availablePhysMem
+	physicalMemorySummary.Memory.UsageBytes = &usagePhysMem
+
+	return physicalMemorySummary
 }
