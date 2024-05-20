@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/netip"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,9 +40,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/api/servicecidr"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/iptree"
 	"k8s.io/utils/clock"
 	netutils "k8s.io/utils/net"
 )
@@ -100,13 +98,9 @@ type RepairIPAddress struct {
 	ipAddressLister networkinglisters.IPAddressLister
 	ipAddressSynced cache.InformerSynced
 
-	cidrQueue        workqueue.TypedRateLimitingInterface[string]
 	svcQueue         workqueue.TypedRateLimitingInterface[string]
 	ipQueue          workqueue.TypedRateLimitingInterface[string]
 	workerLoopPeriod time.Duration
-
-	muTree sync.Mutex
-	tree   *iptree.Tree[string]
 
 	broadcaster events.EventBroadcaster
 	recorder    events.EventRecorder
@@ -132,10 +126,6 @@ func NewRepairIPAddress(interval time.Duration,
 		serviceCIDRSynced: serviceCIDRInformer.Informer().HasSynced,
 		ipAddressLister:   ipAddressInformer.Lister(),
 		ipAddressSynced:   ipAddressInformer.Informer().HasSynced,
-		cidrQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "servicecidrs"},
-		),
 		svcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "services"},
@@ -144,7 +134,6 @@ func NewRepairIPAddress(interval time.Duration,
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ipaddresses"},
 		),
-		tree:             iptree.New[string](),
 		workerLoopPeriod: time.Second,
 		broadcaster:      eventBroadcaster,
 		recorder:         recorder,
@@ -174,29 +163,6 @@ func NewRepairIPAddress(interval time.Duration,
 		},
 	}, interval)
 
-	_, _ = serviceCIDRInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				r.cidrQueue.Add(key)
-			}
-		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err == nil {
-				r.cidrQueue.Add(key)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			// IndexerInformer uses a delta queue, therefore for deletes we have to use this
-			// key function.
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				r.cidrQueue.Add(key)
-			}
-		},
-	})
-
 	ipAddressInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -225,7 +191,6 @@ func NewRepairIPAddress(interval time.Duration,
 
 // RunUntil starts the controller until the provided ch is closed.
 func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
-	defer r.cidrQueue.ShutDown()
 	defer r.ipQueue.ShutDown()
 	defer r.svcQueue.ShutDown()
 	r.broadcaster.StartRecordingToSink(stopCh)
@@ -246,9 +211,6 @@ func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) 
 		return
 	}
 	onFirstSuccess()
-
-	// serialize the operations on ServiceCIDRs
-	go wait.Until(r.cidrWorker, r.workerLoopPeriod, stopCh)
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(r.ipWorker, r.workerLoopPeriod, stopCh)
@@ -370,11 +332,7 @@ func (r *RepairIPAddress) syncService(key string) error {
 		}
 		// TODO(aojea) Refactor to abstract the IPs checks
 		family := getFamilyByIP(ip)
-
-		r.muTree.Lock()
-		prefixes := r.tree.GetHostIPPrefixMatches(ipToAddr(ip))
-		r.muTree.Unlock()
-		if len(prefixes) == 0 {
+		if r.isIPOutOfRange(ip) {
 			// ClusterIP is out of range
 			r.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPOutOfRange", "ClusterIPAllocation", "Cluster IP [%v]: %s is not within any configured Service CIDR; please recreate service", family, ip)
 			runtime.HandleError(fmt.Errorf("the ClusterIP [%v]: %s for Service %s/%s is not within any service CIDR; please recreate", family, ip, svc.Namespace, svc.Name))
@@ -557,60 +515,9 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 
 }
 
-func (r *RepairIPAddress) cidrWorker() {
-	for r.processNextWorkCIDR() {
-	}
-}
-
-func (r *RepairIPAddress) processNextWorkCIDR() bool {
-	eKey, quit := r.cidrQueue.Get()
-	if quit {
-		return false
-	}
-	defer r.cidrQueue.Done(eKey)
-
-	err := r.syncCIDRs()
-	r.handleCIDRErr(err, eKey)
-
-	return true
-}
-
-func (r *RepairIPAddress) handleCIDRErr(err error, key string) {
-	if err == nil {
-		r.cidrQueue.Forget(key)
-		return
-	}
-
-	if r.cidrQueue.NumRequeues(key) < maxRetries {
-		klog.V(2).InfoS("Error syncing ServiceCIDR, retrying", "serviceCIDR", key, "err", err)
-		r.cidrQueue.AddRateLimited(key)
-		return
-	}
-
-	klog.Warningf("Dropping ServiceCIDR %q out of the queue: %v", key, err)
-	r.cidrQueue.Forget(key)
-	runtime.HandleError(err)
-}
-
-// syncCIDRs rebuilds the radix tree based from the informers cache
-func (r *RepairIPAddress) syncCIDRs() error {
-	serviceCIDRList, err := r.serviceCIDRLister.List(labels.Everything())
-	if err != nil {
-		return err
-	}
-
-	tree := iptree.New[string]()
-	for _, serviceCIDR := range serviceCIDRList {
-		for _, cidr := range serviceCIDR.Spec.CIDRs {
-			if prefix, err := netip.ParsePrefix(cidr); err == nil { // it can not fail since is already validated
-				tree.InsertPrefix(prefix, serviceCIDR.Name)
-			}
-		}
-	}
-	r.muTree.Lock()
-	defer r.muTree.Unlock()
-	r.tree = tree
-	return nil
+// isIPOutOfRange returns false if the IP is not contained in any of the ServiceCIDRs
+func (r *RepairIPAddress) isIPOutOfRange(ip net.IP) bool {
+	return len(servicecidr.ContainsIP(r.serviceCIDRLister, ip)) == 0
 }
 
 func newIPAddress(name string, svc *v1.Service) *networkingv1alpha1.IPAddress {
@@ -676,21 +583,4 @@ func verifyIPAddressLabels(ip *networkingv1alpha1.IPAddress) bool {
 		return false
 	}
 	return managedByController(ip)
-}
-
-// TODO(aojea) move to utils, already in pkg/registry/core/service/ipallocator/cidrallocator.go
-// ipToAddr converts a net.IP to a netip.Addr
-// if the net.IP is not valid it returns an empty netip.Addr{}
-func ipToAddr(ip net.IP) netip.Addr {
-	// https://pkg.go.dev/net/netip#AddrFromSlice can return an IPv4 in IPv6 format
-	// so we have to check the IP family to return exactly the format that we want
-	// address, _ := netip.AddrFromSlice(net.ParseIPSloppy(192.168.0.1)) returns
-	// an address like ::ffff:192.168.0.1/32
-	bytes := ip.To4()
-	if bytes == nil {
-		bytes = ip.To16()
-	}
-	// AddrFromSlice returns Addr{}, false if the input is invalid.
-	address, _ := netip.AddrFromSlice(bytes)
-	return address
 }
