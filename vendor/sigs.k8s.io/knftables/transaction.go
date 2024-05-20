@@ -19,7 +19,6 @@ package knftables
 import (
 	"bytes"
 	"fmt"
-	"io"
 )
 
 // Transaction represents an nftables transaction
@@ -48,17 +47,16 @@ const (
 	flushVerb   verb = "flush"
 )
 
-// asCommandBuf returns the transaction as an io.Reader that outputs a series of nft commands
-func (tx *Transaction) asCommandBuf() (io.Reader, error) {
+// populateCommandBuf populates the transaction as series of nft commands to the given bytes.Buffer.
+func (tx *Transaction) populateCommandBuf(buf *bytes.Buffer) error {
 	if tx.err != nil {
-		return nil, tx.err
+		return tx.err
 	}
 
-	buf := &bytes.Buffer{}
 	for _, op := range tx.operations {
 		op.obj.writeOperation(op.verb, tx.nftContext, buf)
 	}
-	return buf, nil
+	return nil
 }
 
 // String returns the transaction as a string containing the nft commands; if there is
