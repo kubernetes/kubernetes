@@ -33,6 +33,7 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
 func TestSummaryProvider(t *testing.T) {
@@ -83,13 +84,21 @@ func TestSummaryProvider(t *testing.T) {
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: imageFsStats, ImageFs: imageFsStats})
 
-	assert.Equal(len(summary.Node.SystemContainers), 1)
+	_, memoryTotalBytes, err := winstats.GetAvailableAndTotalPhysicalMemory()
+	assert.NoError(err)
+	assert.Equal(len(summary.Node.SystemContainers), 2)
 	assert.Equal(summary.Node.SystemContainers[0].Name, "pods")
 	assert.Equal(summary.Node.SystemContainers[0].CPU.UsageCoreNanoSeconds, podStats[0].CPU.UsageCoreNanoSeconds)
 	assert.Equal(summary.Node.SystemContainers[0].CPU.UsageNanoCores, podStats[0].CPU.UsageNanoCores)
 	assert.Equal(summary.Node.SystemContainers[0].Memory.WorkingSetBytes, podStats[0].Memory.WorkingSetBytes)
 	assert.Equal(summary.Node.SystemContainers[0].Memory.UsageBytes, podStats[0].Memory.UsageBytes)
 	assert.Equal(summary.Node.SystemContainers[0].Memory.AvailableBytes, podStats[0].Memory.AvailableBytes)
+	assert.Equal(summary.Node.SystemContainers[1].Name, statsapi.SystemContainerPhysicalMemory)
+	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory)
+	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory.AvailableBytes)
+	assert.NotEqual(nil, summary.Node.SystemContainers[1].Memory.UsageBytes)
+	totalMemory := *summary.Node.SystemContainers[1].Memory.AvailableBytes + *summary.Node.SystemContainers[1].Memory.UsageBytes
+	assert.Equal(memoryTotalBytes, totalMemory)
 	assert.Equal(summary.Pods, podStats)
 }
 
