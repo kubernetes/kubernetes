@@ -597,7 +597,9 @@ func TestGetValidationDirective(t *testing.T) {
 			t.Errorf("validation directive, expected: %v, but got: %v", tc.expectedDirective, directive)
 		}
 		if tc.expectedErr != nil {
-			if err.Error() != tc.expectedErr.Error() {
+			if err == nil {
+				t.Errorf("GetValidationDirective error, expected: %v, but got: nil", tc.expectedErr)
+			} else if err.Error() != tc.expectedErr.Error() {
 				t.Errorf("GetValidationDirective error, expected: %v, but got: %v", tc.expectedErr, err)
 			}
 		} else {

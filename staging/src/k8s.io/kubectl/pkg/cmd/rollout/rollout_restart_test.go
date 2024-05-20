@@ -112,8 +112,7 @@ func TestRolloutRestartError(t *testing.T) {
 	err = opt.RunRestart()
 	if err == nil {
 		t.Errorf("error expected but not fired")
-	}
-	if err.Error() != expectedErr {
+	} else if err.Error() != expectedErr {
 		t.Errorf("unexpected error fired %v", err)
 	}
 

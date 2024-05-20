@@ -115,6 +115,10 @@ func TestGetPodList(t *testing.T) {
 			t.Errorf("%s: expected an error", test.name)
 			continue
 		}
+		if podList == nil {
+			t.Errorf("%s: unexpected nil podList", test.name)
+			continue
+		}
 		if test.expectedNum != len(podList.Items) {
 			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, len(podList.Items))
 			continue

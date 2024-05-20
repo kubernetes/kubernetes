@@ -81,7 +81,7 @@ func TestUnsetConfigMap(t *testing.T) {
 	test.run(t)
 }
 
-func TestUnsetUnexistConfig(t *testing.T) {
+func TestUnsetNonexistentConfigKey(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Kind:       "Config",
 		APIVersion: "v1",
@@ -97,7 +97,7 @@ func TestUnsetUnexistConfig(t *testing.T) {
 	}
 
 	test := unsetConfigTest{
-		description: "Testing for kubectl config unset a unexist map key",
+		description: "Testing for kubectl config unset a nonexistent map key",
 		config:      conf,
 		args:        []string{"contexts.foo.namespace"},
 		expectedErr: "current map key `foo` is invalid",
@@ -126,17 +126,20 @@ func (test unsetConfigTest) run(t *testing.T) {
 	if err == nil {
 		err = opts.run(buf)
 	}
-	if test.expectedErr == "" && err != nil {
+	if err == nil {
+		if test.expectedErr != "" {
+			t.Fatalf("expected error:\n %v\nbut got no error", test.expectedErr)
+		}
+	} else if test.expectedErr == "" {
 		t.Fatalf("unexpected error: %v", err)
+	} else if err.Error() != test.expectedErr {
+		t.Fatalf("expected error:\n %v\nbut got error:\n%v", test.expectedErr, err)
 	}
 	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
 	}
 
-	if err != nil && err.Error() != test.expectedErr {
-		t.Fatalf("expected error:\n %v\nbut got error:\n%v", test.expectedErr, err)
-	}
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
 			t.Errorf("Failed in :%q\n expected %v\n but got %v", test.description, test.expected, buf.String())
