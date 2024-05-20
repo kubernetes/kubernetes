@@ -1181,3 +1181,240 @@ func TestIsSchedulableAfterStorageClassChange(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
+	table := []struct {
+		name    string
+		pod     *v1.Pod
+		oldCap  interface{}
+		newCap  interface{}
+		wantErr bool
+		expect  framework.QueueingHint
+	}{
+		{
+			name:   "When a new CSIStorageCapacity is created, it returns Queue",
+			pod:    makePod("pod-a").Pod,
+			oldCap: nil,
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+			},
+			wantErr: false,
+			expect:  framework.Queue,
+		},
+		{
+			name: "When the Capacity is set, it returns Queue",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(100, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.Queue,
+		},
+		{
+			name: "When the Capacity is increase, it returns Queue",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(100, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.Queue,
+		},
+		{
+			name: "When the MaximumVolumeSize is changed to nil, it returns Queue",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+			},
+			wantErr: false,
+			expect:  framework.Queue,
+		},
+		{
+			name: "When the MaximumVolumeSize is increased, it returns Queue",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(100, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.Queue,
+		},
+		{
+			name: "When there are no changes to the CSIStorageCapacity, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+			},
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "When the Capacity is equal, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(100, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(100, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "When the Capacity is decrease, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(100, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "When the Capacity is nil, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				Capacity: resource.NewQuantity(100, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+			},
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "When the MaximumVolumeSize is equal, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "When the MaximumVolumeSize is decreased, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(40, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "When the MaximumVolumeSize is set, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+			},
+			newCap: &storagev1.CSIStorageCapacity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cap-a",
+				},
+				MaximumVolumeSize: resource.NewQuantity(50, resource.DecimalSI),
+			},
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name:    "type conversion error",
+			oldCap:  new(struct{}),
+			newCap:  new(struct{}),
+			wantErr: true,
+			expect:  framework.Queue,
+		},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{}
+			logger, _ := ktesting.NewTestContext(t)
+			qhint, err := pl.isSchedulableAfterCSIStorageCapacityChange(logger, item.pod, item.oldCap, item.newCap)
+			if (err != nil) != item.wantErr {
+				t.Errorf("isSchedulableAfterCSIStorageCapacityChange failed - got: %q", err)
+			}
+			if qhint != item.expect {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
