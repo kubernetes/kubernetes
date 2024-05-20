@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -948,8 +949,11 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 	argsToUse = append(argsToUse, "--kubeconfig="+fakeKubeFile.Name())
 	argsToUse = append(argsToUse, args...)
 
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
 	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
-	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), streams)
+	cmd := NewCmdConfig(tf, clientcmd.NewDefaultPathOptions(), streams)
 	// "context" is a global flag, inherited from base kubectl command in the real world
 	cmd.PersistentFlags().String("context", "", "The name of the kubeconfig context to use")
 	cmd.SetArgs(argsToUse)
