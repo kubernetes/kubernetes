@@ -324,16 +324,14 @@ message NamespaceOption {
 // SupplementalGroupsPolicy defines how supplemental groups 
 // of the first container processes are calculated.
 enum SupplementalGroupsPolicy {
-    // Merge policy always merges the provided SupplementalGroups (including FsGroup)
-    // specified in SecurityContext with groups of the primary user from the container 
-    // image(`/etc/group`).
-    // Note: The primary user is specified with RunAsUser. 
-    //       If not specified, the user from the image config is used. 
-    //       Otherwise, the runtime default is used.
+    // Merge means that the container's provided SupplementalGroups 
+    // and FsGroup (specified in SecurityContext) will be merged with 
+    // the primary user's groups as defined in the container image
+    // (in /etc/group).
     Merge = 0;
-    // Strict policy uses only the provided SupplementalGroups(including FsGroup)
-    // in SecurityContext as supplemental groups for the first container process.
-    // No groups extracted from the container image.
+    // Strict means that the container's provided SupplementalGroups
+    // and FsGroup (specified in SecurityContext) will be used instead of 
+    // any groups defined in the container image.
     Strict = 1;
 }
 
@@ -1337,7 +1335,7 @@ message ContainerResources {
 
 message ContainerUser {
     // User identities initially attached to first process in the Linux container.
-	// Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls.
+	// Note that the actual running identity can be changed if the process has enough privilege to do so.
     LinuxContainerUser linux = 1;
 
     // User identities initially attached to first process in the Windows container

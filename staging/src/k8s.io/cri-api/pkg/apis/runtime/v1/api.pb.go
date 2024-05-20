@@ -160,16 +160,14 @@ func (NamespaceMode) EnumDescriptor() ([]byte, []int) {
 type SupplementalGroupsPolicy int32
 
 const (
-	// Merge policy always merges the provided SupplementalGroups (including FsGroup)
-	// specified in SecurityContext with groups of the primary user from the container
-	// image(`/etc/group`).
-	// Note: The primary user is specified with RunAsUser.
-	//       If not specified, the user from the image config is used.
-	//       Otherwise, the runtime default is used.
+	// Merge means that the container's provided SupplementalGroups
+	// and FsGroup (specified in SecurityContext) will be merged with
+	// the primary user's groups as defined in the container image
+	// (in /etc/group).
 	SupplementalGroupsPolicy_Merge SupplementalGroupsPolicy = 0
-	// Strict policy uses only the provided SupplementalGroups(including FsGroup)
-	// in SecurityContext as supplemental groups for the first container process.
-	// No groups extracted from the container image.
+	// Strict means that the container's provided SupplementalGroups
+	// and FsGroup (specified in SecurityContext) will be used instead of
+	// any groups defined in the container image.
 	SupplementalGroupsPolicy_Strict SupplementalGroupsPolicy = 1
 )
 
@@ -6241,7 +6239,7 @@ func (m *ContainerResources) GetWindows() *WindowsContainerResources {
 
 type ContainerUser struct {
 	// User identities initially attached to first process in the Linux container.
-	// Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls.
+	// Note that the actual running identity can be changed if the process has enough privilege to do so.
 	Linux                *LinuxContainerUser `protobuf:"bytes,1,opt,name=linux,proto3" json:"linux,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_sizecache        int32               `json:"-"`

@@ -21017,7 +21017,7 @@ func schema_k8sio_api_core_v1_ContainerUser(ref common.ReferenceCallback) common
 				Properties: map[string]spec.Schema{
 					"linux": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Linux holds user identity information initially attached to the first process of the containers in Linux. Note that the actual process identity can be dynamic if the initially attached identity have enough privilege calling setuid/setgid/setgroups syscalls",
+							Description: "Linux holds user identity information initially attached to the first process of the containers in Linux. Note that the actual running identity can be changed if the process has enough privilege to do so.",
 							Ref:         ref("k8s.io/api/core/v1.LinuxContainerUser"),
 						},
 					},
@@ -27163,7 +27163,7 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process. If unspecified, no additional groups are added to any container. Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list. If SupplementalGroupsPolicy feature gate was enabled, you can control how the groups are calculated. Note that this field cannot be set when spec.os.name is windows.",
+							Description: "A list of groups applied to the first process run in each container, in addition to the container's primary GID and fsGroup (if specified).  If the SupplementalGroupsPolicy feature is enabled, the supplementalGroupsPolicy field determines whether these are in addition to or instead of any group memberships defined in the container image. If unspecified, no additional groups are added, though group memberships defined in the container image may still be used, depending on the supplementalGroupsPolicy field. Note that this field cannot be set when spec.os.name is windows.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -27178,7 +27178,7 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 					},
 					"supplementalGroupsPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Defines how supplemental groups of the first container processes are calculated. Valid values are \"Merge\" and \"Strict\". If not specified, \"Merge\" is used. (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled and the container runtime must implement support for this feature. Note that this field cannot be set when spec.os.name is windows.\n\nPossible enum values:\n - `\"Merge\"` Merge policy always merges the provided SupplementalGroups (including FsGroup) specified in SecurityContext with groups of the primary user from the container image(`/etc/group`). Note: The primary user is specified with RunAsUser. If not specified, the user from the image config is used. Otherwise, the runtime default is used.\n - `\"Strict\"` Strict policy uses only the provided SupplementalGroups(including FsGroup) in SecurityContext as supplemental groups for the first container process. No groups extracted from the container image.",
+							Description: "Defines how supplemental groups of the first container processes are calculated. Valid values are \"Merge\" and \"Strict\". If not specified, \"Merge\" is used. (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled and the container runtime must implement support for this feature. Note that this field cannot be set when spec.os.name is windows.\n\nPossible enum values:\n - `\"Merge\"` means that the container's provided SupplementalGroups and FsGroup (specified in SecurityContext) will be merged with the primary user's groups as defined in the container image (in /etc/group).\n - `\"Strict\"` means that the container's provided SupplementalGroups and FsGroup (specified in SecurityContext) will be used instead of any groups defined in the container image.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Merge", "Strict"},
