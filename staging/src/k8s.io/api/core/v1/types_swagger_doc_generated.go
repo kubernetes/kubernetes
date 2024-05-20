@@ -1500,7 +1500,7 @@ var map_PersistentVolumeStatus = map[string]string{
 	"phase":                   "phase indicates if a volume is available, bound to a claim, or released by a claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase",
 	"message":                 "message is a human-readable message indicating details about why the volume is in this state.",
 	"reason":                  "reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
-	"lastPhaseTransitionTime": "lastPhaseTransitionTime is the time the phase transitioned from one to another and automatically resets to current time everytime a volume phase transitions. This is a beta field and requires the PersistentVolumeLastPhaseTransitionTime feature to be enabled (enabled by default).",
+	"lastPhaseTransitionTime": "lastPhaseTransitionTime is the time the phase transitioned from one to another and automatically resets to current time everytime a volume phase transitions.",
 }
 
 func (PersistentVolumeStatus) SwaggerDoc() map[string]string {

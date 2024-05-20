@@ -534,6 +534,7 @@ const (
 	// kep: https://kep.k8s.io/3762
 	// alpha: v1.28
 	// beta: v1.29
+	// GA: v1.31
 	//
 	// Adds a new field to persistent volumes which holds a timestamp of when the volume last transitioned its phase.
 	PersistentVolumeLastPhaseTransitionTime featuregate.Feature = "PersistentVolumeLastPhaseTransitionTime"
@@ -1089,7 +1090,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PDBUnhealthyPodEvictionPolicy: {Default: true, PreRelease: featuregate.Beta},
 
-	PersistentVolumeLastPhaseTransitionTime: {Default: true, PreRelease: featuregate.Beta},
+	PersistentVolumeLastPhaseTransitionTime: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
