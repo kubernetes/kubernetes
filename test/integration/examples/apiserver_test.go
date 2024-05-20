@@ -35,9 +35,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	authv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -247,7 +247,7 @@ func TestFrontProxyConfig(t *testing.T) {
 	t.Cleanup(cancel)
 
 	// start up the KAS and prepare the options for the wardle API server
-	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace)
+	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, []string{"x-remote-uid"})
 	kubeConfig := getKubeConfig(testKAS)
 
 	// create the SA that we will use to query the aggregated API
@@ -260,8 +260,6 @@ func TestFrontProxyConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedSAUserInfo := serviceaccount.UserInfo(expectedSA.Namespace, expectedSA.Name, string(expectedSA.UID))
-	expectedRealSAGroups := append(expectedSAUserInfo.GetGroups(), user.AllAuthenticated)
 
 	saTokenReq, err := kubeClient.CoreV1().ServiceAccounts(testNamespace).CreateToken(ctx, "wardle-client-sa", &v1.TokenRequest{}, metav1.CreateOptions{})
 	if err != nil {
@@ -272,6 +270,24 @@ func TestFrontProxyConfig(t *testing.T) {
 		t.Fatal("empty SA token in token request response")
 	}
 
+	// get the wardle API client using our SA token
+	wardleClientConfig := rest.AnonymousClientConfig(kubeConfig)
+	wardleClientConfig.BearerToken = saToken
+	wardleClient := wardlev1alpha1client.NewForConfigOrDie(wardleClientConfig)
+
+	coreClient := client.NewForConfigOrDie(wardleClientConfig)
+	saSelfInfo, err := coreClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authv1.SelfSubjectReview{}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedSAUserInfo := serviceaccount.UserInfo(expectedSA.Namespace, expectedSA.Name, string(expectedSA.UID))
+	expectedRealSAGroups := append(expectedSAUserInfo.GetGroups(), user.AllAuthenticated)
+
+	expectedSAUserInfoExtra := map[string][]string{
+		serviceaccount.CredentialIDKey: saSelfInfo.Status.UserInfo.Extra[serviceaccount.CredentialIDKey],
+	}
+
 	var checksProcessed atomic.Uint32
 
 	// wrap the authz round tripper to catch the request for our SA SAR to the KAS
@@ -280,7 +296,7 @@ func TestFrontProxyConfig(t *testing.T) {
 		transport.WrapperFunc(func(rt http.RoundTripper) http.RoundTripper {
 			return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				gotUser, ok := genericapirequest.UserFrom(req.Context())
-				if !ok {
+				if !ok || gotUser.GetName() == "system:anonymous" {
 					return nil, fmt.Errorf("got an unauthenticated request")
 				}
 
@@ -301,8 +317,8 @@ func TestFrontProxyConfig(t *testing.T) {
 				if got := gotUser.GetGroups(); !reflect.DeepEqual(expectedRealSAGroups, got) {
 					t.Errorf("expected groups: %v, got: %v", expectedRealSAGroups, got)
 				}
-				if got, expected := gotUser.GetExtra(), expectedSAUserInfo.GetExtra(); !apiequality.Semantic.DeepEqual(expected, got) {
-					t.Errorf("expected extra to be %v, but got %v", expected, got)
+				if got := gotUser.GetExtra(); !reflect.DeepEqual(expectedSAUserInfoExtra, got) {
+					t.Errorf("expected extra to be %v, but got %v", expectedSAUserInfoExtra, got)
 				}
 
 				checksProcessed.Add(1)
@@ -316,11 +332,6 @@ func TestFrontProxyConfig(t *testing.T) {
 
 	runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, kubeConfig)
 	waitForWardleAPIServiceReady(ctx, t, kubeConfig, wardleCertDir, testNamespace)
-
-	// get the wardle API client using our SA token
-	wardleClientConfig := rest.AnonymousClientConfig(kubeConfig)
-	wardleClientConfig.BearerToken = saToken
-	wardleClient := wardlev1alpha1client.NewForConfigOrDie(wardleClientConfig)
 
 	_, err = wardleClient.Flunders(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -338,7 +349,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
-	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace)
+	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, nil)
 	kubeClientConfig := getKubeConfig(testKAS)
 
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
@@ -595,7 +606,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 	}
 }
 
-func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespace string) (*kastesting.TestServer, *sampleserver.WardleServerOptions, int) {
+func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespace string, requestHeadersUIDOverride []string) (*kastesting.TestServer, *sampleserver.WardleServerOptions, int) {
 	// makes the kube-apiserver very responsive.  it's normally a minute
 	dynamiccertificates.FileRefreshDuration = 1 * time.Second
 
@@ -607,7 +618,13 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 	// endpoints cannot have loopback IPs so we need to override the resolver itself
 	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
 
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true}, nil, framework.SharedEtcd())
+	testServer := kastesting.StartTestServerOrDie(t,
+		&kastesting.TestServerInstanceOptions{
+			EnableCertAuth:                  true,
+			RequestHeaderUIDHeadersOverride: requestHeadersUIDOverride,
+		},
+		nil,
+		framework.SharedEtcd())
 	t.Cleanup(func() { testServer.TearDownFn() })
 
 	kubeClient := client.NewForConfigOrDie(getKubeConfig(testServer))
