@@ -891,7 +891,7 @@ func TestVolumeBinding(t *testing.T) {
 	}
 }
 
-func TestIsSchedulableAfterPersistentVolumeAddOrChange(t *testing.T) {
+func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 	table := []struct {
 		name           string
 		pod            *v1.Pod
@@ -980,13 +980,13 @@ func TestIsSchedulableAfterPersistentVolumeAddOrChange(t *testing.T) {
 			var qhint framework.QueueingHint
 			var err error
 			if item.useEmptyStruct {
-				qhint, err = pl.isSchedulableAfterPersistentVolumeAddOrChange(logger, item.pod, new(struct{}), new(struct{}))
+				qhint, err = pl.isSchedulableAfterPersistentVolumeChange(logger, item.pod, new(struct{}), new(struct{}))
 			} else {
-				qhint, err = pl.isSchedulableAfterPersistentVolumeAddOrChange(logger, item.pod, item.oldPV, item.newPV)
+				qhint, err = pl.isSchedulableAfterPersistentVolumeChange(logger, item.pod, item.oldPV, item.newPV)
 			}
 
 			if (item.err && err == nil) || (!item.err && err != nil) {
-				t.Errorf("isSchedulableAfterPersistentVolumeAddOrChange failed - got: %q", err)
+				t.Errorf("isSchedulableAfterPersistentVolumeChange failed - got: %q", err)
 			}
 			if qhint != item.expect {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)

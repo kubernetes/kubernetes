@@ -100,7 +100,7 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}},
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeAddOrChange},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
 		// Pods may fail to find available PVs because the node labels do not
 		// match the storage class's allowed topologies or PV's node affinity.
 		// A new or updated node may make pods schedulable.
@@ -171,7 +171,7 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 	return hasPVC, nil
 }
 
-func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeAddOrChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	_, newPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
@@ -190,7 +190,7 @@ func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeAddOrChange(logger kl
 		}
 	}
 
-	logger.V(4).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable")
+	logger.V(4).Info("PersistentVolume was created or updated, but it doesn't make this pod schedulable")
 	return framework.QueueSkip, nil
 }
 
