@@ -368,7 +368,7 @@ func preparePod(pod *v1.Pod) {
 			v1.ResourceMemory: resource.MustParse("15Mi"),
 		},
 		Limits: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("15Mi"),
+			v1.ResourceMemory: resource.MustParse("35Mi"),
 		},
 	}
 
