@@ -99,9 +99,11 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
 		// schedulable upon StorageClass Add or Update events.
 		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}},
+
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
+
 		// Pods may fail to find available PVs because the node labels do not
 		// match the storage class's allowed topologies or PV's node affinity.
 		// A new or updated node may make pods schedulable.
@@ -115,9 +117,11 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		// We can remove UpdateNodeTaint when we remove the preCheck feature.
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
+
 		// We rely on CSI node to translate in-tree PV to CSI.
 		// TODO: kube-schduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSINodeChange},
+
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
 		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}},
@@ -148,6 +152,46 @@ func (pl *VolumeBinding) isSchedulableAfterCSINodeChange(logger klog.Logger, pod
 	}
 
 	logger.V(5).Info("CISNode was created or updated but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
+func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, newPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"PersistentVolumeClaim", klog.KObj(newPVC),
+	)
+
+	if pod.Namespace != newPVC.Namespace {
+		logger.V(5).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable because the PVC belongs to a different namespace")
+		return framework.QueueSkip, nil
+	}
+
+	for _, vol := range pod.Spec.Volumes {
+		var pvcName string
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+		case vol.Ephemeral != nil:
+			pvcName = ephemeral.VolumeClaimName(pod, &vol)
+		default:
+			continue
+		}
+
+		if pvcName == newPVC.Name {
+			// Return Queue because, in this case,
+			// all PVC creations and almost all PVC updates could make the Pod schedulable.
+			logger.V(5).Info("PersistentVolumeClaim the pod requires was created or updated, potentially making the target Pod schedulable")
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable")
 	return framework.QueueSkip, nil
 }
 
