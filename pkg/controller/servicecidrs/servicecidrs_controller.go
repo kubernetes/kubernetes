@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -43,8 +42,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/servicecidr"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/iptree"
 	netutils "k8s.io/utils/net"
 )
 
@@ -80,7 +79,6 @@ func NewController(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ipaddresses"},
 		),
-		tree:             iptree.New[sets.Set[string]](),
 		workerLoopPeriod: time.Second,
 	}
 
@@ -122,10 +120,6 @@ type Controller struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and ipRange changes.
 	workerLoopPeriod time.Duration
-
-	// tree store the ServiceCIDRs names associated to each
-	muTree sync.Mutex
-	tree   *iptree.Tree[sets.Set[string]]
 }
 
 // Run will not return until stopCh is closed.
@@ -213,24 +207,17 @@ func (c *Controller) deleteIPAddress(obj interface{}) {
 // this is required because adding or removing a CIDR will require to recompute the
 // state of each ServiceCIDR to check if can be unblocked on deletion.
 func (c *Controller) overlappingServiceCIDRs(serviceCIDR *networkingapiv1alpha1.ServiceCIDR) []string {
-	c.muTree.Lock()
-	defer c.muTree.Unlock()
-
-	serviceCIDRs := sets.New[string]()
+	result := sets.New[string]()
 	for _, cidr := range serviceCIDR.Spec.CIDRs {
 		if prefix, err := netip.ParsePrefix(cidr); err == nil { // if is empty err will not be nil
-			c.tree.WalkPath(prefix, func(k netip.Prefix, v sets.Set[string]) bool {
-				serviceCIDRs.Insert(v.UnsortedList()...)
-				return false
-			})
-			c.tree.WalkPrefix(prefix, func(k netip.Prefix, v sets.Set[string]) bool {
-				serviceCIDRs.Insert(v.UnsortedList()...)
-				return false
-			})
+			serviceCIDRs := servicecidr.OverlapsPrefix(c.serviceCIDRLister, prefix)
+			for _, v := range serviceCIDRs {
+				result.Insert(v.Name)
+			}
 		}
 	}
 
-	return serviceCIDRs.UnsortedList()
+	return result.UnsortedList()
 }
 
 // containingServiceCIDRs, given an IPAddress return the ServiceCIDRs that contains the IP,
@@ -249,16 +236,13 @@ func (c *Controller) containingServiceCIDRs(ip *networkingapiv1alpha1.IPAddress)
 		return []string{}
 	}
 
-	c.muTree.Lock()
-	defer c.muTree.Unlock()
-	serviceCIDRs := []string{}
-	// walk the tree to get all the ServiceCIDRs that contain this IP address
-	prefixes := c.tree.GetHostIPPrefixMatches(address)
-	for _, v := range prefixes {
-		serviceCIDRs = append(serviceCIDRs, v.UnsortedList()...)
+	result := sets.New[string]()
+	serviceCIDRs := servicecidr.ContainsAddress(c.serviceCIDRLister, address)
+	for _, v := range serviceCIDRs {
+		result.Insert(v.Name)
 	}
 
-	return serviceCIDRs
+	return result.UnsortedList()
 }
 
 func (c *Controller) worker(ctx context.Context) {
@@ -290,51 +274,12 @@ func (c *Controller) processNext(ctx context.Context) bool {
 	return true
 }
 
-// syncCIDRs rebuilds the radix tree based from the informers cache
-func (c *Controller) syncCIDRs() error {
-	serviceCIDRList, err := c.serviceCIDRLister.List(labels.Everything())
-	if err != nil {
-		return err
-	}
-
-	// track the names of the different ServiceCIDRs, there
-	// can be multiple ServiceCIDRs sharing the same prefixes
-	// and this is important to determine if a ServiceCIDR can
-	// be deleted.
-	tree := iptree.New[sets.Set[string]]()
-	for _, serviceCIDR := range serviceCIDRList {
-		for _, cidr := range serviceCIDR.Spec.CIDRs {
-			if prefix, err := netip.ParsePrefix(cidr); err == nil { // if is empty err will not be nil
-				// if the prefix already exist append the new ServiceCIDR name
-				v, ok := tree.GetPrefix(prefix)
-				if !ok {
-					v = sets.Set[string]{}
-				}
-				v.Insert(serviceCIDR.Name)
-				tree.InsertPrefix(prefix, v)
-			}
-		}
-	}
-
-	c.muTree.Lock()
-	defer c.muTree.Unlock()
-	c.tree = tree
-	return nil
-}
-
 func (c *Controller) sync(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
 		logger.V(4).Info("Finished syncing ServiceCIDR)", "ServiceCIDR", key, "elapsed", time.Since(startTime))
 	}()
-
-	// TODO(aojea) verify if this present a performance problem
-	// restore the radix tree from the current state
-	err := c.syncCIDRs()
-	if err != nil {
-		return err
-	}
 
 	logger.V(4).Info("syncing ServiceCIDR", "ServiceCIDR", key)
 	cidr, err := c.serviceCIDRLister.Get(key)
@@ -406,23 +351,16 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 
 // canDeleteCIDR checks that the ServiceCIDR can be safely deleted and not leave orphan IPAddresses
 func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkingapiv1alpha1.ServiceCIDR) (bool, error) {
-	// TODO(aojea) Revisit the lock usage and if we need to keep it only for the tree operations
-	// to avoid holding it during the whole operation.
-	c.muTree.Lock()
-	defer c.muTree.Unlock()
 	logger := klog.FromContext(ctx)
 	// Check if there is a subnet that already contains the ServiceCIDR that is going to be deleted.
 	hasParent := true
 	for _, cidr := range serviceCIDR.Spec.CIDRs {
-		// Walk the tree to find if there is a larger subnet that contains the existing one,
+		// Find if there is a larger subnet that contains the existing one,
 		// or there is another ServiceCIDR with the same subnet.
 		if prefix, err := netip.ParsePrefix(cidr); err == nil {
-			serviceCIDRs := sets.New[string]()
-			c.tree.WalkPath(prefix, func(k netip.Prefix, v sets.Set[string]) bool {
-				serviceCIDRs.Insert(v.UnsortedList()...)
-				return false
-			})
-			if serviceCIDRs.Len() == 1 && serviceCIDRs.Has(serviceCIDR.Name) {
+			serviceCIDRs := servicecidr.ContainsPrefix(c.serviceCIDRLister, prefix)
+			if len(serviceCIDRs) == 0 ||
+				len(serviceCIDRs) == 1 && serviceCIDRs[0].Name == serviceCIDR.Name {
 				hasParent = false
 			}
 		}
@@ -431,7 +369,7 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 	// All the existing IP addresses will be contained on the parent ServiceCIDRs,
 	// it is safe to delete, remove the finalizer.
 	if hasParent {
-		logger.V(2).Info("Removing finalizer for ServiceCIDR", "ServiceCIDR", serviceCIDR.String())
+		logger.Info("Deleting ServiceCIDR contained in other ServiceCIDR", "ServiceCIDR", serviceCIDR.String())
 		return true, nil
 	}
 
@@ -458,22 +396,18 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 				logger.Info("[SHOULD NOT HAPPEN] unexpected error parsing IPAddress", "IPAddress", ip.Name, "error", err)
 				continue
 			}
-			// walk the tree to find all ServiceCIDRs containing this IP
-			prefixes := c.tree.GetHostIPPrefixMatches(address)
-			if len(prefixes) != 1 {
-				continue
-			}
-			for _, v := range prefixes {
-				if v.Len() == 1 && v.Has(serviceCIDR.Name) {
-					return false, nil
-				}
+			// find all ServiceCIDRs containing this IP
+			serviceCIDRs := servicecidr.ContainsAddress(c.serviceCIDRLister, address)
+			if len(serviceCIDRs) == 1 && serviceCIDRs[0].Name == serviceCIDR.Name {
+				logger.Info("Deleting ServiceCIDR blocked by IP address", "IPAddress", address.String())
+				return false, nil
 			}
 		}
 	}
 
 	// There are no IPAddresses that depend on the existing ServiceCIDR, so
 	// it is safe to delete, remove finalizer.
-	logger.Info("ServiceCIDR no longer have orphan IPs", "ServiceCDIR", serviceCIDR.String())
+	logger.Info("Deleting ServiceCIDR no longer have orphan IPs", "ServiceCIDR", serviceCIDR.String())
 	return true, nil
 }
 
