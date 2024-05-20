@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -98,7 +99,7 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		// Pods may fail because of missing or mis-configured storage class
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
 		// schedulable upon StorageClass Add or Update events.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterStorageClassChange},
 
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
@@ -192,6 +193,38 @@ func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger kl
 	}
 
 	logger.V(5).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
+// isSchedulableAfterStorageClassChange checks whether an StorageClass event might make a Pod schedulable or not.
+// Any StorageClass addition and a StorageClass update to allowedTopologies
+// might make a Pod schedulable.
+// Note that an update to volume binding mode is not allowed and we don't have to consider while examining the update event.
+func (pl *VolumeBinding) isSchedulableAfterStorageClassChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	oldSC, newSC, err := util.As[*storagev1.StorageClass](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"StorageClass", klog.KObj(newSC),
+	)
+
+	if oldSC == nil {
+		// No further filtering can be made for a creation event,
+		// and we just always return Queue.
+		logger.V(5).Info("A new StorageClass was created, which could make a Pod schedulable")
+		return framework.Queue, nil
+	}
+
+	if !apiequality.Semantic.DeepEqual(newSC.AllowedTopologies, oldSC.AllowedTopologies) {
+		logger.V(5).Info("StorageClass got an update in AllowedTopologies", "AllowedTopologies", newSC.AllowedTopologies)
+		return framework.Queue, nil
+	}
+
+	logger.V(5).Info("StorageClass was updated, but it doesn't make this pod schedulable")
 	return framework.QueueSkip, nil
 }
 

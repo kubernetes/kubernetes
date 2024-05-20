@@ -1093,3 +1093,91 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulableAfterStorageClassChange(t *testing.T) {
+	table := []struct {
+		name      string
+		pod       *v1.Pod
+		oldSC     interface{}
+		newSC     interface{}
+		pvcLister tf.PersistentVolumeClaimLister
+		err       bool
+		expect    framework.QueueingHint
+	}{
+		{
+			name:  "When a new StorageClass is created, it returns Queue",
+			pod:   makePod("pod-a").Pod,
+			oldSC: nil,
+			newSC: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sc-a",
+				},
+			},
+			err:    false,
+			expect: framework.Queue,
+		},
+		{
+			name: "When the AllowedTopologies are changed, it returns Queue",
+			pod:  makePod("pod-a").Pod,
+			oldSC: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sc-a",
+				},
+			},
+			newSC: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sc-a",
+				},
+				AllowedTopologies: []v1.TopologySelectorTerm{
+					{
+						MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+							{
+								Key:    "kubernetes.io/hostname",
+								Values: []string{"node-a"},
+							},
+						},
+					},
+				},
+			},
+			err:    false,
+			expect: framework.Queue,
+		},
+		{
+			name: "When there are no changes to the StorageClass, it returns QueueSkip",
+			pod:  makePod("pod-a").Pod,
+			oldSC: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sc-a",
+				},
+			},
+			newSC: &storagev1.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sc-a",
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name:   "type conversion error",
+			oldSC:  new(struct{}),
+			newSC:  new(struct{}),
+			err:    true,
+			expect: framework.Queue,
+		},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{PVCLister: item.pvcLister}
+			logger, _ := ktesting.NewTestContext(t)
+			qhint, err := pl.isSchedulableAfterStorageClassChange(logger, item.pod, item.oldSC, item.newSC)
+			if (err != nil) != item.err {
+				t.Errorf("isSchedulableAfterStorageClassChange failed - got: %q", err)
+			}
+			if qhint != item.expect {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
