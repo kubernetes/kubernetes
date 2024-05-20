@@ -90,7 +90,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 
 				ginkgo.By("Checking if VolumeAttachment was created for the pod")
 				testConfig := storageframework.ConvertTestConfig(m.config)
-				attachmentName := e2evolume.GetVolumeAttachmentName(ctx, m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
+				attachmentName := e2evolume.GetVolumeAttachmentName(ctx, m.cs, testConfig.ClientNodeSelection.Name, m.provisioner, claim.Name, claim.Namespace)
 				_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
@@ -141,7 +141,7 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 			// VolumeAttachment should be created because the default value for CSI attachable is true
 			ginkgo.By("Checking if VolumeAttachment was created for the pod")
 			testConfig := storageframework.ConvertTestConfig(m.config)
-			attachmentName := e2evolume.GetVolumeAttachmentName(ctx, m.cs, testConfig, m.provisioner, claim.Name, claim.Namespace)
+			attachmentName := e2evolume.GetVolumeAttachmentName(ctx, m.cs, testConfig.ClientNodeSelection.Name, m.provisioner, claim.Name, claim.Namespace)
 			_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
