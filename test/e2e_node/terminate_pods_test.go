@@ -116,7 +116,7 @@ var _ = SIGDescribe("Terminate Pods", func() {
 			gomega.Eventually(ctx, func() bool {
 				_, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 				return apierrors.IsNotFound(err)
-			}, 2*time.Minute, time.Second).Should(gomega.BeTrue())
+			}, 2*time.Minute, time.Second).Should(gomega.BeTrueBecause("the pod should terminate and no be found"))
 		})
 	})
 })
