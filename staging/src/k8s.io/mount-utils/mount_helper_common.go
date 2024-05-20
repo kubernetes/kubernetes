@@ -28,10 +28,10 @@ import (
 // if successful. If extensiveMountPointCheck is true IsNotMountPoint will be
 // called instead of IsLikelyNotMountPoint. IsNotMountPoint is more expensive
 // but properly handles bind mounts within the same fs.
-func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
+func CleanupMountPoint(logger klog.Logger, mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
 	pathExists, pathErr := PathExists(mountPath)
 	if !pathExists && pathErr == nil {
-		klog.Warningf("Warning: mount cleanup skipped because path does not exist: %v", mountPath)
+		klog.Info("Warning: mount cleanup skipped because path does not exist", "mountPath",mountPath)
 		return nil
 	}
 	corruptedMnt := IsCorruptedMnt(pathErr)
