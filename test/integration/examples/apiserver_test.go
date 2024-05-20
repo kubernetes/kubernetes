@@ -268,7 +268,7 @@ func TestFrontProxyConfig(t *testing.T) {
 	kubeBinaryVersion := sampleserver.WardleVersionToKubeVersion(version.MustParse(wardleBinaryVersion)).String()
 
 	// start up the KAS and prepare the options for the wardle API server
-	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, kubeBinaryVersion, wardleBinaryVersion)
+	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, kubeBinaryVersion, wardleBinaryVersion, []string{"--requestheader-uid-headers=x-remote-uid"})
 	kubeConfig := getKubeConfig(testKAS)
 
 	// create the SA that we will use to query the aggregated API
@@ -281,8 +281,6 @@ func TestFrontProxyConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedSAUserInfo := serviceaccount.UserInfo(expectedSA.Namespace, expectedSA.Name, string(expectedSA.UID))
-	expectedRealSAGroups := append(expectedSAUserInfo.GetGroups(), user.AllAuthenticated)
 
 	saTokenReq, err := kubeClient.CoreV1().ServiceAccounts(testNamespace).CreateToken(ctx, "wardle-client-sa", &v1.TokenRequest{}, metav1.CreateOptions{})
 	if err != nil {
@@ -301,6 +299,9 @@ func TestFrontProxyConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to retrieve details about the SA: %v", err)
 	}
+
+	expectedSAUserInfo := serviceaccount.UserInfo(expectedSA.Namespace, expectedSA.Name, string(expectedSA.UID))
+	expectedRealSAGroups := append(expectedSAUserInfo.GetGroups(), user.AllAuthenticated)
 	expectedExtra := expectedSAUserInfo.GetExtra()
 	if expectedExtra == nil {
 		expectedExtra = map[string][]string{}
@@ -315,7 +316,7 @@ func TestFrontProxyConfig(t *testing.T) {
 		transport.WrapperFunc(func(rt http.RoundTripper) http.RoundTripper {
 			return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				gotUser, ok := genericapirequest.UserFrom(req.Context())
-				if !ok {
+				if !ok || gotUser.GetName() == "system:anonymous" {
 					return nil, fmt.Errorf("got an unauthenticated request")
 				}
 
@@ -382,7 +383,7 @@ func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool
 	// each wardle binary is bundled with a specific kube binary.
 	kubeBinaryVersion := sampleserver.WardleVersionToKubeVersion(version.MustParse(wardleBinaryVersion)).String()
 
-	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, kubeBinaryVersion, wardleBinaryVersion)
+	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, kubeBinaryVersion, wardleBinaryVersion, nil)
 	kubeClientConfig := getKubeConfig(testKAS)
 
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
@@ -662,7 +663,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 	}
 }
 
-func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespace, kubebinaryVersion, wardleBinaryVersion string) (*kastesting.TestServer, *sampleserver.WardleServerOptions, int) {
+func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespace, kubebinaryVersion, wardleBinaryVersion string, kubeAPIServerFlags []string) (*kastesting.TestServer, *sampleserver.WardleServerOptions, int) {
 	// makes the kube-apiserver very responsive.  it's normally a minute
 	dynamiccertificates.FileRefreshDuration = 1 * time.Second
 
@@ -674,7 +675,13 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 	// endpoints cannot have loopback IPs so we need to override the resolver itself
 	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
 
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, BinaryVersion: kubebinaryVersion}, nil, framework.SharedEtcd())
+	testServer := kastesting.StartTestServerOrDie(t,
+		&kastesting.TestServerInstanceOptions{
+			EnableCertAuth: true,
+			BinaryVersion:  kubebinaryVersion,
+		},
+		kubeAPIServerFlags,
+		framework.SharedEtcd())
 	t.Cleanup(func() { testServer.TearDownFn() })
 
 	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(

@@ -245,8 +245,13 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 		CacheTTL:   10 * time.Second,
 		ClientCert: ClientCertAuthenticationOptions{},
 		RequestHeader: RequestHeaderAuthenticationOptions{
-			UsernameHeaders:     []string{"x-remote-user"},
-			UIDHeaders:          []string{"x-remote-uid"},
+			UsernameHeaders: []string{"x-remote-user"},
+			// we specifically don't default UID headers as these were introduced
+			// later (kube 1.32) and we don't want 3rd parties to be trusting the default headers
+			// before we can safely say that all KAS instances know they should
+			// remove them from an incoming request in its WithAuthentication handler.
+			// The defaulting will be enabled in a future (1.33+) version.
+			UIDHeaders:          nil,
 			GroupHeaders:        []string{"x-remote-group"},
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 		},
