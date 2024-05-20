@@ -43,6 +43,372 @@ func newServiceCIDR(name, primary, secondary string) *networkingv1alpha1.Service
 	return serviceCIDR
 }
 
+func TestOverlapsPrefix(t *testing.T) {
+	tests := []struct {
+		name         string
+		serviceCIDRs []*networkingv1alpha1.ServiceCIDR
+		prefix       netip.Prefix
+		want         []string
+	}{
+		{
+			name: "only one ServiceCIDR and IPv4 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/26"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and same IPv4 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/24"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and larger IPv4 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/16"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and non contained IPv4 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("192.168.0.0/24"),
+			want:   []string{},
+		},
+		{
+			name: "only one ServiceCIDR and IPv6 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/112"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and same IPv6 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/96"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and IPv6 larger",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/64"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and IPv6 prefix out of range",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db2::/112"),
+			want:   []string{},
+		},
+		{
+			name: "two ServiceCIDR and IPv4 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/24"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two overlapping ServiceCIDR and IPv4 prefix only contained in one",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/18"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two ServiceCIDR and IPv4 larger",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/8"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two ServiceCIDR and IPv4 prefix not contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("192.168.0.0/24"),
+			want:   []string{},
+		},
+		{
+			name: "two ServiceCIDR and IPv6 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/96"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two ServiceCIDR and IPv6 prefix contained in one",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/72"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two ServiceCIDR and aprefix larger",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/52"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two ServiceCIDR and prefix out of range",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db2::/64"),
+			want:   []string{},
+		},
+		{
+			name: "multiple ServiceCIDR match with overlap contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("kubernetes2", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/28"),
+			want:   []string{"kubernetes", "kubernetes2", "secondary"},
+		},
+		{
+			name: "multiple ServiceCIDR match with overlap contains",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("kubernetes2", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/8"),
+			want:   []string{"kubernetes", "kubernetes2", "secondary"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			for _, serviceCIDR := range tt.serviceCIDRs {
+				err := indexer.Add(serviceCIDR)
+				if err != nil {
+					t.Fatalf("unexpected error %v", err)
+				}
+			}
+			lister := networkinglisters.NewServiceCIDRLister(indexer)
+			got := []string{}
+			for _, serviceCIDR := range OverlapsPrefix(lister, tt.prefix) {
+				got = append(got, serviceCIDR.Name)
+			}
+			// sort slices to make the order predictable and avoid flakiness
+			sort.Strings(got)
+			sort.Strings(tt.want)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("OverlapsAddress() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestContainsPrefix(t *testing.T) {
+	tests := []struct {
+		name         string
+		serviceCIDRs []*networkingv1alpha1.ServiceCIDR
+		prefix       netip.Prefix
+		want         []string
+	}{
+		{
+			name: "only one ServiceCIDR and IPv4 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/26"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and same IPv4 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/24"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and larger IPv4 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/16"),
+			want:   []string{},
+		},
+		{
+			name: "only one ServiceCIDR and non containerd IPv4 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("192.168.0.0/24"),
+			want:   []string{},
+		},
+		{
+			name: "only one ServiceCIDR and IPv6 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/112"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and same IPv6 prefix",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/96"),
+			want:   []string{"kubernetes"},
+		},
+		{
+			name: "only one ServiceCIDR and IPv6 larger",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/64"),
+			want:   []string{},
+		},
+		{
+			name: "only one ServiceCIDR and IPv6 prefix out of range",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+			},
+			prefix: netip.MustParsePrefix("2001:db2::/112"),
+			want:   []string{},
+		},
+		{
+			name: "two ServiceCIDR and IPv4 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/24"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two ServiceCIDR and IPv4 prefix only contained in one",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/18"),
+			want:   []string{"secondary"},
+		},
+		{
+			name: "two ServiceCIDR and IPv4 larger",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/8"),
+			want:   []string{},
+		},
+		{
+			name: "two ServiceCIDR and IPv4 prefix not contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("192.168.0.0/24"),
+			want:   []string{},
+		},
+		{
+			name: "two ServiceCIDR and IPv6 prefix contained",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/96"),
+			want:   []string{"kubernetes", "secondary"},
+		},
+		{
+			name: "two ServiceCIDR and IPv6 prefix contained in one",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/72"),
+			want:   []string{"secondary"},
+		},
+		{
+			name: "two ServiceCIDR and aprefix larger",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db8::/52"),
+			want:   []string{},
+		},
+		{
+			name: "two ServiceCIDR and prefix out of range",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("2001:db2::/64"),
+			want:   []string{},
+		},
+		{
+			name: "multiple ServiceCIDR match with overlap",
+			serviceCIDRs: []*networkingv1alpha1.ServiceCIDR{
+				newServiceCIDR("kubernetes", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("kubernetes2", "10.0.0.0/24", "2001:db8::/96"),
+				newServiceCIDR("secondary", "10.0.0.0/16", "2001:db8::/64"),
+			},
+			prefix: netip.MustParsePrefix("10.0.0.0/28"),
+			want:   []string{"kubernetes", "kubernetes2", "secondary"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			for _, serviceCIDR := range tt.serviceCIDRs {
+				err := indexer.Add(serviceCIDR)
+				if err != nil {
+					t.Fatalf("unexpected error %v", err)
+				}
+			}
+			lister := networkinglisters.NewServiceCIDRLister(indexer)
+			got := []string{}
+			for _, serviceCIDR := range ContainsPrefix(lister, tt.prefix) {
+				got = append(got, serviceCIDR.Name)
+			}
+			// sort slices to make the order predictable and avoid flakiness
+			sort.Strings(got)
+			sort.Strings(tt.want)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ContainsAddress() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestContainsAddress(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -428,11 +428,6 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			_, controller := newController(tCtx, t, tc.cidrs, tc.ips)
-			err := controller.syncCIDRs()
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			got, err := controller.canDeleteCIDR(tCtx, tc.cidrSynced)
 			if err != nil {
 				t.Fatal(err)
@@ -534,10 +529,6 @@ func TestController_ipToCidrs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			_, controller := newController(tCtx, t, tt.cidrs, nil)
-			err := controller.syncCIDRs()
-			if err != nil {
-				t.Fatal(err)
-			}
 			if got := controller.containingServiceCIDRs(tt.ip); !cmp.Equal(got, tt.want, cmpopts.SortSlices(func(a, b string) bool { return a < b })) {
 				t.Errorf("Controller.ipToCidrs() = %v, want %v", got, tt.want)
 			}
@@ -591,10 +582,6 @@ func TestController_cidrToCidrs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			_, controller := newController(tCtx, t, tt.cidrs, nil)
-			err := controller.syncCIDRs()
-			if err != nil {
-				t.Fatal(err)
-			}
 			if got := controller.overlappingServiceCIDRs(tt.cidr); !cmp.Equal(got, tt.want, cmpopts.SortSlices(func(a, b string) bool { return a < b })) {
 				t.Errorf("Controller.cidrToCidrs() = %v, want %v", got, tt.want)
 			}

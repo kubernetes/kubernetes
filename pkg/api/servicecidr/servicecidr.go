@@ -26,6 +26,46 @@ import (
 	networkinglisters "k8s.io/client-go/listers/networking/v1alpha1"
 )
 
+// OverlapsPrefix return the list of ServiceCIDR that overlaps with the prefix passed as argument
+func OverlapsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefix netip.Prefix) []*networkingv1alpha1.ServiceCIDR {
+	result := []*networkingv1alpha1.ServiceCIDR{}
+	serviceCIDRList, err := serviceCIDRLister.List(labels.Everything())
+	if err != nil {
+		return result
+	}
+
+	for _, serviceCIDR := range serviceCIDRList {
+		for _, cidr := range serviceCIDR.Spec.CIDRs {
+			if p, err := netip.ParsePrefix(cidr); err == nil { // it can not fail since is already validated
+				if p.Overlaps(prefix) {
+					result = append(result, serviceCIDR)
+				}
+			}
+		}
+	}
+	return result
+}
+
+// ContainsPrefix return the list of ServiceCIDR that contains the prefix passed as argument
+func ContainsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefix netip.Prefix) []*networkingv1alpha1.ServiceCIDR {
+	result := []*networkingv1alpha1.ServiceCIDR{}
+	serviceCIDRList, err := serviceCIDRLister.List(labels.Everything())
+	if err != nil {
+		return result
+	}
+
+	for _, serviceCIDR := range serviceCIDRList {
+		for _, cidr := range serviceCIDR.Spec.CIDRs {
+			if p, err := netip.ParsePrefix(cidr); err == nil { // it can not fail since is already validated
+				if p.Overlaps(prefix) && p.Bits() <= prefix.Bits() {
+					result = append(result, serviceCIDR)
+				}
+			}
+		}
+	}
+	return result
+}
+
 // ContainsIP return the list of ServiceCIDR that contains the IP address passed as argument
 func ContainsIP(serviceCIDRLister networkinglisters.ServiceCIDRLister, ip net.IP) []*networkingv1alpha1.ServiceCIDR {
 	address := IPToAddr(ip)
