@@ -83,6 +83,9 @@ func (s *RequestHeaderAuthenticationOptions) Validate() []error {
 	if len(s.UsernameHeaders) > 0 && !caseInsensitiveHas(s.UsernameHeaders, "X-Remote-User") {
 		klog.Warningf("--requestheader-username-headers is set without specifying the standard X-Remote-User header - API aggregation will not work")
 	}
+	if len(s.UIDHeaders) > 0 && !caseInsensitiveHas(s.UIDHeaders, "X-Remote-Uid") {
+		klog.Warningf("--requestheader-uid-headers is set without specifying the standard X-Remote-Uid header - API aggregation will not work")
+	}
 	if len(s.GroupHeaders) > 0 && !caseInsensitiveHas(s.GroupHeaders, "X-Remote-Group") {
 		klog.Warningf("--requestheader-group-headers is set without specifying the standard X-Remote-Group header - API aggregation will not work")
 	}
