@@ -890,3 +890,107 @@ func TestVolumeBinding(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulableAfterPersistentVolumeAddOrChange(t *testing.T) {
+	table := []struct {
+		name           string
+		pod            *v1.Pod
+		oldPV          *v1.PersistentVolume
+		newPV          *v1.PersistentVolume
+		useEmptyStruct bool
+		expect         framework.QueueingHint
+		err            bool
+	}{
+		{
+			name:   "pod has no pvs",
+			pod:    makePod("pod-a").Pod,
+			expect: framework.QueueSkip,
+			err:    false,
+		},
+		{
+			name: "pod has pvs with no changes",
+			pod: func() *v1.Pod {
+				pod := makePod("pod-a").Pod
+				pod.Spec.Volumes = append(pod.Spec.Volumes, []v1.Volume{
+					{
+						Name: "pv-a",
+					},
+					{
+						Name: "pv-b",
+					},
+				}...)
+				return pod
+			}(),
+			oldPV:  makePV("pv-b", "sc-b").PersistentVolume,
+			newPV:  makePV("pv-b", "sc-b").PersistentVolume,
+			expect: framework.Queue,
+			err:    false,
+		},
+		{
+			name: "pod has a newly added pv",
+			pod: func() *v1.Pod {
+				pod := makePod("pod-a").Pod
+				pod.Spec.Volumes = append(pod.Spec.Volumes, []v1.Volume{
+					{
+						Name: "pv-a",
+					},
+					{
+						Name: "pv-b",
+					},
+				}...)
+				return pod
+			}(),
+			oldPV:  nil,
+			newPV:  makePV("pv-b", "sc-b").PersistentVolume,
+			expect: framework.Queue,
+			err:    false,
+		},
+		{
+			name: "pod has pvs with changed fields",
+			pod: func() *v1.Pod {
+				pod := makePod("pod-a").Pod
+				pod.Spec.Volumes = append(pod.Spec.Volumes, []v1.Volume{
+					{
+						Name: "pv-a",
+					},
+					{
+						Name: "pv-b",
+					},
+				}...)
+				return pod
+			}(),
+			oldPV:  makePV("pv-b", "sc-b").withPhase(v1.VolumeAvailable).PersistentVolume,
+			newPV:  makePV("pv-b", "sc-b").withPhase(v1.VolumeBound).PersistentVolume,
+			expect: framework.Queue,
+			err:    false,
+		},
+		{
+			name:           "type conversion error",
+			useEmptyStruct: true,
+			err:            true,
+			expect:         framework.Queue,
+		},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{}
+			logger, _ := ktesting.NewTestContext(t)
+
+			var qhint framework.QueueingHint
+			var err error
+			if item.useEmptyStruct {
+				qhint, err = pl.isSchedulableAfterPersistentVolumeAddOrChange(logger, item.pod, new(struct{}), new(struct{}))
+			} else {
+				qhint, err = pl.isSchedulableAfterPersistentVolumeAddOrChange(logger, item.pod, item.oldPV, item.newPV)
+			}
+
+			if (item.err && err == nil) || (!item.err && err != nil) {
+				t.Errorf("isSchedulableAfterPersistentVolumeAddOrChange failed - got: %q", err)
+			}
+			if qhint != item.expect {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
