@@ -893,13 +893,12 @@ func TestVolumeBinding(t *testing.T) {
 
 func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 	table := []struct {
-		name           string
-		pod            *v1.Pod
-		oldPV          *v1.PersistentVolume
-		newPV          *v1.PersistentVolume
-		useEmptyStruct bool
-		expect         framework.QueueingHint
-		err            bool
+		name   string
+		pod    *v1.Pod
+		oldPV  interface{}
+		newPV  interface{}
+		expect framework.QueueingHint
+		err    bool
 	}{
 		{
 			name:   "pod has no pvs",
@@ -965,10 +964,11 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			err:    false,
 		},
 		{
-			name:           "type conversion error",
-			useEmptyStruct: true,
-			err:            true,
-			expect:         framework.Queue,
+			name:   "type conversion error",
+			oldPV:  new(struct{}),
+			newPV:  new(struct{}),
+			err:    true,
+			expect: framework.Queue,
 		},
 	}
 
@@ -976,16 +976,8 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 		t.Run(item.name, func(t *testing.T) {
 			pl := &VolumeBinding{}
 			logger, _ := ktesting.NewTestContext(t)
-
-			var qhint framework.QueueingHint
-			var err error
-			if item.useEmptyStruct {
-				qhint, err = pl.isSchedulableAfterPersistentVolumeChange(logger, item.pod, new(struct{}), new(struct{}))
-			} else {
-				qhint, err = pl.isSchedulableAfterPersistentVolumeChange(logger, item.pod, item.oldPV, item.newPV)
-			}
-
-			if (item.err && err == nil) || (!item.err && err != nil) {
+			qhint, err := pl.isSchedulableAfterPersistentVolumeChange(logger, item.pod, item.oldPV, item.newPV)
+			if (err != nil) != item.err {
 				t.Errorf("isSchedulableAfterPersistentVolumeChange failed - got: %q", err)
 			}
 			if qhint != item.expect {
