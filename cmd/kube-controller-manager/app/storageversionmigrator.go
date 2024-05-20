@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/metadata"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -53,9 +54,9 @@ func startSVMController(
 	if !controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
 		return nil, true, fmt.Errorf("storage version migrator requires garbage collector")
 	}
-
-	config := controllerContext.ClientBuilder.ConfigOrDie(controllerName)
-	client := controllerContext.ClientBuilder.ClientOrDie(controllerName)
+	logger := klog.FromContext(ctx)
+	config := controllerContext.ClientBuilder.ConfigOrDie(logger, controllerName)
+	client := controllerContext.ClientBuilder.ClientOrDie(logger, controllerName)
 	informer := controllerContext.InformerFactory.Storagemigration().V1alpha1().StorageVersionMigrations()
 
 	dynamicClient, err := dynamic.NewForConfig(config)

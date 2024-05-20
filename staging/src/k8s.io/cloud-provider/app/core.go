@@ -40,11 +40,12 @@ import (
 )
 
 func startCloudNodeController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	// Start the CloudNodeController
 	nodeController, err := cloudnodecontroller.NewCloudNodeController(
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		// cloud node controller uses existing cluster role from node-controller
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		completedConfig.ClientBuilder.ClientOrDie(logger, initContext.ClientName),
 		cloud,
 		completedConfig.ComponentConfig.NodeStatusUpdateFrequency.Duration,
 		completedConfig.ComponentConfig.NodeController.ConcurrentNodeSyncs,
@@ -60,11 +61,12 @@ func startCloudNodeController(ctx context.Context, initContext ControllerInitCon
 }
 
 func startCloudNodeLifecycleController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	// Start the cloudNodeLifecycleController
 	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		// cloud node lifecycle controller uses existing cluster role from node-controller
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		completedConfig.ClientBuilder.ClientOrDie(logger, initContext.ClientName),
 		cloud,
 		completedConfig.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 	)
@@ -79,10 +81,11 @@ func startCloudNodeLifecycleController(ctx context.Context, initContext Controll
 }
 
 func startServiceController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
 		cloud,
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		completedConfig.ClientBuilder.ClientOrDie(logger, initContext.ClientName),
 		completedConfig.SharedInformers.Core().V1().Services(),
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
@@ -127,10 +130,10 @@ func startRouteController(ctx context.Context, initContext ControllerInitContext
 	if len(clusterCIDRs) > 2 {
 		return nil, false, fmt.Errorf("length of clusterCIDRs is:%v more than max allowed of 2", len(clusterCIDRs))
 	}
-
+	logger := klog.FromContext(ctx)
 	routeController := routecontroller.New(
 		routes,
-		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
+		completedConfig.ClientBuilder.ClientOrDie(logger, initContext.ClientName),
 		completedConfig.SharedInformers.Core().V1().Nodes(),
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs,

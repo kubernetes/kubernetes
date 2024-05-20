@@ -24,6 +24,7 @@ import (
 	"fmt"
 
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -38,11 +39,12 @@ func newJobControllerDescriptor() *ControllerDescriptor {
 }
 
 func startJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	jobController, err := job.NewController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
-		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "job-controller"),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("creating Job controller: %v", err)
@@ -60,9 +62,10 @@ func newCronJobControllerDescriptor() *ControllerDescriptor {
 }
 
 func startCronJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),
-		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "cronjob-controller"),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("creating CronJob controller V2: %v", err)

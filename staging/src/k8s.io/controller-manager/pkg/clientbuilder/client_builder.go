@@ -27,12 +27,12 @@ import (
 // Please note a copy also exists in staging/src/k8s.io/cloud-provider/cloud.go
 // TODO: Extract this into a separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
-	Config(name string) (*restclient.Config, error)
-	ConfigOrDie(name string) *restclient.Config
-	Client(name string) (clientset.Interface, error)
-	ClientOrDie(name string) clientset.Interface
-	DiscoveryClient(name string) (discovery.DiscoveryInterface, error)
-	DiscoveryClientOrDie(name string) discovery.DiscoveryInterface
+	Config(logger klog.Logger, name string) (*restclient.Config, error)
+	ConfigOrDie(logger klog.Logger, name string) *restclient.Config
+	Client(logger klog.Logger, name string) (clientset.Interface, error)
+	ClientOrDie(logger klog.Logger, name string) clientset.Interface
+	DiscoveryClient(logger klog.Logger, name string) (discovery.DiscoveryInterface, error)
+	DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents
@@ -42,24 +42,25 @@ type SimpleControllerClientBuilder struct {
 }
 
 // Config returns a client config for a fixed client
-func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
+func (b SimpleControllerClientBuilder) Config(logger klog.Logger, name string) (*restclient.Config, error) {
 	clientConfig := *b.ClientConfig
 	return restclient.AddUserAgent(&clientConfig, name), nil
 }
 
 // ConfigOrDie returns a client config if no error from previous config func.
 // If it gets an error getting the client, it will log the error and kill the process it's running in.
-func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
-	clientConfig, err := b.Config(name)
+func (b SimpleControllerClientBuilder) ConfigOrDie(logger klog.Logger, name string) *restclient.Config {
+	clientConfig, err := b.Config(logger, name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "Error in getting client config")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return clientConfig
 }
 
 // Client returns a clientset.Interface built from the ClientBuilder
-func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface, error) {
-	clientConfig, err := b.Config(name)
+func (b SimpleControllerClientBuilder) Client(logger klog.Logger, name string) (clientset.Interface, error) {
+	clientConfig, err := b.Config(logger, name)
 	if err != nil {
 		return nil, err
 	}
@@ -68,18 +69,19 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 
 // ClientOrDie returns a clientset.interface built from the ClientBuilder with no error.
 // If it gets an error getting the client, it will log the error and kill the process it's running in.
-func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
-	client, err := b.Client(name)
+func (b SimpleControllerClientBuilder) ClientOrDie(logger klog.Logger, name string) clientset.Interface {
+	client, err := b.Client(logger, name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "Error in getting client")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return client
 }
 
 // DiscoveryClient returns a discovery.DiscoveryInterface built from the ClientBuilder
 // Discovery is special because it will artificially pump the burst quite high to handle the many discovery requests.
-func (b SimpleControllerClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
-	clientConfig, err := b.Config(name)
+func (b SimpleControllerClientBuilder) DiscoveryClient(logger klog.Logger, name string) (discovery.DiscoveryInterface, error) {
+	clientConfig, err := b.Config(logger, name)
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +95,11 @@ func (b SimpleControllerClientBuilder) DiscoveryClient(name string) (discovery.D
 // DiscoveryClientOrDie returns a discovery.DiscoveryInterface built from the ClientBuilder with no error.
 // Discovery is special because it will artificially pump the burst quite high to handle the many discovery requests.
 // If it gets an error getting the client, it will log the error and kill the process it's running in.
-func (b SimpleControllerClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
-	client, err := b.DiscoveryClient(name)
+func (b SimpleControllerClientBuilder) DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface {
+	client, err := b.DiscoveryClient(logger, name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "Error in getting client")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return client
 }

@@ -28,6 +28,7 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version/verflag"
+	"k8s.io/klog/v2"
 )
 
 type CommandBuilder struct {
@@ -139,7 +140,8 @@ func (cb *CommandBuilder) BuildCommand() *cobra.Command {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			config, err := cb.options.Config(ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(),
+			logger := klog.FromContext(cmd.Context())
+			config, err := cb.options.Config(logger, ControllerNames(cb.controllerInitFuncConstructors), ControllersDisabledByDefault.List(),
 				cb.controllerAliases, WebhookNames(cb.webhookConfigs), WebhooksDisabledByDefault.List())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
@@ -34,8 +35,9 @@ func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
 	}
 }
 func startBootstrapSignerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	bsc, err := bootstrap.NewSigner(
-		controllerContext.ClientBuilder.ClientOrDie("bootstrap-signer"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "bootstrap-signer"),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		bootstrap.DefaultSignerOptions(),
@@ -56,8 +58,9 @@ func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
 	}
 }
 func startTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	tcc, err := bootstrap.NewTokenCleaner(
-		controllerContext.ClientBuilder.ClientOrDie("token-cleaner"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "token-cleaner"),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),
 	)

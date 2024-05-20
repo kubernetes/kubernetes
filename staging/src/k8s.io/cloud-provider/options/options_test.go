@@ -36,6 +36,7 @@ import (
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
@@ -370,8 +371,8 @@ func TestCreateConfig(t *testing.T) {
 	fs.VisitAll(func(f *pflag.Flag) {
 		fmt.Printf("%s: %s\n", f.Name, f.Value)
 	})
-
-	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
+	logger, _ := ktesting.NewTestContext(t)
+	c, err := s.Config(logger, []string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
 	assert.Nil(t, err, "unexpected error: %s", err)
 
 	expected := &appconfig.Config{

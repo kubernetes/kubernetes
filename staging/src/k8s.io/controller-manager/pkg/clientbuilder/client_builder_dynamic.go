@@ -103,8 +103,8 @@ func NewTestDynamicClientBuilder(clientConfig *restclient.Config, coreClient v1c
 	return builder
 }
 
-func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Config, error) {
-	_, err := getOrCreateServiceAccount(t.CoreClient, t.Namespace, saName)
+func (t *DynamicControllerClientBuilder) Config(logger klog.Logger, saName string) (*restclient.Config, error) {
+	_, err := getOrCreateServiceAccount(logger, t.CoreClient, t.Namespace, saName)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +124,7 @@ func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Conf
 			coreClient:         t.CoreClient,
 			expirationSeconds:  t.expirationSeconds,
 			leewayPercent:      t.leewayPercent,
+			logger:             logger,
 		})
 		configCopy.Wrap(transport.ResettableTokenSourceWrapTransport(cachedTokenSource))
 		t.roundTripperFuncMap[saName] = configCopy.WrapTransport
@@ -132,32 +133,34 @@ func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Conf
 	return &configCopy, nil
 }
 
-func (t *DynamicControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
-	clientConfig, err := t.Config(name)
+func (t *DynamicControllerClientBuilder) ConfigOrDie(logger klog.Logger, name string) *restclient.Config {
+	clientConfig, err := t.Config(logger, name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "Error in getting client")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return clientConfig
 }
 
-func (t *DynamicControllerClientBuilder) Client(name string) (clientset.Interface, error) {
-	clientConfig, err := t.Config(name)
+func (t *DynamicControllerClientBuilder) Client(logger klog.Logger, name string) (clientset.Interface, error) {
+	clientConfig, err := t.Config(logger, name)
 	if err != nil {
 		return nil, err
 	}
 	return clientset.NewForConfig(clientConfig)
 }
 
-func (t *DynamicControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
-	client, err := t.Client(name)
+func (t *DynamicControllerClientBuilder) ClientOrDie(logger klog.Logger, name string) clientset.Interface {
+	client, err := t.Client(logger, name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "Error in getting client")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return client
 }
 
-func (t *DynamicControllerClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
-	clientConfig, err := t.Config(name)
+func (t *DynamicControllerClientBuilder) DiscoveryClient(logger klog.Logger, name string) (discovery.DiscoveryInterface, error) {
+	clientConfig, err := t.Config(logger, name)
 	if err != nil {
 		return nil, err
 	}
@@ -168,10 +171,11 @@ func (t *DynamicControllerClientBuilder) DiscoveryClient(name string) (discovery
 	return clientset.NewForConfig(clientConfig)
 }
 
-func (t *DynamicControllerClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
-	client, err := t.DiscoveryClient(name)
+func (t *DynamicControllerClientBuilder) DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface {
+	client, err := t.DiscoveryClient(logger, name)
 	if err != nil {
-		klog.Fatal(err)
+		logger.Error(err, "Error in getting client")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return client
 }
@@ -182,6 +186,7 @@ type tokenSourceImpl struct {
 	coreClient         v1core.CoreV1Interface
 	expirationSeconds  int64
 	leewayPercent      int
+	logger             klog.Logger
 }
 
 func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
@@ -193,8 +198,8 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 		Steps:    4,
 	}
 	if err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		if _, inErr := getOrCreateServiceAccount(ts.coreClient, ts.namespace, ts.serviceAccountName); inErr != nil {
-			klog.Warningf("get or create service account failed: %v", inErr)
+		if _, inErr := getOrCreateServiceAccount(ts.logger, ts.coreClient, ts.namespace, ts.serviceAccountName); inErr != nil {
+			ts.logger.Info("get or create service account failed", "namespace", ts.namespace, "serviceAccountName", ts.serviceAccountName, "error", inErr)
 			return false, nil
 		}
 
@@ -204,7 +209,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 			},
 		}, metav1.CreateOptions{})
 		if inErr != nil {
-			klog.Warningf("get token failed: %v", inErr)
+			ts.logger.Info("get token failed", "namespace", ts.namespace, "serviceAccountName", ts.serviceAccountName, "error", inErr)
 			return false, nil
 		}
 		retTokenRequest = tr
@@ -244,7 +249,7 @@ func constructClient(saNamespace, saName string, config *restclient.Config) rest
 	return ret
 }
 
-func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
+func getOrCreateServiceAccount(logger klog.Logger, coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
 	sa, err := coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		return sa, nil
@@ -257,7 +262,7 @@ func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, nam
 	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
 	if _, err := coreClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		if _, err = coreClient.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
+			logger.Info("create non-exist namespace", "namespace", namespace, "error", err)
 		}
 	}
 

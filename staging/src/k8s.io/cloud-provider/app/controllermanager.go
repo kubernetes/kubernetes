@@ -96,7 +96,8 @@ the cloud specific control loops shipped with Kubernetes.`,
 				return err
 			}
 
-			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
+			logger := klog.FromContext(cmd.Context())
+			c, err := s.Config(logger, ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
@@ -213,10 +214,11 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface
 	}
 
 	run := func(ctx context.Context, controllerInitializers map[string]InitFunc) {
+		logger := klog.FromContext(ctx)
 		clientBuilder := clientbuilder.SimpleControllerClientBuilder{
 			ClientConfig: c.Kubeconfig,
 		}
-		controllerContext, err := CreateControllerContext(c, clientBuilder, ctx.Done())
+		controllerContext, err := CreateControllerContext(logger, c, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
 		}
@@ -342,9 +344,10 @@ func startControllers(ctx context.Context, cloud cloudprovider.Interface, contro
 
 	healthzHandler.AddHealthChecker(controllerChecks...)
 
+	logger := klog.FromContext(ctx)
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
-	if err := genericcontrollermanager.WaitForAPIServer(c.VersionedClient, 10*time.Second); err != nil {
+	if err := genericcontrollermanager.WaitForAPIServer(logger, c.VersionedClient, 10*time.Second); err != nil {
 		klog.Fatalf("Failed to wait for apiserver being healthy: %v", err)
 	}
 
@@ -472,21 +475,21 @@ var DefaultInitFuncConstructors = map[string]ControllerInitFuncConstructor{
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
-func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (genericcontrollermanager.ControllerContext, error) {
-	versionedClient := clientBuilder.ClientOrDie("shared-informers")
+func CreateControllerContext(logger klog.Logger, s *cloudcontrollerconfig.CompletedConfig, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (genericcontrollermanager.ControllerContext, error) {
+	versionedClient := clientBuilder.ClientOrDie(logger, "shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
-	metadataClient := metadata.NewForConfigOrDie(clientBuilder.ConfigOrDie("metadata-informers"))
+	metadataClient := metadata.NewForConfigOrDie(clientBuilder.ConfigOrDie(logger, "metadata-informers"))
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
-	if err := genericcontrollermanager.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
+	if err := genericcontrollermanager.WaitForAPIServer(logger, versionedClient, 10*time.Second); err != nil {
 		return genericcontrollermanager.ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %v", err)
 	}
 
 	// Use a discovery client capable of being refreshed.
-	discoveryClient := clientBuilder.ClientOrDie("controller-discovery")
+	discoveryClient := clientBuilder.ClientOrDie(logger, "controller-discovery")
 	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient.Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
 	go wait.Until(func() {

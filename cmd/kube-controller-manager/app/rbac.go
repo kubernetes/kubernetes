@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
@@ -33,9 +34,10 @@ func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
 }
 
 func startClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	go clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
-		controllerContext.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "clusterrole-aggregation-controller").RbacV1(),
 	).Run(ctx, 5)
 	return nil, true, nil
 }

@@ -52,7 +52,7 @@ func startCertificateSigningRequestSigningController(ctx context.Context, contro
 		return nil, false, fmt.Errorf("cannot specify default and per controller certs at the same time")
 	}
 
-	c := controllerContext.ClientBuilder.ClientOrDie("certificate-controller")
+	c := controllerContext.ClientBuilder.ClientOrDie(logger, "certificate-controller")
 	csrInformer := controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests()
 	certTTL := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration
 
@@ -165,9 +165,10 @@ func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDesc
 	}
 }
 func startCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	approver := approver.NewCSRApprovingController(
 		ctx,
-		controllerContext.ClientBuilder.ClientOrDie("certificate-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "certificate-controller"),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
 	go approver.Run(ctx, 5)
@@ -183,8 +184,9 @@ func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescri
 	}
 }
 func startCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	cleaner := cleaner.NewCSRCleanerController(
-		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "certificate-controller").CertificatesV1().CertificateSigningRequests(),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
 	go cleaner.Run(ctx, 1)
@@ -200,6 +202,7 @@ func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 }
 
 func startRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	var (
 		rootCA []byte
 		err    error
@@ -209,13 +212,13 @@ func startRootCACertificatePublisherController(ctx context.Context, controllerCo
 			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", controllerContext.ComponentConfig.SAController.RootCAFile, err)
 		}
 	} else {
-		rootCA = controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
+		rootCA = controllerContext.ClientBuilder.ConfigOrDie(logger, "root-ca-cert-publisher").CAData
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
-		controllerContext.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "root-ca-cert-publisher"),
 		rootCA,
 	)
 	if err != nil {

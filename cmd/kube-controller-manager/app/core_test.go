@@ -28,6 +28,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestClientBuilder inherits ClientBuilder and can accept a given fake clientset.
@@ -35,21 +37,25 @@ type TestClientBuilder struct {
 	clientset clientset.Interface
 }
 
-func (TestClientBuilder) Config(name string) (*restclient.Config, error) { return nil, nil }
-func (TestClientBuilder) ConfigOrDie(name string) *restclient.Config {
+func (TestClientBuilder) Config(logger klog.Logger, name string) (*restclient.Config, error) {
+	return nil, nil
+}
+func (TestClientBuilder) ConfigOrDie(logger klog.Logger, name string) *restclient.Config {
 	return &restclient.Config{}
 }
 
-func (TestClientBuilder) Client(name string) (clientset.Interface, error) { return nil, nil }
-func (m TestClientBuilder) ClientOrDie(name string) clientset.Interface {
+func (TestClientBuilder) Client(logger klog.Logger, name string) (clientset.Interface, error) {
+	return nil, nil
+}
+func (m TestClientBuilder) ClientOrDie(logger klog.Logger, name string) clientset.Interface {
 	return m.clientset
 }
 
-func (m TestClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
+func (m TestClientBuilder) DiscoveryClient(logger klog.Logger, name string) (discovery.DiscoveryInterface, error) {
 	return m.clientset.Discovery(), nil
 }
-func (m TestClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
-	ret, err := m.DiscoveryClient(name)
+func (m TestClientBuilder) DiscoveryClientOrDie(logger klog.Logger, name string) discovery.DiscoveryInterface {
+	ret, err := m.DiscoveryClient(logger, name)
 	if err != nil {
 		panic(err)
 	}
@@ -146,8 +152,9 @@ func TestController_DiscoveryError(t *testing.T) {
 				t.Errorf("%v test failed for use case: %v", controllerName, name)
 			}
 		}
+		logger, _ := ktesting.NewTestContext(t)
 		_, _, err := startModifiedNamespaceController(
-			context.TODO(), ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+			context.TODO(), ctx, testClientset, testClientBuilder.ConfigOrDie(logger, "namespace-controller"))
 		if test.expectedErr != (err != nil) {
 			t.Errorf("Namespace Controller test failed for use case: %v", name)
 		}

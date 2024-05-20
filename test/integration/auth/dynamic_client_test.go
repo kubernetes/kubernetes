@@ -54,7 +54,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 		t.Fatalf("parse duration failed: %v", err)
 	}
 
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	baseClient, baseConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceAccountSigningKeyFile = tmpfile.Name()
@@ -87,7 +87,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 		ns, exp, leeway)
 
 	saName := "dt"
-	dymClient, err := clientBuilder.Client(saName)
+	dymClient, err := clientBuilder.Client(logger, saName)
 
 	if err != nil {
 		t.Fatalf("build client via dynamic client builder failed: %v", err)

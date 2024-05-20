@@ -124,12 +124,12 @@ func startNodeIpamController(ctx context.Context, initContext app.ControllerInit
 	if err != nil {
 		return nil, false, err
 	}
-
+	logger := klog.FromContext(ctx)
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx,
 		controllerCtx.InformerFactory.Core().V1().Nodes(),
 		cloud,
-		controllerCtx.ClientBuilder.ClientOrDie(initContext.ClientName),
+		controllerCtx.ClientBuilder.ClientOrDie(logger, initContext.ClientName),
 		clusterCIDRs,
 		serviceCIDR,
 		secondaryServiceCIDR,

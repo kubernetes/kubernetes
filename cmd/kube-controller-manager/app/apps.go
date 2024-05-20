@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -41,13 +42,14 @@ func newDaemonSetControllerDescriptor() *ControllerDescriptor {
 	}
 }
 func startDaemonSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	dsc, err := daemon.NewDaemonSetsController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
-		controllerContext.ClientBuilder.ClientOrDie("daemon-set-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "daemon-set-controller"),
 		flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
 	)
 	if err != nil {
@@ -65,13 +67,14 @@ func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 	}
 }
 func startStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	go statefulset.NewStatefulSetController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
-		controllerContext.ClientBuilder.ClientOrDie("statefulset-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "statefulset-controller"),
 	).Run(ctx, int(controllerContext.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs))
 	return nil, true, nil
 }
@@ -85,11 +88,12 @@ func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 }
 
 func startReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	go replicaset.NewReplicaSetController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.ClientBuilder.ClientOrDie("replicaset-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "replicaset-controller"),
 		replicaset.BurstReplicas,
 	).Run(ctx, int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs))
 	return nil, true, nil
@@ -104,12 +108,13 @@ func newDeploymentControllerDescriptor() *ControllerDescriptor {
 }
 
 func startDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	dc, err := deployment.NewDeploymentController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.ClientBuilder.ClientOrDie("deployment-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "deployment-controller"),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Deployment controller: %v", err)

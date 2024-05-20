@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 )
@@ -38,8 +39,9 @@ func newDisruptionControllerDescriptor() *ControllerDescriptor {
 }
 
 func startDisruptionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
-	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
+	logger := klog.FromContext(ctx)
+	client := controllerContext.ClientBuilder.ClientOrDie(logger, "disruption-controller")
+	config := controllerContext.ClientBuilder.ConfigOrDie(logger, "disruption-controller")
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
 	scaleClient, err := scale.NewForConfig(config, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {

@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
@@ -38,11 +39,12 @@ func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 		}}
 }
 func startServiceCIDRsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	logger := klog.FromContext(ctx)
 	go servicecidrs.NewController(
 		ctx,
 		controllerContext.InformerFactory.Networking().V1alpha1().ServiceCIDRs(),
 		controllerContext.InformerFactory.Networking().V1alpha1().IPAddresses(),
-		controllerContext.ClientBuilder.ClientOrDie("service-cidrs-controller"),
+		controllerContext.ClientBuilder.ClientOrDie(logger, "service-cidrs-controller"),
 	).Run(ctx, 5)
 	// TODO use component config
 	return nil, true, nil

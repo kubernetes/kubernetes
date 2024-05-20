@@ -43,6 +43,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
 	// add the related feature gates
@@ -170,7 +171,7 @@ func (o *CloudControllerManagerOptions) Flags(allControllers []string, disabledB
 }
 
 // ApplyTo fills up cloud controller manager config with options.
-func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, userAgent string) error {
+func (o *CloudControllerManagerOptions) ApplyTo(logger klog.Logger, c *config.Config, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, userAgent string) error {
 	var err error
 
 	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
@@ -236,7 +237,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers
 	} else {
 		c.ClientBuilder = rootClientBuilder
 	}
-	c.VersionedClient = rootClientBuilder.ClientOrDie("shared-informers")
+	c.VersionedClient = rootClientBuilder.ClientOrDie(logger, "shared-informers")
 	c.SharedInformers = informers.NewSharedInformerFactory(c.VersionedClient, resyncPeriod(c)())
 
 	// sync back to component config
@@ -284,7 +285,7 @@ func resyncPeriod(c *config.Config) func() time.Duration {
 }
 
 // Config return a cloud controller manager config objective
-func (o *CloudControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) (*config.Config, error) {
+func (o *CloudControllerManagerOptions) Config(logger klog.Logger, allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) (*config.Config, error) {
 	if err := o.Validate(allControllers, disabledByDefaultControllers, controllerAliases, allWebhooks, disabledByDefaultWebhooks); err != nil {
 		return nil, err
 	}
@@ -300,7 +301,7 @@ func (o *CloudControllerManagerOptions) Config(allControllers []string, disabled
 	}
 
 	c := &config.Config{}
-	if err := o.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases, CloudControllerManagerUserAgent); err != nil {
+	if err := o.ApplyTo(logger, c, allControllers, disabledByDefaultControllers, controllerAliases, CloudControllerManagerUserAgent); err != nil {
 		return nil, err
 	}
 
