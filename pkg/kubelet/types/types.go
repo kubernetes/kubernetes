@@ -72,7 +72,8 @@ func (s SortedContainerStatuses) Less(i, j int) bool {
 }
 
 // SortInitContainerStatuses ensures that statuses are in the order that their
-// init container appears in the pod spec
+// init container appears in the pod spec. The function assumes there are no
+// duplicate names in the statuses.
 func SortInitContainerStatuses(p *v1.Pod, statuses []v1.ContainerStatus) {
 	containers := p.Spec.InitContainers
 	current := 0
