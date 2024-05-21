@@ -420,8 +420,20 @@ run_explain_crd_with_additional_properties_tests() {
 
   kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"mock-resources.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'mock-resources.test.com:'
 
-  # Wait for 1 second before using explain
-  sleep 1
+  retries=0
+  max_retries=5
+
+  # First try would get non zero exit code so we disable immediate exit here
+  set +o errexit
+
+  # Loop until `kubectl explain` returns a zero exit code or maximum retries reached
+  until output_message=$(kubectl explain mock-resource) > /dev/null || [ $retries -eq $max_retries ]; do
+    kube::log::status "Retrying kubectl explain..."
+    ((retries++))
+    sleep 1
+  done
+
+  set -o errexit
 
   output_message=$(kubectl explain mock-resource)
   kube::test::if_has_string "${output_message}" 'FIELDS:'
