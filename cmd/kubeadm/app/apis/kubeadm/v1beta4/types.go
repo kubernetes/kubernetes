@@ -607,7 +607,7 @@ type Timeouts struct {
 	// +optional
 	Discovery *metav1.Duration `json:"discovery,omitempty"`
 
-	// UpgradeManifests is the timeout for upgradring static Pod manifests
+	// UpgradeManifests is the timeout for upgrading static Pod manifests.
 	// Default: 5m
 	UpgradeManifests *metav1.Duration `json:"upgradeManifests,omitempty"`
 }
@@ -662,7 +662,7 @@ type UpgradeApplyConfiguration struct {
 
 	// SkipPhases is a list of phases to skip during command execution.
 	// NOTE: This field is currently ignored for "kubeadm upgrade apply", but in the future it will be supported.
-	SkipPhases []string
+	SkipPhases []string `json:"skipPhases,omitempty"`
 
 	// ImagePullPolicy specifies the policy for image pulling during kubeadm "upgrade apply" operations.
 	// The value of this field must be one of "Always", "IfNotPresent" or "Never".

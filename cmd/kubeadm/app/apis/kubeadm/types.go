@@ -752,6 +752,6 @@ type Timeouts struct {
 	// for a joining node.
 	Discovery *metav1.Duration
 
-	// UpgradeManifests is the timeout for upgradring static Pod manifests
+	// UpgradeManifests is the timeout for upgrading static Pod manifests.
 	UpgradeManifests *metav1.Duration
 }
