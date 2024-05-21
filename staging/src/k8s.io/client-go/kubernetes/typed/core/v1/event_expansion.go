@@ -19,10 +19,11 @@ package v1
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	events2 "k8s.io/client-go/tools/events"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ref "k8s.io/client-go/tools/reference"
@@ -40,7 +41,7 @@ type EventExpansion interface {
 	Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.EventList, error)
 	// Returns the appropriate field selector based on the API version being used to communicate with the server.
 	// The returned field selector can be used with List and Watch to filter desired events.
-	GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector
+	//GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector
 }
 
 // CreateWithEventNamespace makes a new event. Returns the copy of the event the server returns,
@@ -112,38 +113,41 @@ func (e *events) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.Ev
 	if len(e.ns) > 0 && ref.Namespace != e.ns {
 		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.ns)
 	}
-	stringRefKind := string(ref.Kind)
-	var refKind *string
-	if len(stringRefKind) > 0 {
-		refKind = &stringRefKind
+	//stringRefKind := string(ref.Kind)
+	////var refKind *string
+	////if len(stringRefKind) > 0 {
+	////	refKind = &stringRefKind
+	////}
+	////stringRefUID := string(ref.UID)
+	////var refUID *string
+	////if len(stringRefUID) > 0 {
+	////	refUID = &stringRefUID
+	//}
+	fieldSelector, err := events2.GetFieldSelector(schema.GroupVersion{}, ref.GroupVersionKind(), ref.Name, ref.UID)
+	if err != nil {
+		return nil, err
 	}
-	stringRefUID := string(ref.UID)
-	var refUID *string
-	if len(stringRefUID) > 0 {
-		refUID = &stringRefUID
-	}
-	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
 	return e.List(context.TODO(), metav1.ListOptions{FieldSelector: fieldSelector.String()})
 }
 
 // Returns the appropriate field selector based on the API version being used to communicate with the server.
 // The returned field selector can be used with List and Watch to filter desired events.
-func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
-	field := fields.Set{}
-	if involvedObjectName != nil {
-		field["involvedObject.name"] = *involvedObjectName
-	}
-	if involvedObjectNamespace != nil {
-		field["involvedObject.namespace"] = *involvedObjectNamespace
-	}
-	if involvedObjectKind != nil {
-		field["involvedObject.kind"] = *involvedObjectKind
-	}
-	if involvedObjectUID != nil {
-		field["involvedObject.uid"] = *involvedObjectUID
-	}
-	return field.AsSelector()
-}
+//func (e *events) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
+//	field := fields.Set{}
+//	if involvedObjectName != nil {
+//		field["involvedObject.name"] = *involvedObjectName
+//	}
+//	if involvedObjectNamespace != nil {
+//		field["involvedObject.namespace"] = *involvedObjectNamespace
+//	}
+//	if involvedObjectKind != nil {
+//		field["involvedObject.kind"] = *involvedObjectKind
+//	}
+//	if involvedObjectUID != nil {
+//		field["involvedObject.uid"] = *involvedObjectUID
+//	}
+//	return field.AsSelector()
+//}
 
 // Returns the appropriate field label to use for name of the involved object as per the given API version.
 // DEPRECATED: please use "involvedObject.name" inline.

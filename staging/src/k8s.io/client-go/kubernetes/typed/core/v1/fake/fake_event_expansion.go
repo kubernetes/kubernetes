@@ -19,7 +19,6 @@ package fake
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
@@ -91,11 +90,11 @@ func (c *FakeEvents) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v
 	return obj.(*v1.EventList), err
 }
 
-func (c *FakeEvents) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
-	action := core.GenericActionImpl{}
-	action.Verb = "get-field-selector"
-	action.Resource = eventsResource
-
-	c.Fake.Invokes(action, nil)
-	return fields.Everything()
-}
+//func (c *FakeEvents) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {
+//	action := core.GenericActionImpl{}
+//	action.Verb = "get-field-selector"
+//	action.Resource = eventsResource
+//
+//	c.Fake.Invokes(action, nil)
+//	return fields.Everything()
+//}

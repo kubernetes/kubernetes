@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	events2 "k8s.io/client-go/tools/events"
 	"net"
 	"net/url"
 	"reflect"
@@ -740,7 +741,11 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 	if err != nil {
 		if describerSettings.ShowEvents {
 			eventsInterface := d.CoreV1().Events(namespace)
-			selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
+			//selector := eventsInterface.GetFieldSelector(&name, &namespace, nil, nil)
+			selector, err := events2.GetFieldSelector(schema.GroupVersion{}, schema.GroupVersionKind{}, name, "")
+			if err != nil {
+				return "", err
+			}
 			initialOpts := metav1.ListOptions{
 				FieldSelector: selector.String(),
 				Limit:         describerSettings.ChunkSize,
@@ -5589,19 +5594,23 @@ func searchEvents(client corev1client.EventsGetter, objOrRef runtime.Object, lim
 	if err != nil {
 		return nil, err
 	}
-	stringRefKind := string(ref.Kind)
-	var refKind *string
-	if len(stringRefKind) > 0 {
-		refKind = &stringRefKind
-	}
-	stringRefUID := string(ref.UID)
-	var refUID *string
-	if len(stringRefUID) > 0 {
-		refUID = &stringRefUID
-	}
+	//stringRefKind := string(ref.Kind)
+	//var refKind *string
+	//if len(stringRefKind) > 0 {
+	//	refKind = &stringRefKind
+	//}
+	//stringRefUID := string(ref.UID)
+	//var refUID *string
+	//if len(stringRefUID) > 0 {
+	//	refUID = &stringRefUID
+	//}
 
 	e := client.Events(ref.Namespace)
-	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
+	//fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
+	fieldSelector, err := events2.GetFieldSelector(schema.GroupVersion{}, ref.GroupVersionKind(), ref.Name, ref.UID)
+	if err != nil {
+		return nil, err
+	}
 	initialOpts := metav1.ListOptions{FieldSelector: fieldSelector.String(), Limit: limit}
 	eventList := &corev1.EventList{}
 	err = runtimeresource.FollowContinue(&initialOpts,
