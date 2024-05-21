@@ -83,7 +83,7 @@ func ContainsAddress(serviceCIDRLister networkinglisters.ServiceCIDRLister, addr
 	for _, serviceCIDR := range serviceCIDRList {
 		for _, cidr := range serviceCIDR.Spec.CIDRs {
 			if prefix, err := netip.ParsePrefix(cidr); err == nil { // it can not fail since is already validated
-				if prefixContainsIP(prefix, address) {
+				if PrefixContainsIP(prefix, address) {
 					result = append(result, serviceCIDR)
 				}
 			}
@@ -92,12 +92,12 @@ func ContainsAddress(serviceCIDRLister networkinglisters.ServiceCIDRLister, addr
 	return result
 }
 
-// prefixContainsIP returns true if the given IP is contained with the prefix,
+// PrefixContainsIP returns true if the given IP is contained with the prefix,
 // is not the network address and also, if IPv4, is not the broadcast address.
 // This is required (rather than just `prefix.Contains(ip)`) because a ServiceCIDR
 // covering prefix will not allocate those IPs, so a service with one of those IPs
 // can't belong to that ServiceCIDR.
-func prefixContainsIP(prefix netip.Prefix, ip netip.Addr) bool {
+func PrefixContainsIP(prefix netip.Prefix, ip netip.Addr) bool {
 	// if the IP is the network address is not contained
 	if prefix.Masked().Addr() == ip {
 		return false
