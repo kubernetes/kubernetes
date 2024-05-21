@@ -94,6 +94,7 @@ func newCmdConfigPrint(out io.Writer) *cobra.Command {
 	cmd.AddCommand(newCmdConfigPrintInitDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintJoinDefaults(out))
 	cmd.AddCommand(newCmdConfigPrintResetDefaults(out))
+	cmd.AddCommand(newCmdConfigPrintUpgradeDefaults(out))
 	return cmd
 }
 
@@ -110,6 +111,11 @@ func newCmdConfigPrintJoinDefaults(out io.Writer) *cobra.Command {
 // newCmdConfigPrintResetDefaults returns cobra.Command for "kubeadm config print reset-defaults" command
 func newCmdConfigPrintResetDefaults(out io.Writer) *cobra.Command {
 	return newCmdConfigPrintActionDefaults(out, "reset", getDefaultResetConfigBytes)
+}
+
+// newCmdConfigPrintUpgradeDefaults returns cobra.Command for "kubeadm config print upgrade-defaults" command
+func newCmdConfigPrintUpgradeDefaults(out io.Writer) *cobra.Command {
+	return newCmdConfigPrintActionDefaults(out, "upgrade", getDefaultUpgradeConfigBytes)
 }
 
 func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesProc func() ([]byte, error)) *cobra.Command {
@@ -235,6 +241,18 @@ func getDefaultResetConfigBytes() ([]byte, error) {
 		SkipCRIDetect: true,
 	}
 	internalcfg, err := configutil.DefaultedResetConfiguration(&kubeadmapiv1.ResetConfiguration{}, opts)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1.SchemeGroupVersion)
+}
+
+func getDefaultUpgradeConfigBytes() ([]byte, error) {
+	opts := configutil.LoadOrDefaultConfigurationOptions{
+		SkipCRIDetect: true,
+	}
+	internalcfg, err := configutil.DefaultedUpgradeConfiguration(&kubeadmapiv1.UpgradeConfiguration{}, opts)
 	if err != nil {
 		return []byte{}, err
 	}
