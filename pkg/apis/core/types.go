@@ -3960,16 +3960,32 @@ type PodStatus struct {
 	// +optional
 	QOSClass PodQOSClass
 
-	// The list has one entry per init container in the manifest. The most recent successful
+	// Statuses of init containers in this pod. The most recent successful non-restartable
 	// init container will have ready = true, the most recently started container will have
 	// startTime set.
+	// The list should not contain entries with the same container name, and should only contain
+	// statuses for containers listed in pod spec.  However this is not enforced.
+	// If status for not-existing container is present in the list,
+	// the behavior of various Kubernetes components is not defined and those statuses might be
+	// ignored.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
 	InitContainerStatuses []ContainerStatus
-	// The list has one entry per app container in the manifest.
+
+	// Statuses of containers in this pod.
+	// The list should not contain entries with the same container name, and should only contain
+	// statuses for containers listed in pod spec. However this is not enforced.
+	// If status for not-existing container is present in the list,
+	// the behavior of various Kubernetes components is not defined and those statuses might be
+	// ignored.
 	// +optional
 	ContainerStatuses []ContainerStatus
 
-	// Status for any ephemeral containers that have run in this pod.
+	// Statuses for any ephemeral containers that have run in this pod.
+	// The list should not contain entries with the same container name, and should only contain
+	// statuses for containers listed in pod spec. However this is not enforced.
+	// If status for not-existing container is present in the list,
+	// the behavior of various Kubernetes components is not defined and those statuses might be
+	// ignored.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus
 
