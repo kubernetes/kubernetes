@@ -634,25 +634,13 @@ func evalMessageExpression(ctx context.Context, expr celgo.Program, exprSrc stri
 
 	var results []string
 
-	resultValue := evalResult.Value()
-	if messageStr, ok := resultValue.(string); ok {
-		results = []string{messageStr}
-	} else if messageStrList, ok := resultValue.([]string); ok {
-		results = messageStrList
-	} else if messageList, ok := resultValue.([]ref.Val); ok {
-		// CEL Type Checker for some reason verifies this is a list of string
-		// in compilation.go, but here its dynamic value might be a []rev.Val{},
-		// if you used CEL literal syntax like ["a", "b"] as opposed to list(string)(["a", "b"])
-		results = make([]string, len(messageList))
-		for i, msg := range messageList {
-			if msgStr, ok := msg.Value().(string); ok {
-				results[i] = msgStr
-			} else {
-				return nil, remainingBudget - int64(*rtCost), &cel.Error{
-					Detail: "messageExpression failed to evaluate to a list of strings",
-				}
-			}
-		}
+	stringResult, stringErr := evalResult.ConvertToNative(reflect.TypeOf(""))
+	stringListResult, listErr := evalResult.ConvertToNative(reflect.TypeOf([]string{}))
+
+	if stringErr == nil {
+		results = []string{stringResult.(string)}
+	} else if listErr == nil {
+		results = stringListResult.([]string)
 	} else {
 		return nil, remainingBudget - int64(*rtCost), &cel.Error{
 			Detail: "messageExpression failed to evaluate to a string",
