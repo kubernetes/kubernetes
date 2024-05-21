@@ -62,11 +62,4 @@ func (rc *reconciler) reconcile() {
 		// This will start reconciliation of node.status.volumesInUse.
 		rc.updateLastSyncTime()
 	}
-
-	if len(rc.volumesNeedReportedInUse) != 0 && rc.populatorHasAddedPods() {
-		// Once DSW is populated, mark all reconstructed as reported in node.status,
-		// so they can proceed with MountDevice / SetUp.
-		rc.desiredStateOfWorld.MarkVolumesReportedInUse(rc.volumesNeedReportedInUse)
-		rc.volumesNeedReportedInUse = nil
-	}
 }

@@ -91,9 +91,6 @@ func (rc *reconciler) reconstructVolumes() {
 		// Add the volumes to ASW
 		rc.updateStates(reconstructedVolumes)
 
-		// The reconstructed volumes are mounted, hence a previous kubelet must have already put it into node.status.volumesInUse.
-		// Remember to update DSW with this information.
-		rc.volumesNeedReportedInUse = reconstructedVolumeNames
 		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
 	}
