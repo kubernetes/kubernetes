@@ -319,7 +319,7 @@ const (
 	KubeletHealthzPort = 10248
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.4.13-4"
+	MinExternalEtcdVersion = "3.5.11-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
 	DefaultEtcdVersion = "3.5.13-0"
@@ -481,13 +481,6 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		22: "3.5.13-0",
-		23: "3.5.13-0",
-		24: "3.5.13-0",
-		25: "3.5.13-0",
-		26: "3.5.13-0",
-		27: "3.5.13-0",
-		28: "3.5.13-0",
 		29: "3.5.13-0",
 		30: "3.5.13-0",
 		31: "3.5.13-0",
