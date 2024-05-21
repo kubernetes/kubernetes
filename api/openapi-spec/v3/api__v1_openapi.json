@@ -5696,7 +5696,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "containerStatuses": {
-            "description": "The list has one entry per container in the manifest. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
+            "description": "Statuses of containers in this pod. The list should not contain entries with the same container name, and should only contain statuses for containers listed in pod spec. However this is not enforced. If status for not-existing container is present in the list, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
             "items": {
               "allOf": [
                 {
@@ -5709,7 +5709,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "ephemeralContainerStatuses": {
-            "description": "Status for any ephemeral containers that have run in this pod.",
+            "description": "Statuses for any ephemeral containers that have run in this pod. The list should not contain entries with the same container name, and should only contain statuses for ephemeralContainers listed in pod spec. However this is not enforced. If status for not-existing container is present in the list, the behavior of various Kubernetes components is not defined and those statuses might be ignored.",
             "items": {
               "allOf": [
                 {
@@ -5741,7 +5741,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "initContainerStatuses": {
-            "description": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
+            "description": "Statuses of init containers in this pod. The most recent successful non-restartable init container will have ready = true, the most recently started container will have startTime set. The list should not contain entries with the same container name, and should only contain statuses for initContainers listed in pod spec.  However this is not enforced. If status for not-existing container is present in the list, the behavior of various Kubernetes components is not defined and those statuses might be ignored. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
             "items": {
               "allOf": [
                 {
