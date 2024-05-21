@@ -113,6 +113,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
 
 	p := &Proxier{
+		ipFamily:                 ipfamily,
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
@@ -137,6 +138,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		networkInterfacer:        networkInterfacer,
 		nfAcctCounters: map[string]bool{
 			metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: true,
+			metrics.LocalhostNodePortAcceptedNFAcctCounter:     true,
 		},
 	}
 	p.setInitialized(true)
@@ -1746,8 +1748,11 @@ func TestOverallIPTablesRules(t *testing.T) {
 		:KUBE-SVC-NUKIZ6OKUXPJNT4C - [0:0]
 		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+		-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp -d 127.0.0.0/8 --dport 3001 -m nfacct --nfacct-name localhost_nps_accepted_pkts -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
 		-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
+		-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp -d 127.0.0.0/8 --dport 3003 -m nfacct --nfacct-name localhost_nps_accepted_pkts -j KUBE-EXT-X27LE4BHSL4DOUIK
 		-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3003 -j KUBE-EXT-X27LE4BHSL4DOUIK
+		-A KUBE-NODEPORTS -m comment --comment ns5/svc5:p80 -m tcp -p tcp -d 127.0.0.0/8 --dport 3002 -m nfacct --nfacct-name localhost_nps_accepted_pkts -j KUBE-EXT-NUKIZ6OKUXPJNT4C
 		-A KUBE-NODEPORTS -m comment --comment ns5/svc5:p80 -m tcp -p tcp --dport 3002 -j KUBE-EXT-NUKIZ6OKUXPJNT4C
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
