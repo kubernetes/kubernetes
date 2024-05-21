@@ -266,6 +266,15 @@ var (
 		},
 		[]string{"traffic_policy"},
 	)
+
+	// localhostNodePortsAcceptedPacketsDescription describe the metrics for the number of packets accepted
+	// by iptables which were destined for nodeports on loopback interface.
+	localhostNodePortsAcceptedPacketsDescription = metrics.NewDesc(
+		"kubeproxy_iptables_localhost_nodeports_accepted_packets_total",
+		"Number of packets accepted on nodeports of loopback interface",
+		nil, nil, metrics.ALPHA, "")
+	LocalhostNodePortAcceptedNFAcctCounter     = "localhost_nps_accepted_pkts"
+	localhostNodePortsAcceptedMetricsCollector = newNFAcctMetricCollector(LocalhostNodePortAcceptedNFAcctCounter, localhostNodePortsAcceptedPacketsDescription)
 )
 
 var registerMetricsOnce sync.Once
@@ -291,6 +300,7 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 		switch mode {
 		case kubeproxyconfig.ProxyModeIPTables:
 			legacyregistry.CustomMustRegister(iptablesCTStateInvalidDroppedMetricCollector)
+			legacyregistry.CustomMustRegister(localhostNodePortsAcceptedMetricsCollector)
 			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
 			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
