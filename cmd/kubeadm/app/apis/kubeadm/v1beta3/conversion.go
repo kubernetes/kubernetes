@@ -125,7 +125,7 @@ func Convert_kubeadm_DNS_To_v1beta3_DNS(in *kubeadm.DNS, out *DNS, s conversion.
 }
 
 // convertToArgs takes a argument map and converts it to a slice of arguments.
-// Te resulting argument slice is sorted alpha-numerically.
+// The resulting argument slice is sorted alpha-numerically.
 func convertToArgs(in map[string]string) []kubeadm.Arg {
 	if in == nil {
 		return nil
