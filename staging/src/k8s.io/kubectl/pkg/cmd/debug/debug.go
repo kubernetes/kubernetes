@@ -25,8 +25,6 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +44,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/attach"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/logs"
@@ -56,6 +55,7 @@ import (
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -737,7 +737,7 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	copied.Spec.EphemeralContainers = nil
 	// change ShareProcessNamespace configuration only when commanded explicitly
 	if o.shareProcessedChanged {
-		copied.Spec.ShareProcessNamespace = pointer.Bool(o.ShareProcesses)
+		copied.Spec.ShareProcessNamespace = ptr.To(o.ShareProcesses)
 	}
 	if !o.SameNode {
 		copied.Spec.NodeName = ""

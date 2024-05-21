@@ -32,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestGenerateDebugContainer(t *testing.T) {
@@ -287,11 +287,11 @@ func TestGenerateDebugContainer(t *testing.T) {
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 					SecurityContext: &corev1.SecurityContext{
-						RunAsNonRoot: pointer.Bool(true),
+						RunAsNonRoot: ptr.To(true),
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						AllowPrivilegeEscalation: pointer.Bool(false),
+						AllowPrivilegeEscalation: ptr.To(false),
 						SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 					},
 				},
@@ -332,7 +332,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 					SecurityContext: &corev1.SecurityContext{
-						Privileged: pointer.Bool(true),
+						Privileged: ptr.To(true),
 					},
 				},
 			},
@@ -996,7 +996,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -1241,7 +1241,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							},
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -1279,7 +1279,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -1319,7 +1319,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(false),
+					ShareProcessNamespace: ptr.To(false),
 				},
 			},
 		},
@@ -1356,16 +1356,16 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							Image:           "busybox",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(true),
+								RunAsNonRoot: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -1408,7 +1408,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							},
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -1735,11 +1735,11 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 							VolumeMounts:             nil,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(true),
+								RunAsNonRoot: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
@@ -1858,7 +1858,7 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						RunAsNonRoot: pointer.Bool(false),
+						RunAsNonRoot: ptr.To(false),
 					},
 				},
 			},
@@ -1877,7 +1877,7 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 							Stdin:                    true,
 							TTY:                      false,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(false),
+								RunAsNonRoot: ptr.To(false),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -1930,11 +1930,11 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 							Stdin:                    true,
 							TTY:                      false,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(true),
+								RunAsNonRoot: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
@@ -2058,7 +2058,7 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.Bool(true),
+								Privileged: ptr.To(true),
 							},
 						},
 					},
@@ -2145,7 +2145,7 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						RunAsNonRoot: pointer.Bool(false),
+						RunAsNonRoot: ptr.To(false),
 					},
 				},
 			},
@@ -2162,7 +2162,7 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 							Stdin:                    true,
 							TTY:                      false,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(false),
+								RunAsNonRoot: ptr.To(false),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -2173,7 +2173,7 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 					HostNetwork:           false,
 					HostPID:               false,
 					Volumes:               nil,
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -2198,7 +2198,7 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						RunAsNonRoot: pointer.Bool(false),
+						RunAsNonRoot: ptr.To(false),
 					},
 				},
 			},
@@ -2215,8 +2215,8 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 							Stdin:                    true,
 							TTY:                      false,
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: pointer.Bool(false),
-								RunAsNonRoot:             pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
+								RunAsNonRoot:             ptr.To(false),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -2231,7 +2231,7 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 					HostNetwork:           false,
 					HostPID:               false,
 					Volumes:               nil,
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -2256,7 +2256,7 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						RunAsNonRoot: pointer.Bool(false),
+						RunAsNonRoot: ptr.To(false),
 					},
 				},
 			},
@@ -2273,8 +2273,8 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 							Stdin:                    true,
 							TTY:                      false,
 							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: pointer.Bool(false),
-								RunAsNonRoot:             pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
+								RunAsNonRoot:             ptr.To(false),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
@@ -2289,7 +2289,7 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 					HostNetwork:           false,
 					HostPID:               false,
 					Volumes:               nil,
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -2353,7 +2353,7 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						RunAsNonRoot: pointer.Bool(false),
+						RunAsNonRoot: ptr.To(false),
 					},
 				},
 			},
@@ -2372,7 +2372,7 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 								Stdin:                    true,
 								TTY:                      false,
 								SecurityContext: &corev1.SecurityContext{
-									RunAsNonRoot: pointer.Bool(false),
+									RunAsNonRoot: ptr.To(false),
 									Capabilities: &corev1.Capabilities{
 										Drop: []corev1.Capability{"ALL"},
 									},
@@ -2408,7 +2408,7 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						RunAsNonRoot: pointer.Bool(false),
+						RunAsNonRoot: ptr.To(false),
 					},
 				},
 			},
@@ -2427,8 +2427,8 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 								Stdin:                    true,
 								TTY:                      false,
 								SecurityContext: &corev1.SecurityContext{
-									AllowPrivilegeEscalation: pointer.Bool(false),
-									RunAsNonRoot:             pointer.Bool(false),
+									AllowPrivilegeEscalation: ptr.To(false),
+									RunAsNonRoot:             ptr.To(false),
 									Capabilities: &corev1.Capabilities{
 										Drop: []corev1.Capability{"ALL"},
 									},
@@ -2468,7 +2468,7 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 						Capabilities: &corev1.Capabilities{
 							Drop: []corev1.Capability{"ALL"},
 						},
-						RunAsNonRoot: pointer.Bool(false),
+						RunAsNonRoot: ptr.To(false),
 					},
 				},
 			},
@@ -2487,8 +2487,8 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 								Stdin:                    true,
 								TTY:                      false,
 								SecurityContext: &corev1.SecurityContext{
-									AllowPrivilegeEscalation: pointer.Bool(false),
-									RunAsNonRoot:             pointer.Bool(false),
+									AllowPrivilegeEscalation: ptr.To(false),
+									RunAsNonRoot:             ptr.To(false),
 									Capabilities: &corev1.Capabilities{
 										Drop: []corev1.Capability{"ALL"},
 									},

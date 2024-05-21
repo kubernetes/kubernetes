@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/utils/pointer"
 	kjson "sigs.k8s.io/json"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -39,6 +38,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/utils/ptr"
 )
 
 func TestCreateToken(t *testing.T) {
@@ -237,7 +237,7 @@ status:
 			expectTokenRequest: &authenticationv1.TokenRequest{
 				TypeMeta: metav1.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenRequest"},
 				Spec: authenticationv1.TokenRequestSpec{
-					ExpirationSeconds: pointer.Int64(1000),
+					ExpirationSeconds: ptr.To[int64](1000),
 				},
 			},
 			serverResponseToken: "abc",

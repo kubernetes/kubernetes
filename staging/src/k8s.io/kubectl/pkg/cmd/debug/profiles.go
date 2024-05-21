@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubectl/pkg/util/podutils"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type debugStyle int
@@ -353,7 +353,7 @@ func useHostNamespaces(p *corev1.Pod) {
 // process namespace.
 func shareProcessNamespace(p *corev1.Pod) {
 	if p.Spec.ShareProcessNamespace == nil {
-		p.Spec.ShareProcessNamespace = pointer.Bool(true)
+		p.Spec.ShareProcessNamespace = ptr.To(true)
 	}
 }
 
@@ -377,7 +377,7 @@ func setPrivileged(p *corev1.Pod, containerName string) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
-		c.SecurityContext.Privileged = pointer.Bool(true)
+		c.SecurityContext.Privileged = ptr.To(true)
 		return false
 	})
 }
@@ -391,7 +391,7 @@ func disallowRoot(p *corev1.Pod, containerName string) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
-		c.SecurityContext.RunAsNonRoot = pointer.Bool(true)
+		c.SecurityContext.RunAsNonRoot = ptr.To(true)
 		return false
 	})
 }
@@ -456,7 +456,7 @@ func disallowPrivilegeEscalation(p *corev1.Pod, containerName string) {
 		if c.SecurityContext == nil {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
-		c.SecurityContext.AllowPrivilegeEscalation = pointer.Bool(false)
+		c.SecurityContext.AllowPrivilegeEscalation = ptr.To(false)
 		return false
 	})
 }

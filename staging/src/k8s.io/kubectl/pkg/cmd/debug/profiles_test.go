@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var testNode = &corev1.Node{
@@ -349,7 +349,7 @@ func TestGeneralProfile(t *testing.T) {
 							},
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -509,7 +509,7 @@ func TestBaselineProfile(t *testing.T) {
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 					InitContainers:        []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
@@ -604,11 +604,11 @@ func TestRestrictedProfile(t *testing.T) {
 						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 							Name: "dbg", Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(true),
+								RunAsNonRoot: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
@@ -668,7 +668,7 @@ func TestRestrictedProfile(t *testing.T) {
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 					InitContainers:        []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
@@ -676,11 +676,11 @@ func TestRestrictedProfile(t *testing.T) {
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(true),
+								RunAsNonRoot: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
@@ -700,7 +700,7 @@ func TestRestrictedProfile(t *testing.T) {
 								Capabilities: &corev1.Capabilities{
 									Add: []corev1.Capability{"ALL"},
 								},
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
@@ -717,11 +717,11 @@ func TestRestrictedProfile(t *testing.T) {
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsNonRoot: pointer.Bool(true),
+								RunAsNonRoot: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Drop: []corev1.Capability{"ALL"},
 								},
-								AllowPrivilegeEscalation: pointer.Bool(false),
+								AllowPrivilegeEscalation: ptr.To(false),
 								SeccompProfile:           &corev1.SeccompProfile{Type: "RuntimeDefault"},
 							},
 						},
@@ -849,7 +849,7 @@ func TestNetAdminProfile(t *testing.T) {
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 					InitContainers:        []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
@@ -909,7 +909,7 @@ func TestNetAdminProfile(t *testing.T) {
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -1055,7 +1055,7 @@ func TestSysAdminProfile(t *testing.T) {
 						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 							Name: "dbg", Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.Bool(true),
+								Privileged: ptr.To(true),
 							},
 						},
 					},
@@ -1122,11 +1122,11 @@ func TestSysAdminProfile(t *testing.T) {
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.Bool(true),
+								Privileged: ptr.To(true),
 							},
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -1179,14 +1179,14 @@ func TestSysAdminProfile(t *testing.T) {
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.Bool(true),
+								Privileged: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Add: []corev1.Capability{"SYS_PTRACE"},
 								},
 							},
 						},
 					},
-					ShareProcessNamespace: pointer.Bool(true),
+					ShareProcessNamespace: ptr.To(true),
 				},
 			},
 		},
@@ -1219,7 +1219,7 @@ func TestSysAdminProfile(t *testing.T) {
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.Bool(true),
+								Privileged: ptr.To(true),
 							},
 							VolumeMounts: []corev1.VolumeMount{{Name: "host-root", MountPath: "/host"}},
 						},
@@ -1264,7 +1264,7 @@ func TestSysAdminProfile(t *testing.T) {
 							Name:  "dbg",
 							Image: "dbgimage",
 							SecurityContext: &corev1.SecurityContext{
-								Privileged: pointer.Bool(true),
+								Privileged: ptr.To(true),
 								Capabilities: &corev1.Capabilities{
 									Add: []corev1.Capability{"SYS_PTRACE"},
 								},
