@@ -312,24 +312,25 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		RecordTime:      w.clock.Now(),
 	}
 
+	// We can call w.store.Get() outside of a critical section,
+	// because the w.store itself is thread-safe and the only
+	// place where w.store is modified is below (via updateFunc)
+	// and these calls are serialized because reflector is processing
+	// events one-by-one.
+	previous, exists, err := w.store.Get(elem)
+	if err != nil {
+		return err
+	}
+	if exists {
+		previousElem := previous.(*storeElement)
+		wcEvent.PrevObject = previousElem.Object
+		wcEvent.PrevObjLabels = previousElem.Labels
+		wcEvent.PrevObjFields = previousElem.Fields
+	}
+
 	if err := func() error {
-		// TODO: We should consider moving this lock below after the watchCacheEvent
-		// is created. In such situation, the only problematic scenario is Replace()
-		// happening after getting object from store and before acquiring a lock.
-		// Maybe introduce another lock for this purpose.
 		w.Lock()
 		defer w.Unlock()
-
-		previous, exists, err := w.store.Get(elem)
-		if err != nil {
-			return err
-		}
-		if exists {
-			previousElem := previous.(*storeElement)
-			wcEvent.PrevObject = previousElem.Object
-			wcEvent.PrevObjLabels = previousElem.Labels
-			wcEvent.PrevObjFields = previousElem.Fields
-		}
 
 		w.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
