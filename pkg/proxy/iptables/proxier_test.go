@@ -135,6 +135,9 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		localhostNodePorts:       true,
 		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
 		networkInterfacer:        networkInterfacer,
+		nfAcctCounters: map[string]bool{
+			metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: true,
+		},
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
@@ -1717,7 +1720,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j DROP
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
@@ -5916,7 +5919,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -5999,7 +6002,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6053,7 +6056,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6117,7 +6120,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j REJECT
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6173,7 +6176,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6230,7 +6233,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6286,7 +6289,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6344,7 +6347,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6435,7 +6438,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
