@@ -81,7 +81,7 @@ func testingDeployment(name, ns string, numberOfPods int32) appsv1.Deployment {
 							Args:  []string{"logs-generator", "--log-lines-total", "20", "--run-duration", "5s"},
 						},
 					},
-					RestartPolicy: v1.RestartPolicyAlways,
+					RestartPolicy: v1.RestartPolicyNever,
 				},
 			},
 		},
