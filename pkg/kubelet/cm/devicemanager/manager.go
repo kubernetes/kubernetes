@@ -543,7 +543,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		// A pod's resource is not expected to change once admitted by the API server,
 		// so just fail loudly here. We can revisit this part if this no longer holds.
 		if needed != 0 {
-			return nil, fmt.Errorf("pod %q container %q changed request for resource %q from %d to %d", podUID, contName, resource, devices.Len(), required)
+			return nil, fmt.Errorf(ErrContainerResourceChangedMsg, podUID, contName, resource, devices.Len(), required)
 		}
 	}
 
@@ -573,17 +573,17 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// Note: we need to check the device health and registration status *before* we check how many devices are needed, doing otherwise caused issue #109595
 	// Note: if the scheduler is bypassed, we fall back in scenario 1, so we still need these checks.
 	if !hasRegistered {
-		return nil, fmt.Errorf("cannot allocate unregistered device %s", resource)
+		return nil, fmt.Errorf(ErrUnregisteredDevice, resource)
 	}
 
 	// Check if registered resource has healthy devices
 	if healthyDevices.Len() == 0 {
-		return nil, fmt.Errorf("no healthy devices present; cannot allocate unhealthy devices %s", resource)
+		return nil, fmt.Errorf(ErrNoHealthyDevices, resource)
 	}
 
 	// Check if all the previously allocated devices are healthy
 	if !healthyDevices.IsSuperset(devices) {
-		return nil, fmt.Errorf("previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s", resource)
+		return nil, fmt.Errorf(ErrDevicesNotHealthy, resource)
 	}
 
 	// We handled the known error paths in scenario 3 (node reboot), so from now on we can fall back in a common path.
@@ -629,7 +629,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// Gets Available devices.
 	available := m.healthyDevices[resource].Difference(devicesInUse)
 	if available.Len() < needed {
-		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
+		return nil, fmt.Errorf(ErrRequestedDevicesUnavail, resource, needed, available.Len())
 	}
 
 	// Filters available Devices based on NUMA affinity.
@@ -652,7 +652,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 			return allocated, nil
 		}
 
-		return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
+		return nil, fmt.Errorf(ErrUnexpectedAllocation, required, required-needed)
 	}
 
 	// If we can't allocate all remaining devices from the set of aligned ones,
@@ -682,7 +682,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return allocated, nil
 	}
 
-	return nil, fmt.Errorf("unexpectedly allocated less resources than required. Requested: %d, Got: %d", required, required-needed)
+	return nil, fmt.Errorf(ErrUnexpectedAllocation, required, required-needed)
 }
 
 func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, available sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
@@ -838,7 +838,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
 			m.mutex.Unlock()
-			return fmt.Errorf("unknown Device Plugin %s", resource)
+			return fmt.Errorf(ErrGetPreferredAllocation, resource)
 		}
 
 		devs := allocDevices.UnsortedList()
@@ -857,7 +857,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		}
 
 		if len(resp.ContainerResponses) == 0 {
-			return fmt.Errorf("no containers return in allocation response %v", resp)
+			return fmt.Errorf(ErrNoContainersRetured, resp)
 		}
 
 		allocDevicesWithNUMA := checkpoint.NewDevicesPerNUMA()
@@ -985,7 +985,7 @@ func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, re
 	resp, err := eI.e.getPreferredAllocation(available.UnsortedList(), mustInclude.UnsortedList(), size)
 	m.mutex.Lock()
 	if err != nil {
-		return nil, fmt.Errorf("device plugin GetPreferredAllocation rpc failed with err: %v", err)
+		return nil, fmt.Errorf(ErrGetPreferredAllocation, err)
 	}
 	if resp != nil && len(resp.ContainerResponses) > 0 {
 		return sets.New[string](resp.ContainerResponses[0].DeviceIDs...), nil

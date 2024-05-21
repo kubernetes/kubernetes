@@ -27,6 +27,13 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+const (
+	ErrNoEnoughCpusAvailable = "not enough cpus available to satisfy request: requested=%d, available=%d"
+	ErrNoEnoughCpusAllocated = "accounting error, not enough CPUs allocated, remaining: %v"
+	ErrTooManyCpusAllocated  = "accounting error, too many CPUs allocated, remaining: %v"
+	ErrFailedToAllocate      = "failed to allocate cpus"
+)
+
 // LoopControl controls the behavior of the cpu accumulator loop logic
 type LoopControl int
 
@@ -587,7 +594,7 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+		return cpuset.New(), fmt.Errorf(ErrNoEnoughCpusAvailable, numCPUs, availableCPUs.Size())
 	}
 
 	// Algorithm: topology-aware best-fit
@@ -619,7 +626,7 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 		return acc.result, nil
 	}
 
-	return cpuset.New(), fmt.Errorf("failed to allocate cpus")
+	return cpuset.New(), fmt.Errorf(ErrFailedToAllocate)
 }
 
 // takeByTopologyNUMADistributed returns a CPUSet of size 'numCPUs'.
@@ -699,7 +706,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		return acc.result, nil
 	}
 	if acc.isFailed() {
-		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
+		return cpuset.New(), fmt.Errorf(ErrNoEnoughCpusAvailable, numCPUs, availableCPUs.Size())
 	}
 
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
@@ -897,13 +904,13 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 		// If we haven't allocated all of our CPUs at this point, then something
 		// went wrong in our accounting and we should error out.
 		if acc.numCPUsNeeded > 0 {
-			return cpuset.New(), fmt.Errorf("accounting error, not enough CPUs allocated, remaining: %v", acc.numCPUsNeeded)
+			return cpuset.New(), fmt.Errorf(ErrNoEnoughCpusAllocated, acc.numCPUsNeeded)
 		}
 
 		// Likewise, if we have allocated too many CPUs at this point, then something
 		// went wrong in our accounting and we should error out.
 		if acc.numCPUsNeeded < 0 {
-			return cpuset.New(), fmt.Errorf("accounting error, too many CPUs allocated, remaining: %v", acc.numCPUsNeeded)
+			return cpuset.New(), fmt.Errorf(ErrTooManyCpusAllocated, acc.numCPUsNeeded)
 		}
 
 		// Otherwise, return the result

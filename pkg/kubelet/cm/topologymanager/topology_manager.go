@@ -40,17 +40,35 @@ const (
 	maxAllowableNUMANodes = 8
 	// ErrorTopologyAffinity represents the type for a TopologyAffinityError
 	ErrorTopologyAffinity = "TopologyAffinityError"
+	ErrorAllocateResource = "AllocateResourceError"
+	ErrorNoPreference     = "hint Provider has no preference for NUMA affinity with any resource"
 )
 
 // TopologyAffinityError represents an resource alignment error
-type TopologyAffinityError struct{}
+type TopologyAffinityError struct{ Err error }
 
 func (e TopologyAffinityError) Error() string {
-	return "Resources cannot be allocated with Topology locality"
+	return fmt.Sprintf("Resources cannot be allocated with Topology locality due to %v", e.Err)
 }
 
 func (e TopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
+}
+
+// AllocateResourceError represents an resource allocation error
+type AllocateResourceError struct{ Err error }
+
+func (e AllocateResourceError) Error() string {
+	return fmt.Sprintf("Allocate resources failed due to %v", e.Err)
+}
+
+func (e AllocateResourceError) Type() string {
+	return ErrorAllocateResource
+}
+
+func logAdmitError(podAdmitResult lifecycle.PodAdmitResult, attrs lifecycle.PodAdmitAttributes) {
+	logID := klog.KObj(attrs.Pod).String()
+	klog.InfoS("Admit Error", "Reason", podAdmitResult.Message, "logID", logID, "podUID", attrs.Pod.UID)
 }
 
 // Manager interface provides methods for Kubelet to manage pod topology hints
@@ -218,6 +236,10 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	startTime := time.Now()
 	podAdmitResult := m.scope.Admit(attrs.Pod)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
+
+	if !podAdmitResult.Admit {
+		logAdmitError(podAdmitResult, *attrs)
+	}
 
 	return podAdmitResult
 }

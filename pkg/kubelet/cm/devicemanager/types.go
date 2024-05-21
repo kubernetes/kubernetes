@@ -99,7 +99,17 @@ type DeviceRunContainerOptions struct {
 
 // TODO: evaluate whether we need this error definition.
 const (
-	errEndpointStopped = "endpoint %v has been stopped"
+	ErrEndpointStopped             = "endpoint %v has been stopped"
+	ErrContainerResourceChangedMsg = "pod %q container %q changed request for resource %q from %d to %d"
+	ErrUnregisteredDevice          = "cannot allocate unregistered device %s"
+	ErrNoHealthyDevices            = "no healthy devices present; cannot allocate unhealthy devices %s"
+	ErrDevicesNotHealthy           = "previously allocated devices are no longer healthy; cannot allocate unhealthy devices %s"
+	ErrRequestedDevicesUnavail     = "requested number of devices unavailable for %s. Requested: %d, Available: %d"
+	ErrUnexpectedAllocation        = "unexpectedly allocated less resources than required. Requested: %d, Got: %d"
+	ErrEndpointNotFound            = "endpoint not found in cache for a registered resource: %s"
+	ErrGetPreferredAllocation      = "device plugin GetPreferredAllocation rpc failed with err: %v"
+	ErrUnknownDevicePlugin         = "unknown Device Plugin %s"
+	ErrNoContainersRetured         = "no containers return in allocation response %v"
 )
 
 // endpointStopGracePeriod indicates the grace period after an endpoint is stopped

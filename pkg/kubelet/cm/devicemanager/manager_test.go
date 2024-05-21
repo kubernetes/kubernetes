@@ -439,9 +439,9 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	e2.client.Disconnect()
 	as.False(e2.stopTime.IsZero())
 	_, err = e2.allocate([]string{"Device1"})
-	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
+	reflect.DeepEqual(err, fmt.Errorf(ErrEndpointStopped, e2))
 	_, err = e2.preStartContainer([]string{"Device1"})
-	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
+	reflect.DeepEqual(err, fmt.Errorf(ErrEndpointStopped, e2))
 	// Marks resourceName2 unhealthy and verifies its capacity/allocatable are
 	// correctly updated.
 	testManager.markResourceUnhealthy(resourceName2)
