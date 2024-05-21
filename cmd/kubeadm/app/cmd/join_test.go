@@ -36,6 +36,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -233,7 +234,7 @@ func TestNewJoinData(t *testing.T) {
 								UnsafeSkipCAVerification: true,
 							},
 							TLSBootstrapToken: "abcdef.0123456789abcdef",
-							Timeout:           &metav1.Duration{Duration: kubeadmapiv1.DefaultDiscoveryTimeout},
+							Timeout:           &metav1.Duration{Duration: constants.DiscoveryTimeout},
 						},
 						ControlPlane: &kubeadmapi.JoinControlPlane{
 							CertificateKey: "c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd",
