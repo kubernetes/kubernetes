@@ -51,6 +51,7 @@ API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/networking/v1alpha1,ServiceCIDRSpec,CIDRs
+API rule violation: names_match,k8s.io/api/networking/v1beta1,ServiceCIDRSpec,CIDRs
 API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,BoolValue
 API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,IntSliceValue
 API rule violation: names_match,k8s.io/api/resource/v1alpha2,NamedResourcesAttributeValue,IntValue
