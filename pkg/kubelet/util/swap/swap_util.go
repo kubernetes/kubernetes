@@ -18,6 +18,7 @@ package swap
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	sysruntime "runtime"
 	"strings"
@@ -39,7 +40,7 @@ var (
 
 const TmpfsNoswapOption = "noswap"
 
-func IsTmpfsNoswapOptionSupported(mounter mount.Interface) bool {
+func IsTmpfsNoswapOptionSupported(mounter mount.Interface, mountPath string) bool {
 	isTmpfsNoswapOptionSupportedHelper := func() bool {
 		if sysruntime.GOOS == "windows" {
 			return false
@@ -55,28 +56,32 @@ func IsTmpfsNoswapOptionSupported(mounter mount.Interface) bool {
 			return true
 		}
 
-		mountDir, err := os.MkdirTemp("", "tmpfs-noswap-test-")
+		if mountPath == "" {
+			klog.ErrorS(errors.New("mount path is empty, falling back to /tmp"), "")
+		}
+
+		mountPath, err = os.MkdirTemp(mountPath, "tmpfs-noswap-test-")
 		if err != nil {
-			klog.InfoS("error creating dir to test if tmpfs noswap is enabled. Assuming not supported", "mount path", mountDir, "error", err)
+			klog.InfoS("error creating dir to test if tmpfs noswap is enabled. Assuming not supported", "mount path", mountPath, "error", err)
 			return false
 		}
 
 		defer func() {
-			err = os.RemoveAll(mountDir)
+			err = os.RemoveAll(mountPath)
 			if err != nil {
-				klog.ErrorS(err, "error removing test tmpfs dir", "mount path", mountDir)
+				klog.ErrorS(err, "error removing test tmpfs dir", "mount path", mountPath)
 			}
 		}()
 
-		err = mounter.MountSensitiveWithoutSystemd("tmpfs", mountDir, "tmpfs", []string{TmpfsNoswapOption}, nil)
+		err = mounter.MountSensitiveWithoutSystemd("tmpfs", mountPath, "tmpfs", []string{TmpfsNoswapOption}, nil)
 		if err != nil {
 			klog.InfoS("error mounting tmpfs with the noswap option. Assuming not supported", "error", err)
 			return false
 		}
 
-		err = mounter.Unmount(mountDir)
+		err = mounter.Unmount(mountPath)
 		if err != nil {
-			klog.ErrorS(err, "error unmounting test tmpfs dir", "mount path", mountDir)
+			klog.ErrorS(err, "error unmounting test tmpfs dir", "mount path", mountPath)
 		}
 
 		return true
