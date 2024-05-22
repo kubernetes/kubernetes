@@ -62,6 +62,18 @@ func assertOnConcreteError[E error](fn func(*testing.T, E)) func(t *testing.T, e
 	}
 }
 
+func assertErrorMessage(want string) func(*testing.T, error) {
+	return func(t *testing.T, got error) {
+		if got == nil {
+			t.Error("expected non-nil error")
+			return
+		}
+		if got.Error() != want {
+			t.Errorf("got error %q, want %q", got.Error(), want)
+		}
+	}
+}
+
 func assertIdenticalError[E error](expected E) func(*testing.T, error) {
 	return assertOnConcreteError(func(t *testing.T, actual E) {
 		if diff := cmp.Diff(expected, actual); diff != "" {
