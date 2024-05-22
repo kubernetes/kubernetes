@@ -41,6 +41,7 @@ import (
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 func testingDeployment(name, ns string, numberOfPods int32) appsv1.Deployment {
@@ -71,17 +72,20 @@ func testingDeployment(name, ns string, numberOfPods int32) appsv1.Deployment {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "container-1",
-							Image: imageutils.GetE2EImage(imageutils.Agnhost),
-							Args:  []string{"logs-generator", "--log-lines-total", "10", "--run-duration", "5s"},
+							Name:    "container-1",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"/bin/sh", "-c"},
+							Args:    []string{"/agnhost logs-generator --log-lines-total 10 --run-duration 3s && sleep 300"},
 						},
 						{
-							Name:  "container-2",
-							Image: imageutils.GetE2EImage(imageutils.Agnhost),
-							Args:  []string{"logs-generator", "--log-lines-total", "20", "--run-duration", "5s"},
+							Name:    "container-2",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"/bin/sh", "-c"},
+							Args:    []string{"/agnhost logs-generator --log-lines-total 20 --run-duration 3s && sleep 300"},
 						},
 					},
-					RestartPolicy: v1.RestartPolicyAlways,
+					RestartPolicy:                 v1.RestartPolicyAlways,
+					TerminationGracePeriodSeconds: ptr.To[int64](0),
 				},
 			},
 		},
