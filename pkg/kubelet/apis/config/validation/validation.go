@@ -18,6 +18,8 @@ package validation
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 	"unicode"
 
@@ -31,6 +33,7 @@ import (
 	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
@@ -85,6 +88,11 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if kc.ImageGCLowThresholdPercent >= kc.ImageGCHighThresholdPercent {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageGCLowThresholdPercent (--image-gc-low-threshold) %v must be less than imageGCHighThresholdPercent (--image-gc-high-threshold) %v", kc.ImageGCLowThresholdPercent, kc.ImageGCHighThresholdPercent))
 	}
+	imageFsAvailable, _ := strconv.ParseInt(strings.TrimRight(kc.EvictionHard[string(evictionapi.SignalImageFsAvailable)], "%"), 10, 32)
+	if kc.ImageGCHighThresholdPercent >= 100-int32(imageFsAvailable) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: imageGCHighThresholdPercent (--image-gc-high-threshold) %v must be less than evict hard (%s) 100 - %v", kc.ImageGCHighThresholdPercent, evictionapi.SignalImageFsAvailable, imageFsAvailable))
+	}
+
 	if kc.ImageMaximumGCAge.Duration != 0 && !localFeatureGate.Enabled(features.ImageMaximumGCAge) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ImageMaximumGCAge feature gate is required for Kubelet configuration option imageMaximumGCAge"))
 	}

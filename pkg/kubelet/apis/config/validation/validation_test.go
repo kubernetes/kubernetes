@@ -162,6 +162,14 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		errMsg: "invalid configuration: imageGCHighThresholdPercent (--image-gc-high-threshold) 101 must be between 0 and 100, inclusive",
 	}, {
+		name: "invalid ImageGCHighThresholdPercent large than evict hard 100 - imagefs.available",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.ImageGCHighThresholdPercent = 85
+			conf.EvictionHard = map[string]string{"imagefs.available": "15%"}
+			return conf
+		},
+		errMsg: "invalid configuration: imageGCHighThresholdPercent (--image-gc-high-threshold) 85 must be less than evict hard (imagefs.available) 100 - 15",
+	}, {
 		name: "invalid ImageGCLowThresholdPercent",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.ImageGCLowThresholdPercent = -1
