@@ -431,7 +431,7 @@ aliases:
     - pwittrock
     - soltysh
   sig-cloud-provider-api-reviewers:
-    - andrewsykim
+    - elmiko
     - cheftako
     - dims
   # sig-cluster-lifecycle-api-reviewers:
