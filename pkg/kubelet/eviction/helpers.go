@@ -367,7 +367,7 @@ func parseThresholdStatements(statements map[string]string) ([]evictionapi.Thres
 			results = append(results, *result)
 		}
 	}
-	for signal, val := range DefaultEvictionHard{
+	for signal, val := range DefaultEvictionHard {
 		key := signal
 		_, exists := statements[key]
 		if !exists {
