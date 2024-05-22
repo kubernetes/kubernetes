@@ -2436,7 +2436,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			// compute hash
 			if kcs := kps.FindContainerStatusByName(pod.Spec.Containers[idx].Name); kcs != nil {
 				kcs.Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
-				kcs.HashWithoutResources = kubecontainer.HashContainerWithoutResources(&pod.Spec.Containers[idx])
 			}
 		}
 		makeAndSetFakePod(t, m, fakeRuntime, pod)
@@ -2452,7 +2451,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 		for idx := range pod.Spec.Containers {
 			if kcs := kps.FindContainerStatusByName(pod.Spec.Containers[idx].Name); kcs != nil {
 				kcs.Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
-				kcs.HashWithoutResources = kubecontainer.HashContainerWithoutResources(&pod.Spec.Containers[idx])
 			}
 		}
 		if test.mutatePodFn != nil {

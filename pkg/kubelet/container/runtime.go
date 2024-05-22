@@ -295,11 +295,6 @@ type Container struct {
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
-	// Hash of the container over fields with Resources field zero'd out.
-	// NOTE: This is needed during alpha and beta so that containers using Resources are
-	// not unexpectedly restarted when InPlacePodVerticalScaling feature-gate is toggled.
-	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this in GA+1 and make HashWithoutResources to become Hash.
-	HashWithoutResources uint64
 	// State is the state of the container.
 	State State
 }
@@ -365,8 +360,6 @@ type Status struct {
 	ImageRuntimeHandler string
 	// Hash of the container, used for comparison.
 	Hash uint64
-	// Hash of the container over fields with Resources field zero'd out.
-	HashWithoutResources uint64
 	// Number of times that the container has been restarted.
 	RestartCount int
 	// A string explains why container is in such a status.
