@@ -117,7 +117,10 @@ func TestLog(t *testing.T) {
 				o.Prefix = true
 				return o
 			},
-			expectedOutSubstrings: []string{"[pod/test-sts-0/test-container] test log content for pod test-sts-0\n[pod/test-sts-1/test-container] test log content for pod test-sts-1\n"},
+			expectedOutSubstrings: []string{
+				"[pod/test-sts-0/test-container] test log content for pod test-sts-0\n",
+				"[pod/test-sts-1/test-container] test log content for pod test-sts-1\n",
+			},
 		},
 		{
 			name: "pod logs with prefix: init container",
