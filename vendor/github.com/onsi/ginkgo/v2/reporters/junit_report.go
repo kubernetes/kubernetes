@@ -177,6 +177,7 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 				{"FocusFiles", strings.Join(report.SuiteConfig.FocusFiles, ";")},
 				{"SkipFiles", strings.Join(report.SuiteConfig.SkipFiles, ";")},
 				{"FailOnPending", fmt.Sprintf("%t", report.SuiteConfig.FailOnPending)},
+				{"FailOnEmpty", fmt.Sprintf("%t", report.SuiteConfig.FailOnEmpty)},
 				{"FailFast", fmt.Sprintf("%t", report.SuiteConfig.FailFast)},
 				{"FlakeAttempts", fmt.Sprintf("%d", report.SuiteConfig.FlakeAttempts)},
 				{"DryRun", fmt.Sprintf("%t", report.SuiteConfig.DryRun)},
@@ -324,6 +325,7 @@ func MergeAndCleanupJUnitReports(sources []string, dst string) ([]string, error)
 			continue
 		}
 		err = xml.NewDecoder(f).Decode(&report)
+		_ = f.Close()
 		if err != nil {
 			messages = append(messages, fmt.Sprintf("Could not decode %s:\n%s", source, err.Error()))
 			continue

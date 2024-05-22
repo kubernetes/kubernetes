@@ -1,3 +1,77 @@
+## 2.18.0
+
+### Features
+- Add --slience-skips and --force-newlines [f010b65]
+- fail when no tests were run and --fail-on-empty was set [d80eebe]
+
+### Fixes
+- Fix table entry context edge case [42013d6]
+
+### Maintenance
+- Bump golang.org/x/tools from 0.20.0 to 0.21.0 (#1406) [fcf1fd7]
+- Bump github.com/onsi/gomega from 1.33.0 to 1.33.1 (#1399) [8bb14fd]
+- Bump golang.org/x/net from 0.24.0 to 0.25.0 (#1407) [04bfad7]
+
+## 2.17.3
+
+### Fixes
+`ginkgo watch` now ignores hidden files [bde6e00]
+
+## 2.17.2
+
+### Fixes
+- fix: close files [32259c8]
+- fix github output log level for skipped specs [780e7a3]
+
+### Maintenance
+- Bump github.com/google/pprof [d91fe4e]
+- Bump github.com/go-task/slim-sprig to v3 [8cb662e]
+- Bump golang.org/x/net in /integration/_fixtures/version_mismatch_fixture (#1391) [3134422]
+- Bump github-pages from 230 to 231 in /docs (#1384) [eca81b4]
+- Bump golang.org/x/tools from 0.19.0 to 0.20.0 (#1383) [760def8]
+- Bump golang.org/x/net from 0.23.0 to 0.24.0 (#1381) [4ce33f4]
+- Fix test for gomega version bump [f2fcd97]
+- Bump github.com/onsi/gomega from 1.30.0 to 1.33.0 (#1390) [fd622d2]
+- Bump golang.org/x/tools from 0.17.0 to 0.19.0 (#1368) [5474a26]
+- Bump github-pages from 229 to 230 in /docs (#1359) [e6d1170]
+- Bump google.golang.org/protobuf from 1.28.0 to 1.33.0 (#1374) [7f447b2]
+- Bump golang.org/x/net from 0.20.0 to 0.23.0 (#1380) [f15239a]
+
+## 2.17.1
+
+### Fixes
+- If the user sets --seed=0, make sure all parallel nodes get the same seed [af0330d]
+
+## 2.17.0
+
+### Features
+
+- add `--github-output` for nicer output in github actions [e8a2056]
+
+### Maintenance
+
+- fix typo in core_dsl.go [977bc6f]
+- Fix typo in docs [e297e7b]
+
+## 2.16.0
+
+### Features
+- add SpecContext to reporting nodes
+
+### Fixes
+- merge coverages instead of combining them (#1329) (#1340) [23f0cc5]
+- core_dsl: disable Getwd() with environment variable (#1357) [cd418b7]
+
+### Maintenance
+- docs/index.md: Typo [2cebe8d]
+- fix docs [06de431]
+- chore: test with Go 1.22 (#1352) [898cba9]
+- Bump golang.org/x/tools from 0.16.1 to 0.17.0 (#1336) [17ae120]
+- Bump golang.org/x/sys from 0.15.0 to 0.16.0 (#1327) [5a179ed]
+- Bump github.com/go-logr/logr from 1.3.0 to 1.4.1 (#1321) [a1e6b69]
+- Bump github-pages and jekyll-feed in /docs (#1351) [d52951d]
+- Fix docs for handling failures in goroutines (#1339) [4471b2e]
+
 ## 2.15.0
 
 ### Features

@@ -144,6 +144,7 @@
       ],
       "github.com/mailru/easyjson": [
         "github.com/go-openapi/swag",
+        "github.com/google/pprof",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5",

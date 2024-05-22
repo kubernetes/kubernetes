@@ -1,4 +1,4 @@
-= vendor/github.com/go-task/slim-sprig licensed under: =
+= vendor/github.com/go-task/slim-sprig/v3 licensed under: =
 
 Copyright (C) 2013-2020 Masterminds
 
@@ -20,4 +20,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-= vendor/github.com/go-task/slim-sprig/LICENSE.txt 4ed8d725bea5f035fcea1ab05a767f78
+= vendor/github.com/go-task/slim-sprig/v3/LICENSE.txt 4ed8d725bea5f035fcea1ab05a767f78
