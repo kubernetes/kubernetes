@@ -19,16 +19,17 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/kubelet/apis/config"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	"math/big"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -70,7 +71,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 			pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
 			pod = runPodAndWaitUntilScheduled(f, pod)
 
-			gomega.Expect(isPodCgroupV2(f, pod)).To(gomega.BeTrueBecause("cgroup v2 is required for swap"))
+			if !isPodCgroupV2(f, pod) {
+				e2eskipper.Skipf("swap tests require cgroup v2")
+			}
 			gomega.Expect(getSwapBehavior()).To(gomega.Or(gomega.Equal(types.NoSwap), gomega.BeEmpty()), "NodeConformance is expected to run with NoSwap")
 
 			expectNoSwap(f, pod)
@@ -103,7 +106,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 				pod := getSwapTestPod(f, qosClass, memoryRequestEqualLimit)
 				pod = runPodAndWaitUntilScheduled(f, pod)
 
-				gomega.Expect(isPodCgroupV2(f, pod)).To(gomega.BeTrueBecause("cgroup v2 is required for swap"))
+				if !isPodCgroupV2(f, pod) {
+					e2eskipper.Skipf("swap tests require cgroup v2")
+				}
 				gomega.Expect(getSwapBehavior()).To(gomega.Equal(types.LimitedSwap))
 
 				expectedSwapLimit := calcSwapForBurstablePod(f, pod)
@@ -136,7 +141,9 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 
 				sleepingPod := getSleepingPod(f.Namespace.Name)
 				sleepingPod = runPodAndWaitUntilScheduled(f, sleepingPod)
-				gomega.Expect(isPodCgroupV2(f, sleepingPod)).To(gomega.BeTrueBecause("node uses cgroup v1"))
+				if !isPodCgroupV2(f, sleepingPod) {
+					e2eskipper.Skipf("swap tests require cgroup v2")
+				}
 
 				nodeName = sleepingPod.Spec.NodeName
 				gomega.Expect(nodeName).ToNot(gomega.BeEmpty(), "node name is empty")
