@@ -119,7 +119,7 @@ func (o containerOutputList) String() string {
 	return b.String()
 }
 
-// RunTogether returns an error the lhs and rhs run together
+// RunTogether returns an error if containers don't run together or if rhs starts before lhs
 func (o containerOutputList) RunTogether(lhs, rhs string) error {
 	lhsStart := o.findIndex(lhs, "Started", 0)
 	if lhsStart == -1 {

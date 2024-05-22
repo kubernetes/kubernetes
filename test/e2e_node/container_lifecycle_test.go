@@ -282,8 +282,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 		// init container should start and exit with an error, and the regular container should never start
 		framework.ExpectNoError(results.StartsBefore(init1, prefixedName(PostStartPrefix, regular1)))
 		framework.ExpectNoError(results.ExitsBefore(init1, prefixedName(PostStartPrefix, regular1)))
-
-		framework.ExpectNoError(results.RunTogether(regular1, prefixedName(PostStartPrefix, regular1)))
 	})
 
 	ginkgo.It("should restart failing container when pod restartPolicy is Always", func() {
