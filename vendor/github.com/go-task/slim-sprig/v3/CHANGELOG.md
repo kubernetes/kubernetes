@@ -1,5 +1,24 @@
 # Changelog
 
+## Release 3.2.3 (2022-11-29)
+
+### Changed
+
+- Updated docs (thanks @book987 @aJetHorn @neelayu @pellizzetti @apricote @SaigyoujiYuyuko233 @AlekSi)
+- #348: Updated huandu/xstrings which fixed a snake case bug (thanks @yxxhero)
+- #353: Updated masterminds/semver which included bug fixes
+- #354: Updated golang.org/x/crypto which included bug fixes
+
+## Release 3.2.2 (2021-02-04)
+
+This is a re-release of 3.2.1 to satisfy something with the Go module system.
+
+## Release 3.2.1 (2021-02-04)
+
+### Changed
+
+- Upgraded `Masterminds/goutils` to `v1.1.1`. see the [Security Advisory](https://github.com/Masterminds/goutils/security/advisories/GHSA-xg2h-wx96-xgxr)
+
 ## Release 3.2.0 (2020-12-14)
 
 ### Added
