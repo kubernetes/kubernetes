@@ -431,15 +431,15 @@ func RemoveTaintOffNode(cs clientset.Interface, nodeName string, taint v1.Taint)
 
 // WaitForNodeTaints waits for a node to have the target taints and returns
 // an error if it does not have taints within the given timeout.
-func WaitForNodeTaints(cs clientset.Interface, node *v1.Node, taints []v1.Taint) error {
-	return wait.Poll(100*time.Millisecond, 30*time.Second, NodeTainted(cs, node.Name, taints))
+func WaitForNodeTaints(ctx context.Context, cs clientset.Interface, node *v1.Node, taints []v1.Taint) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, false, NodeTainted(ctx, cs, node.Name, taints))
 }
 
 // NodeTainted return a condition function that returns true if the given node contains
 // the taints.
-func NodeTainted(cs clientset.Interface, nodeName string, taints []v1.Taint) wait.ConditionFunc {
-	return func() (bool, error) {
-		node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+func NodeTainted(ctx context.Context, cs clientset.Interface, nodeName string, taints []v1.Taint) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
+		node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -553,14 +553,14 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 }
 
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
-func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
-	schedulerCacheIsEmpty := func() (bool, error) {
+func WaitForSchedulerCacheCleanup(ctx context.Context, sched *scheduler.Scheduler, t *testing.T) {
+	schedulerCacheIsEmpty := func(context.Context) (bool, error) {
 		dump := sched.Cache.Dump()
 
 		return len(dump.Nodes) == 0 && len(dump.AssumedPods) == 0, nil
 	}
 
-	if err := wait.Poll(time.Second, wait.ForeverTestTimeout, schedulerCacheIsEmpty); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, false, schedulerCacheIsEmpty); err != nil {
 		t.Errorf("Failed to wait for scheduler cache cleanup: %v", err)
 	}
 }
@@ -726,10 +726,10 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 
 // WaitForReflection waits till the passFunc confirms that the object it expects
 // to see is in the store. Used to observe reflected events.
-func WaitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key string,
+func WaitForReflection(ctx context.Context, t *testing.T, nodeLister corelisters.NodeLister, key string,
 	passFunc func(n interface{}) bool) error {
 	var nodes []*v1.Node
-	err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
 		n, err := nodeLister.Get(key)
 
 		switch {
@@ -783,13 +783,13 @@ func CreateAndWaitForNodesInCache(testCtx *TestContext, prefix string, wrapper *
 	if err != nil {
 		return nodes, fmt.Errorf("cannot create nodes: %v", err)
 	}
-	return nodes, WaitForNodesInCache(testCtx.Scheduler, numNodes+existingNodes)
+	return nodes, WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, numNodes+existingNodes)
 }
 
 // WaitForNodesInCache ensures at least <nodeCount> nodes are present in scheduler cache
 // within 30 seconds; otherwise returns false.
-func WaitForNodesInCache(sched *scheduler.Scheduler, nodeCount int) error {
-	err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+func WaitForNodesInCache(ctx context.Context, sched *scheduler.Scheduler, nodeCount int) error {
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
 		return sched.Cache.NodeCount() >= nodeCount, nil
 	})
 	if err != nil {
@@ -1018,9 +1018,9 @@ func PodSchedulingError(c clientset.Interface, podNamespace, podName string) wai
 
 // PodSchedulingGated returns a condition function that returns true if the given pod
 // gets unschedulable status of reason 'SchedulingGated'.
-func PodSchedulingGated(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+func PodSchedulingGated(ctx context.Context, c clientset.Interface, podNamespace, podName string) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil
@@ -1033,27 +1033,27 @@ func PodSchedulingGated(c clientset.Interface, podNamespace, podName string) wai
 
 // WaitForPodUnschedulableWithTimeout waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the given timeout.
-func WaitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, timeout, false, PodUnschedulable(cs, pod.Namespace, pod.Name))
+func WaitForPodUnschedulableWithTimeout(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, PodUnschedulable(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPodUnschedulable waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the timeout duration (30 seconds).
-func WaitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
-	return WaitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
+func WaitForPodUnschedulable(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error {
+	return WaitForPodUnschedulableWithTimeout(ctx, cs, pod, 30*time.Second)
 }
 
 // WaitForPodSchedulingGated waits for a pod to be in scheduling gated state
 // and returns an error if it does not fall into this state within the given timeout.
-func WaitForPodSchedulingGated(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(100*time.Millisecond, timeout, PodSchedulingGated(cs, pod.Namespace, pod.Name))
+func WaitForPodSchedulingGated(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, PodSchedulingGated(ctx, cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
 func WaitForPDBsStable(testCtx *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
-	return wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
-		pdbList, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).List(context.TODO(), metav1.ListOptions{})
+	return wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, 60*time.Second, false, func(context.Context) (bool, error) {
+		pdbList, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).List(testCtx.Ctx, metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -1080,7 +1080,7 @@ func WaitForPDBsStable(testCtx *TestContext, pdbs []*policy.PodDisruptionBudget,
 
 // WaitCachedPodsStable waits until scheduler cache has the given pods.
 func WaitCachedPodsStable(testCtx *TestContext, pods []*v1.Pod) error {
-	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
+	return wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, 30*time.Second, false, func(context.Context) (bool, error) {
 		cachedPods, err := testCtx.Scheduler.Cache.PodCount()
 		if err != nil {
 			return false, err
@@ -1089,7 +1089,7 @@ func WaitCachedPodsStable(testCtx *TestContext, pods []*v1.Pod) error {
 			return false, nil
 		}
 		for _, p := range pods {
-			actualPod, err1 := testCtx.ClientSet.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Name, metav1.GetOptions{})
+			actualPod, err1 := testCtx.ClientSet.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
 			if err1 != nil {
 				return false, err1
 			}
