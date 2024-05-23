@@ -799,7 +799,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 				PreStop: &v1.LifecycleHandler{
 					Exec: &v1.ExecAction{
 						Command: ExecCommand(prefixedName(PreStopPrefix, regular1), execCommand{
-							Delay:         1,
+							Delay:         10,
 							ExitCode:      0,
 							ContainerName: regular1,
 						}),
