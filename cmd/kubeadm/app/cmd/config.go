@@ -35,7 +35,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
@@ -213,16 +212,16 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 		return []byte{}, err
 	}
 
-	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1old.SchemeGroupVersion)
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1.SchemeGroupVersion)
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
 	opts := configutil.LoadOrDefaultConfigurationOptions{
 		SkipCRIDetect: true,
 	}
-	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1old.JoinConfiguration{
-		Discovery: kubeadmapiv1old.Discovery{
-			BootstrapToken: &kubeadmapiv1old.BootstrapTokenDiscovery{
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
+		Discovery: kubeadmapiv1.Discovery{
+			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
 				Token:                    configutil.PlaceholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
@@ -233,7 +232,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 		return []byte{}, err
 	}
 
-	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1old.SchemeGroupVersion)
+	return configutil.MarshalKubeadmConfigObject(internalcfg, kubeadmapiv1.SchemeGroupVersion)
 }
 
 func getDefaultResetConfigBytes() ([]byte, error) {
@@ -281,7 +280,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1old.SchemeGroupVersion, kubeadmapiv1old.SchemeGroupVersion),
+		`), kubeadmapiv1.SchemeGroupVersion, kubeadmapiv1.SchemeGroupVersion),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(oldCfgPath) == 0 {
 				return errors.New("the --old-config flag is mandatory")
@@ -331,7 +330,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 
 			In this version of kubeadm, the following API versions are supported:
 			- %s
-		`), kubeadmapiv1old.SchemeGroupVersion),
+		`), kubeadmapiv1.SchemeGroupVersion),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(cfgPath) == 0 {
 				return errors.Errorf("the --%s flag is mandatory", options.CfgPath)
@@ -370,9 +369,9 @@ func newCmdConfigImages(out io.Writer) *cobra.Command {
 
 // newCmdConfigImagesPull returns the `kubeadm config images pull` command
 func newCmdConfigImagesPull() *cobra.Command {
-	externalClusterCfg := &kubeadmapiv1old.ClusterConfiguration{}
+	externalClusterCfg := &kubeadmapiv1.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalClusterCfg)
-	externalInitCfg := &kubeadmapiv1old.InitConfiguration{}
+	externalInitCfg := &kubeadmapiv1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalInitCfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -417,7 +416,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 
 // newCmdConfigImagesList returns the "kubeadm config images list" command
 func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
-	externalcfg := &kubeadmapiv1old.ClusterConfiguration{}
+	externalcfg := &kubeadmapiv1.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -459,8 +458,8 @@ func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 }
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
-func NewImagesList(cfgPath string, cfg *kubeadmapiv1old.ClusterConfiguration) (*ImagesList, error) {
-	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1old.InitConfiguration{}, cfg, configutil.LoadOrDefaultConfigurationOptions{
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1.ClusterConfiguration) (*ImagesList, error) {
+	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1.InitConfiguration{}, cfg, configutil.LoadOrDefaultConfigurationOptions{
 		SkipCRIDetect: true,
 	})
 	if err != nil {
@@ -516,7 +515,7 @@ func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1old.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
