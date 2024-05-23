@@ -4318,10 +4318,8 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		if securityContext.SupplementalGroups != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("supplementalGroups"), "cannot be set for a windows pod"))
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			if securityContext.SupplementalGroupsPolicy != nil {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("supplementalGroupsPolicy"), "cannot be set for a windows pod"))
-			}
+		if securityContext.SupplementalGroupsPolicy != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("supplementalGroupsPolicy"), "cannot be set for a windows pod"))
 		}
 	}
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
@@ -4954,10 +4952,8 @@ func validatePodSpecSecurityContext(securityContext *core.PodSecurityContext, sp
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
 		allErrs = append(allErrs, ValidateAppArmorProfileField(securityContext.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			if securityContext.SupplementalGroupsPolicy != nil {
-				allErrs = append(allErrs, validateSupplementalGroupsPolicy(securityContext.SupplementalGroupsPolicy, fldPath.Child("supplementalGroupsPolicy"))...)
-			}
+		if securityContext.SupplementalGroupsPolicy != nil {
+			allErrs = append(allErrs, validateSupplementalGroupsPolicy(securityContext.SupplementalGroupsPolicy, fldPath.Child("supplementalGroupsPolicy"))...)
 		}
 	}
 
@@ -5370,11 +5366,9 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 		allErrs = append(allErrs, newIPErrs...)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-		allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), newPod.Spec.OS)...)
-		allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.OS)...)
-		allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), newPod.Spec.OS)...)
-	}
+	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), newPod.Spec.OS)...)
+	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.OS)...)
+	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), newPod.Spec.OS)...)
 
 	return allErrs
 }

@@ -26249,8 +26249,6 @@ func TestValidateSleepAction(t *testing.T) {
 
 // TODO: merge these test to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
 func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, true)
-
 	fldPath := field.NewPath("spec")
 	badSupplementalGroupsPolicyEmpty := ptr.To(core.SupplementalGroupsPolicy(""))
 	badSupplementalGroupsPolicyNotSupported := ptr.To(core.SupplementalGroupsPolicy("not-supported"))
@@ -26317,9 +26315,8 @@ func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
 	}
 }
 
-// TODO: merge these testcases to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
+// TODO: merge these testcases to TestValidateWindowsPodSecurityContext after SupplementalGroupsPolicy feature graduates to Beta
 func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, true)
 	fldPath := field.NewPath("spec")
 
 	testCases := map[string]struct {
@@ -26368,8 +26365,6 @@ func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T)
 
 // TODO: merge these testcases to TestValidatePodStatusUpdate after SupplementalGroupsPolicy feature graduates to Beta
 func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, true)
-
 	badUID := int64(-1)
 	badGID := int64(-1)
 
