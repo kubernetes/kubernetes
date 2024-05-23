@@ -118,7 +118,13 @@ bin/${BIN.linux}-$(OS)-$(ARCH): $(SRCS)
 			$(TRIPLE)-strip $(foreach binary, $@, ${binary}${EXTENSION})"
 
 bin/wincat-windows-${ARCH}: windows/wincat/wincat.go
-	CGO_ENABLED=0 GOOS=windows GOARCH=${ARCH} go build -o $@ $^
+	mkdir -p bin
+	docker run --rm -u $$(id -u):$$(id -g) -v $$(pwd):/build \
+		--tmpfs /.cache \
+		$(KUBE_CROSS_IMAGE):$(KUBE_CROSS_VERSION) \
+		/bin/bash -c "\
+		cd /build && \
+		CGO_ENABLED=0 GOOS=windows GOARCH=${ARCH} go build -o $@ $^"
 
 container: .container-${OS}-$(ARCH)
 .container-linux-$(ARCH): bin/$(BIN)-$(OS)-$(ARCH)
