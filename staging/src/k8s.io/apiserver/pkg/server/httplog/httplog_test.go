@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
 func TestDefaultStacktracePred(t *testing.T) {
@@ -148,7 +149,7 @@ func TestLoggedStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	var tw http.ResponseWriter = new(responsewriter.FakeResponseWriter)
+	var tw http.ResponseWriter = new(responsewritertesting.FakeResponseWriter)
 	logger := newLogged(req, tw)
 	logger.Write(nil)
 
@@ -156,7 +157,7 @@ func TestLoggedStatus(t *testing.T) {
 		t.Errorf("expected status after write to be %v, got %v", http.StatusOK, logger.status)
 	}
 
-	tw = new(responsewriter.FakeResponseWriter)
+	tw = new(responsewritertesting.FakeResponseWriter)
 	logger = newLogged(req, tw)
 	logger.WriteHeader(http.StatusForbidden)
 	logger.Write(nil)
@@ -175,14 +176,14 @@ func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
 		{
 			name: "http2",
 			r: func() http.ResponseWriter {
-				return &responsewriter.FakeResponseWriterFlusherCloseNotifier{}
+				return &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{}
 			},
 			hijackable: false,
 		},
 		{
 			name: "http/1.x",
 			r: func() http.ResponseWriter {
-				return &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}
+				return &responsewritertesting.FakeResponseWriterFlusherCloseNotifierHijacker{}
 			},
 			hijackable: true,
 		},
@@ -224,7 +225,7 @@ func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
 
 func TestResponseWriterDecorator(t *testing.T) {
 	decorator := &respLogger{
-		w: &responsewriter.FakeResponseWriter{},
+		w: &responsewritertesting.FakeResponseWriter{},
 	}
 	var w http.ResponseWriter = decorator
 

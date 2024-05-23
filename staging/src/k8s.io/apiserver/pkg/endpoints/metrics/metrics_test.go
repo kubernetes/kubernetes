@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -358,7 +359,7 @@ func TestCleanFieldValidation(t *testing.T) {
 
 func TestResponseWriterDecorator(t *testing.T) {
 	decorator := &ResponseWriterDelegator{
-		ResponseWriter: &responsewriter.FakeResponseWriter{},
+		ResponseWriter: &responsewritertesting.FakeResponseWriter{},
 	}
 	var w http.ResponseWriter = decorator
 

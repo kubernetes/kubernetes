@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
 type fakeAuditSink struct {
@@ -75,7 +76,7 @@ func (s *fakeAuditSink) Pop(timeout time.Duration) (*auditinternal.Event, error)
 }
 
 func TestConstructResponseWriter(t *testing.T) {
-	inner := &responsewriter.FakeResponseWriter{}
+	inner := &responsewritertesting.FakeResponseWriter{}
 	actual := decorateResponseWriter(context.Background(), inner, nil, nil, nil)
 	switch v := actual.(type) {
 	case *auditResponseWriter:
@@ -86,7 +87,7 @@ func TestConstructResponseWriter(t *testing.T) {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 
-	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
+	actual = decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
 	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	if _, ok := actual.(http.CloseNotifier); !ok {
 		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
@@ -98,7 +99,7 @@ func TestConstructResponseWriter(t *testing.T) {
 		t.Errorf("Expected http.ResponseWriter not to implement http.Hijacker")
 	}
 
-	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}, nil, nil, nil)
+	actual = decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriterFlusherCloseNotifierHijacker{}, nil, nil, nil)
 	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	if _, ok := actual.(http.CloseNotifier); !ok {
 		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
@@ -113,7 +114,7 @@ func TestConstructResponseWriter(t *testing.T) {
 
 func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriter{}, ev, nil, nil)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.WriteHeader(42)
@@ -127,7 +128,7 @@ func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 
 func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriter{}, ev, nil, nil)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.Write([]byte("foo"))
@@ -142,7 +143,7 @@ func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 func TestDecorateResponseWriterChannel(t *testing.T) {
 	sink := &fakeAuditSink{}
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, sink, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriter{}, ev, sink, nil)
 
 	done := make(chan struct{})
 	go func() {

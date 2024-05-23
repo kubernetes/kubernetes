@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 	"k8s.io/klog/v2"
 )
 
@@ -520,7 +521,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 
 func TestResponseWriterDecorator(t *testing.T) {
 	decorator := &baseTimeoutWriter{
-		w: &responsewriter.FakeResponseWriter{},
+		w: &responsewritertesting.FakeResponseWriter{},
 	}
 	var w http.ResponseWriter = decorator
 

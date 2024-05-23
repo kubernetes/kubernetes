@@ -24,6 +24,8 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
 func TestWithHTTP1(t *testing.T) {
@@ -139,14 +141,14 @@ func TestGetOriginal(t *testing.T) {
 		{
 			name: "not wrapped",
 			wrap: func() (http.ResponseWriter, http.ResponseWriter) {
-				original := &FakeResponseWriter{}
+				original := &responsewritertesting.FakeResponseWriter{}
 				return original, original
 			},
 		},
 		{
 			name: "wrapped once",
 			wrap: func() (http.ResponseWriter, http.ResponseWriter) {
-				original := &FakeResponseWriter{}
+				original := &responsewritertesting.FakeResponseWriter{}
 				return original, &fakeResponseWriterDecorator{
 					ResponseWriter: original,
 				}
@@ -155,7 +157,7 @@ func TestGetOriginal(t *testing.T) {
 		{
 			name: "wrapped multiple times",
 			wrap: func() (http.ResponseWriter, http.ResponseWriter) {
-				original := &FakeResponseWriter{}
+				original := &responsewritertesting.FakeResponseWriter{}
 				return original, &fakeResponseWriterDecorator{
 					ResponseWriter: &fakeResponseWriterDecorator{
 						ResponseWriter: &fakeResponseWriterDecorator{
