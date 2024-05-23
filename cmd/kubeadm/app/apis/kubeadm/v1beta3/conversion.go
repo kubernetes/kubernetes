@@ -80,9 +80,8 @@ func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *Cl
 	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
-// Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent is required due to the missing ControlPlaneComponent.ExtraEnvs in v1beta3.
+// Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent is required due to the different ControlPlaneComponent.ExtraArgs in v1beta3.
 func Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *ControlPlaneComponent, out *kubeadm.ControlPlaneComponent, s conversion.Scope) error {
-	out.ExtraEnvs = []kubeadm.EnvVar{}
 	out.ExtraArgs = convertToArgs(in.ExtraArgs)
 	return autoConvert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in, out, s)
 }
@@ -93,9 +92,8 @@ func Convert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in *
 	return autoConvert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in, out, s)
 }
 
-// Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd is required due to the missing LocalEtcd.ExtraEnvs in v1beta3.
+// Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd is required due to the different LocalEtcd.Args in v1beta3.
 func Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kubeadm.LocalEtcd, s conversion.Scope) error {
-	out.ExtraEnvs = []kubeadm.EnvVar{}
 	out.ExtraArgs = convertToArgs(in.ExtraArgs)
 	return autoConvert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in, out, s)
 }
