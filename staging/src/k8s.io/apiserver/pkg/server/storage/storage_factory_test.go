@@ -26,10 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	exampleinstall "k8s.io/apiserver/pkg/apis/example/install"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/util/version"
 )
 
 var (
@@ -118,7 +120,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 	f.SetEtcdLocation(example.Resource("*"), []string{"/server2"})
 	f.SetEtcdPrefix(example.Resource("test"), "/prefix_for_test")
 
-	config, err := f.NewConfig(example.Resource("test"))
+	config, err := f.NewConfig(example.Resource("test"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +165,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error
-		config, err := storageFactory.NewConfig(test.resource)
+		config, err := storageFactory.NewConfig(test.resource, nil)
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
@@ -173,7 +175,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			continue
 		}
 
-		config, err = storageFactory.NewConfig(schema.GroupResource{Group: examplev1.GroupName, Resource: "unlikely"})
+		config, err = storageFactory.NewConfig(schema.GroupResource{Group: examplev1.GroupName, Resource: "unlikely"}, nil)
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
@@ -242,5 +244,243 @@ func TestConfigs(t *testing.T) {
 			t.Errorf("%d: expected %v, got %v", i, test.wantConfigs, got)
 			continue
 		}
+	}
+}
+
+var introducedLifecycles = map[reflect.Type]*apimachineryversion.Version{}
+var removedLifecycles = map[reflect.Type]*apimachineryversion.Version{}
+
+type fakeLifecycler[T, V any] struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+}
+
+type removedLifecycler[T, V any] struct {
+	fakeLifecycler[T, V]
+}
+
+func (f *fakeLifecycler[T, V]) GetObjectKind() schema.ObjectKind { return f }
+func (f *fakeLifecycler[T, V]) DeepCopyObject() runtime.Object   { return f }
+func (f *fakeLifecycler[T, V]) APILifecycleIntroduced() (major, minor int) {
+	if introduced, ok := introducedLifecycles[reflect.TypeOf(f)]; ok {
+		return int(introduced.Major()), int(introduced.Minor())
+	}
+	panic("no lifecycle version set")
+}
+func (f *removedLifecycler[T, V]) APILifecycleRemoved() (major, minor int) {
+	if removed, ok := removedLifecycles[reflect.TypeOf(f)]; ok {
+		return int(removed.Major()), int(removed.Minor())
+	}
+	panic("no lifecycle version set")
+}
+
+func registerFakeLifecycle[T, V any](sch *runtime.Scheme, group, introduced, removed string) {
+	f := fakeLifecycler[T, V]{}
+
+	introducedLifecycles[reflect.TypeOf(&f)] = apimachineryversion.MustParseSemantic(introduced)
+
+	var res runtime.Object
+	if removed != "" {
+		removedLifecycles[reflect.TypeOf(&f)] = apimachineryversion.MustParseSemantic(removed)
+		res = &removedLifecycler[T, V]{fakeLifecycler: f}
+	} else {
+		res = &f
+	}
+
+	var v V
+	var t T
+	sch.AddKnownTypeWithName(
+		schema.GroupVersionKind{
+			Group:   group,
+			Version: strings.ToLower(reflect.TypeOf(v).Name()),
+			Kind:    reflect.TypeOf(t).Name(),
+		},
+		res,
+	)
+
+	// Also ensure internal version is registered
+	// If it is registertd multiple times, it will ignore subsequent registrations
+	internalInstance := &fakeLifecycler[T, struct{}]{}
+	sch.AddKnownTypeWithName(
+		schema.GroupVersionKind{
+			Group:   group,
+			Version: runtime.APIVersionInternal,
+			Kind:    reflect.TypeOf(t).Name(),
+		},
+		internalInstance,
+	)
+}
+
+func TestStorageFactoryCompatibilityVersion(t *testing.T) {
+	// Creates a scheme with stub types for unit test
+	sch := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(sch)
+
+	type Internal = struct{}
+	type V1beta1 struct{}
+	type V1beta2 struct{}
+	type V1beta3 struct{}
+	type V1 struct{}
+
+	type Pod struct{}
+	type FlowSchema struct{}
+	type ValidatingAdmisisonPolicy struct{}
+	type CronJob struct{}
+
+	// Order dictates priority order
+	registerFakeLifecycle[FlowSchema, V1](sch, "flowcontrol.apiserver.k8s.io", "1.29.0", "")
+	registerFakeLifecycle[FlowSchema, V1beta3](sch, "flowcontrol.apiserver.k8s.io", "1.26.0", "1.32.0")
+	registerFakeLifecycle[FlowSchema, V1beta2](sch, "flowcontrol.apiserver.k8s.io", "1.23.0", "1.29.0")
+	registerFakeLifecycle[FlowSchema, V1beta1](sch, "flowcontrol.apiserver.k8s.io", "1.20.0", "1.26.0")
+	registerFakeLifecycle[CronJob, V1](sch, "batch", "1.21.0", "")
+	registerFakeLifecycle[CronJob, V1beta1](sch, "batch", "1.8.0", "1.21.0")
+	registerFakeLifecycle[ValidatingAdmisisonPolicy, V1](sch, "admissionregistration.k8s.io", "1.30.0", "")
+	registerFakeLifecycle[ValidatingAdmisisonPolicy, V1beta1](sch, "admissionregistration.k8s.io", "1.28.0", "1.34.0")
+	registerFakeLifecycle[Pod, V1](sch, "", "1.31.0", "")
+
+	// FlowSchema
+	//   - v1beta1: 1.20.0 - 1.23.0
+	//   - v1beta2: 1.23.0 - 1.26.0
+	//   - v1beta3: 1.26.0 - 1.30.0
+	//   - v1: 1.29.0+
+	// CronJob
+	//	 - v1beta1: 1.8.0 - 1.21.0
+	//	 - v1: 1.21.0+
+	// ValidatingAdmissionPolicy
+	//	 - v1beta1: 1.28.0 - 1.31.0
+	//	 - v1: 1.30.0+
+
+	testcases := []struct {
+		effectiveVersion string
+		example          runtime.Object
+		expectedVersion  schema.GroupVersion
+	}{
+		{
+			// Basic case. Beta version for long time
+			effectiveVersion: "1.14.0",
+			example:          &fakeLifecycler[CronJob, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "batch", Version: "v1beta1"},
+		},
+		{
+			// Basic case. Beta version for long time
+			effectiveVersion: "1.20.0",
+			example:          &fakeLifecycler[CronJob, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "batch", Version: "v1beta1"},
+		},
+		{
+			// Basic case. GA version for long time
+			effectiveVersion: "1.28.0",
+			example:          &fakeLifecycler[CronJob, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "batch", Version: "v1"},
+		},
+		{
+			// Basic core/v1
+			effectiveVersion: "1.31.0",
+			example:          &fakeLifecycler[Pod, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "", Version: "v1"},
+		},
+		{
+			// Corner case: 1.1.0 has no flowcontrol. Options are to error
+			// out or to use the latest version. This test assumes the latter.
+			effectiveVersion: "1.1.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1"},
+		},
+		{
+			effectiveVersion: "1.21.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+		},
+		{
+			// v2Beta1 introduced this version, but minCompatibility should
+			// force v1beta1
+			effectiveVersion: "1.23.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+		},
+		{
+			effectiveVersion: "1.24.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
+		},
+		{
+			effectiveVersion: "1.26.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
+		},
+		{
+			effectiveVersion: "1.27.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
+		},
+		{
+			// GA API introduced 1.29 but must keep storing in v1beta3 for downgrades
+			effectiveVersion: "1.29.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
+		},
+		{
+			// Version after GA api is introduced
+			effectiveVersion: "1.30.0",
+			example:          &fakeLifecycler[FlowSchema, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1"},
+		},
+		{
+			effectiveVersion: "1.30.0",
+			example:          &fakeLifecycler[ValidatingAdmisisonPolicy, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+		},
+		{
+			effectiveVersion: "1.31.0",
+			example:          &fakeLifecycler[ValidatingAdmisisonPolicy, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1"},
+		},
+		{
+			effectiveVersion: "1.29.0",
+			example:          &fakeLifecycler[ValidatingAdmisisonPolicy, Internal]{},
+			expectedVersion:  schema.GroupVersion{Group: "admissionregistration.k8s.io", Version: "v1beta1"},
+		},
+	}
+
+	for _, tc := range testcases {
+		gvks, _, err := sch.ObjectKinds(tc.example)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		gvk := gvks[0]
+		t.Run(gvk.GroupKind().String()+"@"+tc.effectiveVersion, func(t *testing.T) {
+			config := NewDefaultResourceEncodingConfig(sch)
+			config.SetEffectiveVersion(version.NewEffectiveVersion(tc.effectiveVersion))
+			f := NewDefaultStorageFactory(
+				storagebackend.Config{},
+				"",
+				codecs,
+				config,
+				NewResourceConfig(),
+				nil)
+
+			cfg, err := f.NewConfig(schema.GroupResource{
+				Group:    gvk.Group,
+				Resource: gvk.Kind, // doesnt really matter here
+			}, tc.example)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			gvks, _, err := sch.ObjectKinds(tc.example)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			expectEncodeVersioner := runtime.NewMultiGroupVersioner(tc.expectedVersion,
+				schema.GroupKind{
+					Group: gvks[0].Group,
+				}, schema.GroupKind{
+					Group: gvks[0].Group,
+				})
+			if cfg.EncodeVersioner.Identifier() != expectEncodeVersioner.Identifier() {
+				t.Errorf("expected %v, got %v", expectEncodeVersioner, cfg.EncodeVersioner)
+			}
+		})
 	}
 }

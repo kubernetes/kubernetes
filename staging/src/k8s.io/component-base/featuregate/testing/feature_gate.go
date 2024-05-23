@@ -45,7 +45,7 @@ func init() {
 func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) {
 	tb.Helper()
 	detectParallelOverrideCleanup := detectParallelOverride(tb, f)
-	originalValue := gate.Enabled(f)
+	originalEnabled := gate.(featuregate.MutableVersionedFeatureGateForTests).EnabledRawMap()
 
 	// Specially handle AllAlpha and AllBeta
 	if f == "AllAlpha" || f == "AllBeta" {
@@ -67,9 +67,7 @@ func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f fea
 	tb.Cleanup(func() {
 		tb.Helper()
 		detectParallelOverrideCleanup()
-		if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
-			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
-		}
+		gate.(featuregate.MutableVersionedFeatureGateForTests).Reset(originalEnabled)
 	})
 }
 

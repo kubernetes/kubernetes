@@ -44,7 +44,7 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	if err != nil {
 		t.Fatalf("Error while making storage factory: %v", err)
 	}
-	resourceConfig, err := factory.NewConfig(resource)
+	resourceConfig, err := factory.NewConfig(resource, nil)
 	if err != nil {
 		t.Fatalf("Error while finding storage destination: %v", err)
 	}

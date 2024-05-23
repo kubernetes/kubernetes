@@ -21,6 +21,7 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
 
 // APIGroupDiscoveryList is a resource containing a list of APIGroupDiscovery.
 // This is one of the types able to be returned from the /api and /apis endpoint and contains an aggregated
@@ -37,6 +38,7 @@ type APIGroupDiscoveryList struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
 
 // APIGroupDiscovery holds information about which resources are being served for all version of the API Group.
 // It contains a list of APIVersionDiscovery that holds a list of APIResourceDiscovery types served for a version.

@@ -82,7 +82,7 @@ func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, s
 // The peer endpoint leases are used to find network locations of apiservers for peer proxy
 func CreatePeerEndpointLeaseReconciler(c genericapiserver.Config, storageFactory serverstorage.StorageFactory) (reconcilers.PeerEndpointLeaseReconciler, error) {
 	ttl := DefaultPeerEndpointReconcilerTTL
-	config, err := storageFactory.NewConfig(api.Resource("apiServerPeerIPInfo"))
+	config, err := storageFactory.NewConfig(api.Resource("apiServerPeerIPInfo"), &api.Endpoints{})
 	if err != nil {
 		return nil, fmt.Errorf("error creating storage factory config: %w", err)
 	}

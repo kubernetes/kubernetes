@@ -24,7 +24,7 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 // AdmissionReview describes an admission review request/response.
 type AdmissionReview struct {
 	metav1.TypeMeta `json:",inline"`

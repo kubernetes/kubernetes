@@ -370,6 +370,10 @@ message MutatingWebhook {
   repeated MatchCondition matchConditions = 12;
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
 message MutatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -953,6 +957,10 @@ message ValidatingWebhook {
   repeated MatchCondition matchConditions = 11;
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
 message ValidatingWebhookConfiguration {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -968,6 +976,8 @@ message ValidatingWebhookConfiguration {
   repeated ValidatingWebhook Webhooks = 2;
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 // ValidatingWebhookConfigurationList is a list of ValidatingWebhookConfiguration.
 message ValidatingWebhookConfigurationList {
   // Standard list metadata.

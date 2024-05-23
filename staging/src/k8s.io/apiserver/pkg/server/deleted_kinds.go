@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -25,16 +26,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/klog/v2"
 )
 
 // resourceExpirationEvaluator holds info for deciding if a particular rest.Storage needs to excluded from the API
 type resourceExpirationEvaluator struct {
-	currentMajor int
-	currentMinor int
-	isAlpha      bool
+	currentVersion *apimachineryversion.Version
+	isAlpha        bool
 	// This is usually set for testing for which tests need to be removed.  This prevent insta-failing CI.
 	// Set KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA to see what will be removed when we tag beta
 	strictRemovedHandlingInAlpha bool
@@ -53,30 +53,17 @@ type ResourceExpirationEvaluator interface {
 	ShouldServeForVersion(majorRemoved, minorRemoved int) bool
 }
 
-func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (ResourceExpirationEvaluator, error) {
+func NewResourceExpirationEvaluator(currentVersion *apimachineryversion.Version) (ResourceExpirationEvaluator, error) {
+	if currentVersion == nil {
+		return nil, fmt.Errorf("empty NewResourceExpirationEvaluator currentVersion")
+	}
+	klog.V(1).Infof("NewResourceExpirationEvaluator with currentVersion: %s.", currentVersion)
 	ret := &resourceExpirationEvaluator{
 		strictRemovedHandlingInAlpha: false,
 	}
-	if len(currentVersion.Major) > 0 {
-		currentMajor64, err := strconv.ParseInt(currentVersion.Major, 10, 32)
-		if err != nil {
-			return nil, err
-		}
-		ret.currentMajor = int(currentMajor64)
-	}
-	if len(currentVersion.Minor) > 0 {
-		// split the "normal" + and - for semver stuff
-		minorString := strings.Split(currentVersion.Minor, "+")[0]
-		minorString = strings.Split(minorString, "-")[0]
-		minorString = strings.Split(minorString, ".")[0]
-		currentMinor64, err := strconv.ParseInt(minorString, 10, 32)
-		if err != nil {
-			return nil, err
-		}
-		ret.currentMinor = int(currentMinor64)
-	}
-
-	ret.isAlpha = strings.Contains(currentVersion.GitVersion, "alpha")
+	// Only keeps the major and minor versions from input version.
+	ret.currentVersion = apimachineryversion.MajorMinor(currentVersion.Major(), currentVersion.Minor())
+	ret.isAlpha = strings.Contains(currentVersion.PreRelease(), "alpha")
 
 	if envString, ok := os.LookupEnv("KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA"); !ok {
 		// do nothing
@@ -112,6 +99,15 @@ func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versio
 		return false
 	}
 
+	introduced, ok := versionedPtr.(introducedInterface)
+	if ok {
+		majorIntroduced, minorIntroduced := introduced.APILifecycleIntroduced()
+		verIntroduced := apimachineryversion.MajorMinor(uint(majorIntroduced), uint(minorIntroduced))
+		if e.currentVersion.LessThan(verIntroduced) {
+			return false
+		}
+	}
+
 	removed, ok := versionedPtr.(removedInterface)
 	if !ok {
 		return true
@@ -121,16 +117,11 @@ func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versio
 }
 
 func (e *resourceExpirationEvaluator) ShouldServeForVersion(majorRemoved, minorRemoved int) bool {
-	if e.currentMajor < majorRemoved {
+	removedVer := apimachineryversion.MajorMinor(uint(majorRemoved), uint(minorRemoved))
+	if removedVer.GreaterThan(e.currentVersion) {
 		return true
 	}
-	if e.currentMajor > majorRemoved {
-		return false
-	}
-	if e.currentMinor < minorRemoved {
-		return true
-	}
-	if e.currentMinor > minorRemoved {
+	if removedVer.LessThan(e.currentVersion) {
 		return false
 	}
 	// at this point major and minor are equal, so this API should be removed when the current release GAs.
@@ -152,6 +143,11 @@ type removedInterface interface {
 	APILifecycleRemoved() (major, minor int)
 }
 
+// Object interface generated from "k8s:prerelease-lifecycle-gen:introduced" tags in types.go.
+type introducedInterface interface {
+	APILifecycleIntroduced() (major, minor int)
+}
+
 // removeDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
@@ -171,6 +167,8 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 			}
 
 			klog.V(1).Infof("Removing resource %v.%v.%v because it is time to stop serving it per APILifecycle.", resourceName, apiVersion, groupName)
+			storage := versionToResource[resourceName]
+			storage.Destroy()
 			delete(versionToResource, resourceName)
 		}
 		versionedResourcesStorageMap[apiVersion] = versionToResource

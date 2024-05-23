@@ -29,6 +29,7 @@ import (
 
 	rbacapi "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -80,8 +81,8 @@ type testRESTOptionsGetter struct {
 	config *controlplane.Config
 }
 
-func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	storageConfig, err := getter.config.ControlPlane.Extra.StorageFactory.NewConfig(resource)
+func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource, example runtime.Object) (generic.RESTOptions, error) {
+	storageConfig, err := getter.config.ControlPlane.Extra.StorageFactory.NewConfig(resource, example)
 	if err != nil {
 		return generic.RESTOptions{}, fmt.Errorf("failed to get storage: %v", err)
 	}

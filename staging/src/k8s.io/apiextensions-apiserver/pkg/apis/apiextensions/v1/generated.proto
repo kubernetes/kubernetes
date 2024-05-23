@@ -65,6 +65,8 @@ message ConversionResponse {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Status result = 3;
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 // ConversionReview describes a conversion request/response.
 message ConversionReview {
   // request describes the attributes for the conversion request.

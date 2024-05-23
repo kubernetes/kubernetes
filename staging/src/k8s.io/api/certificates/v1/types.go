@@ -27,6 +27,7 @@ import (
 // +genclient:nonNamespaced
 // +genclient:method=UpdateApproval,verb=update,subresource=approval,input=k8s.io/api/certificates/v1.CertificateSigningRequest,result=k8s.io/api/certificates/v1.CertificateSigningRequest
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // CertificateSigningRequest objects provide a mechanism to obtain x509 certificates
 // by submitting a certificate signing request, and having it asynchronously approved and issued.
@@ -262,6 +263,7 @@ type CertificateSigningRequestCondition struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // CertificateSigningRequestList is a collection of CertificateSigningRequest objects
 type CertificateSigningRequestList struct {

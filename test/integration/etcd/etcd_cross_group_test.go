@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
@@ -38,6 +39,7 @@ import (
 func TestCrossGroupStorage(t *testing.T) {
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 		// force enable all resources so we can check storage.
+		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("1.30")
 	})
 	defer apiServer.Cleanup()
 
