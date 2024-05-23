@@ -189,11 +189,14 @@ dependencies:
     - path: build/common.sh
       match: __default_go_runner_version=
 
-  - name: "registry.k8s.io/pause"
-    version: 3.9
-    refPaths:
-    - path: build/pause/Makefile
-      match: TAG\s*\?=
+  # TODO: enable once pause 3.10 is promoted
+  # https://github.com/kubernetes/kubernetes/issues/125092
+  #
+  # - name: "registry.k8s.io/pause"
+  #   version: 3.10
+  #   refPaths:
+  #   - path: build/pause/Makefile
+  #     match: TAG\s*\?=
 
   - name: "registry.k8s.io/pause: dependents"
     version: 3.9
