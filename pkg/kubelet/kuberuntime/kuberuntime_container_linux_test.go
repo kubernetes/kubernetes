@@ -721,12 +721,13 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name      string
-		scalingFg bool
-		limits    v1.ResourceList
-		requests  v1.ResourceList
-		cStatus   []v1.ContainerStatus
-		expected  *runtimeapi.LinuxContainerResources
+		name          string
+		scalingFg     bool
+		limits        v1.ResourceList
+		requests      v1.ResourceList
+		cStatus       []v1.ContainerStatus
+		expected      *runtimeapi.LinuxContainerResources
+		cgroupVersion CgroupVersion
 	}{
 		{
 			"requests & limits, cpu & memory, guaranteed qos - no container status",
@@ -735,6 +736,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - no container status",
@@ -743,6 +745,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
+			cgroupV1,
 		},
 		{
 			"best-effort qos - no container status",
@@ -751,6 +754,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			[]v1.ContainerStatus{},
 			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - empty resources container status",
@@ -759,6 +763,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{{Name: "c1"}},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - empty resources container status",
@@ -767,6 +772,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{{Name: "c1"}},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 999},
+			cgroupV1,
 		},
 		{
 			"best-effort qos - empty resources container status",
@@ -775,6 +781,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			[]v1.ContainerStatus{{Name: "c1"}},
 			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
@@ -788,6 +795,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
@@ -801,6 +809,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - no container status",
@@ -809,6 +818,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			[]v1.ContainerStatus{},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
@@ -822,6 +832,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970},
+			cgroupV1,
 		},
 		{
 			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
@@ -835,6 +846,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 				},
 			},
 			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997},
+			cgroupV1,
 		},
 		{
 			"best-effort qos - no container status",
@@ -843,6 +855,135 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			[]v1.ContainerStatus{},
 			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000},
+			cgroupV1,
+		},
+		{
+			"requests & limits, cpu & memory, guaranteed qos - no container status",
+			true,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, burstable qos - no container status",
+			true,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"best-effort qos - no container status",
+			true,
+			nil,
+			nil,
+			[]v1.ContainerStatus{},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, guaranteed qos - empty resources container status",
+			true,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{{Name: "c1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, burstable qos - empty resources container status",
+			true,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{{Name: "c1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 999, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"best-effort qos - empty resources container status",
+			true,
+			nil,
+			nil,
+			[]v1.ContainerStatus{{Name: "c1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
+			true,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+				},
+			},
+			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
+			true,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+				},
+			},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, guaranteed qos - no container status",
+			false,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, burstable qos - container status with allocatedResources",
+			false,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+				},
+			},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"requests & limits, cpu & memory, guaranteed qos - container status with allocatedResources",
+			false,
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+			[]v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+				},
+			},
+			&runtimeapi.LinuxContainerResources{CpuShares: 204, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
+		},
+		{
+			"best-effort qos - no container status",
+			false,
+			nil,
+			nil,
+			[]v1.ContainerStatus{},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1"}},
+			cgroupV2,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -850,8 +991,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			if tc.scalingFg {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 			}
-
-			setCgroupVersionDuringTest(cgroupV1)
+			setCgroupVersionDuringTest(tc.cgroupVersion)
 
 			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{Limits: tc.limits, Requests: tc.requests}
 			if len(tc.cStatus) > 0 {
