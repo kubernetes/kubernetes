@@ -105,8 +105,8 @@ func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bo
 	return false, nil
 }
 
-func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()), &realMountDetector{plugin.host.GetMounter(plugin.GetPluginName())}, opts)
+func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()), &realMountDetector{plugin.host.GetMounter(plugin.GetPluginName())})
 }
 
 func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec *volume.Spec, pod *v1.Pod) *resource.Quantity {
@@ -143,7 +143,7 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 	return sizeLimit
 }
 
-func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
 	sizeLimit := &resource.Quantity{}
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.

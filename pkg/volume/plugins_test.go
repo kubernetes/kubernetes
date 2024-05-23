@@ -87,7 +87,7 @@ func (plugin *testPlugins) SupportsSELinuxContextMount(spec *Spec) (bool, error)
 	return false, nil
 }
 
-func (plugin *testPlugins) NewMounter(spec *Spec, podRef *v1.Pod, opts VolumeOptions) (Mounter, error) {
+func (plugin *testPlugins) NewMounter(spec *Spec, podRef *v1.Pod) (Mounter, error) {
 	return nil, nil
 }
 

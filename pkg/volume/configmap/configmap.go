@@ -90,7 +90,7 @@ func (plugin *configMapPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (b
 	return false, nil
 }
 
-func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return &configMapVolumeMounter{
 		configMapVolume: &configMapVolume{
 			spec.Name(),
@@ -101,7 +101,6 @@ func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 		},
 		source:       *spec.Volume.ConfigMap,
 		pod:          *pod,
-		opts:         &opts,
 		getConfigMap: plugin.getConfigMap,
 	}, nil
 }
@@ -151,7 +150,6 @@ type configMapVolumeMounter struct {
 
 	source       v1.ConfigMapVolumeSource
 	pod          v1.Pod
-	opts         *volume.VolumeOptions
 	getConfigMap func(namespace, name string) (*v1.ConfigMap, error)
 }
 
@@ -183,7 +181,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod)
 	if err != nil {
 		return err
 	}

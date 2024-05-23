@@ -315,7 +315,7 @@ func doTestPlugin(scenario struct {
 		return allErrs
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
-	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(scenario.vol), pod, volume.VolumeOptions{})
+	mounter, err := plug.NewMounter(volume.NewSpecFromVolume(scenario.vol), pod)
 
 	if err != nil {
 		allErrs = append(allErrs,
