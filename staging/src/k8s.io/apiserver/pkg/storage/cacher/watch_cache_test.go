@@ -125,7 +125,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	wc := &testWatchCache{}
 	wc.bookmarkRevision = make(chan int64, 1)
 	wc.stopCh = make(chan struct{})
-	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
+	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil, "")
 	go pr.Run(wc.stopCh)
 	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"}, pr)
 	// To preserve behavior of tests that assume a given capacity,

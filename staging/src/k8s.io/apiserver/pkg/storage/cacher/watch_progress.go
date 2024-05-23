@@ -36,11 +36,12 @@ const (
 	progressRequestPeriod = 100 * time.Millisecond
 )
 
-func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock TickerFactory, contextMetadata metadata.MD) *conditionalProgressRequester {
+func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock TickerFactory, contextMetadata metadata.MD, groupResource string) *conditionalProgressRequester {
 	pr := &conditionalProgressRequester{
 		clock:                clock,
 		requestWatchProgress: requestWatchProgress,
 		contextMetadata:      contextMetadata,
+		groupResource:        groupResource,
 	}
 	pr.cond = sync.NewCond(&pr.mux)
 	return pr
@@ -58,6 +59,7 @@ type conditionalProgressRequester struct {
 	clock                TickerFactory
 	requestWatchProgress WatchProgressRequester
 	contextMetadata      metadata.MD
+	groupResource        string
 
 	mux     sync.Mutex
 	cond    *sync.Cond
@@ -84,6 +86,10 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 		stopped := func() bool {
 			pr.mux.Lock()
 			defer pr.mux.Unlock()
+			if pr.waiting == 0 {
+				klog.InfoS("ProgressNotifier Wait", "groupResource", pr.groupResource)
+				defer klog.InfoS("ProgressNotifier WokeUp", "groupResource", pr.groupResource)
+			}
 			for pr.waiting == 0 && !pr.stopped {
 				pr.cond.Wait()
 			}
@@ -101,13 +107,15 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 				return pr.waiting > 0 && !pr.stopped
 			}()
 			if !shouldRequest {
+				klog.InfoS("ProgressNotifier NoNeed", "groupResource", pr.groupResource)
 				timer.Reset(0)
 				continue
 			}
 			timer.Reset(progressRequestPeriod)
+			klog.InfoS("ProgressNotifier Request", "groupResource", pr.groupResource)
 			err := pr.requestWatchProgress(ctx)
 			if err != nil {
-				klog.V(4).InfoS("Error requesting bookmark", "err", err)
+				klog.InfoS("ProgressNotifier Error", "groupResource", pr.groupResource, "err", err)
 			}
 		case <-stopCh:
 			return
@@ -116,6 +124,7 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 }
 
 func (pr *conditionalProgressRequester) Add() {
+	klog.InfoS("ProgressNotifier Add", "groupResource", pr.groupResource)
 	pr.mux.Lock()
 	defer pr.mux.Unlock()
 	pr.waiting += 1
@@ -123,6 +132,7 @@ func (pr *conditionalProgressRequester) Add() {
 }
 
 func (pr *conditionalProgressRequester) Remove() {
+	klog.InfoS("ProgressNotifier Remove", "groupResource", pr.groupResource)
 	pr.mux.Lock()
 	defer pr.mux.Unlock()
 	pr.waiting -= 1

@@ -115,7 +115,7 @@ func TestConditionalProgressRequester(t *testing.T) {
 
 func newTestConditionalProgressRequester(clock clock.WithTicker) *testConditionalProgressRequester {
 	pr := &testConditionalProgressRequester{}
-	pr.conditionalProgressRequester = newConditionalProgressRequester(pr.RequestWatchProgress, clock, nil)
+	pr.conditionalProgressRequester = newConditionalProgressRequester(pr.RequestWatchProgress, clock, nil, "")
 	return pr
 }
 

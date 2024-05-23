@@ -486,6 +486,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 				return nil
 			}
 		}
+		klog.InfoS("ProgressNotifier got progress notify", "groupResource", wc.watcher.groupResource, "resourceVersion", e.rev)
 		res = &watch.Event{
 			Type:   watch.Bookmark,
 			Object: object,

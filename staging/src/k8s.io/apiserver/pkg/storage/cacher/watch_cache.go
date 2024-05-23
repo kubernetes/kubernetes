@@ -500,8 +500,11 @@ func (s sortableStoreElements) Swap(i, j int) {
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) (result []interface{}, rv uint64, index string, err error) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
 	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported && w.notFresh(resourceVersion) {
+	notfresh, wcRV := w.notFresh(resourceVersion)
+	klog.InfoS("ProgressNotifier WaitUntilFreshAndList", "groupResource", w.groupResource, "resourceVersion", resourceVersion, "watchCacheResourceVersion", wcRV, "enabled", enabled, "supported", requestWatchProgressSupported, "fresh", !notfresh)
+	if enabled && requestWatchProgressSupported && notfresh {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 		w.waitingUntilFresh.Remove()
@@ -531,16 +534,17 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	return result, rv, index, err
 }
 
-func (w *watchCache) notFresh(resourceVersion uint64) bool {
+func (w *watchCache) notFresh(resourceVersion uint64) (bool, uint64) {
 	w.RLock()
 	defer w.RUnlock()
-	return resourceVersion > w.resourceVersion
+	return resourceVersion > w.resourceVersion, w.resourceVersion
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
 func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
 	var err error
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
+	notFresh, _ := w.notFresh(resourceVersion)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && notFresh {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 		w.waitingUntilFresh.Remove()

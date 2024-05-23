@@ -407,7 +407,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		contextMetadata = metadata.New(map[string]string{"source": "cache"})
 	}
 
-	progressRequester := newConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
+	progressRequester := newConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata, cacher.groupResource.String())
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource, progressRequester)
 	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata)
@@ -1303,7 +1303,9 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 		//
 		// In this very rare scenario, the worst case will be that this
 		// request will wait for 3 seconds before it fails.
-		if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) && c.watchCache.notFresh(requestedWatchRV) {
+		notFresh, _ := c.watchCache.notFresh(requestedWatchRV)
+		if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) && !notFresh {
+
 			c.watchCache.waitingUntilFresh.Add()
 			defer c.watchCache.waitingUntilFresh.Remove()
 		}
