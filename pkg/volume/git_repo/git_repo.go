@@ -89,7 +89,7 @@ func (plugin *gitRepoPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (boo
 	return false, nil
 }
 
-func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	if err := validateVolume(spec.Volume.GitRepo); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,6 @@ func (plugin *gitRepoPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vol
 		revision: spec.Volume.GitRepo.Revision,
 		target:   spec.Volume.GitRepo.Directory,
 		exec:     exec.New(),
-		opts:     opts,
 	}, nil
 }
 
@@ -156,7 +155,6 @@ type gitRepoVolumeMounter struct {
 	revision string
 	target   string
 	exec     exec.Interface
-	opts     volume.VolumeOptions
 }
 
 var _ volume.Mounter = &gitRepoVolumeMounter{}
@@ -181,7 +179,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod)
 	if err != nil {
 		return err
 	}

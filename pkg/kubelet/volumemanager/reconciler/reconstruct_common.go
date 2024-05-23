@@ -340,8 +340,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 		var newMapperErr error
 		volumeMapper, newMapperErr = mapperPlugin.NewBlockVolumeMapper(
 			volumeSpec,
-			pod,
-			volumepkg.VolumeOptions{})
+			pod)
 		if newMapperErr != nil {
 			return nil, fmt.Errorf(
 				"reconstructVolume.NewBlockVolumeMapper failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
@@ -353,10 +352,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 		}
 	} else {
 		var err error
-		volumeMounter, err = plugin.NewMounter(
-			volumeSpec,
-			pod,
-			volumepkg.VolumeOptions{})
+		volumeMounter, err = plugin.NewMounter(volumeSpec, pod)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"reconstructVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",

@@ -111,7 +111,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.LocalVolumeSource, bool, error) {
 	return nil, false, fmt.Errorf("Spec does not reference a Local volume type")
 }
 
-func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	_, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -155,8 +155,7 @@ func (plugin *localVolumePlugin) NewUnmounter(volName string, podUID types.UID) 
 	}, nil
 }
 
-func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod,
-	_ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod) (volume.BlockVolumeMapper, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err

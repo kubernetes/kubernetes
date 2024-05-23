@@ -93,7 +93,7 @@ func (plugin *secretPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool
 	return false, nil
 }
 
-func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return &secretVolumeMounter{
 		secretVolume: &secretVolume{
 			spec.Name(),
@@ -104,7 +104,6 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volu
 		},
 		source:    *spec.Volume.Secret,
 		pod:       *pod,
-		opts:      &opts,
 		getSecret: plugin.getSecret,
 	}, nil
 }
@@ -156,7 +155,6 @@ type secretVolumeMounter struct {
 
 	source    v1.SecretVolumeSource
 	pod       v1.Pod
-	opts      *volume.VolumeOptions
 	getSecret func(namespace, name string) (*v1.Secret, error)
 }
 
@@ -178,7 +176,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod)
 	if err != nil {
 		return err
 	}
