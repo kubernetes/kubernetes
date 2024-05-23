@@ -92,10 +92,10 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
 		Duration: 0,
 	}
-	obj.ControllerManager.ExtraEnvs = []kubeadm.EnvVar{}
-	obj.APIServer.ExtraEnvs = []kubeadm.EnvVar{}
-	obj.Scheduler.ExtraEnvs = []kubeadm.EnvVar{}
-	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
+	obj.ControllerManager.ExtraEnvs = nil
+	obj.APIServer.ExtraEnvs = nil
+	obj.Scheduler.ExtraEnvs = nil
+	obj.Etcd.Local.ExtraEnvs = nil
 	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	obj.Proxy.Disabled = false
 	obj.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
