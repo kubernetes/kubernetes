@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
@@ -1211,7 +1212,7 @@ func MakePodSpec() v1.PodSpec {
 	return v1.PodSpec{
 		Containers: []v1.Container{{
 			Name:  "pause",
-			Image: "registry.k8s.io/pause:3.9",
+			Image: imageutils.GetE2EImage(imageutils.Pause),
 			Ports: []v1.ContainerPort{{ContainerPort: 80}},
 			Resources: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -1478,7 +1479,7 @@ type DaemonConfig struct {
 
 func (config *DaemonConfig) Run(ctx context.Context) error {
 	if config.Image == "" {
-		config.Image = "registry.k8s.io/pause:3.9"
+		config.Image = imageutils.GetE2EImage(imageutils.Pause)
 	}
 	nameLabel := map[string]string{
 		"name": config.Name + "-daemon",
