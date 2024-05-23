@@ -356,7 +356,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		// Change the services' main ports.
-
+		framework.Logf("Service Status: %v", udpService.Status)
 		ginkgo.By("changing the UDP service's port")
 		udpService, err = udpJig.UpdateService(ctx, func(s *v1.Service) {
 			s.Spec.Ports[0].Port++
@@ -370,6 +370,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 			framework.Failf("UDP Spec.Ports[0].NodePort (%d) changed", udpService.Spec.Ports[0].NodePort)
 		}
+		framework.Logf("Service Status: %v", udpService.Status)
 		if e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
 			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
 		}
