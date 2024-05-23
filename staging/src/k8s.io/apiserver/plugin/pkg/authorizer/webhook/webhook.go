@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
@@ -39,7 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
-	"k8s.io/apiserver/pkg/features"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
@@ -195,15 +196,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	}
 
 	if attr.IsResourceRequest() {
-		r.Spec.ResourceAttributes = &authorizationv1.ResourceAttributes{
-			Namespace:   attr.GetNamespace(),
-			Verb:        attr.GetVerb(),
-			Group:       attr.GetAPIGroup(),
-			Version:     attr.GetAPIVersion(),
-			Resource:    attr.GetResource(),
-			Subresource: attr.GetSubresource(),
-			Name:        attr.GetName(),
-		}
+		r.Spec.ResourceAttributes = resourceAttributesFrom(attr)
 	} else {
 		r.Spec.NonResourceAttributes = &authorizationv1.NonResourceAttributes{
 			Path: attr.GetPath(),
@@ -211,7 +204,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		}
 	}
 	// skipping match when feature is not enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthorizationConfiguration) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
 		// Process Match Conditions before calling the webhook
 		matches, err := w.match(ctx, r)
 		// If at least one matchCondition evaluates to an error (but none are FALSE):
@@ -302,6 +295,115 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
 	}
 
+}
+
+func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.ResourceAttributes {
+	ret := &authorizationv1.ResourceAttributes{
+		Namespace:   attr.GetNamespace(),
+		Verb:        attr.GetVerb(),
+		Group:       attr.GetAPIGroup(),
+		Version:     attr.GetAPIVersion(),
+		Resource:    attr.GetResource(),
+		Subresource: attr.GetSubresource(),
+		Name:        attr.GetName(),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		// If there's an error while parsing selectors, we can safely ignore the selector
+		// This is because selectors only narrow, so if broader permission is available, the request can be allowed.
+		if selectorRequirements, err := fieldSelectorToAuthorizationAPI(attr); err == nil && selectorRequirements != nil {
+			ret.FieldSelector = &authorizationv1.FieldSelectorAttributes{
+				Requirements: selectorRequirements,
+			}
+		}
+
+		if selectorRequirements, err := labelSelectorToAuthorizationAPI(attr); err == nil && selectorRequirements != nil {
+			ret.LabelSelector = &authorizationv1.LabelSelectorAttributes{
+				Requirements: selectorRequirements,
+			}
+		}
+	}
+
+	return ret
+}
+
+func fieldSelectorToAuthorizationAPI(attr authorizer.Attributes) ([]authorizationv1.FieldSelectorRequirement, error) {
+	requirements, err := attr.ParseFieldSelector()
+	if err != nil {
+		return nil, err
+	}
+	if len(requirements) == 0 {
+		return nil, nil
+	}
+
+	retRequirements := []authorizationv1.FieldSelectorRequirement{}
+	for _, requirement := range requirements {
+		retRequirement := authorizationv1.FieldSelectorRequirement{}
+		switch {
+		case requirement.Operator == selection.Equals || requirement.Operator == selection.DoubleEquals || requirement.Operator == selection.In:
+			retRequirement.Operator = metav1.LabelSelectorOpIn
+			retRequirement.Key = requirement.Field
+			retRequirement.Values = []string{requirement.Value}
+		case requirement.Operator == selection.NotEquals || requirement.Operator == selection.NotIn:
+			retRequirement.Operator = metav1.LabelSelectorOpNotIn
+			retRequirement.Key = requirement.Field
+			retRequirement.Values = []string{requirement.Value}
+		default:
+			// ignore this particular requirement. since requirements are AND'd, it is safe to ignore unknown requirements
+			// for authorization since the resulting check will only be as broad or broader than the intended.
+			continue
+		}
+		retRequirements = append(retRequirements, retRequirement)
+	}
+
+	if len(retRequirements) == 0 {
+		// this means that all requirements were dropped (likely due to unknown operators), so we are checking the broader
+		// unrestricted action.
+		return nil, nil
+	}
+	return retRequirements, nil
+}
+
+func labelSelectorToAuthorizationAPI(attr authorizer.Attributes) ([]metav1.LabelSelectorRequirement, error) {
+	requirements, err := attr.ParseLabelSelector()
+	if err != nil {
+		return nil, err
+	}
+	if len(requirements) == 0 {
+		return nil, nil
+	}
+
+	retRequirements := []metav1.LabelSelectorRequirement{}
+	for _, requirement := range requirements {
+		retRequirement := metav1.LabelSelectorRequirement{
+			Key: requirement.Key(),
+		}
+		if len(requirement.Values()) > 0 {
+			retRequirement.Values = requirement.Values().List()
+		}
+		switch {
+		case requirement.Operator() == selection.Equals || requirement.Operator() == selection.DoubleEquals || requirement.Operator() == selection.In:
+			retRequirement.Operator = metav1.LabelSelectorOpIn
+		case requirement.Operator() == selection.NotEquals || requirement.Operator() == selection.NotIn:
+			retRequirement.Operator = metav1.LabelSelectorOpNotIn
+		case requirement.Operator() == selection.Exists:
+			retRequirement.Operator = metav1.LabelSelectorOpExists
+		case requirement.Operator() == selection.DoesNotExist:
+			retRequirement.Operator = metav1.LabelSelectorOpDoesNotExist
+		default:
+			// ignore this particular requirement. since requirements are AND'd, it is safe to ignore unknown requirements
+			// for authorization since the resulting check will only be as broad or broader than the intended.
+			continue
+		}
+		retRequirements = append(retRequirements, retRequirement)
+	}
+
+	if len(retRequirements) == 0 {
+		// this means that all requirements were dropped (likely due to unknown operators), so we are checking the broader
+		// unrestricted action.
+		return nil, nil
+	}
+	return retRequirements, nil
 }
 
 // TODO: need to finish the method to get the rules when using webhook mode
@@ -474,13 +576,15 @@ func v1ResourceAttributesToV1beta1ResourceAttributes(in *authorizationv1.Resourc
 		return nil
 	}
 	return &authorizationv1beta1.ResourceAttributes{
-		Namespace:   in.Namespace,
-		Verb:        in.Verb,
-		Group:       in.Group,
-		Version:     in.Version,
-		Resource:    in.Resource,
-		Subresource: in.Subresource,
-		Name:        in.Name,
+		Namespace:     in.Namespace,
+		Verb:          in.Verb,
+		Group:         in.Group,
+		Version:       in.Version,
+		Resource:      in.Resource,
+		Subresource:   in.Subresource,
+		Name:          in.Name,
+		FieldSelector: in.FieldSelector,
+		LabelSelector: in.LabelSelector,
 	}
 }
 

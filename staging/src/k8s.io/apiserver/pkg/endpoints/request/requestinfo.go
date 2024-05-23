@@ -19,6 +19,8 @@ package request
 import (
 	"context"
 	"fmt"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"net/http"
 	"strings"
 
@@ -62,6 +64,13 @@ type RequestInfo struct {
 	Name string
 	// Parts are the path parts for the request, always starting with /{resource}/{name}
 	Parts []string
+
+	// FieldSelector contains the unparsed field selector from a request.  It is only present if the apiserver
+	// honors field selectors for the verb this request is associated with.
+	FieldSelector string
+	// LabelSelector contains the unparsed field selector from a request.  It is only present if the apiserver
+	// honors field selectors for the verb this request is associated with.
+	LabelSelector string
 }
 
 // specialVerbs contains just strings which are used in REST paths for special actions that don't fall under the normal
@@ -238,9 +247,24 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 			}
 		}
 	}
+
 	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "delete" {
 		requestInfo.Verb = "deletecollection"
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		if requestInfo.Verb == "list" || requestInfo.Verb == "watch" {
+			// interestingly these are parsed above, but the current structure there means that if one (or anything) in the
+			// listOptions fails to decode, the field and label selectors are lost.
+			// therefore, do the straight query param read here.
+			if vals := req.URL.Query()["fieldSelector"]; len(vals) > 0 {
+				requestInfo.FieldSelector = vals[0]
+			}
+			if vals := req.URL.Query()["labelSelector"]; len(vals) > 0 {
+				requestInfo.LabelSelector = vals[0]
+			}
+		}
 	}
 
 	return &requestInfo, nil

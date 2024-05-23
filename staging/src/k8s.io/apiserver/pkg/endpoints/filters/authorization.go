@@ -19,6 +19,10 @@ package filters
 import (
 	"context"
 	"errors"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"net/http"
 	"time"
 
@@ -116,6 +120,28 @@ func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error)
 	attribs.Subresource = requestInfo.Subresource
 	attribs.Namespace = requestInfo.Namespace
 	attribs.Name = requestInfo.Name
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		// parsing here makes it easy to keep the AttributesRecord type value-only and avoids any mutex copies when
+		// doing shallow copies in other steps.
+		fieldSelector, err := fields.ParseSelector(requestInfo.FieldSelector)
+		if err != nil {
+			attribs.FieldSelectorRequirements, attribs.FieldSelectorParsingErr = nil, err
+		} else {
+			if requirements := fieldSelector.Requirements(); len(requirements) > 0 {
+				attribs.FieldSelectorRequirements, attribs.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
+			}
+		}
+
+		labelSelector, err := labels.Parse(requestInfo.LabelSelector)
+		if err != nil {
+			attribs.LabelSelectorRequirements, attribs.LabelSelectorParsingErr = nil, err
+		} else {
+			if requirements, _ /*selectable*/ := labelSelector.Requirements(); len(requirements) > 0 {
+				attribs.LabelSelectorRequirements, attribs.LabelSelectorParsingErr = requirements, nil
+			}
+		}
+	}
 
 	return &attribs, nil
 }

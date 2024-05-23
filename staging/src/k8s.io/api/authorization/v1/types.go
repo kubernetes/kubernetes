@@ -186,6 +186,8 @@ type FieldSelectorAttributes struct {
 	Requirements []FieldSelectorRequirement `json:"requirements,omitempty" protobuf:"bytes,2,rep,name=requirements"`
 }
 
+// FieldSelectorRequirement is a selector that contains values, a key, and an operator that
+// relates the key and values.
 type FieldSelectorRequirement struct {
 	// key is the field selector key that the requirement applies to.
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`

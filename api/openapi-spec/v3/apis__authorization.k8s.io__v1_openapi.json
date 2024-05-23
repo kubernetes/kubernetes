@@ -25,6 +25,7 @@
         "type": "object"
       },
       "io.k8s.api.authorization.v1.FieldSelectorRequirement": {
+        "description": "FieldSelectorRequirement is a selector that contains values, a key, and an operator that relates the key and values.",
         "properties": {
           "key": {
             "default": "",

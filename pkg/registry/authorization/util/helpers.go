@@ -17,14 +17,20 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
 // ResourceAttributesFrom combines the API object information and the user.Info from the context to build a full authorizer.AttributesRecord for resource access
 func ResourceAttributesFrom(user user.Info, in authorizationapi.ResourceAttributes) authorizer.AttributesRecord {
-	return authorizer.AttributesRecord{
+	ret := authorizer.AttributesRecord{
 		User:            user,
 		Verb:            in.Verb,
 		Namespace:       in.Namespace,
@@ -35,6 +41,89 @@ func ResourceAttributesFrom(user user.Info, in authorizationapi.ResourceAttribut
 		Name:            in.Name,
 		ResourceRequest: true,
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		if in.LabelSelector != nil {
+			if len(in.LabelSelector.RawSelector) > 0 {
+				labelSelector, err := labels.Parse(in.LabelSelector.RawSelector)
+				if err != nil {
+					ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = nil, err
+				} else {
+					requirements, _ /*selectable*/ := labelSelector.Requirements()
+					ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = requirements, nil
+				}
+			}
+			if len(in.LabelSelector.Requirements) > 0 {
+				selector := &metav1.LabelSelector{MatchExpressions: in.LabelSelector.Requirements}
+				labelSelector, err := metav1.LabelSelectorAsSelector(selector)
+				if err != nil {
+					ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = nil, err
+				} else {
+					requirements, _ /*selectable*/ := labelSelector.Requirements()
+					ret.LabelSelectorRequirements, ret.LabelSelectorParsingErr = requirements, nil
+				}
+			}
+		}
+
+		if in.FieldSelector != nil {
+			if len(in.FieldSelector.RawSelector) > 0 {
+				fieldSelector, err := fields.ParseSelector(in.FieldSelector.RawSelector)
+				if err != nil {
+					ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = nil, err
+				} else {
+					ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
+				}
+			}
+			if len(in.FieldSelector.Requirements) > 0 {
+				ret.FieldSelectorRequirements, ret.FieldSelectorParsingErr = fieldSelectorAsSelector(in.FieldSelector.Requirements)
+			}
+		}
+	}
+
+	return ret
+}
+
+func fieldSelectorAsSelector(requirements []authorizationapi.FieldSelectorRequirement) (fields.Requirements, error) {
+	if requirements == nil {
+		return nil, nil
+	}
+
+	selectors := make([]fields.Selector, 0, len(requirements))
+	for _, expr := range requirements {
+		if len(expr.Values) > 1 {
+			// this fails here instead of validation so that a SAR with an invalid field selector can be tried without the selector
+			return nil, fmt.Errorf("fieldSelectors do not yet support multiple values")
+		}
+
+		switch expr.Operator {
+		case metav1.LabelSelectorOpIn:
+			if len(expr.Values) != 1 {
+				// this fails here instead of validation so that a SAR with an invalid field selector can be tried without the selector
+				return nil, fmt.Errorf("fieldSelectors in must have one value")
+			}
+
+			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
+
+		case metav1.LabelSelectorOpNotIn:
+			if len(expr.Values) != 1 {
+				// this fails here instead of validation so that a SAR with an invalid field selector can be tried without the selector
+				return nil, fmt.Errorf("fieldSelectors not in must have one value")
+			}
+
+			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
+
+		case metav1.LabelSelectorOpExists:
+			// this fails here instead of validation so that a SAR with an invalid field selector can be tried without the selector
+			return nil, fmt.Errorf("fieldSelectors do not yet support %v", metav1.LabelSelectorOpExists)
+		case metav1.LabelSelectorOpDoesNotExist:
+			// this fails here instead of validation so that a SAR with an invalid field selector can be tried without the selector
+			return nil, fmt.Errorf("fieldSelectors do not yet support %v", metav1.LabelSelectorOpDoesNotExist)
+		default:
+			return nil, fmt.Errorf("%q is not a valid field selector operator", expr.Operator)
+		}
+	}
+
+	return fields.AndSelectors(selectors...).Requirements(), nil
 }
 
 // NonResourceAttributesFrom combines the API object information and the user.Info from the context to build a full authorizer.AttributesRecord for non resource access

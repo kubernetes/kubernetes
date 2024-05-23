@@ -32,6 +32,10 @@ import (
 type LabelSelectorValidationOptions struct {
 	// Allow invalid label value in selector
 	AllowInvalidLabelValueInSelector bool
+
+	// Allows an operator that is not interpretable to pass validation.  This is useful for cases where a broader check
+	// can be performed, as in a *SubjectAccessReview
+	AllowUnknownOperatorInRequirement bool
 }
 
 // LabelSelectorHasInvalidLabelValue returns true if the given selector contains an invalid label value in a match expression.
@@ -79,7 +83,9 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, opts L
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
 		}
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
+		if !opts.AllowUnknownOperatorInRequirement {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
+		}
 	}
 	allErrs = append(allErrs, ValidateLabelName(sr.Key, fldPath.Child("key"))...)
 	if !opts.AllowInvalidLabelValueInSelector {

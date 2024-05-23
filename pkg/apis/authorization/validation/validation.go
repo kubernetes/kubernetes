@@ -17,8 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
@@ -36,6 +38,7 @@ func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSp
 	if len(spec.User) == 0 && len(spec.Groups) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), spec.User, `at least one of user or group must be specified`))
 	}
+	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
 
 	return allErrs
 }
@@ -50,6 +53,7 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccess
 	if spec.ResourceAttributes == nil && spec.NonResourceAttributes == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceAttributes"), spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`))
 	}
+	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
 
 	return allErrs
 }
@@ -95,6 +99,83 @@ func ValidateLocalSubjectAccessReview(sar *authorizationapi.LocalSubjectAccessRe
 	}
 	if sar.Spec.NonResourceAttributes != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.nonResourceAttributes"), sar.Spec.NonResourceAttributes, `disallowed on this kind of request`))
+	}
+
+	return allErrs
+}
+
+func validateResourceAttributes(resourceAttributes *authorizationapi.ResourceAttributes, fldPath *field.Path) field.ErrorList {
+	if resourceAttributes == nil {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, validateFieldSelectorAttributes(resourceAttributes.FieldSelector, fldPath.Child("fieldSelector"))...)
+	allErrs = append(allErrs, validateLabelSelectorAttributes(resourceAttributes.LabelSelector, fldPath.Child("labelSelector"))...)
+
+	return allErrs
+}
+
+func validateFieldSelectorAttributes(selector *authorizationapi.FieldSelectorAttributes, fldPath *field.Path) field.ErrorList {
+	if selector == nil {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+
+	if len(selector.RawSelector) > 0 && len(selector.Requirements) > 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("rawSelector"), selector.RawSelector, "may not specified at the same time as requirements"))
+	}
+	if len(selector.RawSelector) == 0 && len(selector.Requirements) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("requirements"), fmt.Sprintf("when %s is specified, requirements or rawSelector is required", fldPath)))
+	}
+
+	for i, requirement := range selector.Requirements {
+		allErrs = append(allErrs, validateFieldSelectorRequirement(requirement, fldPath.Child("requirements").Index(i))...)
+	}
+
+	return allErrs
+}
+
+func validateFieldSelectorRequirement(requirement authorizationapi.FieldSelectorRequirement, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(requirement.Key) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("key"), "must be specified"))
+	}
+
+	switch requirement.Operator {
+	case metav1.LabelSelectorOpIn, metav1.LabelSelectorOpNotIn:
+		if len(requirement.Values) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
+		}
+	case metav1.LabelSelectorOpExists, metav1.LabelSelectorOpDoesNotExist:
+		if len(requirement.Values) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
+		}
+	default:
+		// this is unrecognized, but we don't hard fail.  Instead the consuming code will skip evaluating these requirements.  Since requirements
+		// are all AND'd, this is safe since the requirement checked will be broader (covers) the requested requirements.
+	}
+
+	return allErrs
+}
+
+func validateLabelSelectorAttributes(selector *authorizationapi.LabelSelectorAttributes, fldPath *field.Path) field.ErrorList {
+	if selector == nil {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+
+	if len(selector.RawSelector) > 0 && len(selector.Requirements) > 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("rawSelector"), selector.RawSelector, "may not specified at the same time as requirements"))
+	}
+	if len(selector.RawSelector) == 0 && len(selector.Requirements) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("requirements"), fmt.Sprintf("when %s is specified, requirements or rawSelector is required", fldPath)))
+	}
+
+	validationOptions := metav1validation.LabelSelectorValidationOptions{AllowUnknownOperatorInRequirement: true}
+	for i, requirement := range selector.Requirements {
+		allErrs = append(allErrs, metav1validation.ValidateLabelSelectorRequirement(requirement, validationOptions, fldPath.Child("requirements").Index(i))...)
 	}
 
 	return allErrs

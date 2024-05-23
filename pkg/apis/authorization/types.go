@@ -155,6 +155,8 @@ type FieldSelectorAttributes struct {
 	Requirements []FieldSelectorRequirement
 }
 
+// FieldSelectorRequirement is a selector that contains values, a key, and an operator that
+// relates the key and values.
 type FieldSelectorRequirement struct {
 	// key is the field selector key that the requirement applies to.
 	Key string
