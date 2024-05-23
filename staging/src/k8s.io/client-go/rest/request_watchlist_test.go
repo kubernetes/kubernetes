@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
 
 func TestWatchListResult(t *testing.T) {
@@ -317,6 +319,22 @@ func TestWatchListFailure(t *testing.T) {
 				t.Fatalf("the watcher wasn't stopped")
 			}
 		})
+	}
+}
+
+func TestWatchListWhenFeatureGateDisabled(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
+	expectedError := fmt.Errorf("%q feature gate is not enabled", clientfeatures.WatchListClient)
+	target := &Request{}
+
+	res := target.WatchList(context.TODO())
+
+	resErr := res.Into(nil)
+	if resErr == nil {
+		t.Fatal("expected to get an error, got nil")
+	}
+	if resErr.Error() != expectedError.Error() {
+		t.Fatalf("unexpected error: %v, expected: %v", resErr, expectedError)
 	}
 }
 
