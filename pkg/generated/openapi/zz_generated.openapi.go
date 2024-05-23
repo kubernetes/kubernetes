@@ -58022,21 +58022,9 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfigura
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
-					"HorizontalPodAutoscalerUpscaleForbiddenWindow": {
-						SchemaProps: spec.SchemaProps{
-							Description: "HorizontalPodAutoscalerUpscaleForbiddenWindow is a period after which next upscale allowed.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
-						},
-					},
 					"HorizontalPodAutoscalerDownscaleStabilizationWindow": {
 						SchemaProps: spec.SchemaProps{
 							Description: "HorizontalPodAutoscalerDowncaleStabilizationWindow is a period for which autoscaler will look backwards and not scale down below any recommendation it made during that period.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
-						},
-					},
-					"HorizontalPodAutoscalerDownscaleForbiddenWindow": {
-						SchemaProps: spec.SchemaProps{
-							Description: "HorizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
@@ -58061,7 +58049,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfigura
 						},
 					},
 				},
-				Required: []string{"ConcurrentHorizontalPodAutoscalerSyncs", "HorizontalPodAutoscalerSyncPeriod", "HorizontalPodAutoscalerUpscaleForbiddenWindow", "HorizontalPodAutoscalerDownscaleStabilizationWindow", "HorizontalPodAutoscalerDownscaleForbiddenWindow", "HorizontalPodAutoscalerTolerance", "HorizontalPodAutoscalerCPUInitializationPeriod", "HorizontalPodAutoscalerInitialReadinessDelay"},
+				Required: []string{"ConcurrentHorizontalPodAutoscalerSyncs", "HorizontalPodAutoscalerSyncPeriod", "HorizontalPodAutoscalerDownscaleStabilizationWindow", "HorizontalPodAutoscalerTolerance", "HorizontalPodAutoscalerCPUInitializationPeriod", "HorizontalPodAutoscalerInitialReadinessDelay"},
 			},
 		},
 		Dependencies: []string{
