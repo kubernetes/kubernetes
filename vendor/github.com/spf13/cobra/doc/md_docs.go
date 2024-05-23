@@ -27,6 +27,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const markdownExtension = ".md"
+
 func printOptions(buf *bytes.Buffer, cmd *cobra.Command, name string) error {
 	flags := cmd.NonInheritedFlags()
 	flags.SetOutput(buf)
@@ -83,7 +85,7 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 		if cmd.HasParent() {
 			parent := cmd.Parent()
 			pname := parent.CommandPath()
-			link := pname + ".md"
+			link := pname + markdownExtension
 			link = strings.ReplaceAll(link, " ", "_")
 			buf.WriteString(fmt.Sprintf("* [%s](%s)\t - %s\n", pname, linkHandler(link), parent.Short))
 			cmd.VisitParents(func(c *cobra.Command) {
@@ -101,7 +103,7 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 				continue
 			}
 			cname := name + " " + child.Name()
-			link := cname + ".md"
+			link := cname + markdownExtension
 			link = strings.ReplaceAll(link, " ", "_")
 			buf.WriteString(fmt.Sprintf("* [%s](%s)\t - %s\n", cname, linkHandler(link), child.Short))
 		}
@@ -138,7 +140,7 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHa
 		}
 	}
 
-	basename := strings.ReplaceAll(cmd.CommandPath(), " ", "_") + ".md"
+	basename := strings.ReplaceAll(cmd.CommandPath(), " ", "_") + markdownExtension
 	filename := filepath.Join(dir, basename)
 	f, err := os.Create(filename)
 	if err != nil {

@@ -144,7 +144,7 @@ func loadCrdIntoConfig(
 		}
 		_, label := property.Extensions.GetString(xLabelSelector)
 		if label {
-			err = theConfig.AddLabelFieldSpec(
+			err = theConfig.AddCommonLabelsFieldSpec(
 				makeFs(theGvk, append(path, propName)))
 			if err != nil {
 				return

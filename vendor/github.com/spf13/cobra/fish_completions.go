@@ -113,7 +113,7 @@ function __%[1]s_clear_perform_completion_once_result
     __%[1]s_debug ""
     __%[1]s_debug "========= clearing previously set __%[1]s_perform_completion_once_result variable =========="
     set --erase __%[1]s_perform_completion_once_result
-    __%[1]s_debug "Succesfully erased the variable __%[1]s_perform_completion_once_result"
+    __%[1]s_debug "Successfully erased the variable __%[1]s_perform_completion_once_result"
 end
 
 function __%[1]s_requires_order_preservation
