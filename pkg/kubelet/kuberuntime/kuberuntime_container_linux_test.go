@@ -1004,7 +1004,6 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			}
 		})
 	}
-	//TODO(vinaykul,InPlacePodVerticalScaling): Add unit tests for cgroup v1 & v2
 }
 
 func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
