@@ -937,10 +937,3 @@ func TestFilterOut(t *testing.T) {
 		})
 	}
 }
-
-func max(i, j int) int {
-	if i > j {
-		return i
-	}
-	return j
-}
