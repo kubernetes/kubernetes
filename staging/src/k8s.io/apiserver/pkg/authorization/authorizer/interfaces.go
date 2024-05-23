@@ -18,8 +18,13 @@ package authorizer
 
 import (
 	"context"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"net/http"
+	"sync"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -62,6 +67,14 @@ type Attributes interface {
 
 	// GetPath returns the path of the request
 	GetPath() string
+
+	// ParseFieldSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the field selector cannot be parsed.
+	ParseFieldSelector() (fields.Selector, error)
+
+	// ParseLabelSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the label selector cannot be parsed.
+	ParseLabelSelector() (labels.Selector, error)
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -100,6 +113,16 @@ type AttributesRecord struct {
 	Name            string
 	ResourceRequest bool
 	Path            string
+	FieldSelector   string
+	LabelSelector   string
+
+	parseFieldSelectorOnce  sync.Once
+	parsedFieldSelector     fields.Selector
+	fieldSelectorParsingErr error
+
+	parseLabelSelectorOnce  sync.Once
+	parsedLabelSelector     labels.Selector
+	labelSelectorParsingErr error
 }
 
 func (a AttributesRecord) GetUser() user.Info {
@@ -144,6 +167,41 @@ func (a AttributesRecord) IsResourceRequest() bool {
 
 func (a AttributesRecord) GetPath() string {
 	return a.Path
+}
+
+func (a AttributesRecord) ParseFieldSelector() (fields.Selector, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		return nil, nil
+	}
+
+	a.parseFieldSelectorOnce.Do(func() {
+		if len(a.FieldSelector) == 0 {
+			return
+		}
+		selector, err := fields.ParseSelector(a.FieldSelector)
+		if err != nil {
+			a.fieldSelectorParsingErr = err
+			return
+		}
+		a.parsedFieldSelector = selector
+	})
+
+	return a.parsedFieldSelector, a.fieldSelectorParsingErr
+}
+
+func (a AttributesRecord) ParseLabelSelector() (labels.Selector, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		return nil, nil
+	}
+
+	a.parseLabelSelectorOnce.Do(func() {
+		if len(a.LabelSelector) == 0 {
+			return
+		}
+		a.parsedLabelSelector, a.labelSelectorParsingErr = labels.Parse(a.LabelSelector)
+	})
+
+	return a.parsedLabelSelector, a.labelSelectorParsingErr
 }
 
 type Decision int

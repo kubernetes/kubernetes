@@ -19,6 +19,8 @@ package filters
 import (
 	"context"
 	"errors"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"net/http"
 	"time"
 
@@ -116,6 +118,11 @@ func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error)
 	attribs.Subresource = requestInfo.Subresource
 	attribs.Namespace = requestInfo.Namespace
 	attribs.Name = requestInfo.Name
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		attribs.FieldSelector = requestInfo.FieldSelector
+		attribs.LabelSelector = requestInfo.LabelSelector
+	}
 
 	return &attribs, nil
 }

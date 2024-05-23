@@ -22,6 +22,8 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
@@ -58,6 +60,8 @@ var _ authorizer.Attributes = (interface {
 	GetAPIVersion() string
 	IsResourceRequest() bool
 	GetPath() string
+	ParseFieldSelector() (fields.Selector, error)
+	ParseLabelSelector() (labels.Selector, error)
 })(nil)
 
 // The user info accessors known to cache key construction. If this fails to compile, the cache
@@ -82,6 +86,13 @@ func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 		Name:            a.GetName(),
 		ResourceRequest: a.IsResourceRequest(),
 		Path:            a.GetPath(),
+	}
+	// in the error case, we won't honor this field selector, so the cache doesn't need it.
+	if fieldSelector, err := a.ParseFieldSelector(); err == nil && fieldSelector != nil {
+		serializableAttributes.FieldSelector = fieldSelector.String()
+	}
+	if labelSelector, err := a.ParseLabelSelector(); err == nil && labelSelector != nil {
+		serializableAttributes.LabelSelector = labelSelector.String()
 	}
 
 	if u := a.GetUser(); u != nil {
