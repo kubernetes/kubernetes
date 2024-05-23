@@ -1509,6 +1509,7 @@ func TestParamRef(t *testing.T) {
 						}
 
 						t.Run(name, func(t *testing.T) {
+							t.Parallel()
 							// Test creating a policy with a cluster or namesapce-scoped param
 							// and binding with the provided configuration. Test will ensure
 							// that the provided configuration is capable of matching
