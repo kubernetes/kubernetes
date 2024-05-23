@@ -43,7 +43,7 @@ import (
 // desirable because it means that CEL expressions are portable across a wider range
 // of Kubernetes versions.
 func DefaultCompatibilityVersion() *version.Version {
-	return version.MajorMinor(1, 29)
+	return version.MajorMinor(1, 30)
 }
 
 var baseOpts = append(baseOptsWithoutStrictCost, StrictCostOpt)

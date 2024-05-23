@@ -2039,6 +2039,27 @@ func TestValidationExpressions(t *testing.T) {
 			},
 			expectedCost: 7,
 		},
+		{name: "IP and CIDR",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				`isIP("192.168.0.1")`,
+				`ip.isCanonical("127.0.0.1")`,
+				`ip("192.168.0.1").family() > 0`,
+				`ip("0.0.0.0").isUnspecified()`,
+				`ip("127.0.0.1").isLoopback()`,
+				`ip("224.0.0.1").isLinkLocalMulticast()`,
+				`ip("192.168.0.1").isGlobalUnicast()`,
+				`type(ip("192.168.0.1")) == net.IP`,
+				`cidr("192.168.0.0/24").containsIP(ip("192.168.0.1"))`,
+				`cidr("192.168.0.0/24").containsCIDR("192.168.0.0/25")`,
+				`cidr("2001:db8::/32").containsCIDR(cidr("2001:db8::/33"))`,
+				`type(cidr("2001:db8::/32").ip()) == net.IP`,
+				`cidr('192.168.0.0/24') == cidr('192.168.0.0/24').masked()`,
+				`cidr('192.168.0.0/16').prefixLength() == 16`,
+				`cidr('::1/128').ip().family() == 6`,
+			},
+		},
 	}
 
 	for i := range tests {
