@@ -45,7 +45,7 @@ require (
 	github.com/moby/ipvs v1.1.0
 	github.com/mrunalp/fileutils v0.5.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
-	github.com/onsi/ginkgo/v2 v2.18.0
+	github.com/onsi/ginkgo/v2 v2.18.1-0.20240523025407-0ff528bffd13
 	github.com/onsi/gomega v1.33.1
 	github.com/opencontainers/runc v1.1.12
 	github.com/opencontainers/selinux v1.11.0
