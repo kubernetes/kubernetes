@@ -95,15 +95,16 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 
 		select {
 		case <-timer.C():
-			timer.Reset(progressRequestPeriod)
 			shouldRequest := func() bool {
 				pr.mux.Lock()
 				defer pr.mux.Unlock()
 				return pr.waiting > 0 && !pr.stopped
 			}()
 			if !shouldRequest {
+				timer.Reset(0)
 				continue
 			}
+			timer.Reset(progressRequestPeriod)
 			err := pr.requestWatchProgress(ctx)
 			if err != nil {
 				klog.V(4).InfoS("Error requesting bookmark", "err", err)
