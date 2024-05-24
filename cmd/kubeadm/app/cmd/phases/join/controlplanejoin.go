@@ -112,7 +112,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	// in case of local etcd
+	// in case of external etcd
 	if cfg.Etcd.External != nil {
 		fmt.Println("[control-plane-join] Using external etcd - no local stacked instance added")
 		return nil

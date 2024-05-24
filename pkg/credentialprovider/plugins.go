@@ -21,9 +21,7 @@ import (
 	"sort"
 	"sync"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // All registered credential providers.
@@ -45,12 +43,6 @@ func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 	}
 	klog.V(4).Infof("Registered credential provider %q", name)
 	providers[name] = provider
-}
-
-// AreLegacyCloudCredentialProvidersDisabled checks if the legacy in-tree cloud
-// credential providers have been disabled.
-func AreLegacyCloudCredentialProvidersDisabled() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.DisableKubeletCloudCredentialProviders)
 }
 
 // NewDockerKeyring creates a DockerKeyring to use for resolving credentials,

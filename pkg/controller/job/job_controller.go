@@ -50,6 +50,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
+	"k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -109,10 +110,10 @@ type Controller struct {
 	podStore corelisters.PodLister
 
 	// Jobs that need to be updated
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// Orphan deleted pods that still have a Job tracking finalizer to be removed
-	orphanQueue workqueue.RateLimitingInterface
+	orphanQueue workqueue.TypedRateLimitingInterface[string]
 
 	broadcaster record.EventBroadcaster
 	recorder    record.EventRecorder
@@ -159,8 +160,8 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 		},
 		expectations:          controller.NewControllerExpectations(),
 		finalizerExpectations: newUIDTrackingExpectations(),
-		queue:                 workqueue.NewRateLimitingQueueWithConfig(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.RateLimitingQueueConfig{Name: "job", Clock: clock}),
-		orphanQueue:           workqueue.NewRateLimitingQueueWithConfig(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.RateLimitingQueueConfig{Name: "job_orphan_pod", Clock: clock}),
+		queue:                 workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job", Clock: clock}),
+		orphanQueue:           workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job_orphan_pod", Clock: clock}),
 		broadcaster:           eventBroadcaster,
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		clock:                 clock,
@@ -426,7 +427,7 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 		return
 	}
 	job := jm.resolveControllerRef(pod.Namespace, controllerRef)
-	if job == nil || IsJobFinished(job) {
+	if job == nil || util.IsJobFinished(job) {
 		// syncJob will not remove this finalizer.
 		if hasFinalizer {
 			jm.enqueueOrphanPod(pod)
@@ -480,7 +481,7 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 
 	// The job shouldn't be marked as finished until all pod finalizers are removed.
 	// This is a backup operation in this case.
-	if IsJobFinished(curJob) {
+	if util.IsJobFinished(curJob) {
 		jm.cleanupPodFinalizers(curJob)
 	}
 
@@ -590,7 +591,7 @@ func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer jm.queue.Done(key)
 
-	err := jm.syncHandler(ctx, key.(string))
+	err := jm.syncHandler(ctx, key)
 	if err == nil {
 		jm.queue.Forget(key)
 		return true
@@ -613,7 +614,7 @@ func (jm *Controller) processNextOrphanPod(ctx context.Context) bool {
 		return false
 	}
 	defer jm.orphanQueue.Done(key)
-	err := jm.syncOrphanPod(ctx, key.(string))
+	err := jm.syncOrphanPod(ctx, key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing orphan pod: %v", err))
 		jm.orphanQueue.AddRateLimited(key)
@@ -647,6 +648,10 @@ func (jm *Controller) syncOrphanPod(ctx context.Context, key string) error {
 	}
 	// Make sure the pod is still orphaned.
 	if controllerRef := metav1.GetControllerOf(sharedPod); controllerRef != nil {
+		if controllerRef.Kind != controllerKind.Kind || controllerRef.APIVersion != batch.SchemeGroupVersion.String() {
+			// The pod is controlled by an owner that is not a batch/v1 Job. Do not remove finalizer.
+			return nil
+		}
 		job := jm.resolveControllerRef(sharedPod.Namespace, controllerRef)
 		if job != nil {
 			// Skip cleanup of finalizers for pods owned by a job managed by an external controller
@@ -655,7 +660,7 @@ func (jm *Controller) syncOrphanPod(ctx context.Context, key string) error {
 				return nil
 			}
 		}
-		if job != nil && !IsJobFinished(job) {
+		if job != nil && !util.IsJobFinished(job) {
 			// The pod was adopted. Do not remove finalizer.
 			return nil
 		}
@@ -766,7 +771,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	job := *sharedJob.DeepCopy()
 
 	// if job was finished previously, we don't want to redo the termination
-	if IsJobFinished(&job) {
+	if util.IsJobFinished(&job) {
 		err := jm.podBackoffStore.removeBackoffRecord(key)
 		if err != nil {
 			// re-syncing here as the record has to be removed for finished/deleted jobs

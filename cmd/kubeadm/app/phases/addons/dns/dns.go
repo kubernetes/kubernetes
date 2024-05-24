@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -42,6 +43,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/image"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
 
 const (
@@ -85,7 +87,7 @@ func deployedDNSReplicas(client clientset.Interface, replicas int32) (*int32, er
 }
 
 // EnsureDNSAddon creates the CoreDNS addon
-func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, out io.Writer, printManifest bool) error {
+func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, patchesDir string, out io.Writer, printManifest bool) error {
 	var replicas *int32
 	var err error
 	if !printManifest {
@@ -97,10 +99,10 @@ func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inter
 		var defaultReplicas int32 = coreDNSReplicas
 		replicas = &defaultReplicas
 	}
-	return coreDNSAddon(cfg, client, replicas, out, printManifest)
+	return coreDNSAddon(cfg, client, replicas, patchesDir, out, printManifest)
 }
 
-func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, out io.Writer, printManifest bool) error {
+func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, patchesDir string, out io.Writer, printManifest bool) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct {
 		DeploymentName, Image, ControlPlaneTaintKey string
@@ -113,6 +115,14 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS deployment template")
+	}
+
+	// Apply patches to the CoreDNS Deployment
+	if len(patchesDir) != 0 {
+		coreDNSDeploymentBytes, err = applyCoreDNSDeploymentPatches(coreDNSDeploymentBytes, patchesDir, out)
+		if err != nil {
+			return errors.Wrap(err, "could not apply patches to the CoreDNS Deployment")
+		}
 	}
 
 	// Get the config file for CoreDNS
@@ -376,4 +386,28 @@ func setCorefile(client clientset.Interface, coreDNSCorefileName string) error {
 		return errors.Wrap(err, "unable to patch the CoreDNS deployment")
 	}
 	return nil
+}
+
+// applyCoreDNSDeploymentPatches reads patches from a directory and applies them over the input coreDNSDeploymentBytes
+func applyCoreDNSDeploymentPatches(coreDNSDeploymentBytes []byte, patchesDir string, output io.Writer) ([]byte, error) {
+	patchManager, err := patches.GetPatchManagerForPath(patchesDir, patches.KnownTargets(), output)
+	if err != nil {
+		return nil, err
+	}
+
+	patchTarget := &patches.PatchTarget{
+		Name:                      patches.CoreDNSDeployment,
+		StrategicMergePatchObject: apps.Deployment{},
+		Data:                      coreDNSDeploymentBytes,
+	}
+	if err := patchManager.ApplyPatchesToTarget(patchTarget); err != nil {
+		return nil, err
+	}
+
+	coreDNSDeploymentBytes, err = yaml.JSONToYAML(patchTarget.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	return coreDNSDeploymentBytes, nil
 }

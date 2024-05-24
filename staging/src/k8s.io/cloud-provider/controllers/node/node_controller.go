@@ -109,7 +109,7 @@ type CloudNodeController struct {
 
 	nodesLister corelisters.NodeLister
 	nodesSynced cache.InformerSynced
-	workqueue   workqueue.RateLimitingInterface
+	workqueue   workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewCloudNodeController creates a CloudNodeController object
@@ -134,7 +134,10 @@ func NewCloudNodeController(
 		workerCount:               workerCount,
 		nodesLister:               nodeInformer.Lister(),
 		nodesSynced:               nodeInformer.Informer().HasSynced,
-		workqueue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Nodes"),
+		workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "Nodes"},
+		),
 	}
 
 	// Use shared informer to listen to add/update of nodes. Note that any nodes
@@ -219,16 +222,8 @@ func (cnc *CloudNodeController) processNextWorkItem(ctx context.Context) bool {
 	}
 
 	// We wrap this block in a func so we can defer cnc.workqueue.Done.
-	err := func(obj interface{}) error {
-		defer cnc.workqueue.Done(obj)
-
-		var key string
-		var ok bool
-		if key, ok = obj.(string); !ok {
-			cnc.workqueue.Forget(obj)
-			utilruntime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
-			return nil
-		}
+	err := func(key string) error {
+		defer cnc.workqueue.Done(key)
 
 		// Run the syncHandler, passing it the key of the
 		// Node resource to be synced.
@@ -241,7 +236,7 @@ func (cnc *CloudNodeController) processNextWorkItem(ctx context.Context) bool {
 
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queued again until another change happens.
-		cnc.workqueue.Forget(obj)
+		cnc.workqueue.Forget(key)
 		return nil
 	}(obj)
 

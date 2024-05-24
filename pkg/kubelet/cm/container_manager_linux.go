@@ -305,7 +305,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	cm.topologyManager.AddHintProvider(cm.deviceManager)
 
-	// initialize DRA manager
+	// Initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
 		cm.draManager, err = dra.NewManagerImpl(kubeClient, nodeConfig.KubeletRootDir, nodeConfig.NodeName)
@@ -563,6 +563,14 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	ctx := context.Background()
 
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
+
+	// Initialize DRA manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		err := cm.draManager.Start(dra.ActivePodsFunc(activePods), sourcesReady)
+		if err != nil {
+			return fmt.Errorf("start dra manager error: %w", err)
+		}
+	}
 
 	// Initialize CPU manager
 	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
@@ -959,7 +967,6 @@ func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.C
 	}
 	for _, containerClaimInfo := range containerClaimInfos {
 		var claimResources []*podresourcesapi.ClaimResource
-		containerClaimInfo.RLock()
 		// TODO: Currently  we maintain a list of ClaimResources, each of which contains
 		// a set of CDIDevices from a different kubelet plugin. In the future we may want to
 		// include the name of the kubelet plugin and/or other types of resources that are
@@ -971,7 +978,6 @@ func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.C
 			}
 			claimResources = append(claimResources, &podresourcesapi.ClaimResource{CDIDevices: cdiDevices})
 		}
-		containerClaimInfo.RUnlock()
 		containerDynamicResource := podresourcesapi.DynamicResource{
 			ClassName:      containerClaimInfo.ClassName,
 			ClaimName:      containerClaimInfo.ClaimName,

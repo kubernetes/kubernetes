@@ -24,8 +24,8 @@ package v1beta4
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
@@ -453,6 +453,8 @@ func autoConvert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
 	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmType(in.EncryptionAlgorithm)
+	out.CertificateValidityPeriod = (*v1.Duration)(unsafe.Pointer(in.CertificateValidityPeriod))
+	out.CACertificateValidityPeriod = (*v1.Duration)(unsafe.Pointer(in.CACertificateValidityPeriod))
 	return nil
 }
 
@@ -488,6 +490,8 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta4_ClusterConfiguration(in
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
 	out.EncryptionAlgorithm = EncryptionAlgorithmType(in.EncryptionAlgorithm)
+	out.CertificateValidityPeriod = (*v1.Duration)(unsafe.Pointer(in.CertificateValidityPeriod))
+	out.CACertificateValidityPeriod = (*v1.Duration)(unsafe.Pointer(in.CACertificateValidityPeriod))
 	return nil
 }
 
@@ -654,7 +658,7 @@ func autoConvert_v1beta4_HostPathMount_To_kubeadm_HostPathMount(in *HostPathMoun
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
 	out.ReadOnly = in.ReadOnly
-	out.PathType = v1.HostPathType(in.PathType)
+	out.PathType = corev1.HostPathType(in.PathType)
 	return nil
 }
 
@@ -668,7 +672,7 @@ func autoConvert_kubeadm_HostPathMount_To_v1beta4_HostPathMount(in *kubeadm.Host
 	out.HostPath = in.HostPath
 	out.MountPath = in.MountPath
 	out.ReadOnly = in.ReadOnly
-	out.PathType = v1.HostPathType(in.PathType)
+	out.PathType = corev1.HostPathType(in.PathType)
 	return nil
 }
 
@@ -856,10 +860,10 @@ func Convert_kubeadm_Networking_To_v1beta4_Networking(in *kubeadm.Networking, ou
 func autoConvert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in *NodeRegistrationOptions, out *kubeadm.NodeRegistrationOptions, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
-	out.Taints = *(*[]v1.Taint)(unsafe.Pointer(&in.Taints))
+	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*[]kubeadm.Arg)(unsafe.Pointer(&in.KubeletExtraArgs))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
-	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
@@ -872,10 +876,10 @@ func Convert_v1beta4_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(
 func autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta4_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	out.Name = in.Name
 	out.CRISocket = in.CRISocket
-	out.Taints = *(*[]v1.Taint)(unsafe.Pointer(&in.Taints))
+	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*[]Arg)(unsafe.Pointer(&in.KubeletExtraArgs))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
-	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
 	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
@@ -962,13 +966,13 @@ func Convert_kubeadm_ResetConfiguration_To_v1beta4_ResetConfiguration(in *kubead
 }
 
 func autoConvert_v1beta4_Timeouts_To_kubeadm_Timeouts(in *Timeouts, out *kubeadm.Timeouts, s conversion.Scope) error {
-	out.ControlPlaneComponentHealthCheck = (*metav1.Duration)(unsafe.Pointer(in.ControlPlaneComponentHealthCheck))
-	out.KubeletHealthCheck = (*metav1.Duration)(unsafe.Pointer(in.KubeletHealthCheck))
-	out.KubernetesAPICall = (*metav1.Duration)(unsafe.Pointer(in.KubernetesAPICall))
-	out.EtcdAPICall = (*metav1.Duration)(unsafe.Pointer(in.EtcdAPICall))
-	out.TLSBootstrap = (*metav1.Duration)(unsafe.Pointer(in.TLSBootstrap))
-	out.Discovery = (*metav1.Duration)(unsafe.Pointer(in.Discovery))
-	out.UpgradeManifests = (*metav1.Duration)(unsafe.Pointer(in.UpgradeManifests))
+	out.ControlPlaneComponentHealthCheck = (*v1.Duration)(unsafe.Pointer(in.ControlPlaneComponentHealthCheck))
+	out.KubeletHealthCheck = (*v1.Duration)(unsafe.Pointer(in.KubeletHealthCheck))
+	out.KubernetesAPICall = (*v1.Duration)(unsafe.Pointer(in.KubernetesAPICall))
+	out.EtcdAPICall = (*v1.Duration)(unsafe.Pointer(in.EtcdAPICall))
+	out.TLSBootstrap = (*v1.Duration)(unsafe.Pointer(in.TLSBootstrap))
+	out.Discovery = (*v1.Duration)(unsafe.Pointer(in.Discovery))
+	out.UpgradeManifests = (*v1.Duration)(unsafe.Pointer(in.UpgradeManifests))
 	return nil
 }
 
@@ -978,13 +982,13 @@ func Convert_v1beta4_Timeouts_To_kubeadm_Timeouts(in *Timeouts, out *kubeadm.Tim
 }
 
 func autoConvert_kubeadm_Timeouts_To_v1beta4_Timeouts(in *kubeadm.Timeouts, out *Timeouts, s conversion.Scope) error {
-	out.ControlPlaneComponentHealthCheck = (*metav1.Duration)(unsafe.Pointer(in.ControlPlaneComponentHealthCheck))
-	out.KubeletHealthCheck = (*metav1.Duration)(unsafe.Pointer(in.KubeletHealthCheck))
-	out.KubernetesAPICall = (*metav1.Duration)(unsafe.Pointer(in.KubernetesAPICall))
-	out.EtcdAPICall = (*metav1.Duration)(unsafe.Pointer(in.EtcdAPICall))
-	out.TLSBootstrap = (*metav1.Duration)(unsafe.Pointer(in.TLSBootstrap))
-	out.Discovery = (*metav1.Duration)(unsafe.Pointer(in.Discovery))
-	out.UpgradeManifests = (*metav1.Duration)(unsafe.Pointer(in.UpgradeManifests))
+	out.ControlPlaneComponentHealthCheck = (*v1.Duration)(unsafe.Pointer(in.ControlPlaneComponentHealthCheck))
+	out.KubeletHealthCheck = (*v1.Duration)(unsafe.Pointer(in.KubeletHealthCheck))
+	out.KubernetesAPICall = (*v1.Duration)(unsafe.Pointer(in.KubernetesAPICall))
+	out.EtcdAPICall = (*v1.Duration)(unsafe.Pointer(in.EtcdAPICall))
+	out.TLSBootstrap = (*v1.Duration)(unsafe.Pointer(in.TLSBootstrap))
+	out.Discovery = (*v1.Duration)(unsafe.Pointer(in.Discovery))
+	out.UpgradeManifests = (*v1.Duration)(unsafe.Pointer(in.UpgradeManifests))
 	return nil
 }
 
@@ -1005,6 +1009,8 @@ func autoConvert_v1beta4_UpgradeApplyConfiguration_To_kubeadm_UpgradeApplyConfig
 	out.Patches = (*kubeadm.Patches)(unsafe.Pointer(in.Patches))
 	out.PrintConfig = (*bool)(unsafe.Pointer(in.PrintConfig))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 
@@ -1025,6 +1031,8 @@ func autoConvert_kubeadm_UpgradeApplyConfiguration_To_v1beta4_UpgradeApplyConfig
 	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
 	out.PrintConfig = (*bool)(unsafe.Pointer(in.PrintConfig))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 
@@ -1106,6 +1114,8 @@ func autoConvert_v1beta4_UpgradeNodeConfiguration_To_kubeadm_UpgradeNodeConfigur
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	out.Patches = (*kubeadm.Patches)(unsafe.Pointer(in.Patches))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 
@@ -1121,6 +1131,8 @@ func autoConvert_kubeadm_UpgradeNodeConfiguration_To_v1beta4_UpgradeNodeConfigur
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	out.Patches = (*Patches)(unsafe.Pointer(in.Patches))
+	out.ImagePullPolicy = corev1.PullPolicy(in.ImagePullPolicy)
+	out.ImagePullSerial = (*bool)(unsafe.Pointer(in.ImagePullSerial))
 	return nil
 }
 

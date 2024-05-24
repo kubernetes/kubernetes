@@ -150,11 +150,6 @@ type OperationGenerator interface {
 	// GetCSITranslator returns the CSI Translation Library
 	GetCSITranslator() InTreeToCSITranslator
 
-	GenerateBulkVolumeVerifyFunc(
-		map[types.NodeName][]*volume.Spec,
-		string,
-		map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
-
 	GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (volumetypes.GeneratedOperations, error)
 
 	GenerateExpandAndRecoverVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume, string) (volumetypes.GeneratedOperations, error)
@@ -267,84 +262,6 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume("<n/a>", nil), "verify_volumes_are_attached_per_node"),
 		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
-}
-
-func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
-	pluginNodeVolumes map[types.NodeName][]*volume.Spec,
-	pluginName string,
-	volumeSpecMap map[*volume.Spec]v1.UniqueVolumeName,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
-
-	// Migration: All inputs already should be translated by caller for this
-	// function except volumeSpecMap which contains original volume names for
-	// use with actualStateOfWorld
-
-	bulkVolumeVerifyFunc := func() volumetypes.OperationContext {
-		attachableVolumePlugin, err :=
-			og.volumePluginMgr.FindAttachablePluginByName(pluginName)
-		if err != nil || attachableVolumePlugin == nil {
-			klog.Errorf(
-				"BulkVerifyVolume.FindAttachablePluginBySpec failed for plugin %q with: %v",
-				pluginName,
-				err)
-			return volumetypes.NewOperationContext(nil, nil, false)
-		}
-
-		volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
-
-		if newAttacherErr != nil {
-			klog.Errorf(
-				"BulkVerifyVolume.NewAttacher failed for getting plugin %q with: %v",
-				attachableVolumePlugin,
-				newAttacherErr)
-			return volumetypes.NewOperationContext(nil, nil, false)
-		}
-		bulkVolumeVerifier, ok := volumeAttacher.(volume.BulkVolumeVerifier)
-
-		if !ok {
-			klog.Errorf("BulkVerifyVolume failed to type assert attacher %q", bulkVolumeVerifier)
-			return volumetypes.NewOperationContext(nil, nil, false)
-		}
-
-		attached, bulkAttachErr := bulkVolumeVerifier.BulkVerifyVolumes(pluginNodeVolumes)
-		if bulkAttachErr != nil {
-			klog.Errorf("BulkVerifyVolume.BulkVerifyVolumes Error checking volumes are attached with %v", bulkAttachErr)
-			return volumetypes.NewOperationContext(nil, nil, false)
-		}
-
-		for nodeName, volumeSpecs := range pluginNodeVolumes {
-			for _, volumeSpec := range volumeSpecs {
-				nodeVolumeSpecs, nodeChecked := attached[nodeName]
-
-				if !nodeChecked {
-					klog.V(2).Infof("VerifyVolumesAreAttached.BulkVerifyVolumes failed for node %q and leaving volume %q as attached",
-						nodeName,
-						volumeSpec.Name())
-					continue
-				}
-
-				check := nodeVolumeSpecs[volumeSpec]
-
-				if !check {
-					klog.V(2).Infof("VerifyVolumesAreAttached.BulkVerifyVolumes failed for node %q and volume %q",
-						nodeName,
-						volumeSpec.Name())
-					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[volumeSpec], nodeName)
-				}
-			}
-		}
-
-		// It is hard to differentiate migrated status for all volumes for verify_volumes_are_attached
-		return volumetypes.NewOperationContext(nil, nil, false)
-	}
-
-	return volumetypes.GeneratedOperations{
-		OperationName:     "verify_volumes_are_attached",
-		OperationFunc:     bulkVolumeVerifyFunc,
-		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, nil), "verify_volumes_are_attached"),
-		EventRecorderFunc: nil, // nil because we do not want to generate event on error
-	}, nil
-
 }
 
 func (og *operationGenerator) GenerateAttachVolumeFunc(

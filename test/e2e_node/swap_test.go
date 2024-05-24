@@ -46,7 +46,7 @@ const (
 
 var _ = SIGDescribe("Swap", framework.WithNodeConformance(), "[LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("swap-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.DescribeTable("with configuration", func(qosClass v1.PodQOSClass, memoryRequestEqualLimit bool) {
 		ginkgo.By(fmt.Sprintf("Creating a pod of QOS class %s. memoryRequestEqualLimit: %t", qosClass, memoryRequestEqualLimit))

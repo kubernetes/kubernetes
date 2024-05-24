@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -30,6 +31,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -50,6 +52,8 @@ type KubeadmCert struct {
 	// These functions will be run in series, passed both the InitConfiguration and a cert Config.
 	configMutators []configMutatorsFunc
 	config         pkiutil.CertConfig
+	// Used for unit tests.
+	creationTime time.Time
 }
 
 // GetConfig returns the definition for the given cert given the provided InitConfiguration
@@ -60,6 +64,30 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*pkiutil.Cert
 		}
 	}
 
+	// creationTime should be set only during unit tests, otherwise the kubeadm start time
+	// should be
+	if k.creationTime.IsZero() {
+		k.creationTime = kubeadmutil.StartTimeUTC()
+	}
+
+	// Backdate certificate to allow small time jumps.
+	k.config.NotBefore = k.creationTime.Add(-kubeadmconstants.CertificateBackdate)
+
+	// Use the validity periods defined in the ClusterConfiguration.
+	// If CAName is empty this is a CA cert.
+	if len(k.CAName) != 0 {
+		if ic.ClusterConfiguration.CertificateValidityPeriod != nil {
+			k.config.NotAfter = k.creationTime.
+				Add(ic.ClusterConfiguration.CertificateValidityPeriod.Duration)
+		}
+	} else {
+		if ic.ClusterConfiguration.CACertificateValidityPeriod != nil {
+			k.config.NotAfter = k.creationTime.
+				Add(ic.ClusterConfiguration.CACertificateValidityPeriod.Duration)
+		}
+	}
+
+	// Use the encryption algorithm from ClusterConfiguration.
 	k.config.EncryptionAlgorithm = ic.ClusterConfiguration.EncryptionAlgorithmType()
 	return &k.config, nil
 }

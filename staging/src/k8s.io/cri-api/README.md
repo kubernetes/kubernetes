@@ -228,6 +228,27 @@ No changes
 - [Add runtime handler field to ImageSpec struct](https://github.com/kubernetes/kubernetes/pull/121121)
   - Added `runtime_handler` field to type `ImageSpec`
 
+- [Add container filesystem to the ImageFsInfoResponse](https://github.com/kubernetes/kubernetes/pull/120914)
+  - Added `container_filesystems` field to type `ImageFsInfoResponse`
+
+### v1.30
+
+`git diff v1.29.0 v1.30.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+- [Recursive Read-only (RRO) mounts](https://github.com/kubernetes/kubernetes/pull/123272)
+  - Added RuntimeHandler and RuntimeHandlerFeatures type
+  - Added `recursive_read_only` field to type `Mount`
+  - Added `runtime_handlers` field to type `StatusResponse`
+
+- [Add user_namespaces field to RuntimeHandlerFeatures](https://github.com/kubernetes/kubernetes/pull/123356)
+  - Added `user_namespaces` field to type `RuntimeHandlerFeatures`
+
+- [Add image_id to CRI Container message](https://github.com/kubernetes/kubernetes/pull/123508)
+  - Added `image_id` field to type `Container`
+
+- [Add image_id to CRI ContainerStatus message](https://github.com/kubernetes/kubernetes/pull/123583)
+  - Added `image_id` field to type `ContainerStatus`
+
 ## Community, discussion, contribution, and support
 
 Learn how to engage with the Kubernetes community on the [community

@@ -16,7 +16,7 @@ REGISTRY ?= registry.k8s.io/e2e-test-images
 GOARM ?= 7
 DOCKER_CERT_BASE_PATH ?=
 QEMUVERSION=v5.1.0-2
-GOLANG_VERSION=1.22.2
+GOLANG_VERSION=1.22.3
 export
 
 ifndef WHAT

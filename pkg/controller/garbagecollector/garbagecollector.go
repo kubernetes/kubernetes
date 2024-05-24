@@ -20,7 +20,6 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
-	"k8s.io/controller-manager/pkg/informerfactory"
 	"reflect"
 	"sync"
 	"time"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/controller"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
@@ -65,9 +65,9 @@ type GarbageCollector struct {
 	restMapper     meta.ResettableRESTMapper
 	metadataClient metadata.Interface
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
-	attemptToDelete workqueue.RateLimitingInterface
+	attemptToDelete workqueue.TypedRateLimitingInterface[*node]
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
-	attemptToOrphan        workqueue.RateLimitingInterface
+	attemptToOrphan        workqueue.TypedRateLimitingInterface[*node]
 	dependencyGraphBuilder *GraphBuilder
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *ReferenceCache

@@ -100,9 +100,9 @@ type RepairIPAddress struct {
 	ipAddressLister networkinglisters.IPAddressLister
 	ipAddressSynced cache.InformerSynced
 
-	cidrQueue        workqueue.RateLimitingInterface
-	svcQueue         workqueue.RateLimitingInterface
-	ipQueue          workqueue.RateLimitingInterface
+	cidrQueue        workqueue.TypedRateLimitingInterface[string]
+	svcQueue         workqueue.TypedRateLimitingInterface[string]
+	ipQueue          workqueue.TypedRateLimitingInterface[string]
 	workerLoopPeriod time.Duration
 
 	muTree sync.Mutex
@@ -132,14 +132,23 @@ func NewRepairIPAddress(interval time.Duration,
 		serviceCIDRSynced: serviceCIDRInformer.Informer().HasSynced,
 		ipAddressLister:   ipAddressInformer.Lister(),
 		ipAddressSynced:   ipAddressInformer.Informer().HasSynced,
-		cidrQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "servicecidrs"),
-		svcQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "services"),
-		ipQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ipaddresses"),
-		tree:              iptree.New[string](),
-		workerLoopPeriod:  time.Second,
-		broadcaster:       eventBroadcaster,
-		recorder:          recorder,
-		clock:             clock.RealClock{},
+		cidrQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "servicecidrs"},
+		),
+		svcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "services"},
+		),
+		ipQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "ipaddresses"},
+		),
+		tree:             iptree.New[string](),
+		workerLoopPeriod: time.Second,
+		broadcaster:      eventBroadcaster,
+		recorder:         recorder,
+		clock:            clock.RealClock{},
 	}
 
 	_, _ = serviceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -310,13 +319,13 @@ func (r *RepairIPAddress) processNextWorkSvc() bool {
 	}
 	defer r.svcQueue.Done(eKey)
 
-	err := r.syncService(eKey.(string))
+	err := r.syncService(eKey)
 	r.handleSvcErr(err, eKey)
 
 	return true
 }
 
-func (r *RepairIPAddress) handleSvcErr(err error, key interface{}) {
+func (r *RepairIPAddress) handleSvcErr(err error, key string) {
 	if err == nil {
 		r.svcQueue.Forget(key)
 		return
@@ -458,13 +467,13 @@ func (r *RepairIPAddress) processNextWorkIp() bool {
 	}
 	defer r.ipQueue.Done(eKey)
 
-	err := r.syncIPAddress(eKey.(string))
-	r.handleIpErr(err, eKey)
+	err := r.syncIPAddress(eKey)
+	r.handleIPErr(err, eKey)
 
 	return true
 }
 
-func (r *RepairIPAddress) handleIpErr(err error, key interface{}) {
+func (r *RepairIPAddress) handleIPErr(err error, key string) {
 	if err == nil {
 		r.ipQueue.Forget(key)
 		return
@@ -566,7 +575,7 @@ func (r *RepairIPAddress) processNextWorkCIDR() bool {
 	return true
 }
 
-func (r *RepairIPAddress) handleCIDRErr(err error, key interface{}) {
+func (r *RepairIPAddress) handleCIDRErr(err error, key string) {
 	if err == nil {
 		r.cidrQueue.Forget(key)
 		return

@@ -31,14 +31,14 @@ export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
 # Install zeitgeist
-go install sigs.k8s.io/zeitgeist@v0.2.0
+go install sigs.k8s.io/zeitgeist@v0.5.3
 
 # Prefer full path for running zeitgeist
 ZEITGEIST_BIN="$(which zeitgeist)"
 
 # TODO: revert sed hack when zetigeist respects CLICOLOR/ttys
 CLICOLOR=0 "${ZEITGEIST_BIN}" validate \
-  --local \
+  --local-only \
   --base-path "${KUBE_ROOT}" \
   --config "${KUBE_ROOT}"/build/dependencies.yaml \
   2> >(sed -e $'s/\x1b\[[0-9;]*m//g' >&2)

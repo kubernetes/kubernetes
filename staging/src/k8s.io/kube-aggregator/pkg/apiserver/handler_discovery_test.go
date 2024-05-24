@@ -1072,39 +1072,39 @@ func fetchPath(handler http.Handler, etag string) (*http.Response, []byte, *apid
 // isComplete
 type completerWorkqueue struct {
 	lock sync.Mutex
-	workqueue.RateLimitingInterface
-	processing map[interface{}]struct{}
+	workqueue.TypedRateLimitingInterface[string]
+	processing map[string]struct{}
 }
 
-var _ = workqueue.RateLimitingInterface(&completerWorkqueue{})
+var _ = workqueue.TypedRateLimitingInterface[string](&completerWorkqueue{})
 
-func newCompleterWorkqueue(wq workqueue.RateLimitingInterface) *completerWorkqueue {
+func newCompleterWorkqueue(wq workqueue.TypedRateLimitingInterface[string]) *completerWorkqueue {
 	return &completerWorkqueue{
-		RateLimitingInterface: wq,
-		processing:            make(map[interface{}]struct{}),
+		TypedRateLimitingInterface: wq,
+		processing:                 make(map[string]struct{}),
 	}
 }
 
-func (q *completerWorkqueue) Add(item interface{}) {
+func (q *completerWorkqueue) Add(item string) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	q.processing[item] = struct{}{}
-	q.RateLimitingInterface.Add(item)
+	q.TypedRateLimitingInterface.Add(item)
 }
 
-func (q *completerWorkqueue) AddAfter(item interface{}, duration time.Duration) {
+func (q *completerWorkqueue) AddAfter(item string, duration time.Duration) {
 	q.Add(item)
 }
 
-func (q *completerWorkqueue) AddRateLimited(item interface{}) {
+func (q *completerWorkqueue) AddRateLimited(item string) {
 	q.Add(item)
 }
 
-func (q *completerWorkqueue) Done(item interface{}) {
+func (q *completerWorkqueue) Done(item string) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	delete(q.processing, item)
-	q.RateLimitingInterface.Done(item)
+	q.TypedRateLimitingInterface.Done(item)
 }
 
 func (q *completerWorkqueue) isComplete() bool {

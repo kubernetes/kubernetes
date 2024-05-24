@@ -228,10 +228,6 @@ func (plugin *portworxVolumePlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *portworxVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *portworxVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

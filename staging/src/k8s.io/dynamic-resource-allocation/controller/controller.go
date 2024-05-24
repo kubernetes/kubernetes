@@ -163,7 +163,7 @@ type controller struct {
 	setReservedFor      bool
 	kubeClient          kubernetes.Interface
 	claimNameLookup     *resourceclaim.Lookup
-	queue               workqueue.RateLimitingInterface
+	queue               workqueue.TypedRateLimitingInterface[string]
 	eventRecorder       record.EventRecorder
 	rcLister            resourcev1alpha2listers.ResourceClassLister
 	rcSynced            cache.InformerSynced
@@ -208,8 +208,10 @@ func New(
 		v1.EventSource{Component: fmt.Sprintf("resource driver %s", name)})
 
 	// The work queue contains either keys for claims or PodSchedulingContext objects.
-	queue := workqueue.NewNamedRateLimitingQueue(
-		workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("%s-queue", name))
+	queue := workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[string](),
+		workqueue.TypedRateLimitingQueueConfig[string]{Name: fmt.Sprintf("%s-queue", name)},
+	)
 
 	// The mutation cache acts as an additional layer for the informer
 	// cache and after an update made by the controller returns a more
@@ -371,7 +373,7 @@ func (ctrl *controller) sync() {
 	logger := klog.LoggerWithValues(ctrl.logger, "key", key)
 	ctx := klog.NewContext(ctrl.ctx, logger)
 	logger.V(4).Info("processing")
-	obj, err := ctrl.syncKey(ctx, key.(string))
+	obj, err := ctrl.syncKey(ctx, key)
 	switch err {
 	case nil:
 		logger.V(5).Info("completed")

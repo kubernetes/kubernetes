@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/lithammer/dedent"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -53,10 +54,14 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 				Apply: kubeadmapi.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 				Node: kubeadmapi.UpgradeNodeConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 			},
 		},
@@ -78,10 +83,14 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 				Apply: kubeadmapi.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(false),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 				Node: kubeadmapi.UpgradeNodeConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(false),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 			},
 		},
@@ -162,10 +171,14 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 				Apply: kubeadmapi.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 				Node: kubeadmapi.UpgradeNodeConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 			},
 			wantErr: false,
@@ -214,10 +227,14 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 				Apply: kubeadmapi.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 				Node: kubeadmapi.UpgradeNodeConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 			},
 		},
@@ -226,9 +243,13 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 			cfg: &kubeadmapiv1.UpgradeConfiguration{
 				Apply: kubeadmapiv1.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(false),
+					ImagePullPolicy:    v1.PullAlways,
+					ImagePullSerial:    ptr.To(false),
 				},
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
-					EtcdUpgrade: ptr.To(false),
+					EtcdUpgrade:     ptr.To(false),
+					ImagePullPolicy: v1.PullAlways,
+					ImagePullSerial: ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -239,10 +260,14 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 				Apply: kubeadmapi.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(false),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullAlways,
+					ImagePullSerial:    ptr.To(false),
 				},
 				Node: kubeadmapi.UpgradeNodeConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(false),
+					ImagePullPolicy:    v1.PullAlways,
+					ImagePullSerial:    ptr.To(false),
 				},
 			},
 		},
@@ -269,15 +294,6 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 	}()
 	filename := "kubeadmConfig"
 	filePath := filepath.Join(tmpdir, filename)
-	fileContents := dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta4
-				kind: UpgradeConfiguration
-			`)
-	err = os.WriteFile(filePath, []byte(fileContents), 0644)
-	if err != nil {
-		t.Fatalf("Couldn't write content to file: %v", err)
-	}
-
 	options := LoadOrDefaultConfigurationOptions{}
 
 	tests := []struct {
@@ -305,10 +321,14 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 				Apply: kubeadmapi.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(false),
 					EtcdUpgrade:        ptr.To(true),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 				Node: kubeadmapi.UpgradeNodeConfiguration{
 					CertificateRenewal: ptr.To(true),
 					EtcdUpgrade:        ptr.To(false),
+					ImagePullPolicy:    v1.PullIfNotPresent,
+					ImagePullSerial:    ptr.To(true),
 				},
 			},
 		},
@@ -318,9 +338,15 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 			cfg: &kubeadmapiv1.UpgradeConfiguration{
 				Apply: kubeadmapiv1.UpgradeApplyConfiguration{
 					CertificateRenewal: ptr.To(false),
+					EtcdUpgrade:        ptr.To(false),
+					ImagePullPolicy:    v1.PullNever,
+					ImagePullSerial:    ptr.To(false),
 				},
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
-					EtcdUpgrade: ptr.To(false),
+					CertificateRenewal: ptr.To(false),
+					EtcdUpgrade:        ptr.To(false),
+					ImagePullPolicy:    v1.PullNever,
+					ImagePullSerial:    ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -329,18 +355,31 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 			},
 			want: &kubeadmapi.UpgradeConfiguration{
 				Apply: kubeadmapi.UpgradeApplyConfiguration{
-					CertificateRenewal: ptr.To(true),
-					EtcdUpgrade:        ptr.To(true),
+					CertificateRenewal: ptr.To(false),
+					EtcdUpgrade:        ptr.To(false),
+					ImagePullPolicy:    v1.PullNever,
+					ImagePullSerial:    ptr.To(false),
 				},
 				Node: kubeadmapi.UpgradeNodeConfiguration{
-					CertificateRenewal: ptr.To(true),
-					EtcdUpgrade:        ptr.To(true),
+					CertificateRenewal: ptr.To(false),
+					EtcdUpgrade:        ptr.To(false),
+					ImagePullPolicy:    v1.PullNever,
+					ImagePullSerial:    ptr.To(false),
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			bytes, err := yaml.Marshal(tt.cfg)
+			if err != nil {
+				t.Fatalf("Could not marshal test config: %v", err)
+			}
+			err = os.WriteFile(filePath, bytes, 0644)
+			if err != nil {
+				t.Fatalf("Couldn't write content to file: %v", err)
+			}
+
 			got, _ := LoadOrDefaultUpgradeConfiguration(tt.cfgPath, tt.cfg, options)
 			if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
 				t.Errorf("LoadOrDefaultUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)

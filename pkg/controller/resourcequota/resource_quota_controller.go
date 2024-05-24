@@ -85,9 +85,9 @@ type Controller struct {
 	// A list of functions that return true when their caches have synced
 	informerSyncedFuncs []cache.InformerSynced
 	// ResourceQuota objects that need to be synchronized
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 	// missingUsageQueue holds objects that are missing the initial usage information
-	missingUsageQueue workqueue.RateLimitingInterface
+	missingUsageQueue workqueue.TypedRateLimitingInterface[string]
 	// To allow injection of syncUsage for testing.
 	syncHandler func(ctx context.Context, key string) error
 	// function that controls full recalculation of quota usage
@@ -109,10 +109,16 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 		rqClient:            options.QuotaClient,
 		rqLister:            options.ResourceQuotaInformer.Lister(),
 		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
-		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
-		missingUsageQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
-		resyncPeriod:        options.ResyncPeriod,
-		registry:            options.Registry,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_primary"},
+		),
+		missingUsageQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_priority"},
+		),
+		resyncPeriod: options.ResyncPeriod,
+		registry:     options.Registry,
 	}
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
@@ -246,7 +252,7 @@ func (rq *Controller) addQuota(logger klog.Logger, obj interface{}) {
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
-func (rq *Controller) worker(queue workqueue.RateLimitingInterface) func(context.Context) {
+func (rq *Controller) worker(queue workqueue.TypedRateLimitingInterface[string]) func(context.Context) {
 	workFunc := func(ctx context.Context) bool {
 		key, quit := queue.Get()
 		if quit {
@@ -261,7 +267,7 @@ func (rq *Controller) worker(queue workqueue.RateLimitingInterface) func(context
 		logger = klog.LoggerWithValues(logger, "queueKey", key)
 		ctx = klog.NewContext(ctx, logger)
 
-		err := rq.syncHandler(ctx, key.(string))
+		err := rq.syncHandler(ctx, key)
 		if err == nil {
 			queue.Forget(key)
 			return false

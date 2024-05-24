@@ -82,8 +82,6 @@ type VolumeOptions struct {
 	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
 	// so on.
 	PVC *v1.PersistentVolumeClaim
-	// Unique name of Kubernetes cluster.
-	ClusterName string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
 }
@@ -168,11 +166,6 @@ type VolumePlugin interface {
 	// Specifying mount options in a volume plugin that doesn't support
 	// user specified mount options will result in error creating persistent volumes
 	SupportsMountOption() bool
-
-	// SupportsBulkVolumeVerification checks if volume plugin type is capable
-	// of enabling bulk polling of all nodes. This can speed up verification of
-	// attached volumes by quite a bit, but underlying pluging must support it.
-	SupportsBulkVolumeVerification() bool
 
 	// SupportsSELinuxContextMount returns true if volume plugins supports
 	// mount -o context=XYZ for a given volume.

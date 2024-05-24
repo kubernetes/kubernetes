@@ -89,10 +89,6 @@ func (plugin *secretPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *secretPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *secretPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

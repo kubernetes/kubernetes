@@ -87,7 +87,7 @@ type expandController struct {
 
 	operationGenerator operationexecutor.OperationGenerator
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	translator CSINameTranslator
 
@@ -104,10 +104,13 @@ func NewExpandController(
 	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
 	expc := &expandController{
-		kubeClient:               kubeClient,
-		pvcLister:                pvcInformer.Lister(),
-		pvcsSynced:               pvcInformer.Informer().HasSynced,
-		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
+		kubeClient: kubeClient,
+		pvcLister:  pvcInformer.Lister(),
+		pvcsSynced: pvcInformer.Informer().HasSynced,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
+		),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
 	}
@@ -180,7 +183,7 @@ func (expc *expandController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer expc.queue.Done(key)
 
-	err := expc.syncHandler(ctx, key.(string))
+	err := expc.syncHandler(ctx, key)
 	if err == nil {
 		expc.queue.Forget(key)
 		return true

@@ -285,10 +285,6 @@ func (plugin *flexVolumePlugin) unsupported(commands ...string) {
 	plugin.unsupportedCommands = append(plugin.unsupportedCommands, commands...)
 }
 
-func (plugin *flexVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *flexVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

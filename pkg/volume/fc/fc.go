@@ -97,10 +97,6 @@ func (plugin *fcPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *fcPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *fcPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return true, nil
 }

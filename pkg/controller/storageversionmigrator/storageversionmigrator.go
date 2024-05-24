@@ -55,7 +55,7 @@ type SVMController struct {
 	dynamicClient          *dynamic.DynamicClient
 	svmListers             svmlisters.StorageVersionMigrationLister
 	svmSynced              cache.InformerSynced
-	queue                  workqueue.RateLimitingInterface
+	queue                  workqueue.TypedRateLimitingInterface[string]
 	restMapper             meta.RESTMapper
 	dependencyGraphBuilder *garbagecollector.GraphBuilder
 }
@@ -79,7 +79,10 @@ func NewSVMController(
 		svmSynced:              svmInformer.Informer().HasSynced,
 		restMapper:             mapper,
 		dependencyGraphBuilder: dependencyGraphBuilder,
-		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), controllerName),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: controllerName},
+		),
 	}
 
 	_, _ = svmInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -146,13 +149,12 @@ func (svmc *SVMController) worker(ctx context.Context) {
 }
 
 func (svmc *SVMController) processNext(ctx context.Context) bool {
-	svmKey, quit := svmc.queue.Get()
+	key, quit := svmc.queue.Get()
 	if quit {
 		return false
 	}
-	defer svmc.queue.Done(svmKey)
+	defer svmc.queue.Done(key)
 
-	key := svmKey.(string)
 	err := svmc.sync(ctx, key)
 	if err == nil {
 		svmc.queue.Forget(key)

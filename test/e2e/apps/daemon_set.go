@@ -585,10 +585,12 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 		nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		nodeCount := len(nodes.Items)
-		retryTimeout := dsRetryTimeout + time.Duration(nodeCount*30)*time.Second
+		// We disturb daemonset progress by randomly terminating pods.
+		randomPodTerminationTimeout := 5 * time.Minute
+		retryTimeout := dsRetryTimeout + randomPodTerminationTimeout + time.Duration(nodeCount*30)*time.Second
 
 		ginkgo.By("Check that daemon pods surge and invariants are preserved during that rollout")
-		ageOfOldPod := make(map[string]time.Time)
+		nodeToAgeOfOldPod := make(map[string]map[string]time.Time)
 		deliberatelyDeletedPods := sets.NewString()
 		err = wait.PollUntilContextTimeout(ctx, dsRetryPeriod, retryTimeout, true, func(ctx context.Context) (bool, error) {
 			podList, err := c.CoreV1().Pods(ds.Namespace).List(ctx, metav1.ListOptions{})
@@ -682,17 +684,25 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 				// if this is a pod in an older version AND there is a new version of this pod, record when
 				// we started seeing this, otherwise delete the record (perhaps the node was drained)
 				if nodesToVersions[pod.Spec.NodeName][newVersion] > 0 {
-					if _, ok := ageOfOldPod[string(pod.UID)]; !ok {
-						ageOfOldPod[string(pod.UID)] = now
+					if _, ok := nodeToAgeOfOldPod[pod.Spec.NodeName][string(pod.UID)]; !ok {
+						if _, ok := nodeToAgeOfOldPod[pod.Spec.NodeName]; !ok {
+							nodeToAgeOfOldPod[pod.Spec.NodeName] = make(map[string]time.Time)
+						}
+						nodeToAgeOfOldPod[pod.Spec.NodeName][string(pod.UID)] = now
 					}
 				} else {
-					delete(ageOfOldPod, string(pod.UID))
+					delete(nodeToAgeOfOldPod, pod.Spec.NodeName)
 				}
 			}
 			// purge the old pods list of any deleted pods
-			for uid := range ageOfOldPod {
-				if !podUIDs.Has(uid) {
-					delete(ageOfOldPod, uid)
+			for node, uidToTime := range nodeToAgeOfOldPod {
+				for uid := range uidToTime {
+					if !podUIDs.Has(uid) {
+						delete(uidToTime, uid)
+					}
+				}
+				if len(uidToTime) == 0 {
+					delete(nodeToAgeOfOldPod, node)
 				}
 			}
 			deliberatelyDeletedPods = deliberatelyDeletedPods.Intersection(deletedPodUIDs)
@@ -713,9 +723,11 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 			}
 
 			// invariant: the controller must react to the new pod becoming ready within a reasonable timeframe (2x grace period)
-			for uid, firstSeen := range ageOfOldPod {
-				if now.Sub(firstSeen) > maxSurgeOverlap {
-					errs = append(errs, fmt.Sprintf("An old pod with UID %s has been running alongside a newer version for longer than %s", uid, maxSurgeOverlap))
+			for node, uidToTime := range nodeToAgeOfOldPod {
+				for uid, firstSeenSinceNewVersionPod := range uidToTime {
+					if now.Sub(firstSeenSinceNewVersionPod) > maxSurgeOverlap {
+						errs = append(errs, fmt.Sprintf("An old pod with UID %s on a node %s has been running alongside a newer version for longer than %s", uid, node, maxSurgeOverlap))
+					}
 				}
 			}
 
@@ -800,6 +812,9 @@ var _ = SIGDescribe("Daemon set", framework.WithSerial(), func() {
 							} else {
 								framework.Logf("Deleted pod %s prematurely", pod.Name)
 								deliberatelyDeletedPods.Insert(string(pod.UID))
+								// If it is an old version we do not need to measure the controller reaction because we have done it instead.
+								// If it is a new version, we have to reset the time to start counting the time for the replacement pod to reach readiness again.
+								delete(nodeToAgeOfOldPod, pod.Spec.NodeName)
 							}
 						}
 					}

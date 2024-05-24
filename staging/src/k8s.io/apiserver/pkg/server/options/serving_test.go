@@ -290,7 +290,8 @@ func TestServerRunWithSNI(t *testing.T) {
 						KeyFile:  serverKeyFile,
 					},
 				},
-				SNICertKeys: namedCertKeys,
+				DisableHTTP2Serving: true,
+				SNICertKeys:         namedCertKeys,
 			}).WithLoopback()
 			// use a random free port
 			ln, err := net.Listen("tcp", "127.0.0.1:0")

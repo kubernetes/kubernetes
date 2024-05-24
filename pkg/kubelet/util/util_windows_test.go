@@ -20,161 +20,18 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
+	"context"
+	"net"
 	"reflect"
 	"runtime"
 	"testing"
 
+	"github.com/Microsoft/go-winio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"k8s.io/cri-client/pkg/util"
 )
-
-func TestGetAddressAndDialer(t *testing.T) {
-
-	// Compare dialer function by pointer
-	tcpDialPointer := reflect.ValueOf(tcpDial).Pointer()
-	npipeDialPointer := reflect.ValueOf(npipeDial).Pointer()
-	var nilDialPointer uintptr = 0x0
-
-	tests := []struct {
-		endpoint      string
-		expectedAddr  string
-		expectedDial  uintptr
-		expectedError bool
-	}{
-		{
-			endpoint:      "tcp://localhost:15880",
-			expectedAddr:  "localhost:15880",
-			expectedDial:  tcpDialPointer,
-			expectedError: false,
-		},
-		{
-			endpoint:      "npipe://./pipe/mypipe",
-			expectedAddr:  "//./pipe/mypipe",
-			expectedDial:  npipeDialPointer,
-			expectedError: false,
-		},
-		{
-			endpoint:      "npipe:\\\\.\\pipe\\mypipe",
-			expectedAddr:  "//./pipe/mypipe",
-			expectedDial:  npipeDialPointer,
-			expectedError: false,
-		},
-		{
-			endpoint:      "unix:///tmp/s1.sock",
-			expectedAddr:  "",
-			expectedDial:  nilDialPointer,
-			expectedError: true,
-		},
-		{
-			endpoint:      "tcp1://abc",
-			expectedAddr:  "",
-			expectedDial:  nilDialPointer,
-			expectedError: true,
-		},
-		{
-			endpoint:      "a b c",
-			expectedAddr:  "",
-			expectedDial:  nilDialPointer,
-			expectedError: true,
-		},
-	}
-
-	for _, test := range tests {
-		expectedDialerName := runtime.FuncForPC(test.expectedDial).Name()
-		if expectedDialerName == "" {
-			expectedDialerName = "nilDial"
-		}
-		t.Run(fmt.Sprintf("Endpoint is %s, addr is %s and dialer is %s",
-			test.endpoint, test.expectedAddr, expectedDialerName),
-			func(t *testing.T) {
-				address, dialer, err := GetAddressAndDialer(test.endpoint)
-
-				dialerPointer := reflect.ValueOf(dialer).Pointer()
-				actualDialerName := runtime.FuncForPC(dialerPointer).Name()
-				if actualDialerName == "" {
-					actualDialerName = "nilDial"
-				}
-
-				assert.Equalf(t, test.expectedDial, dialerPointer,
-					"Expected dialer %s, but get %s", expectedDialerName, actualDialerName)
-
-				assert.Equal(t, test.expectedAddr, address)
-
-				if test.expectedError {
-					assert.NotNil(t, err, "Expect error during parsing %q", test.endpoint)
-				} else {
-					assert.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
-				}
-			})
-	}
-}
-
-func TestParseEndpoint(t *testing.T) {
-	tests := []struct {
-		endpoint         string
-		expectedError    bool
-		expectedProtocol string
-		expectedAddr     string
-	}{
-		{
-			endpoint:         "unix:///tmp/s1.sock",
-			expectedProtocol: "unix",
-			expectedError:    true,
-		},
-		{
-			endpoint:         "tcp://localhost:15880",
-			expectedProtocol: "tcp",
-			expectedAddr:     "localhost:15880",
-		},
-		{
-			endpoint:         "npipe://./pipe/mypipe",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe",
-		},
-		{
-			endpoint:         "npipe:////./pipe/mypipe2",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe2",
-		},
-		{
-			endpoint:         "npipe:/pipe/mypipe3",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe3",
-		},
-		{
-			endpoint:         "npipe:\\\\.\\pipe\\mypipe4",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe4",
-		},
-		{
-			endpoint:         "npipe:\\pipe\\mypipe5",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe5",
-		},
-		{
-			endpoint:         "tcp1://abc",
-			expectedProtocol: "tcp1",
-			expectedError:    true,
-		},
-		{
-			endpoint:      "a b c",
-			expectedError: true,
-		},
-	}
-
-	for _, test := range tests {
-		protocol, addr, err := parseEndpoint(test.endpoint)
-		assert.Equal(t, test.expectedProtocol, protocol)
-		if test.expectedError {
-			assert.NotNil(t, err, "Expect error during parsing %q", test.endpoint)
-			continue
-		}
-		require.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
-		assert.Equal(t, test.expectedAddr, addr)
-	}
-
-}
 
 func TestNormalizePath(t *testing.T) {
 	tests := []struct {
@@ -241,6 +98,10 @@ func TestLocalEndpoint(t *testing.T) {
 	}
 }
 
+func npipeDial(ctx context.Context, addr string) (net.Conn, error) {
+	return winio.DialPipeContext(ctx, addr)
+}
+
 func TestLocalEndpointRoundTrip(t *testing.T) {
 	npipeDialPointer := reflect.ValueOf(npipeDial).Pointer()
 	expectedDialerName := runtime.FuncForPC(npipeDialPointer).Name()
@@ -249,7 +110,7 @@ func TestLocalEndpointRoundTrip(t *testing.T) {
 	fullPath, err := LocalEndpoint(`pod-resources`, "kubelet")
 	require.NoErrorf(t, err, "Failed to create the local endpoint path")
 
-	address, dialer, err := GetAddressAndDialer(fullPath)
+	address, dialer, err := util.GetAddressAndDialer(fullPath)
 	require.NoErrorf(t, err, "Failed to parse the endpoint path and get back address and dialer (path=%q)", fullPath)
 
 	dialerPointer := reflect.ValueOf(dialer).Pointer()

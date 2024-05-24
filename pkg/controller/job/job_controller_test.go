@@ -5214,22 +5214,22 @@ func TestAddPod(t *testing.T) {
 	jm.addPod(logger, pod1)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done := jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(job1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
 	jm.addPod(logger, pod2)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done = jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(job2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -5290,11 +5290,11 @@ func TestUpdatePod(t *testing.T) {
 	jm.updatePod(logger, &prev, pod1)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done := jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(job1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
@@ -5303,11 +5303,11 @@ func TestUpdatePod(t *testing.T) {
 	jm.updatePod(logger, &prev, pod2)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done = jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(job2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -5420,22 +5420,22 @@ func TestDeletePod(t *testing.T) {
 	jm.deletePod(logger, pod1, true)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done := jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod1.Name)
 	}
 	expectedKey, _ := controller.KeyFunc(job1)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 
 	jm.deletePod(logger, pod2, true)
 	verifyEmptyQueueAndAwaitForQueueLen(ctx, t, jm, 1)
 	key, done = jm.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Fatalf("failed to enqueue controller for pod %v", pod2.Name)
 	}
 	expectedKey, _ = controller.KeyFunc(job2)
-	if got, want := key.(string), expectedKey; got != want {
+	if got, want := key, expectedKey; got != want {
 		t.Errorf("queue.Get() = %v, want %v", got, want)
 	}
 }
@@ -5684,6 +5684,184 @@ func TestWatchOrphanPods(t *testing.T) {
 	}
 }
 
+func TestSyncOrphanPod(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	clientset := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	if err != nil {
+		t.Fatalf("Error creating Job controller: %v", err)
+	}
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	podInformer := sharedInformers.Core().V1().Pods().Informer()
+	go podInformer.Run(stopCh)
+	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
+	go manager.Run(ctx, 1)
+
+	cases := map[string]struct {
+		owner                *metav1.OwnerReference
+		job                  *batch.Job
+		inCache              bool
+		wantFinalizerRemoved bool
+	}{
+		"controlled_by_existing_running_job": {
+			owner: &metav1.OwnerReference{
+				APIVersion:         "batch/v1",
+				Kind:               "Job",
+				Name:               "j",
+				UID:                "111",
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			},
+			job: func() *batch.Job {
+				j := newJob(2, 2, 6, batch.NonIndexedCompletion)
+				j.UID = "111"
+				j.Name = "j"
+				return j
+			}(),
+			inCache:              true,
+			wantFinalizerRemoved: false,
+		},
+		"controlled_by_existing_finished_job": {
+			owner: &metav1.OwnerReference{
+				APIVersion:         "batch/v1",
+				Kind:               "Job",
+				Name:               "j",
+				UID:                "111",
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			},
+			job: func() *batch.Job {
+				j := newJob(2, 2, 6, batch.NonIndexedCompletion)
+				j.UID = "111"
+				j.Name = "j"
+				j.Status.Conditions = append(j.Status.Conditions, batch.JobCondition{
+					Type:   batch.JobComplete,
+					Status: v1.ConditionTrue,
+				})
+				return j
+			}(),
+			inCache:              true,
+			wantFinalizerRemoved: true,
+		},
+		"controlled_by_non_existing_job": {
+			owner: &metav1.OwnerReference{
+				APIVersion:         "batch/v1",
+				Kind:               "Job",
+				Name:               "j",
+				UID:                "111",
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			},
+			wantFinalizerRemoved: true,
+		},
+		"controlled_by_cronjob": {
+			owner: &metav1.OwnerReference{
+				APIVersion:         "batch/v1",
+				Kind:               "CronJob",
+				Name:               "cj",
+				UID:                "111",
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			},
+			wantFinalizerRemoved: false,
+		},
+		"not_controlled": {
+			wantFinalizerRemoved: true,
+		},
+		"controlled_by_custom_crd": {
+			owner: &metav1.OwnerReference{
+				APIVersion:         "example/v1",
+				Kind:               "Job",
+				Name:               "job",
+				UID:                "111",
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
+			},
+			wantFinalizerRemoved: false,
+		},
+		"owned_by_existing_running_job": {
+			owner: &metav1.OwnerReference{
+				APIVersion: "batch/v1",
+				Kind:       "Job",
+				Name:       "j",
+				UID:        "111",
+			},
+			job: func() *batch.Job {
+				j := newJob(2, 2, 6, batch.NonIndexedCompletion)
+				j.UID = "111"
+				j.Name = "j"
+				return j
+			}(),
+			inCache:              true,
+			wantFinalizerRemoved: true,
+		},
+		"owned_by_custom_crd": {
+			owner: &metav1.OwnerReference{
+				APIVersion: "example/v1",
+				Kind:       "Job",
+				Name:       "job",
+				UID:        "111",
+			},
+			wantFinalizerRemoved: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if tc.inCache {
+				if err := sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job); err != nil {
+					t.Fatalf("Failed to insert job in index: %v", err)
+				}
+				t.Cleanup(func() {
+					if err := sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Delete(tc.job); err != nil {
+						t.Fatalf("Failed to delete job from index: %v", err)
+					}
+				})
+			}
+
+			podBuilder := buildPod().name(name).deletionTimestamp().trackingFinalizer()
+			if tc.owner != nil {
+				podBuilder = podBuilder.owner(*tc.owner)
+			}
+			orphanPod := podBuilder.Pod
+			orphanPod, err := clientset.CoreV1().Pods("default").Create(ctx, orphanPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Creating orphan pod: %v", err)
+			}
+			err = manager.syncOrphanPod(ctx, cache.MetaObjectToName(orphanPod).String())
+			if err != nil {
+				t.Fatalf("Failed sync orphan pod: %v", err)
+			}
+			if tc.wantFinalizerRemoved {
+				if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+					p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(ctx, orphanPod.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					return !hasJobTrackingFinalizer(p), nil
+				}); err != nil {
+					t.Errorf("Waiting for the Job's finalizer to be removed: %v", err)
+				}
+			} else {
+				// we sleep a little bit to give potential time for the client's
+				// cache to update after the finalizer removal.
+				time.Sleep(time.Millisecond)
+				orphanPod, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(ctx, orphanPod.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to the latest pod: %v", err)
+				}
+				if !hasJobTrackingFinalizer(orphanPod) {
+					t.Errorf("Unexpected removal of the Job's finalizer")
+				}
+			}
+		})
+	}
+}
+
 func bumpResourceVersion(obj metav1.Object) {
 	ver, _ := strconv.ParseInt(obj.GetResourceVersion(), 10, 32)
 	obj.SetResourceVersion(strconv.FormatInt(ver+1, 10))
@@ -5725,23 +5903,23 @@ func TestJobApiBackoffReset(t *testing.T) {
 	verifyEmptyQueue(ctx, t, manager)
 }
 
-var _ workqueue.RateLimitingInterface = &fakeRateLimitingQueue{}
+var _ workqueue.TypedRateLimitingInterface[string] = &fakeRateLimitingQueue{}
 
 type fakeRateLimitingQueue struct {
-	workqueue.Interface
+	workqueue.TypedInterface[string]
 	requeues int
-	item     interface{}
+	item     string
 	duration time.Duration
 }
 
-func (f *fakeRateLimitingQueue) AddRateLimited(item interface{}) {}
-func (f *fakeRateLimitingQueue) Forget(item interface{}) {
+func (f *fakeRateLimitingQueue) AddRateLimited(item string) {}
+func (f *fakeRateLimitingQueue) Forget(item string) {
 	f.requeues = 0
 }
-func (f *fakeRateLimitingQueue) NumRequeues(item interface{}) int {
+func (f *fakeRateLimitingQueue) NumRequeues(item string) int {
 	return f.requeues
 }
-func (f *fakeRateLimitingQueue) AddAfter(item interface{}, duration time.Duration) {
+func (f *fakeRateLimitingQueue) AddAfter(item string, duration time.Duration) {
 	f.item = item
 	f.duration = duration
 }
@@ -6395,6 +6573,11 @@ func (pb podBuilder) job(j *batch.Job) podBuilder {
 	pb.Labels = j.Spec.Selector.MatchLabels
 	pb.Namespace = j.Namespace
 	pb.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(j, controllerKind)}
+	return pb
+}
+
+func (pb podBuilder) owner(ownerRef metav1.OwnerReference) podBuilder {
+	pb.OwnerReferences = append(pb.OwnerReferences, ownerRef)
 	return pb
 }
 

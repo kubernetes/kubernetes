@@ -706,59 +706,6 @@ func TestNextScheduleTimeDuration(t *testing.T) {
 	}
 }
 
-func TestIsJobSucceeded(t *testing.T) {
-	tests := map[string]struct {
-		job        batchv1.Job
-		wantResult bool
-	}{
-		"job doesn't have any conditions": {
-			wantResult: false,
-		},
-		"job has Complete=True condition": {
-			job: batchv1.Job{
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobSuspended,
-							Status: v1.ConditionFalse,
-						},
-						{
-							Type:   batchv1.JobComplete,
-							Status: v1.ConditionTrue,
-						},
-					},
-				},
-			},
-			wantResult: true,
-		},
-		"job has Complete=False condition": {
-			job: batchv1.Job{
-				Status: batchv1.JobStatus{
-					Conditions: []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobFailed,
-							Status: v1.ConditionTrue,
-						},
-						{
-							Type:   batchv1.JobComplete,
-							Status: v1.ConditionFalse,
-						},
-					},
-				},
-			},
-			wantResult: false,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			gotResult := IsJobSucceeded(&tc.job)
-			if tc.wantResult != gotResult {
-				t.Errorf("unexpected result, want=%v, got=%v", tc.wantResult, gotResult)
-			}
-		})
-	}
-}
-
 func topOfTheHour() *time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
 	if err != nil {

@@ -99,12 +99,17 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		// such as an update to a Service or Deployment. A more significant
 		// rate limit back off here helps ensure that the Controller does not
 		// overwhelm the API Server.
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
-			workqueue.NewItemExponentialFailureRateLimiter(defaultSyncBackOff, maxSyncBackOff),
-			// 10 qps, 100 bucket size. This is only for retry speed and its
-			// only the overall factor (not per item).
-			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
-		), "endpoint_slice"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[string](defaultSyncBackOff, maxSyncBackOff),
+				// 10 qps, 100 bucket size. This is only for retry speed and its
+				// only the overall factor (not per item).
+				&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+			),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "endpoint_slice",
+			},
+		),
 		workerLoopPeriod: time.Second,
 	}
 
@@ -231,7 +236,7 @@ type Controller struct {
 	// more often than services with few pods; it also would cause a
 	// service that's inserted multiple times to be processed more than
 	// necessary.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// maxEndpointsPerSlice references the maximum number of endpoints that
 	// should be added to an EndpointSlice
@@ -293,13 +298,13 @@ func (c *Controller) processNextWorkItem(logger klog.Logger) bool {
 	}
 	defer c.queue.Done(cKey)
 
-	err := c.syncService(logger, cKey.(string))
+	err := c.syncService(logger, cKey)
 	c.handleErr(logger, err, cKey)
 
 	return true
 }
 
-func (c *Controller) handleErr(logger klog.Logger, err error, key interface{}) {
+func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 	trackSync(err)
 
 	if err == nil {

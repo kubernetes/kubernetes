@@ -57,10 +57,12 @@ type OptionalVariableDeclarations struct {
 	// HasParams specifies if the "params" variable is declared.
 	// The "params" variable may still be bound to "null" when declared.
 	HasParams bool
-	// HasAuthorizer specifies if the"authorizer" and "authorizer.requestResource"
+	// HasAuthorizer specifies if the "authorizer" and "authorizer.requestResource"
 	// variables are declared. When declared, the authorizer variables are
 	// expected to be non-null.
 	HasAuthorizer bool
+	// StrictCost specifies if the CEL cost limitation is strict for extended libraries as well as native libraries.
+	StrictCost bool
 }
 
 // FilterCompiler contains a function to assist with converting types and values to/from CEL-typed values.

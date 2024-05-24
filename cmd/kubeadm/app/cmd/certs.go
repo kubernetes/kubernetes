@@ -516,7 +516,7 @@ func (p *certTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 		s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
 			cert.Name,
 			cert.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-			duration.ShortHumanDuration(time.Duration(cert.ResidualTimeSeconds)*time.Second),
+			duration.HumanDuration(time.Duration(cert.ResidualTimeSeconds)*time.Second),
 			cert.CAName,
 			yesNo(cert.ExternallyManaged),
 		)
@@ -535,7 +535,7 @@ func (p *certTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 		s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
 			ca.Name,
 			ca.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
-			duration.ShortHumanDuration(time.Duration(ca.ResidualTimeSeconds)*time.Second),
+			duration.HumanDuration(time.Duration(ca.ResidualTimeSeconds)*time.Second),
 			yesNo(ca.ExternallyManaged),
 		)
 		fmt.Fprintln(tabw, s)

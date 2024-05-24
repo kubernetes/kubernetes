@@ -297,10 +297,8 @@ func TestStatefulSetControllerAddPod(t *testing.T) {
 
 	ssc.addPod(logger, pod1)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -308,10 +306,8 @@ func TestStatefulSetControllerAddPod(t *testing.T) {
 
 	ssc.addPod(logger, pod2)
 	key, done = ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -348,7 +344,7 @@ func TestStatefulSetControllerAddPodNoSet(t *testing.T) {
 	ssc.addPod(logger, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
-	if key != nil {
+	if key != "" {
 		t.Errorf("StatefulSet enqueued key for Pod with no Set %s", key)
 	}
 }
@@ -368,10 +364,8 @@ func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	fakeResourceVersion(pod1)
 	ssc.updatePod(logger, &prev, pod1)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -380,10 +374,8 @@ func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	fakeResourceVersion(pod2)
 	ssc.updatePod(logger, &prev, pod2)
 	key, done = ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -399,7 +391,7 @@ func TestStatefulSetControllerUpdatePodWithNoSet(t *testing.T) {
 	ssc.updatePod(logger, &prev, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
-	if key != nil {
+	if key != "" {
 		t.Errorf("StatefulSet enqueued key for Pod with no Set %s", key)
 	}
 }
@@ -413,7 +405,7 @@ func TestStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
 	ssc.updatePod(logger, pod, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
-	if key != nil {
+	if key != "" {
 		t.Errorf("StatefulSet enqueued key for Pod with no Set %s", key)
 	}
 }
@@ -487,20 +479,16 @@ func TestStatefulSetControllerDeletePod(t *testing.T) {
 
 	ssc.deletePod(logger, pod1)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
 
 	ssc.deletePod(logger, pod2)
 	key, done = ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -533,10 +521,8 @@ func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 	tombstone := cache.DeletedFinalStateUnknown{Key: tombstoneKey, Obj: pod}
 	ssc.deletePod(logger, tombstone)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -952,7 +938,7 @@ func newFakeStatefulSetController(ctx context.Context, initialObjects ...runtime
 
 func fakeWorker(ssc *StatefulSetController) {
 	if obj, done := ssc.queue.Get(); !done {
-		ssc.sync(context.TODO(), obj.(string))
+		_ = ssc.sync(context.TODO(), obj)
 		ssc.queue.Done(obj)
 	}
 }

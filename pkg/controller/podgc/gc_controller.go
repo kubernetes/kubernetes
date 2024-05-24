@@ -61,7 +61,7 @@ type PodGCController struct {
 	nodeLister       corelisters.NodeLister
 	nodeListerSynced cache.InformerSynced
 
-	nodeQueue workqueue.DelayingInterface
+	nodeQueue workqueue.TypedDelayingInterface[string]
 
 	terminatedPodThreshold int
 	gcCheckPeriod          time.Duration
@@ -83,7 +83,7 @@ func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podIn
 		podListerSynced:        podInformer.Informer().HasSynced,
 		nodeLister:             nodeInformer.Lister(),
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
-		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
+		nodeQueue:              workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{Name: "orphaned_pods_nodes"}),
 		gcCheckPeriod:          gcCheckPeriod,
 		quarantineTime:         quarantineTime,
 	}
@@ -270,7 +270,7 @@ func (gcc *PodGCController) discoverDeletedNodes(ctx context.Context, existingNo
 		if quit {
 			return nil, true
 		}
-		nodeName := item.(string)
+		nodeName := item
 		if !existingNodeNames.Has(nodeName) {
 			exists, err := gcc.checkIfNodeExists(ctx, nodeName)
 			switch {

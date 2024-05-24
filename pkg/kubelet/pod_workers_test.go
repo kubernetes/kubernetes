@@ -2382,3 +2382,63 @@ func Test_allowPodStart(t *testing.T) {
 		})
 	}
 }
+
+func Test_calculateEffectiveGracePeriod(t *testing.T) {
+	zero := int64(0)
+	two := int64(2)
+	five := int64(5)
+	thirty := int64(30)
+	testCases := []struct {
+		desc                                 string
+		podSpecTerminationGracePeriodSeconds *int64
+		podDeletionGracePeriodSeconds        *int64
+		gracePeriodOverride                  *int64
+		expectedGracePeriod                  int64
+	}{
+		{
+			desc:                                 "use termination grace period from the spec when no overrides",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			expectedGracePeriod:                  thirty,
+		},
+		{
+			desc:                                 "use pod DeletionGracePeriodSeconds when set",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &five,
+			expectedGracePeriod:                  five,
+		},
+		{
+			desc:                                 "use grace period override when set",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &five,
+			gracePeriodOverride:                  &two,
+			expectedGracePeriod:                  two,
+		},
+		{
+			desc:                                 "use 1 when pod DeletionGracePeriodSeconds is zero",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &zero,
+			expectedGracePeriod:                  1,
+		},
+		{
+			desc:                                 "use 1 when grace period override is zero",
+			podSpecTerminationGracePeriodSeconds: &thirty,
+			podDeletionGracePeriodSeconds:        &five,
+			gracePeriodOverride:                  &zero,
+			expectedGracePeriod:                  1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			pod := newNamedPod("1", "ns", "running-pod", false)
+			pod.Spec.TerminationGracePeriodSeconds = tc.podSpecTerminationGracePeriodSeconds
+			pod.DeletionGracePeriodSeconds = tc.podDeletionGracePeriodSeconds
+			gracePeriod, _ := calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{
+				PodTerminationGracePeriodSecondsOverride: tc.gracePeriodOverride,
+			})
+			if gracePeriod != tc.expectedGracePeriod {
+				t.Errorf("Expected a grace period of %v, but was %v", tc.expectedGracePeriod, gracePeriod)
+			}
+		})
+	}
+}

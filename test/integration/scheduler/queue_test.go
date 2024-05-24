@@ -57,11 +57,11 @@ import (
 
 func TestSchedulingGates(t *testing.T) {
 	tests := []struct {
-		name                  string
-		pods                  []*v1.Pod
-		want                  []string
-		rmPodsSchedulingGates []int
-		wantPostGatesRemoval  []string
+		name     string
+		pods     []*v1.Pod
+		schedule []string
+		delete   []string
+		rmGates  []string
 	}{
 		{
 			name: "regular pods",
@@ -69,7 +69,7 @@ func TestSchedulingGates(t *testing.T) {
 				st.MakePod().Name("p1").Container("pause").Obj(),
 				st.MakePod().Name("p2").Container("pause").Obj(),
 			},
-			want: []string{"p1", "p2"},
+			schedule: []string{"p1", "p2"},
 		},
 		{
 			name: "one pod carrying scheduling gates",
@@ -77,7 +77,7 @@ func TestSchedulingGates(t *testing.T) {
 				st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).Container("pause").Obj(),
 				st.MakePod().Name("p2").Container("pause").Obj(),
 			},
-			want: []string{"p2"},
+			schedule: []string{"p2"},
 		},
 		{
 			name: "two pod carrying scheduling gates, and remove gates of one pod",
@@ -86,9 +86,18 @@ func TestSchedulingGates(t *testing.T) {
 				st.MakePod().Name("p2").SchedulingGates([]string{"bar"}).Container("pause").Obj(),
 				st.MakePod().Name("p3").Container("pause").Obj(),
 			},
-			want:                  []string{"p3"},
-			rmPodsSchedulingGates: []int{1}, // remove gates of 'p2'
-			wantPostGatesRemoval:  []string{"p2"},
+			schedule: []string{"p3"},
+			rmGates:  []string{"p2"},
+		},
+		{
+			name: "gated pod schedulable after deleting the scheduled pod and removing gate",
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).Container("pause").Obj(),
+				st.MakePod().Name("p2").Container("pause").Obj(),
+			},
+			schedule: []string{"p2"},
+			delete:   []string{"p2"},
+			rmGates:  []string{"p1"},
 		},
 	}
 
@@ -107,6 +116,15 @@ func TestSchedulingGates(t *testing.T) {
 			testutils.SyncSchedulerInformerFactory(testCtx)
 
 			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+
+			// Create node, so we can schedule pods.
+			node := st.MakeNode().Name("node").Obj()
+			if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatal("Failed to create node")
+
+			}
+
+			// Create pods.
 			for _, p := range tt.pods {
 				p.Namespace = ns
 				if _, err := cs.CoreV1().Pods(ns).Create(ctx, p, metav1.CreateOptions{}); err != nil {
@@ -122,30 +140,42 @@ func TestSchedulingGates(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Pop the expected pods out. They should be de-queueable.
-			for _, wantPod := range tt.want {
-				podInfo := testutils.NextPodOrDie(t, testCtx)
-				if got := podInfo.Pod.Name; got != wantPod {
-					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
+			// Schedule pods.
+			for _, podName := range tt.schedule {
+				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, podName)); err != nil {
+					t.Fatalf("Failed to schedule %s", podName)
 				}
 			}
 
-			if len(tt.rmPodsSchedulingGates) == 0 {
-				return
+			// Delete pods, which triggers AssignedPodDelete event in the scheduling queue.
+			for _, podName := range tt.delete {
+				if err := cs.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("Error calling Delete on %s", podName)
+				}
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodDeleted(ctx, cs, ns, podName)); err != nil {
+					t.Fatalf("Failed to delete %s", podName)
+				}
 			}
+
+			// Ensure gated pods are not in ActiveQ
+			if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) > 0 {
+				t.Fatal("Expected no schedulable pods")
+			}
+
 			// Remove scheduling gates from the pod spec.
-			for _, idx := range tt.rmPodsSchedulingGates {
+			for _, podName := range tt.rmGates {
 				patch := `{"spec": {"schedulingGates": null}}`
-				podName := tt.pods[idx].Name
 				if _, err := cs.CoreV1().Pods(ns).Patch(ctx, podName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("Failed to patch pod %v: %v", podName, err)
 				}
 			}
-			// Pop the expected pods out. They should be de-queueable.
-			for _, wantPod := range tt.wantPostGatesRemoval {
-				podInfo := testutils.NextPodOrDie(t, testCtx)
-				if got := podInfo.Pod.Name; got != wantPod {
-					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
+
+			// Schedule pods which no longer have gates.
+			for _, podName := range tt.rmGates {
+				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, podName)); err != nil {
+					t.Fatalf("Failed to schedule %s", podName)
 				}
 			}
 		})

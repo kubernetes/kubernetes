@@ -34,6 +34,203 @@ var testNode = &corev1.Node{
 	},
 }
 
+func TestLegacyProfile(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+		Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+			{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name: "dbg", Image: "dbgimage",
+				},
+			},
+		}},
+	}
+
+	tests := map[string]struct {
+		pod           *corev1.Pod
+		containerName string
+		target        runtime.Object
+		expectPod     *corev1.Pod
+		expectErr     bool
+	}{
+		"bad inputs results in error": {
+			pod:           nil,
+			containerName: "dbg",
+			target:        runtime.Object(nil),
+			expectErr:     true,
+		},
+		"debug by ephemeral container": {
+			pod:           pod,
+			containerName: "dbg",
+			target:        pod,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+					{
+						EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "dbg", Image: "dbgimage"},
+					},
+				}},
+			},
+		},
+		"debug by pod copy": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
+					Containers: []corev1.Container{
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"NET_ADMIN"},
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
+					Containers: []corev1.Container{
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
+					},
+				},
+			},
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
+					Containers: []corev1.Container{
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"NET_ADMIN"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"debug by node": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"NET_ADMIN"},
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        testNode,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					HostPID:     true,
+					HostIPC:     true,
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"NET_ADMIN"},
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			applier := &legacyProfile{KeepFlags{InitContainers: true}}
+			err := applier.Apply(test.pod, test.containerName, test.target)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
+			}
+			if err != nil {
+				return
+			}
+			if diff := cmp.Diff(test.expectPod, test.pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}
+
 func TestGeneralProfile(t *testing.T) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -81,10 +278,25 @@ func TestGeneralProfile(t *testing.T) {
 		},
 		"debug by pod copy": {
 			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 						{
 							Name:  "dbg",
 							Image: "dbgimage",
@@ -99,16 +311,32 @@ func TestGeneralProfile(t *testing.T) {
 			},
 			containerName: "dbg",
 			target: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 					},
 				},
 			},
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -169,7 +397,8 @@ func TestGeneralProfile(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := (&generalProfile{}).Apply(test.pod, test.containerName, test.target)
+			applier := &generalProfile{KeepFlags{InitContainers: true}}
+			err := applier.Apply(test.pod, test.containerName, test.target)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
 			}
@@ -230,20 +459,50 @@ func TestBaselineProfile(t *testing.T) {
 		},
 		"debug by pod copy": {
 			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 						{Name: "dbg", Image: "dbgimage"},
 					},
 				},
 			},
 			containerName: "dbg",
 			target: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 					},
 				},
 			},
@@ -251,6 +510,7 @@ func TestBaselineProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
 					ShareProcessNamespace: pointer.Bool(true),
+					InitContainers:        []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -288,7 +548,8 @@ func TestBaselineProfile(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := (&baselineProfile{}).Apply(test.pod, test.containerName, test.target)
+			applier := &baselineProfile{KeepFlags{InitContainers: true}}
+			err := applier.Apply(test.pod, test.containerName, test.target)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
 			}
@@ -357,20 +618,50 @@ func TestRestrictedProfile(t *testing.T) {
 		},
 		"debug by pod copy": {
 			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 						{Name: "dbg", Image: "dbgimage"},
 					},
 				},
 			},
 			containerName: "dbg",
 			target: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 					},
 				},
 			},
@@ -378,6 +669,7 @@ func TestRestrictedProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
 					ShareProcessNamespace: pointer.Bool(true),
+					InitContainers:        []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -441,7 +733,8 @@ func TestRestrictedProfile(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := (&restrictedProfile{}).Apply(test.pod, test.containerName, test.target)
+			applier := &restrictedProfile{KeepFlags{InitContainers: true}}
+			err := applier.Apply(test.pod, test.containerName, test.target)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
 			}
@@ -506,20 +799,50 @@ func TestNetAdminProfile(t *testing.T) {
 		{
 			name: "debug by pod copy",
 			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 						{Name: "dbg", Image: "dbgimage"},
 					},
 				},
 			},
 			containerName: "dbg",
 			target: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 					},
 				},
 			},
@@ -527,6 +850,7 @@ func TestNetAdminProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
 					ShareProcessNamespace: pointer.Bool(true),
+					InitContainers:        []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -548,7 +872,13 @@ func TestNetAdminProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 						{
 							Name:  "dbg",
 							Image: "dbgimage",
@@ -566,7 +896,13 @@ func TestNetAdminProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 					},
 				},
 			},
@@ -665,7 +1001,8 @@ func TestNetAdminProfile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := (&netadminProfile{}).Apply(test.pod, test.containerName, test.target)
+			applier := &netadminProfile{KeepFlags{InitContainers: true}}
+			err := applier.Apply(test.pod, test.containerName, test.target)
 			if (err == nil) != (test.expectErr == nil) || (err != nil && test.expectErr != nil && err.Error() != test.expectErr.Error()) {
 				t.Fatalf("expect error: %v, got error: %v", test.expectErr, err)
 			}
@@ -728,26 +1065,57 @@ func TestSysAdminProfile(t *testing.T) {
 		{
 			name: "debug by pod copy",
 			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 						{Name: "dbg", Image: "dbgimage"},
 					},
 				},
 			},
 			containerName: "dbg",
 			target: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "podcopy",
+					Labels: map[string]string{
+						"app": "podcopy",
+					},
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 					},
 				},
 			},
 			expectPod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init-container"}},
 					Containers: []corev1.Container{
 						{Name: "app", Image: "appimage"},
 						{
@@ -768,7 +1136,13 @@ func TestSysAdminProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 						{
 							Name:  "dbg",
 							Image: "dbgimage",
@@ -786,7 +1160,13 @@ func TestSysAdminProfile(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: "app", Image: "appimage"},
+						{
+							Name:           "app",
+							Image:          "appimage",
+							LivenessProbe:  &corev1.Probe{},
+							ReadinessProbe: &corev1.Probe{},
+							StartupProbe:   &corev1.Probe{},
+						},
 					},
 				},
 			},
@@ -899,7 +1279,8 @@ func TestSysAdminProfile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := (&sysadminProfile{}).Apply(test.pod, test.containerName, test.target)
+			applier := &sysadminProfile{KeepFlags{InitContainers: true}}
+			err := applier.Apply(test.pod, test.containerName, test.target)
 			if (err == nil) != (test.expectErr == nil) || (err != nil && test.expectErr != nil && err.Error() != test.expectErr.Error()) {
 				t.Fatalf("expect error: %v, got error: %v", test.expectErr, err)
 			}

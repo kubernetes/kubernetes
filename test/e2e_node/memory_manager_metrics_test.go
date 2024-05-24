@@ -36,7 +36,7 @@ import (
 
 var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.MemoryManager, func() {
 	f := framework.NewDefaultFramework("memorymanager-metrics")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("when querying /metrics", func() {
 		var testPod *v1.Pod

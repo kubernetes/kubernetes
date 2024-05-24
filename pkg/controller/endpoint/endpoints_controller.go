@@ -76,8 +76,13 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
 
 	e := &Controller{
-		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
+		client: client,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "endpoint",
+			},
+		),
 		workerLoopPeriod: time.Second,
 	}
 
@@ -146,7 +151,7 @@ type Controller struct {
 	// more often than services with few pods; it also would cause a
 	// service that's inserted multiple times to be processed more than
 	// necessary.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
@@ -324,19 +329,19 @@ func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer e.queue.Done(eKey)
 
 	logger := klog.FromContext(ctx)
-	err := e.syncService(ctx, eKey.(string))
+	err := e.syncService(ctx, eKey)
 	e.handleErr(logger, err, eKey)
 
 	return true
 }
 
-func (e *Controller) handleErr(logger klog.Logger, err error, key interface{}) {
+func (e *Controller) handleErr(logger klog.Logger, err error, key string) {
 	if err == nil {
 		e.queue.Forget(key)
 		return
 	}
 
-	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
+	ns, name, keyErr := cache.SplitMetaNamespaceKey(key)
 	if keyErr != nil {
 		logger.Error(err, "Failed to split meta namespace cache key", "key", key)
 	}

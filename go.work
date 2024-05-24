@@ -28,7 +28,6 @@ use (
 	./staging/src/k8s.io/kube-scheduler
 	./staging/src/k8s.io/kubectl
 	./staging/src/k8s.io/kubelet
-	./staging/src/k8s.io/legacy-cloud-providers
 	./staging/src/k8s.io/metrics
 	./staging/src/k8s.io/mount-utils
 	./staging/src/k8s.io/pod-security-admission

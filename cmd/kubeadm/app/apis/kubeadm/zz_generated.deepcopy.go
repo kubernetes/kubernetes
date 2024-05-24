@@ -133,6 +133,16 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	if in.CertificateValidityPeriod != nil {
+		in, out := &in.CertificateValidityPeriod, &out.CertificateValidityPeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.CACertificateValidityPeriod != nil {
+		in, out := &in.CACertificateValidityPeriod, &out.CACertificateValidityPeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 
@@ -757,6 +767,11 @@ func (in *UpgradeApplyConfiguration) DeepCopyInto(out *UpgradeApplyConfiguration
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ImagePullSerial != nil {
+		in, out := &in.ImagePullSerial, &out.ImagePullSerial
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -851,6 +866,11 @@ func (in *UpgradeNodeConfiguration) DeepCopyInto(out *UpgradeNodeConfiguration) 
 	if in.Patches != nil {
 		in, out := &in.Patches, &out.Patches
 		*out = new(Patches)
+		**out = **in
+	}
+	if in.ImagePullSerial != nil {
+		in, out := &in.ImagePullSerial, &out.ImagePullSerial
+		*out = new(bool)
 		**out = **in
 	}
 	return

@@ -61,6 +61,7 @@ func TestValidationExpressions(t *testing.T) {
 		costBudget    int64
 		isRoot        bool
 		expectSkipped bool
+		expectedCost  int64
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -2006,6 +2007,38 @@ func TestValidationExpressions(t *testing.T) {
 				`quantity(self.val1).isInteger()`,
 			},
 		},
+		{name: "cost for extended lib calculated correctly: isSorted",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"[1,2,3,4].isSorted()",
+			},
+			expectedCost: 4,
+		},
+		{name: "cost for extended lib calculated correctly: url",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"url('https:://kubernetes.io/').getHostname() != 'test'",
+			},
+			expectedCost: 4,
+		},
+		{name: "cost for extended lib calculated correctly: split",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"size('abc 123 def 123'.split(' ')) > 0",
+			},
+			expectedCost: 5,
+		},
+		{name: "cost for extended lib calculated correctly: join",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"size(['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join(' ')) > 0",
+			},
+			expectedCost: 7,
+		},
 	}
 
 	for i := range tests {
@@ -2013,7 +2046,9 @@ func TestValidationExpressions(t *testing.T) {
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
-			tt.costBudget = celconfig.RuntimeCELCostBudget
+			if tt.costBudget == 0 {
+				tt.costBudget = celconfig.RuntimeCELCostBudget
+			}
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -2031,6 +2066,13 @@ func TestValidationExpressions(t *testing.T) {
 					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
+					}
+
+					if tt.expectedCost != 0 {
+						if remainingBudget != tt.costBudget-tt.expectedCost {
+							t.Errorf("expected cost to be %d, but got %d", tt.expectedCost, tt.costBudget-remainingBudget)
+						}
+						return
 					}
 					if tt.expectSkipped {
 						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.

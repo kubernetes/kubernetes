@@ -376,7 +376,6 @@ func createAdClients(ctx context.Context, t *testing.T, server *kubeapiservertes
 		KubeClient:                testClient,
 		SyncPeriod:                controllerOptions.PVClaimBinderSyncPeriod,
 		VolumePlugins:             plugins,
-		ClusterName:               "volume-test-cluster",
 		VolumeInformer:            informers.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informers.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informers.Storage().V1().StorageClasses(),

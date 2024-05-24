@@ -82,7 +82,7 @@ type Signer struct {
 	// have one item (Named <ConfigMapName>) in this queue. We are using it
 	// serializes and collapses updates as they can come from both the ConfigMap
 	// and Secrets controllers.
-	syncQueue workqueue.RateLimitingInterface
+	syncQueue workqueue.TypedRateLimitingInterface[string]
 
 	secretLister corelisters.SecretLister
 	secretSynced cache.InformerSynced
@@ -103,7 +103,12 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 		secretSynced:       secrets.Informer().HasSynced,
 		configMapLister:    configMaps.Lister(),
 		configMapSynced:    configMaps.Informer().HasSynced,
-		syncQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "bootstrap_signer_queue"),
+		syncQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "bootstrap_signer_queue",
+			},
+		),
 	}
 
 	configMaps.Informer().AddEventHandlerWithResyncPeriod(

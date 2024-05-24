@@ -96,10 +96,13 @@ func TestRotateLogs(t *testing.T) {
 			MaxSize:  testMaxSize,
 			MaxFiles: testMaxFiles,
 		},
-		osInterface:      container.RealOS{},
-		clock:            testingclock.NewFakeClock(now),
-		mutex:            sync.Mutex{},
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kubelet_log_rotate_manager"),
+		osInterface: container.RealOS{},
+		clock:       testingclock.NewFakeClock(now),
+		mutex:       sync.Mutex{},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
 		maxWorkers:       10,
 		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
 	}
@@ -204,10 +207,13 @@ func TestClean(t *testing.T) {
 			MaxSize:  testMaxSize,
 			MaxFiles: testMaxFiles,
 		},
-		osInterface:      container.RealOS{},
-		clock:            testingclock.NewFakeClock(now),
-		mutex:            sync.Mutex{},
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kubelet_log_rotate_manager"),
+		osInterface: container.RealOS{},
+		clock:       testingclock.NewFakeClock(now),
+		mutex:       sync.Mutex{},
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
 		maxWorkers:       10,
 		monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
 	}
@@ -411,12 +417,15 @@ func TestRotateLatestLog(t *testing.T) {
 		now := time.Now()
 		f := critest.NewFakeRuntimeService()
 		c := &containerLogManager{
-			runtimeService:   f,
-			policy:           LogRotatePolicy{MaxFiles: test.maxFiles},
-			osInterface:      container.RealOS{},
-			clock:            testingclock.NewFakeClock(now),
-			mutex:            sync.Mutex{},
-			queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kubelet_log_rotate_manager"),
+			runtimeService: f,
+			policy:         LogRotatePolicy{MaxFiles: test.maxFiles},
+			osInterface:    container.RealOS{},
+			clock:          testingclock.NewFakeClock(now),
+			mutex:          sync.Mutex{},
+			queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[string](),
+				workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+			),
 			maxWorkers:       10,
 			monitoringPeriod: v1.Duration{Duration: 10 * time.Second},
 		}

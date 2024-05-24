@@ -25,6 +25,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -157,6 +158,24 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			ginkgo.DeferCleanup(cleanup)
 
 			var err error
+			// create Pod with pvc
+			ginkgo.By("Creating a pod with PVC")
+			podConfig := e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+				SeLinuxLabel:  e2epod.GetLinuxLabel(),
+				NodeSelection: l.config.ClientNodeSelection,
+				ImageID:       e2epod.GetDefaultTestImageID(),
+			}
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, &podConfig, f.Timeouts.PodStart)
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod)
+			framework.ExpectNoError(err, "While creating pods for expanding")
+
+			// Waiting for pod to run
+			ginkgo.By("Waiting for pod to run")
+			err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
+			framework.ExpectNoError(err)
+
 			gomega.Expect(l.resource.Sc.AllowVolumeExpansion).NotTo(gomega.BeNil())
 			allowVolumeExpansion := *l.resource.Sc.AllowVolumeExpansion
 			gomega.Expect(allowVolumeExpansion).To(gomega.BeFalse())
@@ -166,7 +185,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			_, err = ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
-			framework.ExpectError(err, "While updating non-expandable PVC")
+			gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "While updating non-expandable PVC"))
 		})
 	} else {
 		ginkgo.It("Verify if offline PVC expansion works", func(ctx context.Context) {
@@ -316,7 +335,7 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 		return true, nil
 	})
 	if wait.Interrupted(waitErr) {
-		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %v", lastUpdateError)
+		return nil, fmt.Errorf("timed out attempting to update PVC size. last update error: %w", lastUpdateError)
 	}
 	if waitErr != nil {
 		return nil, fmt.Errorf("failed to expand PVC size (check logs for error): %v", waitErr)

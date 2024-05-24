@@ -50,7 +50,7 @@ type Controller struct {
 	// To allow injection for testing.
 	syncFn func(string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	openAPIV3Service *handler3.OpenAPIService
 
@@ -62,9 +62,12 @@ type Controller struct {
 // NewController creates a new Controller with input CustomResourceDefinition informer
 func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Controller {
 	c := &Controller{
-		crdLister:        crdInformer.Lister(),
-		crdsSynced:       crdInformer.Informer().HasSynced,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_openapi_v3_controller"),
+		crdLister:  crdInformer.Lister(),
+		crdsSynced: crdInformer.Informer().HasSynced,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "crd_openapi_v3_controller"},
+		),
 		specsByGVandName: map[schema.GroupVersion]map[string]*spec3.OpenAPI{},
 	}
 
@@ -133,11 +136,11 @@ func (c *Controller) processNextWorkItem() bool {
 	defer func() {
 		elapsed := time.Since(start)
 		if elapsed > time.Second {
-			klog.Warningf("slow openapi aggregation of %q: %s", key.(string), elapsed)
+			klog.Warningf("slow openapi aggregation of %q: %s", key, elapsed)
 		}
 	}()
 
-	err := c.syncFn(key.(string))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

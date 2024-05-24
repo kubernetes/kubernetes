@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
@@ -520,14 +519,13 @@ func TestSyncHandler(t *testing.T) {
 			}
 
 			// Ensure informers are up-to-date.
-			go informerFactory.Start(ctx.Done())
+			informerFactory.Start(ctx.Done())
 			stopInformers := func() {
 				cancel()
 				informerFactory.Shutdown()
 			}
 			defer stopInformers()
 			informerFactory.WaitForCacheSync(ctx.Done())
-			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, claimInformer.Informer().HasSynced, templateInformer.Informer().HasSynced)
 
 			// Add claims that only exist in the mutation cache.
 			for _, claim := range tc.claimsInCache {

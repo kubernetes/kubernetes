@@ -129,7 +129,7 @@ func compileAndRun(env *cel.Env, activation *testActivation, exp string) (ref.Va
 func buildTestEnv() (*cel.Env, *apiservercel.DeclType, error) {
 	variablesType := apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, 0)
 	variablesType.Fields = make(map[string]*apiservercel.DeclField)
-	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
+	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(
 		environment.VersionedOptions{
 			IntroducedVersion: version.MajorMinor(1, 28),
 			EnvOptions: []cel.EnvOption{

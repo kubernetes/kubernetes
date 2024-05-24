@@ -45,7 +45,7 @@ type EstablishingController struct {
 	// To allow injection for testing.
 	syncFn func(key string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewEstablishingController creates new EstablishingController.
@@ -55,7 +55,10 @@ func NewEstablishingController(crdInformer informers.CustomResourceDefinitionInf
 		crdClient: crdClient,
 		crdLister: crdInformer.Lister(),
 		crdSynced: crdInformer.Informer().HasSynced,
-		queue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crdEstablishing"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "crdEstablishing"},
+		),
 	}
 
 	ec.syncFn = ec.sync
@@ -100,7 +103,7 @@ func (ec *EstablishingController) processNextWorkItem() bool {
 	}
 	defer ec.queue.Done(key)
 
-	err := ec.syncFn(key.(string))
+	err := ec.syncFn(key)
 	if err == nil {
 		ec.queue.Forget(key)
 		return true

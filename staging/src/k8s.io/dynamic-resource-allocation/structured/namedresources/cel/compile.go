@@ -184,7 +184,8 @@ func (c CompilationResult) Evaluate(ctx context.Context, attributes []resourceap
 }
 
 func mustBuildEnv() *environment.EnvSet {
-	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	// strictCost is always true to enforce cost limits.
+	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true)
 	versioned := []environment.VersionedOptions{
 		{
 			// Feature epoch was actually 1.30, but we artificially set it to 1.0 because these

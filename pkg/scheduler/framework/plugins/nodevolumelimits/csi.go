@@ -74,7 +74,7 @@ func (pl *CSILimits) Name() string {
 	return CSIName
 }
 
-// EventsToRegister returns the possible events that may make a Pod
+// EventsToRegister returns the possible events that may make a Pod.
 // failed by this plugin schedulable.
 func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
@@ -82,8 +82,33 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 		// because any new CSINode could make pods that were rejected by CSI volumes schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterPVCAdded},
 	}
+}
+
+func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+	}
+
+	if len(deletedPod.Spec.Volumes) == 0 {
+		return framework.QueueSkip, nil
+	}
+
+	if deletedPod.Spec.NodeName == "" {
+		return framework.QueueSkip, nil
+	}
+
+	for _, vol := range deletedPod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil || vol.Ephemeral != nil || pl.translator.IsInlineMigratable(&vol) {
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("The deleted pod does not impact the scheduling of the unscheduled pod", "deletedPod", klog.KObj(pod), "pod", klog.KObj(deletedPod))
+	return framework.QueueSkip, nil
 }
 
 func (pl *CSILimits) isSchedulableAfterPVCAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {

@@ -103,13 +103,13 @@ type GraphBuilder struct {
 	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
-	graphChanges workqueue.RateLimitingInterface
+	graphChanges workqueue.TypedRateLimitingInterface[*event]
 	// uidToNode doesn't require a lock to protect, because only the
 	// single-threaded GraphBuilder.processGraphChanges() reads/writes it.
 	uidToNode *concurrentUIDToNode
 	// GraphBuilder is the producer of attemptToDelete and attemptToOrphan, GC is the consumer.
-	attemptToDelete workqueue.RateLimitingInterface
-	attemptToOrphan workqueue.RateLimitingInterface
+	attemptToDelete workqueue.TypedRateLimitingInterface[*node]
+	attemptToOrphan workqueue.TypedRateLimitingInterface[*node]
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *ReferenceCache
@@ -145,8 +145,18 @@ func NewDependencyGraphBuilder(
 ) *GraphBuilder {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 
-	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
-	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
+	attemptToDelete := workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[*node](),
+		workqueue.TypedRateLimitingQueueConfig[*node]{
+			Name: "garbage_collector_attempt_to_delete",
+		},
+	)
+	attemptToOrphan := workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[*node](),
+		workqueue.TypedRateLimitingQueueConfig[*node]{
+			Name: "garbage_collector_attempt_to_orphan",
+		},
+	)
 	absentOwnerCache := NewReferenceCache(500)
 	graphBuilder := &GraphBuilder{
 		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"}),
@@ -154,7 +164,12 @@ func NewDependencyGraphBuilder(
 		metadataClient:   metadataClient,
 		informersStarted: informersStarted,
 		restMapper:       mapper,
-		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		graphChanges: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[*event](),
+			workqueue.TypedRateLimitingQueueConfig[*event]{
+				Name: "garbage_collector_graph_changes",
+			},
+		),
 		uidToNode: &concurrentUIDToNode{
 			uidToNode: make(map[types.UID]*node),
 		},
@@ -666,12 +681,8 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 		return false
 	}
 	defer gb.graphChanges.Done(item)
-	event, ok := item.(*event)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect a *event, got %v", item))
-		return true
-	}
-	obj := event.obj
+	event := item
+	obj := item.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
@@ -971,8 +982,8 @@ func getAlternateOwnerIdentity(deps []*node, verifiedAbsentIdentity objectRefere
 }
 
 func (gb *GraphBuilder) GetGraphResources() (
-	attemptToDelete workqueue.RateLimitingInterface,
-	attemptToOrphan workqueue.RateLimitingInterface,
+	attemptToDelete workqueue.TypedRateLimitingInterface[*node],
+	attemptToOrphan workqueue.TypedRateLimitingInterface[*node],
 	absentOwnerCache *ReferenceCache,
 ) {
 	return gb.attemptToDelete, gb.attemptToOrphan, gb.absentOwnerCache

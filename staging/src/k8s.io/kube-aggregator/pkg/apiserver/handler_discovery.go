@@ -103,7 +103,7 @@ type discoveryManager struct {
 	// It is important that the reconciler for this queue does not excessively
 	// contact the apiserver if a key was enqueued before the server was last
 	// contacted.
-	dirtyAPIServiceQueue workqueue.RateLimitingInterface
+	dirtyAPIServiceQueue workqueue.TypedRateLimitingInterface[string]
 
 	// Merged handler which stores all known groupversions
 	mergedDiscoveryHandler discoveryendpoint.ResourceManager
@@ -197,8 +197,11 @@ func NewDiscoveryManager(
 		mergedDiscoveryHandler: target,
 		apiServices:            make(map[string]groupVersionInfo),
 		cachedResults:          make(map[serviceKey]cachedResult),
-		dirtyAPIServiceQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "discovery-manager"),
-		codecs:                 codecs,
+		dirtyAPIServiceQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "discovery-manager"},
+		),
+		codecs: codecs,
 	}
 }
 
@@ -488,7 +491,7 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}, discoverySyncedCh chan<-
 				func() {
 					defer dm.dirtyAPIServiceQueue.Done(next)
 
-					if err := dm.syncAPIService(next.(string)); err != nil {
+					if err := dm.syncAPIService(next); err != nil {
 						dm.dirtyAPIServiceQueue.AddRateLimited(next)
 					} else {
 						dm.dirtyAPIServiceQueue.Forget(next)

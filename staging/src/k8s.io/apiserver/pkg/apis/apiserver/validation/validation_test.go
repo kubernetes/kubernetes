@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	compiler = authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler = authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 )
 
 func TestValidateAuthenticationConfiguration(t *testing.T) {

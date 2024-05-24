@@ -35,7 +35,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -106,7 +105,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	if err := PerformAddonsUpgrade(client, cfg, out); err != nil {
+	if err := PerformAddonsUpgrade(client, cfg, patchesDir, out); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -114,29 +113,14 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 }
 
 // PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
-// When UpgradeAddonsBeforeControlPlane feature gate is enabled, the addons will be upgraded immediately.
-// When UpgradeAddonsBeforeControlPlane feature gate is disabled, the addons will only get updated after all the control plane instances have been upgraded.
-func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) error {
+func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, out io.Writer) error {
 	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
 	if err != nil {
-		err = errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
-		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
-			return err
-		}
-
-		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
-		klog.V(1).Info(err)
+		return errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
 	}
 	if len(unupgradedControlPlanes) > 0 {
-		if !features.Enabled(cfg.FeatureGates, features.UpgradeAddonsBeforeControlPlane) {
-			fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
-			return nil
-		}
-
-		// when UpgradeAddonsBeforeControlPlane feature gate is enabled, just throw a warning
-		klog.V(1).Infof("upgrading addons when control plane instances %v have not been upgraded "+
-			"may lead to incompatibility problems. You can disable the UpgradeAddonsBeforeControlPlane feature gate to "+
-			"ensure that the addons upgrade is executed only when all the control plane instances have been upgraded.", unupgradedControlPlanes)
+		fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
+		return nil
 	}
 
 	var errs []error
@@ -163,7 +147,7 @@ func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfig
 			metav1.NamespaceSystem)
 	} else {
 		// Upgrade CoreDNS
-		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, out, false); err != nil {
+		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, false); err != nil {
 			errs = append(errs, err)
 		}
 	}

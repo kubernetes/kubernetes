@@ -51,14 +51,17 @@ type Controller struct {
 	podListerSynced cache.InformerSynced
 	podIndexer      cache.Indexer
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
 func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
 	e := &Controller{
 		client: cl,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcprotection"},
+		),
 	}
 
 	e.pvcLister = pvcInformer.Lister()
@@ -126,7 +129,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer c.queue.Done(pvcKey)
 
-	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey.(string))
+	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %v", pvcKey, err))
 		return true

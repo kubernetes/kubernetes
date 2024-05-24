@@ -106,7 +106,7 @@ func buildTestEnv() (*cel.Env, error) {
 	fooType := common.SchemaDeclType(simpleMapSchema("foo", spec.StringProperty()), true).MaybeAssignTypeName("fooType")
 	barType := common.SchemaDeclType(simpleMapSchema("bar", spec.Int64Property()), true).MaybeAssignTypeName("barType")
 
-	env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).Extend(
+	env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).Extend(
 		environment.VersionedOptions{
 			IntroducedVersion: version.MajorMinor(1, 26),
 			EnvOptions: []cel.EnvOption{

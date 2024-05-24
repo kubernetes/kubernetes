@@ -68,10 +68,6 @@ func (n *noopExpandableVolumePluginInstance) SupportsMountOption() bool {
 	return true
 }
 
-func (n *noopExpandableVolumePluginInstance) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (n *noopExpandableVolumePluginInstance) RequiresFSResize() bool {
 	return true
 }

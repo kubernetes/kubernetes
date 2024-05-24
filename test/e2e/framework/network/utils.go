@@ -46,6 +46,7 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
@@ -327,7 +328,41 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 		}
 		if responses.Difference(expectedResponses).Len() > 0 {
 			returnMsg := fmt.Errorf("received unexpected responses... \nAttempt %d\nCommand %v\nretrieved %v\nexpected %v", i, cmd, responses, expectedResponses)
+			// TODO(aojea) Remove once issues.k8s.io/123760 is solved
+			// Dump the nodes network routes and addresses for troubleshooting #123760
 			framework.Logf("encountered error during dial (%v)", returnMsg)
+			hostExec := storageutils.NewHostExec(config.f)
+			ginkgo.DeferCleanup(hostExec.Cleanup)
+			cmd := `echo "IP routes: " && ip route && echo "IP addresses:" && ip addr && echo "Open sockets: " && ss -anp --socket=tcp`
+			for _, node := range config.Nodes {
+				result, err := hostExec.IssueCommandWithResult(ctx, cmd, &node)
+				if err != nil {
+					framework.Logf("error occurred while executing command %s on node: %v", cmd, err)
+					continue
+				}
+				framework.Logf("Dump network information for node %s:\n%s", node.Name, result)
+			}
+			// Dump the node iptables rules and conntrack flows for troubleshooting #123760
+			podList, _ := config.f.ClientSet.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{
+				LabelSelector: "k8s-app=kube-proxy",
+			})
+			for _, pod := range podList.Items {
+				// dump only for the node running test-container-pod
+				if pod.Status.HostIP == config.TestContainerPod.Status.HostIP {
+					output, _, _ := e2epod.ExecWithOptions(config.f, e2epod.ExecOptions{
+						Namespace:          "kube-system",
+						PodName:            pod.Name,
+						ContainerName:      "kube-proxy",
+						Command:            []string{"sh", "-c", fmt.Sprintf(`echo "IPTables Dump: " && iptables-save | grep "%s/%s:http" && echo "Conntrack flows: " && conntrack -Ln -p tcp | grep %d`, config.Namespace, config.NodePortService.Name, EndpointHTTPPort)},
+						Stdin:              nil,
+						CaptureStdout:      true,
+						CaptureStderr:      true,
+						PreserveWhitespace: false,
+					})
+					framework.Logf("Dump iptables and connntrack flows\n%s", output)
+					break
+				}
+			}
 			return returnMsg
 		}
 

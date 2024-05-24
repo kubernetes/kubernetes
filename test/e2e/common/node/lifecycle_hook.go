@@ -549,7 +549,7 @@ func getSidecarPodWithHook(name string, image string, lifecycle *v1.Lifecycle) *
 
 var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
 
 	validDuration := func(duration time.Duration, low, high int64) bool {

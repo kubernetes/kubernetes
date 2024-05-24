@@ -1029,7 +1029,7 @@ func TestPDBNotExist(t *testing.T) {
 func TestUpdateDisruptedPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	dc, ps := newFakeDisruptionController(ctx)
-	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb_queue")
+	dc.recheckQueue = workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{Name: "pdb_queue"})
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	currentTime := dc.clock.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{

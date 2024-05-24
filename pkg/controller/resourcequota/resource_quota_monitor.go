@@ -83,7 +83,7 @@ type QuotaMonitor struct {
 	running bool
 
 	// monitors are the producer of the resourceChanges queue
-	resourceChanges workqueue.RateLimitingInterface
+	resourceChanges workqueue.TypedRateLimitingInterface[*event]
 
 	// interfaces with informers
 	informerFactory informerfactory.InformerFactory
@@ -106,10 +106,13 @@ type QuotaMonitor struct {
 // NewMonitor creates a new instance of a QuotaMonitor
 func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactory.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry, updateFilter UpdateFilter) *QuotaMonitor {
 	return &QuotaMonitor{
-		informersStarted:  informersStarted,
-		informerFactory:   informerFactory,
-		ignoredResources:  ignoredResources,
-		resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
+		informersStarted: informersStarted,
+		informerFactory:  informerFactory,
+		ignoredResources: ignoredResources,
+		resourceChanges: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[*event](),
+			workqueue.TypedRateLimitingQueueConfig[*event]{Name: "resource_quota_controller_resource_changes"},
+		),
 		resyncPeriod:      resyncPeriod,
 		replenishmentFunc: replenishmentFunc,
 		registry:          registry,
@@ -351,11 +354,7 @@ func (qm *QuotaMonitor) processResourceChanges(ctx context.Context) bool {
 		return false
 	}
 	defer qm.resourceChanges.Done(item)
-	event, ok := item.(*event)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect a *event, got %v", item))
-		return true
-	}
+	event := item
 	obj := event.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {

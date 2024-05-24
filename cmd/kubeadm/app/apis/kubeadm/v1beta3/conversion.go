@@ -19,10 +19,12 @@ package v1beta3
 import (
 	"sort"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration converts a private InitConfiguration to public InitConfiguration.
@@ -38,9 +40,11 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	}
 	err = Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(&ClusterConfiguration{}, &out.ClusterConfiguration, s)
 	// Required to pass fuzzer tests. This ClusterConfiguration is empty and is never defaulted.
-	// If we call Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration() it will receive
-	// a default value, thus here we need to reset it back to "".
+	// If we call Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration() these fields will receive
+	// a default value, thus here we need to reset them back to empty.
 	out.EncryptionAlgorithm = ""
+	out.CertificateValidityPeriod = nil
+	out.CACertificateValidityPeriod = nil
 	// Set default timeouts.
 	kubeadm.SetDefaultTimeouts(&out.Timeouts)
 	return err
@@ -64,9 +68,11 @@ func Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in *ku
 
 // Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration is required due to missing EncryptionAlgorithm in v1beta3.
 func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
-	// Required to pass validation and fuzzer tests. The field is missing in v1beta3, thus we have to
-	// default it to a sane (default) value in the internal type.
+	// Required to pass validation and fuzzer tests. These fields are missing in v1beta3, thus we have to
+	// default them to a sane (default) value in the internal type.
 	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
+	out.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
+	out.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
 	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 

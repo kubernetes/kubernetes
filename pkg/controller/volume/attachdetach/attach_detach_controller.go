@@ -133,7 +133,10 @@ func NewAttachDetachController(
 		podIndexer:  podInformer.Informer().GetIndexer(),
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		pvcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcs"},
+		),
 	}
 
 	adc.csiNodeLister = csiNodeInformer.Lister()
@@ -313,7 +316,7 @@ type attachDetachController struct {
 	broadcaster record.EventBroadcaster
 
 	// pvcQueue is used to queue pvc objects
-	pvcQueue workqueue.RateLimitingInterface
+	pvcQueue workqueue.TypedRateLimitingInterface[string]
 
 	// csiMigratedPluginManager detects in-tree plugins that have been migrated to CSI
 	csiMigratedPluginManager csimigration.PluginManager
@@ -600,11 +603,11 @@ func (adc *attachDetachController) processNextItem(logger klog.Logger) bool {
 	}
 	defer adc.pvcQueue.Done(keyObj)
 
-	if err := adc.syncPVCByKey(logger, keyObj.(string)); err != nil {
+	if err := adc.syncPVCByKey(logger, keyObj); err != nil {
 		// Rather than wait for a full resync, re-add the key to the
 		// queue to be processed.
 		adc.pvcQueue.AddRateLimited(keyObj)
-		runtime.HandleError(fmt.Errorf("Failed to sync pvc %q, will retry again: %v", keyObj.(string), err))
+		runtime.HandleError(fmt.Errorf("failed to sync pvc %q, will retry again: %w", keyObj, err))
 		return true
 	}
 

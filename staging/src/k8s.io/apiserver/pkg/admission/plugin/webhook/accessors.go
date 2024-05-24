@@ -27,6 +27,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 )
@@ -139,11 +141,16 @@ func (m *mutatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompiler
 				Expression: matchCondition.Expression,
 			}
 		}
+		strictCost := false
+		if utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks) {
+			strictCost = true
+		}
 		m.compiledMatcher = matchconditions.NewMatcher(compiler.Compile(
 			expressions,
 			cel.OptionalVariableDeclarations{
 				HasParams:     false,
 				HasAuthorizer: true,
+				StrictCost:    strictCost,
 			},
 			environment.StoredExpressions,
 		), m.FailurePolicy, "webhook", "admit", m.Name)
@@ -267,11 +274,16 @@ func (v *validatingWebhookAccessor) GetCompiledMatcher(compiler cel.FilterCompil
 				Expression: matchCondition.Expression,
 			}
 		}
+		strictCost := false
+		if utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks) {
+			strictCost = true
+		}
 		v.compiledMatcher = matchconditions.NewMatcher(compiler.Compile(
 			expressions,
 			cel.OptionalVariableDeclarations{
 				HasParams:     false,
 				HasAuthorizer: true,
+				StrictCost:    strictCost,
 			},
 			environment.StoredExpressions,
 		), v.FailurePolicy, "webhook", "validating", v.Name)

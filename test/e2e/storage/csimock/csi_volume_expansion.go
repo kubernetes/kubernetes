@@ -24,6 +24,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
@@ -151,11 +152,10 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					framework.Failf("error updating pvc size %q", pvc.Name)
 				}
 				if test.expectFailure {
-					err = testsuites.WaitForResizingCondition(ctx, pvc, m.cs, csiResizingConditionWait)
-					framework.ExpectError(err, "unexpected resizing condition on PVC")
+					gomega.Consistently(ctx, framework.GetObject(m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get, pvc.Name, metav1.GetOptions{})).WithTimeout(csiResizingConditionWait).
+						ShouldNot(gomega.HaveField("Status.Conditions", gomega.ContainElement(gomega.HaveField("Type", gomega.Equal("PersistentVolumeClaimResizing")))), "unexpected resizing condition on PVC")
 					return
 				}
-
 				ginkgo.By("Waiting for persistent volume resize to finish")
 				err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
 				framework.ExpectNoError(err, "While waiting for CSI PV resize to finish")
