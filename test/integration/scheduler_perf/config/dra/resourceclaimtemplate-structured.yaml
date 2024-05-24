@@ -1,0 +1,11 @@
+apiVersion: resource.k8s.io/v1alpha2
+kind: ResourceClaimTemplate
+metadata:
+  name: test-claim-template
+spec:
+  spec:
+    resourceClassName: test-class
+    parametersRef:
+      apiGroup: resource.k8s.io
+      kind: ResourceClaimParameters
+      name: test-claim-parameters

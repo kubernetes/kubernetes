@@ -18,17 +18,18 @@ package args
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/types"
-
-	codegenutil "k8s.io/code-generator/pkg/util"
+	"k8s.io/gengo/v2/types"
 )
 
-// CustomArgs is a wrapper for arguments to applyconfiguration-gen.
-type CustomArgs struct {
+// Args is a wrapper for arguments to applyconfiguration-gen.
+type Args struct {
+	OutputDir string // must be a directory path
+	OutputPkg string // must be a Go import-path
+
+	GoHeaderFile string
+
 	// ExternalApplyConfigurations provides the locations of externally generated
 	// apply configuration types for types referenced by the go structs provided as input.
 	// Locations are provided as a comma separated list of <package>.<typeName>:<applyconfiguration-package>
@@ -44,38 +45,44 @@ type CustomArgs struct {
 	OpenAPISchemaFilePath string
 }
 
-// NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	customArgs := &CustomArgs{
+// New returns default arguments for the generator.
+func New() *Args {
+	return &Args{
 		ExternalApplyConfigurations: map[types.Name]string{
-			// Always include TypeMeta and ObjectMeta. They are sufficient for the vast majority of use cases.
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:       "k8s.io/client-go/applyconfigurations/meta/v1",
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}:     "k8s.io/client-go/applyconfigurations/meta/v1",
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "OwnerReference"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+			// Always include the applyconfigurations we've generated in client-go. They are sufficient for the vast majority of use cases.
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "Condition"}:                "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}:            "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "LabelSelector"}:            "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "LabelSelectorRequirement"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ManagedFieldsEntry"}:       "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}:               "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "OwnerReference"}:           "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:                 "k8s.io/client-go/applyconfigurations/meta/v1",
 		},
 	}
-	genericArgs.CustomArgs = customArgs
-
-	if pkg := codegenutil.CurrentPackage(); len(pkg) != 0 {
-		genericArgs.OutputPackagePath = path.Join(pkg, "pkg/client/applyconfigurations")
-	}
-
-	return genericArgs, customArgs
 }
 
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
-	pflag.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
+func (args *Args) AddFlags(fs *pflag.FlagSet, inputBase string) {
+	fs.StringVar(&args.OutputDir, "output-dir", "",
+		"the base directory under which to generate results")
+	fs.StringVar(&args.OutputPkg, "output-pkg", args.OutputPkg,
+		"the Go import-path of the generated results")
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
+	fs.Var(NewExternalApplyConfigurationValue(&args.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
 			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
-	pflag.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
+	fs.StringVar(&args.OpenAPISchemaFilePath, "openapi-schema", "",
 		"path to the openapi schema containing all the types that apply configurations will be generated for")
 }
 
 // Validate checks the given arguments.
-func Validate(genericArgs *args.GeneratorArgs) error {
-	if len(genericArgs.OutputPackagePath) == 0 {
-		return fmt.Errorf("output package cannot be empty")
+func (args *Args) Validate() error {
+	if len(args.OutputDir) == 0 {
+		return fmt.Errorf("--output-dir must be specified")
+	}
+	if len(args.OutputPkg) == 0 {
+		return fmt.Errorf("--output-pkg must be specified")
 	}
 	return nil
 }

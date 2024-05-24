@@ -191,7 +191,7 @@ func (c *client) Get(ctx context.Context, name string, opts metav1.GetOptions, s
 	}
 	obj, err := result.Get()
 	if runtime.IsNotRegisteredError(err) {
-		klog.V(5).Infof("Unable to retrieve PartialObjectMetadata: %#v", err)
+		klog.FromContext(ctx).V(5).Info("Could not retrieve PartialObjectMetadata", "err", err)
 		rawBytes, err := result.Raw()
 		if err != nil {
 			return nil, err
@@ -227,7 +227,7 @@ func (c *client) List(ctx context.Context, opts metav1.ListOptions) (*metav1.Par
 	}
 	obj, err := result.Get()
 	if runtime.IsNotRegisteredError(err) {
-		klog.V(5).Infof("Unable to retrieve PartialObjectMetadataList: %#v", err)
+		klog.FromContext(ctx).V(5).Info("Could not retrieve PartialObjectMetadataList", "err", err)
 		rawBytes, err := result.Raw()
 		if err != nil {
 			return nil, err

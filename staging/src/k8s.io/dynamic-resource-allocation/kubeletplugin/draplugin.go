@@ -140,7 +140,16 @@ func KubeletPluginSocketPath(path string) Option {
 // may be used more than once and each interceptor will get called.
 func GRPCInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
 	return func(o *options) error {
-		o.interceptors = append(o.interceptors, interceptor)
+		o.unaryInterceptors = append(o.unaryInterceptors, interceptor)
+		return nil
+	}
+}
+
+// GRPCStreamInterceptor is called for each gRPC streaming method call. This option
+// may be used more than once and each interceptor will get called.
+func GRPCStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
+	return func(o *options) error {
+		o.streamInterceptors = append(o.streamInterceptors, interceptor)
 		return nil
 	}
 }
@@ -170,7 +179,8 @@ type options struct {
 	draEndpoint                endpoint
 	draAddress                 string
 	pluginRegistrationEndpoint endpoint
-	interceptors               []grpc.UnaryServerInterceptor
+	unaryInterceptors          []grpc.UnaryServerInterceptor
+	streamInterceptors         []grpc.StreamServerInterceptor
 
 	nodeV1alpha2, nodeV1alpha3 bool
 }
@@ -215,7 +225,7 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	implemented := false
-	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.interceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		if nodeServer, ok := nodeServer.(drapbv1alpha3.NodeServer); ok && o.nodeV1alpha3 {
 			o.logger.V(5).Info("registering drapbv1alpha3.NodeServer")
 			drapbv1alpha3.RegisterNodeServer(grpcServer, nodeServer)
@@ -246,7 +256,7 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 	}
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.interceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}

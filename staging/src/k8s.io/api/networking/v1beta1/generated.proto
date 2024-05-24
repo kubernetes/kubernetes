@@ -69,6 +69,7 @@ message HTTPIngressPath {
 // or '#'.
 message HTTPIngressRuleValue {
   // paths is a collection of paths that map requests to backends.
+  // +listType=atomic
   repeated HTTPIngressPath paths = 1;
 }
 
@@ -211,6 +212,7 @@ message IngressLoadBalancerIngress {
 message IngressLoadBalancerStatus {
   // ingress is a list containing ingress points for the load-balancer.
   // +optional
+  // +listType=atomic
   repeated IngressLoadBalancerIngress ingress = 1;
 }
 
@@ -313,11 +315,13 @@ message IngressSpec {
   // through the SNI TLS extension, if the ingress controller fulfilling the
   // ingress supports SNI.
   // +optional
+  // +listType=atomic
   repeated IngressTLS tls = 2;
 
   // rules is a list of host rules used to configure the Ingress. If unspecified, or
   // no rule matches, all traffic is sent to the default backend.
   // +optional
+  // +listType=atomic
   repeated IngressRule rules = 3;
 }
 
@@ -335,6 +339,7 @@ message IngressTLS {
   // wildcard host setting for the loadbalancer controller fulfilling this
   // Ingress, if left unspecified.
   // +optional
+  // +listType=atomic
   repeated string hosts = 1;
 
   // secretName is the name of the secret used to terminate TLS traffic on

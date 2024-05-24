@@ -24,7 +24,12 @@ cd "$(pwd -P)"
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
+# Get all the default Go environment.
+kube::golang::setup_env
+
+# Turn off workspaces until we are ready for them later
+export GOWORK=off
+# Explicitly opt into go modules
 export GO111MODULE=on
 # Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=-mod=mod
@@ -37,7 +42,6 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
   exit 1
 fi
 
-kube::golang::verify_go_version
 kube::util::require-jq
 
 TMP_DIR="${TMP_DIR:-$(mktemp -d /tmp/update-vendor.XXXX)}"
@@ -51,6 +55,7 @@ exec 22>&2            # Real stderr, use this explicitly
 exec 1>"${LOG_FILE}"  # Automatic stdout
 exec 2>&1             # Automatic stderr
 set -x                # Trace this script to stderr
+go env                # For the log
 
 function finish {
   ret=$?
@@ -86,12 +91,13 @@ function ensure_require_replace_directives_for_all_dependencies() {
 
   # Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
   for repo in $(kube::util::list_staging_repos); do
-    pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+    (
+      cd "staging/src/k8s.io/${repo}"
       jq -r '"-require \(.Path)@\(.Version)"' < "${require_json}" \
           | xargs -L 100 go mod edit -fmt
       jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"' < "${replace_json}" \
           | xargs -L 100 go mod edit -fmt
-    popd >/dev/null 2>&1
+    )
   done
 
   # tidy to ensure require directives are added for indirect dependencies
@@ -178,14 +184,16 @@ function add_generated_comments() {
 # Phase 1: ensure go.mod files for staging modules and main module
 
 for repo in $(kube::util::list_staging_repos); do
-  pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+  (
+    cd "staging/src/k8s.io/${repo}"
+
     if [[ ! -f go.mod ]]; then
       kube::log::status "go.mod: initialize ${repo}" >&11
       rm -f Godeps/Godeps.json # remove before initializing, staging Godeps are not authoritative
       go mod init "k8s.io/${repo}"
       go mod edit -fmt
     fi
-  popd >/dev/null 2>&1
+  )
 done
 
 if [[ ! -f go.mod ]]; then
@@ -205,7 +213,7 @@ go mod edit -json \
 go mod edit -json \
     | jq -r '.Replace[]? | select(.New.Path | startswith("./staging/")) | "-dropreplace \(.Old.Path)"' \
     | xargs -L 100 go mod edit -fmt
-# Readd
+# Re-add
 kube::util::list_staging_repos \
     | while read -r X; do echo "-require k8s.io/${X}@v0.0.0"; done \
     | xargs -L 100 go mod edit -fmt
@@ -229,7 +237,9 @@ group_directives
 
 kube::log::status "go.mod: propagate to staging modules" >&11
 for repo in $(kube::util::list_staging_repos); do
-  pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+  (
+    cd "staging/src/k8s.io/${repo}"
+
     echo "=== propagating to ${repo}"
     # copy root go.mod, changing module name
     sed "s#module k8s.io/kubernetes#module k8s.io/${repo}#" \
@@ -243,7 +253,7 @@ for repo in $(kube::util::list_staging_repos); do
     kube::util::list_staging_repos \
         | while read -r X; do echo "-replace k8s.io/${X}=../${X}"; done \
         | xargs -L 100 go mod edit
-  popd >/dev/null 2>&1
+  )
 done
 
 
@@ -265,20 +275,31 @@ while IFS= read -r repo; do
   # record existence of the repo to ensure modules with no peer relationships still get included in the order
   echo "${repo} ${repo}" >> "${TMP_DIR}/tidy_deps.txt"
 
-  pushd "${KUBE_ROOT}/staging/src/${repo}" >/dev/null 2>&1
+  (
+    cd "${KUBE_ROOT}/staging/src/${repo}"
+
     # save the original go.mod, since go list doesn't just add missing entries, it also removes specific required versions from it
     tmp_go_mod="${TMP_DIR}/tidy_${repo/\//_}_go.mod.original"
     tmp_go_deps="${TMP_DIR}/tidy_${repo/\//_}_deps.txt"
     cp go.mod "${tmp_go_mod}"
 
-    {
-      echo "=== sorting ${repo}"
-      # 'go list' calculates direct imports and updates go.mod so that go list -m lists our module dependencies
-      echo "=== computing imports for ${repo}"
-      go list all
-      echo "=== computing tools imports for ${repo}"
-      go list -e -tags=tools all
-    }
+    echo "=== sorting ${repo}"
+    # 'go list' calculates direct imports and updates go.mod so that go list -m lists our module dependencies
+    echo "=== computing imports for ${repo}"
+    go list all
+    # ignore errors related to importing `package main` packages, but catch
+    # other errors (https://github.com/golang/go/issues/59186)
+    errs=()
+    kube::util::read-array errs < <(
+        go list -e -tags=tools -json all | jq -r '.Error.Err | select( . != null )' \
+            | grep -v "is a program, not an importable package"
+    )
+    if (( "${#errs[@]}" != 0 )); then
+        for err in "${errs[@]}"; do
+            echo "${err}" >&2
+        done
+        exit 1
+    fi
 
     # capture module dependencies
     go list -m -f '{{if not .Main}}{{.Path}}{{end}}' all > "${tmp_go_deps}"
@@ -293,12 +314,13 @@ while IFS= read -r repo; do
       # switch the required version to an explicit v0.0.0 (rather than an unknown v0.0.0-00010101000000-000000000000)
       go mod edit -require "${dep}@v0.0.0"
     done
-  popd >/dev/null 2>&1
+  )
 done < "${tidy_unordered}"
 
 kube::log::status "go.mod: tidying" >&11
 for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
-  pushd "${KUBE_ROOT}/staging/src/${repo}" >/dev/null 2>&1
+  (
+    cd "${KUBE_ROOT}/staging/src/${repo}"
     echo "=== tidying ${repo}"
 
     # prune replace directives that pin to the naturally selected version.
@@ -317,9 +339,9 @@ for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
 
     # disallow transitive dependencies on k8s.io/kubernetes
     loopback_deps=()
-    kube::util::read-array loopback_deps < <(go list all 2>/dev/null | grep k8s.io/kubernetes/ || true)
-    if [[ -n ${loopback_deps[*]:+"${loopback_deps[*]}"} ]]; then
-      kube::log::error "Disallowed ${repo} -> k8s.io/kubernetes dependencies exist via the following imports: $(go mod why "${loopback_deps[@]}")" >&22 2>&1
+    kube::util::read-array loopback_deps < <(go list all 2>/dev/null | grep k8s.io/kubernetes/ | grep -v github.com/openshift/apiserver-library-go || true)
+    if (( "${#loopback_deps[@]}" > 0 )); then
+      kube::log::error "${#loopback_deps[@]} disallowed ${repo} -> k8s.io/kubernetes dependencies exist via the following imports: $(go mod why "${loopback_deps[@]}")" >&22 2>&1
       exit 1
     fi
 
@@ -340,8 +362,7 @@ for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
 
     # group require/replace directives
     group_directives
-
-  popd >/dev/null 2>&1
+  )
 done
 echo "=== tidying root"
 go mod tidy
@@ -355,7 +376,7 @@ xargs -L 100 go mod edit -fmt
 
 # disallow transitive dependencies on k8s.io/kubernetes
 loopback_deps=()
-kube::util::read-array loopback_deps < <(go mod graph | grep ' k8s.io/kubernetes' || true)
+kube::util::read-array loopback_deps < <(go mod graph | grep ' k8s.io/kubernetes' | grep -v github.com/openshift/apiserver-library-go || true)
 ## Allow apiserver-library-go to depend on k8s.io/kubernetes
 if [[ -n ${loopback_deps[*]:+"${loopback_deps[*]}"} && ! "${loopback_deps[*]}" =~ github.com/openshift/apiserver-library-go ]]; then
   kube::log::error "Disallowed transitive k8s.io/kubernetes dependencies exist via the following imports:" >&22 2>&1
@@ -373,9 +394,10 @@ add_generated_comments "
 // Run hack/update-vendor.sh to update go.mod files and the vendor directory.
 "
 for repo in $(kube::util::list_staging_repos); do
-  pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
+  (
+    cd "staging/src/k8s.io/${repo}"
     add_generated_comments "// This is a generated file. Do not edit directly."
-  popd >/dev/null 2>&1
+  )
 done
 
 
@@ -385,15 +407,12 @@ hack/update-internal-modules.sh
 
 
 # Phase 8: rebuild vendor directory
-kube::log::status "vendor: running 'go mod vendor'" >&11
-go mod vendor
-
-# create a symlink in vendor directory pointing to the staging components.
-# This lets other packages and tools use the local staging components as if they were vendored.
-for repo in $(kube::util::list_staging_repos); do
-  rm -fr "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-  ln -s "../../staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-done
+(
+  kube::log::status "vendor: running 'go work vendor'" >&11
+  unset GOWORK
+  unset GOFLAGS
+  go work vendor
+)
 
 kube::log::status "vendor: updating vendor/LICENSES" >&11
 hack/update-vendor-licenses.sh

@@ -32,6 +32,23 @@
       ]
     },
     {
+      "kind": "ResourceClaimParameters",
+      "name": "resourceclaimparameters",
+      "namespaced": true,
+      "singularName": "resourceclaimparameters",
+      "storageVersionHash": "DWM408h+ZHE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
       "kind": "ResourceClaim",
       "name": "resourceclaims",
       "namespaced": true,
@@ -82,6 +99,40 @@
       "namespaced": false,
       "singularName": "resourceclass",
       "storageVersionHash": "wkt0Tpte++U=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourceClassParameters",
+      "name": "resourceclassparameters",
+      "namespaced": true,
+      "singularName": "resourceclassparameters",
+      "storageVersionHash": "MDq5XoTnXWQ=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourceSlice",
+      "name": "resourceslices",
+      "namespaced": false,
+      "singularName": "resourceslice",
+      "storageVersionHash": "IECvOcO76kw=",
       "verbs": [
         "create",
         "delete",

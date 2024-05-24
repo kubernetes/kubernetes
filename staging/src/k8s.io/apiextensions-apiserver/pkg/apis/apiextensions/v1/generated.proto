@@ -40,6 +40,7 @@ message ConversionRequest {
   optional string desiredAPIVersion = 2;
 
   // objects is the list of custom resource objects to be converted.
+  // +listType=atomic
   repeated k8s.io.apimachinery.pkg.runtime.RawExtension objects = 3;
 }
 
@@ -53,6 +54,7 @@ message ConversionResponse {
   // The webhook is expected to set `apiVersion` of these objects to the `request.desiredAPIVersion`. The list
   // must also have the same size as the input list with the same objects in the same order (equal kind, metadata.uid, metadata.name and metadata.namespace).
   // The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
+  // +listType=atomic
   repeated k8s.io.apimachinery.pkg.runtime.RawExtension convertedObjects = 2;
 
   // result contains the result of conversion with extra details if the conversion failed. `result.status` determines if
@@ -182,6 +184,7 @@ message CustomResourceDefinitionNames {
   // and used by clients to support invocations like `kubectl get <shortname>`.
   // It must be all lowercase.
   // +optional
+  // +listType=atomic
   repeated string shortNames = 3;
 
   // kind is the serialized kind of the resource. It is normally CamelCase and singular.
@@ -196,6 +199,7 @@ message CustomResourceDefinitionNames {
   // This is published in API discovery documents, and used by clients to support invocations like
   // `kubectl get all`.
   // +optional
+  // +listType=atomic
   repeated string categories = 6;
 }
 
@@ -221,6 +225,7 @@ message CustomResourceDefinitionSpec {
   // by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing
   // major version, then minor version. An example sorted list of versions:
   // v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
+  // +listType=atomic
   repeated CustomResourceDefinitionVersion versions = 7;
 
   // conversion defines conversion settings for the CRD.
@@ -256,6 +261,7 @@ message CustomResourceDefinitionStatus {
   // versions from this list.
   // Versions may not be removed from `spec.versions` while they exist in this list.
   // +optional
+  // +listType=atomic
   repeated string storedVersions = 3;
 }
 
@@ -297,7 +303,17 @@ message CustomResourceDefinitionVersion {
   // See https://kubernetes.io/docs/reference/using-api/api-concepts/#receiving-resources-as-tables for details.
   // If no columns are specified, a single column displaying the age of the custom resource is used.
   // +optional
+  // +listType=atomic
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
+
+  // selectableFields specifies paths to fields that may be used as field selectors.
+  // A maximum of 8 selectable fields are allowed.
+  // See https://kubernetes.io/docs/concepts/overview/working-with-objects/field-selectors
+  //
+  // +featureGate=CustomResourceFieldSelectors
+  // +optional
+  // +listType=atomic
+  repeated SelectableField selectableFields = 9;
 }
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
@@ -439,20 +455,25 @@ message JSONSchemaProps {
 
   optional double multipleOf = 19;
 
+  // +listType=atomic
   repeated JSON enum = 20;
 
   optional int64 maxProperties = 21;
 
   optional int64 minProperties = 22;
 
+  // +listType=atomic
   repeated string required = 23;
 
   optional JSONSchemaPropsOrArray items = 24;
 
+  // +listType=atomic
   repeated JSONSchemaProps allOf = 25;
 
+  // +listType=atomic
   repeated JSONSchemaProps oneOf = 26;
 
+  // +listType=atomic
   repeated JSONSchemaProps anyOf = 27;
 
   optional JSONSchemaProps not = 28;
@@ -518,6 +539,7 @@ message JSONSchemaProps {
   // to ensure those properties are present for all list items.
   //
   // +optional
+  // +listType=atomic
   repeated string xKubernetesListMapKeys = 41;
 
   // x-kubernetes-list-type annotates an array to further describe its topology.
@@ -564,6 +586,7 @@ message JSONSchemaProps {
 message JSONSchemaPropsOrArray {
   optional JSONSchemaProps schema = 1;
 
+  // +listType=atomic
   repeated JSONSchemaProps jSONSchemas = 2;
 }
 
@@ -579,7 +602,21 @@ message JSONSchemaPropsOrBool {
 message JSONSchemaPropsOrStringArray {
   optional JSONSchemaProps schema = 1;
 
+  // +listType=atomic
   repeated string property = 2;
+}
+
+// SelectableField specifies the JSON path of a field that may be used with field selectors.
+message SelectableField {
+  // jsonPath is a simple JSON path which is evaluated against each custom resource to produce a
+  // field selector value.
+  // Only JSON paths without the array notation are allowed.
+  // Must point to a field of type string, boolean or integer. Types with enum values
+  // and strings with formats are allowed.
+  // If jsonPath refers to absent field in a resource, the jsonPath evaluates to an empty string.
+  // Must not point to metdata fields.
+  // Required.
+  optional string jsonPath = 1;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
@@ -787,6 +824,7 @@ message WebhookConversion {
   // are supported by API server, conversion will fail for the custom resource.
   // If a persisted Webhook configuration specifies allowed versions and does not
   // include any versions known to the API Server, calls to the webhook will fail.
+  // +listType=atomic
   repeated string conversionReviewVersions = 3;
 }
 

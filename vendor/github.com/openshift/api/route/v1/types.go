@@ -447,8 +447,12 @@ type TLSConfig struct {
 	// insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While
 	// each router may make its own decisions on which ports to expose, this is normally port 80.
 	//
-	// * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only) (default).
-	// * None - no traffic is allowed on the insecure port.
+	// If a route does not specify insecureEdgeTerminationPolicy, then the default behavior is "None".
+	//
+	// * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only).
+	//
+	// * None - no traffic is allowed on the insecure port (default).
+	//
 	// * Redirect - clients are redirected to the secure port.
 	//
 	// +kubebuilder:validation:Enum=Allow;None;Redirect;""

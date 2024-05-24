@@ -75,8 +75,6 @@ const (
 
 type fakeKubelet struct {
 	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	containerInfoFunc   func(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	rawInfoFunc         func(query *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
 	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
 	podsFunc            func() []*v1.Pod
 	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
@@ -108,14 +106,6 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 
 func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil
-}
-
-func (fk *fakeKubelet) GetContainerInfo(ctx context.Context, podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-	return fk.containerInfoFunc(ctx, podFullName, uid, containerName, req)
-}
-
-func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
-	return fk.rawInfoFunc(req)
 }
 
 func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) {
@@ -868,18 +858,24 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 }
 
 func TestCheckpointContainer(t *testing.T) {
-	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
-
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
 	podNamespace := "other"
 	podName := "foo"
 	expectedContainerName := "baz"
-	// GetPodByName() should always fail
-	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
-		return nil, false
+
+	setupTest := func(featureGate bool) *serverTestFramework {
+		// Enable features.ContainerCheckpoint during test
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)()
+
+		fw := newServerTest()
+		// GetPodByName() should always fail
+		fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+			return nil, false
+		}
+		return fw
 	}
+	fw := setupTest(true)
+	defer fw.testHTTPServer.Close()
+
 	t.Run("wrong pod namespace", func(t *testing.T) {
 		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
 		if err != nil {
@@ -936,6 +932,19 @@ func TestCheckpointContainer(t *testing.T) {
 			t.Errorf("Got error POSTing: %v", err)
 		}
 		assert.Equal(t, resp.StatusCode, 200)
+	})
+
+	// Now test for 404 if checkpointing support is explicitly disabled.
+	fw.testHTTPServer.Close()
+	fw = setupTest(false)
+	defer fw.testHTTPServer.Close()
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	t.Run("checkpointing fails because disabled", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, 404, resp.StatusCode)
 	})
 }
 

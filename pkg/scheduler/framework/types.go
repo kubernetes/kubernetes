@@ -53,11 +53,12 @@ const (
 	UpdateNodeLabel       // 1000
 	UpdateNodeTaint       // 10000
 	UpdateNodeCondition   // 100000
+	UpdateNodeAnnotation  // 1000000
 
-	All ActionType = 1<<iota - 1 // 111111
+	All ActionType = 1<<iota - 1 // 1111111
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.
@@ -65,18 +66,43 @@ type GVK string
 
 // Constants for GVKs.
 const (
-	Pod                   GVK = "Pod"
-	Node                  GVK = "Node"
-	PersistentVolume      GVK = "PersistentVolume"
-	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
-	PodSchedulingContext  GVK = "PodSchedulingContext"
-	ResourceClaim         GVK = "ResourceClaim"
-	ResourceClass         GVK = "ResourceClass"
-	StorageClass          GVK = "storage.k8s.io/StorageClass"
-	CSINode               GVK = "storage.k8s.io/CSINode"
-	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
-	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
-	WildCard              GVK = "*"
+	// There are a couple of notes about how the scheduler notifies the events of Pods:
+	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is scheduled to a Node.
+	// - Delete: delete events could be triggered by:
+	//           - a Pod that is deleted
+	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
+	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
+	Pod GVK = "Pod"
+	// A note about NodeAdd event and UpdateNodeTaint event:
+	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
+	// It's definitely not something expected for plugin developers,
+	// and registering UpdateNodeTaint event is the only mitigation for now.
+	// So, kube-scheduler registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
+	// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuck in the
+	// unschedulable pod pool.
+	// This behavior will be removed when we remove the preCheck feature.
+	// See: https://github.com/kubernetes/kubernetes/issues/110175
+	Node                    GVK = "Node"
+	PersistentVolume        GVK = "PersistentVolume"
+	PersistentVolumeClaim   GVK = "PersistentVolumeClaim"
+	CSINode                 GVK = "storage.k8s.io/CSINode"
+	CSIDriver               GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity      GVK = "storage.k8s.io/CSIStorageCapacity"
+	StorageClass            GVK = "storage.k8s.io/StorageClass"
+	PodSchedulingContext    GVK = "PodSchedulingContext"
+	ResourceClaim           GVK = "ResourceClaim"
+	ResourceClass           GVK = "ResourceClass"
+	ResourceClaimParameters GVK = "ResourceClaimParameters"
+	ResourceClassParameters GVK = "ResourceClassParameters"
+
+	// WildCard is a special GVK to match all resources.
+	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
+	// all coming clusterEvents will be admitted. Be careful to register it, it will
+	// increase the computing pressure in requeueing unless you really need it.
+	//
+	// Meanwhile, if the coming clusterEvent is a wildcard one, all pods
+	// will be moved from unschedulablePod pool to activeQ/backoffQ forcibly.
+	WildCard GVK = "*"
 )
 
 type ClusterEventWithHint struct {
@@ -137,17 +163,32 @@ func (ce ClusterEvent) IsWildCard() bool {
 	return ce.Resource == WildCard && ce.ActionType == All
 }
 
+// Match returns true if ClusterEvent is matched with the coming event.
+// If the ce.Resource is "*", there's no requirement for the coming event' Resource.
+// Contrarily, if the coming event's Resource is "*", the ce.Resource should only be "*".
+//
+// Note: we have a special case here when the coming event is a wildcard event,
+// it will force all Pods to move to activeQ/backoffQ,
+// but we take it as an unmatched event unless the ce is also a wildcard one.
+func (ce ClusterEvent) Match(event ClusterEvent) bool {
+	return ce.IsWildCard() || (ce.Resource == WildCard || ce.Resource == event.Resource) && ce.ActionType&event.ActionType != 0
+}
+
 func UnrollWildCardResource() []ClusterEventWithHint {
 	return []ClusterEventWithHint{
 		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
 		{Event: ClusterEvent{Resource: Node, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
+		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},
 		{Event: ClusterEvent{Resource: CSINode, ActionType: All}},
 		{Event: ClusterEvent{Resource: CSIDriver, ActionType: All}},
 		{Event: ClusterEvent{Resource: CSIStorageCapacity, ActionType: All}},
-		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
-		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},
 		{Event: ClusterEvent{Resource: StorageClass, ActionType: All}},
 		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClaim, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClass, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClaimParameters, ActionType: All}},
+		{Event: ClusterEvent{Resource: ResourceClassParameters, ActionType: All}},
 	}
 }
 
@@ -279,8 +320,14 @@ type WeightedAffinityTerm struct {
 	Weight int32
 }
 
+// ExtenderName is a fake plugin name put in UnschedulablePlugins when Extender rejected some Nodes.
+const ExtenderName = "Extender"
+
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
+	// NodeToStatusMap records the status of each node
+	// if they're rejected in PreFilter (via PreFilterResult) or Filter plugins.
+	// Nodes that pass PreFilter/Filter plugins are not included in this map.
 	NodeToStatusMap NodeToStatusMap
 	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]
@@ -813,13 +860,6 @@ func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
 	n.updatePVCRefCounts(pod, sign > 0)
 
 	n.Generation = nextGeneration()
-}
-
-func max(a, b int64) int64 {
-	if a >= b {
-		return a
-	}
-	return b
 }
 
 func calculateResource(pod *v1.Pod) (Resource, int64, int64) {

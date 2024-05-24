@@ -18,6 +18,7 @@ package job
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -35,11 +36,12 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 
-// TestJobStrategy_PrepareForUpdate tests various scenearios for PrepareForUpdate
+// TestJobStrategy_PrepareForUpdate tests various scenarios for PrepareForUpdate
 func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 	validSelector := getValidLabelSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForSelector(validSelector)
@@ -68,15 +70,140 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 			},
 		},
 	}
+	successPolicy := &batch.SuccessPolicy{
+		Rules: []batch.SuccessPolicyRule{
+			{
+				SucceededIndexes: ptr.To("1,3-7"),
+				SucceededCount:   ptr.To[int32](4),
+			},
+		},
+	}
+	updatedSuccessPolicy := &batch.SuccessPolicy{
+		Rules: []batch.SuccessPolicyRule{
+			{
+				SucceededIndexes: ptr.To("1,3-7"),
+				SucceededCount:   ptr.To[int32](5),
+			},
+		},
+	}
 
 	cases := map[string]struct {
 		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
 		enableJobPodReplacementPolicy bool
+		enableJobSuccessPolicy        bool
 		job                           batch.Job
 		updatedJob                    batch.Job
 		wantJob                       batch.Job
 	}{
+		"update job with a new field; updated when JobSuccessPolicy enabled": {
+			enableJobSuccessPolicy: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: nil,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: updatedSuccessPolicy,
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: updatedSuccessPolicy,
+				},
+			},
+		},
+		"update pre-existing field; updated when JobSuccessPolicy enabled": {
+			enableJobSuccessPolicy: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: successPolicy,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: updatedSuccessPolicy,
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: updatedSuccessPolicy,
+				},
+			},
+		},
+		"update job with a new field: not update when JobSuccessPolicy disabled": {
+			enableJobSuccessPolicy: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: nil,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: updatedSuccessPolicy,
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: nil,
+				},
+			},
+		},
+		"update pre-existing field; updated when JobSuccessPolicy disabled": {
+			enableJobSuccessPolicy: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: successPolicy,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: updatedSuccessPolicy,
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:      validSelector,
+					Template:      validPodTemplateSpec,
+					SuccessPolicy: updatedSuccessPolicy,
+				},
+			},
+		},
 		"update job with a new field; updated when JobBackoffLimitPerIndex enabled": {
 			enableJobBackoffLimitPerIndex: true,
 			job: batch.Job{
@@ -445,6 +572,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)()
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForUpdate(ctx, &tc.updatedJob, &tc.job)
@@ -475,11 +603,21 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 			},
 		},
 	}
+	successPolicy := &batch.SuccessPolicy{
+		Rules: []batch.SuccessPolicyRule{
+			{
+				SucceededIndexes: ptr.To("1,3-7"),
+				SucceededCount:   ptr.To[int32](4),
+			},
+		},
+	}
 
 	cases := map[string]struct {
 		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
 		enableJobPodReplacementPolicy bool
+		enableJobManageBy             bool
+		enableJobSuccessPolicy        bool
 		job                           batch.Job
 		wantJob                       batch.Job
 	}{
@@ -498,6 +636,48 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 					Selector:       validSelector,
 					ManualSelector: pointer.Bool(false),
 					Template:       expectedPodTemplateSpec,
+				},
+			},
+		},
+		"create job with a new field; JobSuccessPolicy enabled": {
+			enableJobSuccessPolicy: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: ptr.To(false),
+					Template:       validPodTemplateSpec,
+					SuccessPolicy:  successPolicy,
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: ptr.To(false),
+					Template:       expectedPodTemplateSpec,
+					SuccessPolicy:  successPolicy,
+				},
+			},
+		},
+		"create job with a new field; JobSuccessPolicy disabled": {
+			enableJobSuccessPolicy: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: ptr.To(false),
+					Template:       validPodTemplateSpec,
+					SuccessPolicy:  successPolicy,
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: ptr.To(false),
+					Template:       validPodTemplateSpec,
+					SuccessPolicy:  nil,
 				},
 			},
 		},
@@ -751,6 +931,47 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
+		"managedBy field is dropped when the feature gate is disabled": {
+			enableJobManageBy: false,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       validPodTemplateSpec,
+					ManagedBy:      ptr.To("custom-controller-name"),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       expectedPodTemplateSpec,
+				},
+			},
+		},
+		"managedBy field is set when the feature gate is enabled": {
+			enableJobManageBy: true,
+			job: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       validPodTemplateSpec,
+					ManagedBy:      ptr.To("custom-controller-name"),
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(1),
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					ManualSelector: pointer.Bool(false),
+					Template:       expectedPodTemplateSpec,
+					ManagedBy:      ptr.To("custom-controller-name"),
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -758,6 +979,8 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManageBy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)()
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForCreate(ctx, &tc.job)
@@ -1859,11 +2082,27 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 		},
 	}
+	validObjectMeta := metav1.ObjectMeta{
+		Name:            "myjob",
+		Namespace:       metav1.NamespaceDefault,
+		ResourceVersion: "10",
+	}
+	validSuccessPolicy := &batch.SuccessPolicy{
+		Rules: []batch.SuccessPolicyRule{{
+			SucceededIndexes: ptr.To("0-2"),
+		}},
+	}
+	now := metav1.Now()
+	nowPlusMinute := metav1.Time{Time: now.Add(time.Minute)}
 
 	cases := map[string]struct {
-		job     *batch.Job
-		newJob  *batch.Job
-		wantJob *batch.Job
+		enableJobManagedBy     bool
+		enableJobSuccessPolicy bool
+
+		job      *batch.Job
+		newJob   *batch.Job
+		wantJob  *batch.Job
+		wantErrs field.ErrorList
 	}{
 		"incoming resource version on update should not be mutated": {
 			job: &batch.Job{
@@ -1903,15 +2142,1289 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 		},
+		"invalid addition of both Failed=True and Complete=True; allowed because feature gate disabled": {
+			enableJobManagedBy: false,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+		},
+		"invalid addition of both Failed=True and Complete=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"completionTime can be removed to fix still running job": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+				},
+			},
+		},
+		"invalid attempt to transition to Failed=True without startTime": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
+			},
+		},
+		"invalid attempt to transition to Complete=True without startTime": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
+			},
+		},
+		"invalid attempt to transition to Complete=True with active > 0": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Active:         1,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.active"},
+			},
+		},
+		"transition to Failed condition with terminating>0 and ready>0": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+					Terminating: ptr.To[int32](1),
+					Ready:       ptr.To[int32](1),
+				},
+			},
+		},
+		"invalid attempt to transition to Failed=True with uncountedTerminatedPods.Failed>0": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods"},
+			},
+		},
+		"invalid attempt to update uncountedTerminatedPods.Succeeded for Complete job": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"b"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods"},
+			},
+		},
+		"non-empty uncountedTerminatedPods for complete job, unrelated update": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobConditionType("CustomJobCondition"),
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+		},
+		"invalid attempt to transition to Complete=True with uncountedTerminatedPods.Succeeded>0": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Succeeded: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods"},
+			},
+		},
+		"invalid addition Complete=True without setting CompletionTime": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.completionTime"},
+			},
+		},
+		"invalid attempt to remove completionTime": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: nil,
+					StartTime:      &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.completionTime"},
+			},
+		},
+		"verify startTime can be cleared for suspended job": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: &now,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Suspend: ptr.To(true),
+				},
+				Status: batch.JobStatus{
+					StartTime: nil,
+				},
+			},
+		},
+		"verify startTime cannot be removed for unsuspended job": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: nil,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
+			},
+		},
+		"verify startTime cannot be updated for unsuspended job": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &nowPlusMinute,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "status.startTime"},
+			},
+		},
+		"invalid attempt to set completionTime before startTime": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &nowPlusMinute,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &nowPlusMinute,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.completionTime"},
+			},
+		},
+		"invalid attempt to modify completionTime": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: &nowPlusMinute,
+					StartTime:      &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.completionTime"},
+			},
+		},
+		"invalid removal of terminal condition Failed=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid removal of terminal condition Complete=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid removal of terminal condition FailureTarget=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of FailureTarget=True when Complete=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid attempt setting of CompletionTime when there is no Complete condition": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: &now,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.completionTime"},
+			},
+		},
+		"invalid CompletionTime when there is no Complete condition, but allowed": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: &now,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					CompletionTime: &now,
+					Active:         1,
+				},
+			},
+		},
+		"invalid attempt setting CompletedIndexes when non-indexed completion mode is used": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					StartTime:        &now,
+					CompletedIndexes: "0",
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.completedIndexes"},
+			},
+		},
+		"invalid because CompletedIndexes set when non-indexed completion mode is used; but allowed": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					CompletedIndexes: "0",
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.NonIndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					CompletedIndexes: "0",
+					Active:           1,
+				},
+			},
+		},
+		"invalid attempt setting FailedIndexes when not backoffLimitPerIndex": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes: ptr.To("0"),
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.failedIndexes"},
+			},
+		},
+		"invalid attempt to decrease the failed counter": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+				Status: batch.JobStatus{
+					Failed: 3,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+				Status: batch.JobStatus{
+					Failed: 1,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.failed"},
+			},
+		},
+		"invalid attempt to decrease the succeeded counter": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+				Status: batch.JobStatus{
+					Succeeded: 3,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+				Status: batch.JobStatus{
+					Succeeded: 1,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.succeeded"},
+			},
+		},
+		"invalid attempt to set bad format for CompletedIndexes": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					CompletedIndexes: "invalid format",
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.completedIndexes"},
+			},
+		},
+		"invalid format for CompletedIndexes, but allowed": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					CompletedIndexes: "invalid format",
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					CompletedIndexes: "invalid format",
+					Active:           1,
+				},
+			},
+		},
+		"invalid attempt to set bad format for FailedIndexes": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:          ptr.To[int32](5),
+					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					BackoffLimitPerIndex: pointer.Int32(1),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:          ptr.To[int32](5),
+					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					BackoffLimitPerIndex: pointer.Int32(1),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes: ptr.To("invalid format"),
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.failedIndexes"},
+			},
+		},
+		"invalid format for FailedIndexes, but allowed": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:          ptr.To[int32](5),
+					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					BackoffLimitPerIndex: pointer.Int32(1),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes: ptr.To("invalid format"),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:          ptr.To[int32](5),
+					CompletionMode:       completionModePtr(batch.IndexedCompletion),
+					BackoffLimitPerIndex: pointer.Int32(1),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes: ptr.To("invalid format"),
+					Active:        1,
+				},
+			},
+		},
+		"more ready pods than active, but allowed": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+				Status: batch.JobStatus{
+					Active: 1,
+					Ready:  ptr.To[int32](2),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+				Status: batch.JobStatus{
+					Active:    1,
+					Ready:     ptr.To[int32](2),
+					Succeeded: 1,
+				},
+			},
+		},
+		"invalid addition of both FailureTarget=True and Complete=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid failedIndexes, which overlap with completedIndexes": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "3-4",
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "2-4",
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.failedIndexes"},
+			},
+		},
+		"failedIndexes overlap with completedIndexes, unrelated field change": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "2-4",
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions:    ptr.To[int32](5),
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+				},
+				Status: batch.JobStatus{
+					FailedIndexes:    ptr.To("0,2"),
+					CompletedIndexes: "2-4",
+					Active:           1,
+				},
+			},
+		},
+		"invalid addition of SuccessCriteriaMet for NonIndexed Job": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					SuccessPolicy: validSuccessPolicy,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					SuccessPolicy: validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of SuccessCriteriaMet for Job with Failed": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobFailed,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of Failed for Job with SuccessCriteriaMet": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of SuccessCriteriaMet for Job with FailureTarget": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobFailureTarget,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of FailureTarget for Job with SuccessCriteriaMet": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of SuccessCriteriaMet for Job with Complete": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobComplete,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"valid addition of Complete for Job with SuccessCriteriaMet": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+		},
+		"invalid addition of SuccessCriteriaMet for Job without SuccessPolicy": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of Complete for Job with SuccessPolicy unless SuccessCriteriaMet": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid disabling of SuccessCriteriaMet for Job": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobComplete,
+						Status: api.ConditionFalse,
+					}},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid removing of SuccessCriteriaMet for Job": {
+			enableJobSuccessPolicy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](10),
+					SuccessPolicy:  validSuccessPolicy,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)()
+
 			errs := StatusStrategy.ValidateUpdate(ctx, tc.newJob, tc.job)
-			if len(errs) != 0 {
-				t.Errorf("Unexpected error %v", errs)
+			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
+				t.Errorf("Unexpected errors (-want,+got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tc.wantJob, tc.newJob); diff != "" {
-				t.Errorf("Unexpected job (-want,+got):\n%s", diff)
+			if tc.wantJob != nil {
+				if diff := cmp.Diff(tc.wantJob, tc.newJob); diff != "" {
+					t.Errorf("Unexpected job (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}

@@ -236,10 +236,14 @@ func (e WithVersionEncoder) Encode(obj Object, stream io.Writer) error {
 			gvk = preferredGVK
 		}
 	}
-	kind.SetGroupVersionKind(gvk)
-	err = e.Encoder.Encode(obj, stream)
-	kind.SetGroupVersionKind(oldGVK)
-	return err
+
+	// The gvk only needs to be set if not already as desired.
+	if gvk != oldGVK {
+		kind.SetGroupVersionKind(gvk)
+		defer kind.SetGroupVersionKind(oldGVK)
+	}
+
+	return e.Encoder.Encode(obj, stream)
 }
 
 // WithoutVersionDecoder clears the group version kind of a deserialized object.

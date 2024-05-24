@@ -347,7 +347,7 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		CloudConfigFile:      opts.CloudProvider.CloudConfigFile,
 	}
 	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
-	pluginInitializers, admissionPostStartHook, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
+	pluginInitializers, err := admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
 	}
@@ -377,9 +377,6 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 		pluginInitializers...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to apply admission: %w", err)
-	}
-	if err := config.GenericConfig.AddPostStartHook("start-kube-apiserver-admission-initializer", admissionPostStartHook); err != nil {
-		return nil, nil, nil, err
 	}
 
 	if config.GenericConfig.EgressSelector != nil {

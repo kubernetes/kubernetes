@@ -193,8 +193,8 @@ func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
 	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return true })
 	require.NoError(t, err)
 	// Update the websocket executor to request remote command v4, which is unsupported.
-	fallbackExec, ok := exec.(*fallbackExecutor)
-	assert.True(t, ok, "error casting executor as fallbackExecutor")
+	fallbackExec, ok := exec.(*FallbackExecutor)
+	assert.True(t, ok, "error casting executor as FallbackExecutor")
 	websocketExec, ok := fallbackExec.primary.(*wsStreamExecutor)
 	assert.True(t, ok, "error casting executor as websocket executor")
 	// Set the attempted subprotocol version to V4; websocket server only accepts V5.

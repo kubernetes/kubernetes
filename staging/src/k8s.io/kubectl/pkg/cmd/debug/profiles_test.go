@@ -678,3 +678,237 @@ func TestNetAdminProfile(t *testing.T) {
 		})
 	}
 }
+
+func TestSysAdminProfile(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+		Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+			{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name: "dbg", Image: "dbgimage",
+				},
+			},
+		}},
+	}
+
+	tests := []struct {
+		name          string
+		pod           *corev1.Pod
+		containerName string
+		target        runtime.Object
+		expectPod     *corev1.Pod
+		expectErr     error
+	}{
+		{
+			name:          "nil target",
+			pod:           pod,
+			containerName: "dbg",
+			target:        nil,
+			expectErr:     fmt.Errorf("sysadmin profile: objects of type <nil> are not supported"),
+		},
+		{
+			name:          "debug by ephemeral container",
+			pod:           pod,
+			containerName: "dbg",
+			target:        pod,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{EphemeralContainers: []corev1.EphemeralContainer{
+					{
+						EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+							Name: "dbg", Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.Bool(true),
+							},
+						},
+					},
+				}},
+			},
+		},
+		{
+			name: "debug by pod copy",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+					},
+				},
+			},
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.Bool(true),
+							},
+						},
+					},
+					ShareProcessNamespace: pointer.Bool(true),
+				},
+			},
+		},
+		{
+			name: "debug by pod copy preserve existing capability",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+					},
+				},
+			},
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "podcopy"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.Bool(true),
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+					ShareProcessNamespace: pointer.Bool(true),
+				},
+			},
+		},
+		{
+			name: "debug by node",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "dbg", Image: "dbgimage"},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        testNode,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					HostPID:     true,
+					HostIPC:     true,
+					Volumes: []corev1.Volume{
+						{
+							Name:         "host-root",
+							VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/"}},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.Bool(true),
+							},
+							VolumeMounts: []corev1.VolumeMount{{Name: "host-root", MountPath: "/host"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "debug by node preserve existing capability",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        testNode,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					HostPID:     true,
+					HostIPC:     true,
+					Volumes: []corev1.Volume{
+						{
+							Name:         "host-root",
+							VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/"}},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.Bool(true),
+								Capabilities: &corev1.Capabilities{
+									Add: []corev1.Capability{"SYS_PTRACE"},
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{{Name: "host-root", MountPath: "/host"}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := (&sysadminProfile{}).Apply(test.pod, test.containerName, test.target)
+			if (err == nil) != (test.expectErr == nil) || (err != nil && test.expectErr != nil && err.Error() != test.expectErr.Error()) {
+				t.Fatalf("expect error: %v, got error: %v", test.expectErr, err)
+			}
+			if err != nil {
+				return
+			}
+			if diff := cmp.Diff(test.expectPod, test.pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}

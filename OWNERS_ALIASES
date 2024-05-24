@@ -10,7 +10,6 @@ aliases:
     - sttts
     - tallclair
   sig-auth-audit-reviewers:
-    - hzxuzhonghu
     - sttts
     - tallclair
   sig-auth-authenticators-approvers:
@@ -45,16 +44,11 @@ aliases:
     - mikedanese
     - smarterclayton
   sig-auth-certificates-reviewers:
-    - caesarxuchao
     - deads2k
     - dims
     - enj
     - liggitt
     - mikedanese
-    - smarterclayton
-    - sttts
-    - thockin
-    - wojtek-t
   sig-auth-encryption-at-rest-approvers:
     - smarterclayton
     - enj
@@ -82,6 +76,7 @@ aliases:
     - krmayankk
   sig-auth-serviceaccounts-approvers:
     - deads2k
+    - enj
     - liggitt
     - mikedanese
   sig-auth-serviceaccounts-reviewers:
@@ -140,6 +135,7 @@ aliases:
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
+    - carlory
     - chrishenzie
     - gnufied
     - humblec
@@ -254,6 +250,7 @@ aliases:
     - haircommander
     - tzneal
     - rphillips
+    - kannon92
   sig-network-approvers:
     - andrewsykim
     - aojea
@@ -307,6 +304,7 @@ aliases:
     - RainbowMango
     - serathius
     - dgrisonnet
+    - rexagod
   sig-instrumentation-reviewers:
     - dashpole
     - ehashman
@@ -318,6 +316,7 @@ aliases:
     - dgrisonnet
     - pohly
     - mengjiao-liu
+    - rexagod
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
@@ -492,13 +491,14 @@ aliases:
   feature-approvers:
     - andrewsykim # Cloud Provider
     - ahg-g # Scheduling
-    - caseydavenport # Network
-    - dcbw # Network
+    - aojea # Network, Testing
+    - danwinship # Network
     - dchen1107 # Node
     - deads2k # API Machinery
     - derekwaynecarr # Node
     - dims # Architecture
     - ehashman # Instrumentation
+    - enj # Auth
     - janetkuo # Apps
     - jayunit100 # Windows
     - jpbetz # API Machinery
@@ -510,14 +510,18 @@ aliases:
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
     - marosset # Windows
+    - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
     - mwielgus # Autoscaling
     - pwittrock # CLI
+    - rexagod # Instrumentation
     - saad-ali # Storage
     - seans3 # CLI
     - sergeykanzhelev # Node
+    - shaneutt # Network
     - soltysh # Apps, CLI
+    - sttts # API Machinery
     - tallclair # Auth
     - thockin # Network
     - xing-yang # Storage

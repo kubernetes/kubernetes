@@ -95,6 +95,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.LegacyServiceAccountTokenCleanerController,
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,
+		names.StorageVersionMigratorController,
 	)
 
 	for _, name := range KnownControllers() {
@@ -147,8 +148,8 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 			continue
 		}
 
-		// DO NOT ADD any new controllers here. These two controllers are an exception, because they were added before this test was introduced
-		if name == names.LegacyServiceAccountTokenCleanerController || name == names.ResourceClaimController {
+		// DO NOT ADD any new controllers here. one controller is an exception, because it was added before this test was introduced
+		if name == names.ResourceClaimController {
 			continue
 		}
 

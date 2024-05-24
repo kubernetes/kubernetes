@@ -30,12 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestEndpointSliceMirroring(t *testing.T) {
@@ -48,11 +48,12 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	tCtx := ktesting.Init(t)
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
 	epController := endpoint.NewEndpointController(
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Endpoints(),
@@ -60,7 +61,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	epsController := endpointslice.NewController(
-		ctx,
+		tCtx,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
@@ -70,7 +71,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	epsmController := endpointslicemirroring.NewController(
-		ctx,
+		tCtx,
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -79,11 +80,10 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	defer cancel()
-	informers.Start(ctx.Done())
-	go epController.Run(ctx, 5)
-	go epsController.Run(ctx, 5)
-	go epsmController.Run(ctx, 5)
+	informers.Start(tCtx.Done())
+	go epController.Run(tCtx, 5)
+	go epsController.Run(tCtx, 5)
+	go epsmController.Run(tCtx, 5)
 
 	testCases := []struct {
 		testName                     string
@@ -259,7 +259,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 			if tc.service != nil {
 				resourceName = tc.service.Name
 				tc.service.Namespace = ns.Name
-				_, err = client.CoreV1().Services(ns.Name).Create(ctx, tc.service, metav1.CreateOptions{})
+				_, err = client.CoreV1().Services(ns.Name).Create(tCtx, tc.service, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating service: %v", err)
 				}
@@ -268,7 +268,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 			if tc.customEndpoints != nil {
 				resourceName = tc.customEndpoints.Name
 				tc.customEndpoints.Namespace = ns.Name
-				_, err = client.CoreV1().Endpoints(ns.Name).Create(ctx, tc.customEndpoints, metav1.CreateOptions{})
+				_, err = client.CoreV1().Endpoints(ns.Name).Create(tCtx, tc.customEndpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating endpoints: %v", err)
 				}
@@ -276,7 +276,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + resourceName
-				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
+				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(tCtx, metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
 					t.Logf("Error listing EndpointSlices: %v", err)
 					return false, err
@@ -312,7 +312,6 @@ func TestEndpointSliceMirroring(t *testing.T) {
 }
 
 func TestEndpointSliceMirroringUpdates(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -325,8 +324,9 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
+	tCtx := ktesting.Init(t)
 	epsmController := endpointslicemirroring.NewController(
-		ctx,
+		tCtx,
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -335,10 +335,8 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	informers.Start(ctx.Done())
-	go epsmController.Run(ctx, 1)
+	informers.Start(tCtx.Done())
+	go epsmController.Run(tCtx, 1)
 
 	testCases := []struct {
 		testName      string
@@ -405,19 +403,19 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 				}},
 			}
 
-			_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+			_, err = client.CoreV1().Services(ns.Name).Create(tCtx, service, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating service: %v", err)
 			}
 
-			_, err = client.CoreV1().Endpoints(ns.Name).Create(ctx, customEndpoints, metav1.CreateOptions{})
+			_, err = client.CoreV1().Endpoints(ns.Name).Create(tCtx, customEndpoints, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating endpoints: %v", err)
 			}
 
 			// update endpoint
 			tc.tweakEndpoint(customEndpoints)
-			_, err = client.CoreV1().Endpoints(ns.Name).Update(ctx, customEndpoints, metav1.UpdateOptions{})
+			_, err = client.CoreV1().Endpoints(ns.Name).Update(tCtx, customEndpoints, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Error updating endpoints: %v", err)
 			}
@@ -425,7 +423,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 			// verify the endpoint updates were mirrored
 			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + service.Name
-				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
+				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(tCtx, metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
 					t.Logf("Error listing EndpointSlices: %v", err)
 					return false, err
@@ -489,7 +487,6 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 }
 
 func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -502,8 +499,9 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
 
+	tCtx := ktesting.Init(t)
 	epsmController := endpointslicemirroring.NewController(
-		ctx,
+		tCtx,
 		informers.Core().V1().Endpoints(),
 		informers.Discovery().V1().EndpointSlices(),
 		informers.Core().V1().Services(),
@@ -512,10 +510,8 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	informers.Start(ctx.Done())
-	go epsmController.Run(ctx, 1)
+	informers.Start(tCtx.Done())
+	go epsmController.Run(tCtx, 1)
 
 	testCases := []struct {
 		testName               string

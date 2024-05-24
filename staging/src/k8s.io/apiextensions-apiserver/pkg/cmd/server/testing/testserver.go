@@ -27,11 +27,14 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apiextensions-apiserver/pkg/apiserver"
+	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	"k8s.io/apimachinery/pkg/util/wait"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -58,7 +61,7 @@ type TestServer struct {
 	ServerOpts      *options.CustomResourceDefinitionsServerOptions // ServerOpts
 	TearDownFn      TearDownFunc                                    // TearDown function
 	TmpDir          string                                          // Temp Dir used, by the apiserver
-	CompletedConfig apiserver.CompletedConfig
+	CompletedConfig extensionsapiserver.CompletedConfig
 }
 
 // Logger allows t.Testing and b.Testing to be passed to StartTestServer and StartTestServerOrDie
@@ -151,6 +154,11 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
+
+	getOpenAPIDefinitions := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)
+	namer := openapinamer.NewDefinitionNamer(extensionsapiserver.Scheme)
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(getOpenAPIDefinitions, namer)
+
 	completedConfig := config.Complete()
 	server, err := completedConfig.New(genericapiserver.NewEmptyDelegate())
 	if err != nil {

@@ -4,13 +4,13 @@ package v1alpha1
 
 import (
 	v1alpha1 "github.com/openshift/api/network/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // DNSNameResolverResolvedNameApplyConfiguration represents an declarative configuration of the DNSNameResolverResolvedName type for use
 // with apply.
 type DNSNameResolverResolvedNameApplyConfiguration struct {
-	Conditions         []v1.Condition                                     `json:"conditions,omitempty"`
+	Conditions         []v1.ConditionApplyConfiguration                   `json:"conditions,omitempty"`
 	DNSName            *v1alpha1.DNSName                                  `json:"dnsName,omitempty"`
 	ResolvedAddresses  []DNSNameResolverResolvedAddressApplyConfiguration `json:"resolvedAddresses,omitempty"`
 	ResolutionFailures *int32                                             `json:"resolutionFailures,omitempty"`
@@ -25,9 +25,12 @@ func DNSNameResolverResolvedName() *DNSNameResolverResolvedNameApplyConfiguratio
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *DNSNameResolverResolvedNameApplyConfiguration) WithConditions(values ...v1.Condition) *DNSNameResolverResolvedNameApplyConfiguration {
+func (b *DNSNameResolverResolvedNameApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *DNSNameResolverResolvedNameApplyConfiguration {
 	for i := range values {
-		b.Conditions = append(b.Conditions, values[i])
+		if values[i] == nil {
+			panic("nil value passed to WithConditions")
+		}
+		b.Conditions = append(b.Conditions, *values[i])
 	}
 	return b
 }

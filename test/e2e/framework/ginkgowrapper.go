@@ -148,7 +148,7 @@ func ConformanceIt(args ...interface{}) bool {
 
 // It is a wrapper around [ginkgo.It] which supports framework With* labels as
 // optional arguments in addition to those already supported by ginkgo itself,
-// like [ginkgo.Label] and [gingko.Offset].
+// like [ginkgo.Label] and [ginkgo.Offset].
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
@@ -163,7 +163,7 @@ func (f *Framework) It(args ...interface{}) bool {
 
 // Describe is a wrapper around [ginkgo.Describe] which supports framework
 // With* labels as optional arguments in addition to those already supported by
-// ginkgo itself, like [ginkgo.Label] and [gingko.Offset].
+// ginkgo itself, like [ginkgo.Label] and [ginkgo.Offset].
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
@@ -178,7 +178,7 @@ func (f *Framework) Describe(args ...interface{}) bool {
 
 // Context is a wrapper around [ginkgo.Context] which supports framework With*
 // labels as optional arguments in addition to those already supported by
-// ginkgo itself, like [ginkgo.Label] and [gingko.Offset].
+// ginkgo itself, like [ginkgo.Label] and [ginkgo.Offset].
 //
 // Text and arguments may be mixed. The final text is a concatenation
 // of the text arguments and special tags from the With functions.
@@ -248,7 +248,7 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 
 var (
 	tagRe                 = regexp.MustCompile(`\[.*?\]`)
-	deprecatedTags        = sets.New("Conformance", "NodeConformance", "Disruptive", "Serial", "Slow")
+	deprecatedTags        = sets.New("Conformance", "Flaky", "NodeConformance", "Disruptive", "Serial", "Slow")
 	deprecatedTagPrefixes = sets.New("Environment", "Feature", "NodeFeature", "FeatureGate")
 	deprecatedStability   = sets.New("Alpha", "Beta")
 )
@@ -528,15 +528,37 @@ func withLabel(label string) interface{} {
 	return newLabel(label)
 }
 
+// WithFlaky specifies that a certain test or group of tests are failing randomly.
+// These tests are usually filtered out and ran separately from other tests.
+func WithFlaky() interface{} {
+	return withFlaky()
+}
+
+// WithFlaky is a shorthand for the corresponding package function.
+func (f *Framework) WithFlaky() interface{} {
+	return withFlaky()
+}
+
+func withFlaky() interface{} {
+	return newLabel("Flaky")
+}
+
 type label struct {
 	// parts get concatenated with ":" to build the full label.
 	parts []string
 	// extra is an optional fully-formed extra label.
 	extra string
+	// explanation gets set for each label to help developers
+	// who pass a label to a ginkgo function. They need to use
+	// the corresponding framework function instead.
+	explanation string
 }
 
 func newLabel(parts ...string) label {
-	return label{parts: parts}
+	return label{
+		parts:       parts,
+		explanation: "If you see this as part of an 'Unknown Decorator' error from Ginkgo, then you need to replace the ginkgo.It/Context/Describe call with the corresponding framework.It/Context/Describe or (if available) f.It/Context/Describe.",
+	}
 }
 
 // TagsEqual can be used to check whether two tags are the same.

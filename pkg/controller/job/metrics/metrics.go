@@ -71,6 +71,20 @@ var (
 		[]string{"completion_mode", "result", "reason"},
 	)
 
+	// JobByExternalControllerTotal tracks the number of Jobs that were created
+	// as managed by an external controller.
+	// The value of the label controller_name corresponds to the value of the
+	// managedBy field.
+	JobByExternalControllerTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      JobControllerSubsystem,
+			Name:           "jobs_by_external_controller_total",
+			Help:           "The number of Jobs managed by an external controller",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"controller_name"},
+	)
+
 	// JobPodsFinished records the number of finished Pods that the job controller
 	// finished tracking.
 	// It only applies to Jobs that were created while the feature gate
@@ -195,5 +209,6 @@ func Register() {
 		legacyregistry.MustRegister(TerminatedPodsTrackingFinalizerTotal)
 		legacyregistry.MustRegister(JobFinishedIndexesTotal)
 		legacyregistry.MustRegister(JobPodsCreationTotal)
+		legacyregistry.MustRegister(JobByExternalControllerTotal)
 	})
 }

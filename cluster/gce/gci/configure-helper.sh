@@ -2301,6 +2301,7 @@ function start-cloud-controller-manager {
   params+=("--secure-port=10258")
   params+=("--use-service-account-credentials")
   params+=("--cloud-provider=gce")
+  params+=("--concurrent-node-syncs=10")
   params+=("--kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
   params+=("--authorization-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
   params+=("--authentication-kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig")
@@ -2465,7 +2466,7 @@ function start-cluster-autoscaler {
     echo "Start kubernetes cluster autoscaler"
     setup-addon-manifests "addons" "rbac/cluster-autoscaler"
     create-kubeconfig "cluster-autoscaler" "${KUBE_CLUSTER_AUTOSCALER_TOKEN}"
-    prepare-log-file /var/log/cluster-autoscaler.log
+    prepare-log-file /var/log/cluster-autoscaler.log "${CLUSTER_AUTOSCALER_RUNASUSER:-0}"
 
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
@@ -2484,6 +2485,17 @@ function start-cluster-autoscaler {
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
     sed -i -e "s@{%.*%}@@g" "${src_file}"
+
+    if [[ -n "${CLUSTER_AUTOSCALER_RUNASUSER:-}" && -n "${CLUSTER_AUTOSCALER_RUNASGROUP:-}" ]]; then
+      #run-cluster-autoscaler-as-non-root
+      sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${CLUSTER_AUTOSCALER_RUNASUSER},@g" "${src_file}"
+      sed -i -e "s@{{runAsGroup}}@\"runAsGroup\":${CLUSTER_AUTOSCALER_RUNASGROUP},@g" "${src_file}"
+      sed -i -e "s@{{supplementalGroups}}@\"supplementalGroups\": [ ${KUBE_PKI_READERS_GROUP} ],@g" "${src_file}"
+    else
+      sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
+      sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
+      sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
+    fi
 
     cp "${src_file}" /etc/kubernetes/manifests
   fi

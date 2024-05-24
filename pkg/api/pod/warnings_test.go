@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -296,16 +297,16 @@ func TestWarnings(t *testing.T) {
 				}}},
 			}},
 			expected: []string{
-				`spec.initContainers[0].env[1]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[2]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[3]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[4]: hides previous definition of "a"`,
-				`spec.initContainers[0].env[5]: hides previous definition of "a"`,
-				`spec.containers[0].env[1]: hides previous definition of "b"`,
-				`spec.containers[0].env[2]: hides previous definition of "b"`,
-				`spec.containers[0].env[3]: hides previous definition of "b"`,
-				`spec.containers[0].env[4]: hides previous definition of "b"`,
-				`spec.containers[0].env[5]: hides previous definition of "b"`,
+				`spec.initContainers[0].env[1]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[2]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[3]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[4]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.initContainers[0].env[5]: hides previous definition of "a", which may be dropped when using apply`,
+				`spec.containers[0].env[1]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[2]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[3]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[4]: hides previous definition of "b", which may be dropped when using apply`,
+				`spec.containers[0].env[5]: hides previous definition of "b", which may be dropped when using apply`,
 			},
 		},
 		{
@@ -1066,12 +1067,12 @@ func TestWarnings(t *testing.T) {
 			if tc.oldTemplate != nil {
 				oldTemplate = tc.oldTemplate
 			}
-			actual := sets.NewString(GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})
@@ -1084,13 +1085,100 @@ func TestWarnings(t *testing.T) {
 					Spec:       tc.template.Spec,
 				}
 			}
-			actual := sets.NewString(GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
-			expected := sets.NewString(tc.expected...)
-			for _, missing := range expected.Difference(actual).List() {
+			actual := sets.New[string](GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range actual.Difference(expected).List() {
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
 				t.Errorf("extra: %s", extra)
+			}
+		})
+	}
+}
+
+func TestTemplateOnlyWarnings(t *testing.T) {
+	testcases := []struct {
+		name        string
+		template    *api.PodTemplateSpec
+		oldTemplate *api.PodTemplateSpec
+		expected    []string
+	}{
+		{
+			name: "annotations",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
+				}},
+				Spec: api.PodSpec{Containers: []api.Container{{Name: "foo"}}},
+			},
+			expected: []string{
+				`template.metadata.annotations[container.apparmor.security.beta.kubernetes.io/foo]: deprecated since v1.30; use the "appArmorProfile" field instead`,
+			},
+		},
+		{
+			name: "AppArmor pod field",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
+				}},
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined},
+					},
+					Containers: []api.Container{{
+						Name: "foo",
+					}},
+				},
+			},
+			expected: []string{},
+		},
+		{
+			name: "AppArmor container field",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
+				}},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name: "foo",
+						SecurityContext: &api.SecurityContext{
+							AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined},
+						},
+					}},
+				},
+			},
+			expected: []string{},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run("podspec_"+tc.name, func(t *testing.T) {
+			var oldTemplate *api.PodTemplateSpec
+			if tc.oldTemplate != nil {
+				oldTemplate = tc.oldTemplate
+			}
+			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), field.NewPath("template"), tc.template, oldTemplate)...)
+			expected := sets.New[string](tc.expected...)
+			for _, missing := range sets.List[string](expected.Difference(actual)) {
+				t.Errorf("missing: %s", missing)
+			}
+			for _, extra := range sets.List[string](actual.Difference(expected)) {
+				t.Errorf("extra: %s", extra)
+			}
+		})
+
+		t.Run("pod_"+tc.name, func(t *testing.T) {
+			var pod *api.Pod
+			if tc.template != nil {
+				pod = &api.Pod{
+					ObjectMeta: tc.template.ObjectMeta,
+					Spec:       tc.template.Spec,
+				}
+			}
+			actual := GetWarningsForPod(context.TODO(), pod, &api.Pod{})
+			if len(actual) > 0 {
+				t.Errorf("unexpected template-only warnings on pod: %v", actual)
 			}
 		})
 	}

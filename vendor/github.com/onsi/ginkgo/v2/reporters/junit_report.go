@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2/config"
@@ -104,6 +105,8 @@ type JUnitProperty struct {
 	Value string `xml:"value,attr"`
 }
 
+var ownerRE = regexp.MustCompile(`(?i)^owner:(.*)$`)
+
 type JUnitTestCase struct {
 	// Name maps onto the full text of the spec - equivalent to "[SpecReport.LeafNodeType] SpecReport.FullText()"
 	Name string `xml:"name,attr"`
@@ -113,6 +116,8 @@ type JUnitTestCase struct {
 	Status string `xml:"status,attr"`
 	// Time is the time in seconds to execute the spec - maps onto SpecReport.RunTime
 	Time float64 `xml:"time,attr"`
+	// Owner is the owner the spec - is set if a label matching Label("owner:X") is provided.  The last matching label is used as the owner, thereby allowing specs to override owners specified in container nodes.
+	Owner string `xml:"owner,attr,omitempty"`
 	//Skipped is populated with a message if the test was skipped or pending
 	Skipped *JUnitSkipped `xml:"skipped,omitempty"`
 	//Error is populated if the test panicked or was interrupted
@@ -195,6 +200,12 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 		if len(labels) > 0 && !config.OmitSpecLabels {
 			name = name + " [" + strings.Join(labels, ", ") + "]"
 		}
+		owner := ""
+		for _, label := range labels {
+			if matches := ownerRE.FindStringSubmatch(label); len(matches) == 2 {
+				owner = matches[1]
+			}
+		}
 		name = strings.TrimSpace(name)
 
 		test := JUnitTestCase{
@@ -202,6 +213,7 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 			Classname: report.SuiteDescription,
 			Status:    spec.State.String(),
 			Time:      spec.RunTime.Seconds(),
+			Owner:     owner,
 		}
 		if !spec.State.Is(config.OmitTimelinesForSpecState) {
 			test.SystemErr = systemErrForUnstructuredReporters(spec)

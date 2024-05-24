@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -454,7 +458,7 @@ func TestMigrateOldConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			b, err := MigrateOldConfig([]byte(test.oldCfg), test.allowExperimental)
+			b, err := MigrateOldConfig([]byte(test.oldCfg), test.allowExperimental, defaultEmptyMigrateMutators())
 			if test.expectErr {
 				if err == nil {
 					t.Fatalf("unexpected success:\n%s", b)
@@ -747,6 +751,158 @@ func TestNormalizeKubernetesVersion(t *testing.T) {
 			}
 			if !tc.expectErr && err != nil {
 				t.Errorf("unexpected failure: %v", err)
+			}
+		})
+	}
+}
+
+// TODO: update the test cases for this test once v1beta3 is removed.
+func TestDefaultMigrateMutators(t *testing.T) {
+	tests := []struct {
+		name          string
+		mutators      migrateMutators
+		input         []any
+		expected      []any
+		expectedDiff  bool
+		expectedError bool
+	}{
+		{
+			name:     "mutate InitConfiguration",
+			mutators: defaultMigrateMutators(),
+			input: []any{&kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					APIServer: kubeadmapi.APIServer{
+						TimeoutForControlPlane: &metav1.Duration{
+							Duration: 1234 * time.Millisecond,
+						},
+					},
+				},
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{},
+				},
+			}},
+			expected: []any{&kubeadmapi.InitConfiguration{
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{
+						Duration: 1234 * time.Millisecond,
+					},
+				},
+			}},
+		},
+		{
+			name:     "mutate JoinConfiguration",
+			mutators: defaultMigrateMutators(),
+			input: []any{&kubeadmapi.JoinConfiguration{
+				Discovery: kubeadmapi.Discovery{
+					Timeout: &metav1.Duration{
+						Duration: 1234 * time.Microsecond,
+					},
+				},
+				Timeouts: &kubeadmapi.Timeouts{
+					Discovery: &metav1.Duration{},
+				},
+			}},
+			expected: []any{&kubeadmapi.JoinConfiguration{
+				Timeouts: &kubeadmapi.Timeouts{
+					Discovery: &metav1.Duration{
+						Duration: 1234 * time.Microsecond,
+					},
+				},
+			}},
+		},
+		{
+			name:     "diff when mutating InitConfiguration",
+			mutators: defaultMigrateMutators(),
+			input: []any{&kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					APIServer: kubeadmapi.APIServer{
+						TimeoutForControlPlane: &metav1.Duration{
+							Duration: 1234 * time.Millisecond,
+						},
+					},
+				},
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{},
+				},
+			}},
+			expected: []any{&kubeadmapi.InitConfiguration{
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{
+						Duration: 1 * time.Millisecond, // a different value
+					},
+				},
+			}},
+			expectedDiff: true,
+		},
+		{
+			name:          "expect an error for a missing mutator",
+			mutators:      migrateMutators{}, // empty list of mutators
+			input:         []any{&kubeadmapi.ResetConfiguration{}},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.mutators.mutate(tc.input)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, (err != nil), err)
+			}
+			if err != nil {
+				return
+			}
+			diff := cmp.Diff(tc.expected, tc.input)
+			if (len(diff) > 0) != tc.expectedDiff {
+				t.Fatalf("got a diff with the expected config (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIsKubeadmConfigPresent(t *testing.T) {
+	var tcases = []struct {
+		name     string
+		gvkmap   kubeadmapi.DocumentMap
+		expected bool
+	}{
+		{
+			name: " Wrong Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: []byte(`kind: Foo`),
+			},
+			expected: false,
+		},
+		{
+			name: "Empty Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: false,
+		},
+		{
+			name:     "Nil value",
+			gvkmap:   nil,
+			expected: false,
+		},
+		{
+			name: "Correct Group value 1",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "kubeadm.k8s.io", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+		{
+			name: "Correct Group value 2",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: kubeadmapi.GroupName, Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			if isKubeadmConfigPresent(tt.gvkmap) != tt.expected {
+				t.Error("unexpected result")
 			}
 		})
 	}

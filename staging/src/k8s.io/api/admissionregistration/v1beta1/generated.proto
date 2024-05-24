@@ -222,6 +222,7 @@ message MutatingWebhook {
   // from putting the cluster in a state which cannot be recovered from without completely
   // disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
   // on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
+  // +listType=atomic
   repeated k8s.io.api.admissionregistration.v1.RuleWithOperations rules = 3;
 
   // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -332,6 +333,7 @@ message MutatingWebhook {
   // and be subject to the failure policy.
   // Default to `['v1beta1']`.
   // +optional
+  // +listType=atomic
   repeated string admissionReviewVersions = 8;
 
   // reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation.
@@ -364,13 +366,10 @@ message MutatingWebhook {
   //      - If failurePolicy=Fail, reject the request
   //      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
   //
-  // This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=AdmissionWebhookMatchConditions
   // +optional
   repeated MatchCondition matchConditions = 12;
 }
@@ -386,6 +385,8 @@ message MutatingWebhookConfiguration {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated MutatingWebhook Webhooks = 2;
 }
 
@@ -765,6 +766,7 @@ message ValidatingWebhook {
   // from putting the cluster in a state which cannot be recovered from without completely
   // disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
   // on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
+  // +listType=atomic
   repeated k8s.io.api.admissionregistration.v1.RuleWithOperations rules = 3;
 
   // FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -856,6 +858,7 @@ message ValidatingWebhook {
   // Requests with the dryRun attribute will be auto-rejected if they match a webhook with
   // sideEffects == Unknown or Some. Defaults to Unknown.
   // +optional
+  // +listType=atomic
   optional string sideEffects = 6;
 
   // TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
@@ -875,6 +878,7 @@ message ValidatingWebhook {
   // and be subject to the failure policy.
   // Default to `['v1beta1']`.
   // +optional
+  // +listType=atomic
   repeated string admissionReviewVersions = 8;
 
   // MatchConditions is a list of conditions that must be met for a request to be sent to this
@@ -889,13 +893,10 @@ message ValidatingWebhook {
   //      - If failurePolicy=Fail, reject the request
   //      - If failurePolicy=Ignore, the error is ignored and the webhook is skipped
   //
-  // This is a beta feature and managed by the AdmissionWebhookMatchConditions feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=AdmissionWebhookMatchConditions
   // +optional
   repeated MatchCondition matchConditions = 11;
 }
@@ -911,6 +912,8 @@ message ValidatingWebhookConfiguration {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated ValidatingWebhook Webhooks = 2;
 }
 

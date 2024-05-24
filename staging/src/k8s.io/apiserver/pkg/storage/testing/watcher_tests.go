@@ -1504,31 +1504,36 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 // by adding the pod to a different ns to advance the global RV
 func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, store storage.Interface) {
 	trueVal := true
-	expectedInitialEventsInStrictOrder := func(firstPod, secondPod *example.Pod) []watch.Event {
-		return []watch.Event{
-			{Type: watch.Added, Object: firstPod},
-			{Type: watch.Bookmark, Object: &example.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					ResourceVersion: secondPod.ResourceVersion,
-					Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
-				},
-			}},
+	expectedInitialEventsInStrictOrder := func(initialPods []*example.Pod, globalResourceVersion string) []watch.Event {
+		watchEvents := []watch.Event{}
+		for _, initialPod := range initialPods {
+			watchEvents = append(watchEvents, watch.Event{Type: watch.Added, Object: initialPod})
 		}
+		watchEvents = append(watchEvents, watch.Event{Type: watch.Bookmark, Object: &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: globalResourceVersion,
+				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+			},
+		}})
+		return watchEvents
 	}
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
 
+	initialPods := []*example.Pod{}
 	ns := "ns-foo"
-	pod := makePod("1")
-	pod.Namespace = ns
-	firstPod := &example.Pod{}
-	err := store.Create(ctx, computePodKey(pod), pod, firstPod, 0)
-	require.NoError(t, err, "failed to add a pod: %v")
+	for _, initialPod := range []*example.Pod{makePod("1"), makePod("2"), makePod("3"), makePod("4"), makePod("5")} {
+		initialPod.Namespace = ns
+		out := &example.Pod{}
+		err := store.Create(ctx, computePodKey(initialPod), initialPod, out, 0)
+		require.NoError(t, err, "failed to add a pod: %v")
+		initialPods = append(initialPods, out)
+	}
 
 	// add the pod to a different ns to advance the global RV
-	pod = makePod("2")
+	pod := makePod("1")
 	pod.Namespace = "other-ns-foo"
-	secondPod := &example.Pod{}
-	err = store.Create(ctx, computePodKey(pod), pod, secondPod, 0)
+	otherNsPod := &example.Pod{}
+	err := store.Create(ctx, computePodKey(pod), pod, otherNsPod, 0)
 	require.NoError(t, err, "failed to add a pod: %v")
 
 	opts := storage.ListOptions{Predicate: storage.Everything, Recursive: true}
@@ -1541,7 +1546,7 @@ func RunWatchSemanticInitialEventsExtended(ctx context.Context, t *testing.T, st
 
 	// make sure we only get initial events from the first ns
 	// followed by the bookmark with the global RV
-	testCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(firstPod, secondPod))
+	testCheckResultsInStrictOrder(t, w, expectedInitialEventsInStrictOrder(initialPods, otherNsPod.ResourceVersion))
 	testCheckNoMoreResults(t, w)
 }
 

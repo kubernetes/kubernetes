@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/portforward"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
@@ -99,6 +100,23 @@ func IsWebSocketRequestWithStreamCloseProtocol(req *http.Request) bool {
 	requestedProtocols := strings.TrimSpace(req.Header.Get(WebSocketProtocolHeader))
 	for _, requestedProtocol := range strings.Split(requestedProtocols, ",") {
 		if protocolSupportsStreamClose(strings.TrimSpace(requestedProtocol)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsWebSocketRequestWithTunnelingProtocol returns true if the request contains headers
+// identifying that it is requesting a websocket upgrade with a tunneling protocol;
+// false otherwise.
+func IsWebSocketRequestWithTunnelingProtocol(req *http.Request) bool {
+	if !IsWebSocketRequest(req) {
+		return false
+	}
+	requestedProtocols := strings.TrimSpace(req.Header.Get(WebSocketProtocolHeader))
+	for _, requestedProtocol := range strings.Split(requestedProtocols, ",") {
+		if protocolSupportsWebsocketTunneling(strings.TrimSpace(requestedProtocol)) {
 			return true
 		}
 	}
@@ -299,6 +317,12 @@ func (conn *Conn) Close() error {
 // false otherwise.
 func protocolSupportsStreamClose(protocol string) bool {
 	return protocol == remotecommand.StreamProtocolV5Name
+}
+
+// protocolSupportsWebsocketTunneling returns true if the passed protocol
+// is a tunneled Kubernetes spdy protocol; false otherwise.
+func protocolSupportsWebsocketTunneling(protocol string) bool {
+	return strings.HasPrefix(protocol, portforward.WebsocketsSPDYTunnelingPrefix) && strings.HasSuffix(protocol, portforward.KubernetesSuffix)
 }
 
 // handle implements a websocket handler.

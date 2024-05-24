@@ -334,6 +334,9 @@ template:
       restartPolicy: restartPolicyValue
       securityContext:
         allowPrivilegeEscalation: true
+        appArmorProfile:
+          localhostProfile: localhostProfileValue
+          type: typeValue
         capabilities:
           add:
           - addValue
@@ -395,6 +398,7 @@ template:
         mountPropagation: mountPropagationValue
         name: nameValue
         readOnly: true
+        recursiveReadOnly: recursiveReadOnlyValue
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue
@@ -545,6 +549,9 @@ template:
       restartPolicy: restartPolicyValue
       securityContext:
         allowPrivilegeEscalation: true
+        appArmorProfile:
+          localhostProfile: localhostProfileValue
+          type: typeValue
         capabilities:
           add:
           - addValue
@@ -607,6 +614,7 @@ template:
         mountPropagation: mountPropagationValue
         name: nameValue
         readOnly: true
+        recursiveReadOnly: recursiveReadOnlyValue
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue
@@ -758,6 +766,9 @@ template:
       restartPolicy: restartPolicyValue
       securityContext:
         allowPrivilegeEscalation: true
+        appArmorProfile:
+          localhostProfile: localhostProfileValue
+          type: typeValue
         capabilities:
           add:
           - addValue
@@ -819,6 +830,7 @@ template:
         mountPropagation: mountPropagationValue
         name: nameValue
         readOnly: true
+        recursiveReadOnly: recursiveReadOnlyValue
         subPath: subPathValue
         subPathExpr: subPathExprValue
       workingDir: workingDirValue
@@ -845,6 +857,9 @@ template:
     schedulingGates:
     - name: nameValue
     securityContext:
+      appArmorProfile:
+        localhostProfile: localhostProfileValue
+        type: typeValue
       fsGroup: 5
       fsGroupChangePolicy: fsGroupChangePolicyValue
       runAsGroup: 6

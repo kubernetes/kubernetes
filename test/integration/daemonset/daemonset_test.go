@@ -62,9 +62,7 @@ func setup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *d
 }
 
 func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (context.Context, kubeapiservertesting.TearDownFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-
+	tCtx := ktesting.Init(t)
 	modifyServerRunOptions := serverSetup.ModifyServerRunOptions
 	serverSetup.ModifyServerRunOptions = func(opts *options.ServerRunOptions) {
 		if modifyServerRunOptions != nil {
@@ -79,12 +77,12 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 		)
 	}
 
-	clientSet, config, closeFn := framework.StartTestServer(ctx, t, serverSetup)
+	clientSet, config, closeFn := framework.StartTestServer(tCtx, t, serverSetup)
 
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-informers")), resyncPeriod)
 	dc, err := daemon.NewDaemonSetsController(
-		ctx,
+		tCtx,
 		informers.Apps().V1().DaemonSets(),
 		informers.Apps().V1().ControllerRevisions(),
 		informers.Core().V1().Pods(),
@@ -101,7 +99,7 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 	})
 
 	sched, err := scheduler.New(
-		ctx,
+		tCtx,
 		clientSet,
 		informers,
 		nil,
@@ -111,16 +109,16 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 
-	eventBroadcaster.StartRecordingToSink(ctx.Done())
-	go sched.Run(ctx)
+	eventBroadcaster.StartRecordingToSink(tCtx.Done())
+	go sched.Run(tCtx)
 
 	tearDownFn := func() {
-		cancel()
+		tCtx.Cancel("tearing down apiserver")
 		closeFn()
 		eventBroadcaster.Shutdown()
 	}
 
-	return ctx, tearDownFn, dc, informers, clientSet
+	return tCtx, tearDownFn, dc, informers, clientSet
 }
 
 func testLabels() map[string]string {

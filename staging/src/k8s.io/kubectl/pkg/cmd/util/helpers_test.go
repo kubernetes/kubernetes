@@ -289,6 +289,26 @@ func TestJSONPatch(t *testing.T) {
 			fragment:  `[ {"op": "add", "path": "/metadata/labels/foo", "value": "bar"} ]`,
 			expectErr: true,
 		},
+		{
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "foo",
+					Finalizers: []string{"foo", "bar", "test"},
+				},
+			},
+			fragment: `[ {"op": "replace", "path": "/metadata/finalizers/-1", "value": "baz"} ]`,
+			expected: &corev1.Pod{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "foo",
+					Finalizers: []string{"foo", "bar", "baz"},
+				},
+				Spec: corev1.PodSpec{},
+			},
+		},
 	}
 
 	codec := runtime.NewCodec(scheme.DefaultJSONEncoder(),

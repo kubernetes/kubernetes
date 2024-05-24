@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -122,9 +124,9 @@ func New(ctx context.Context, kubeClient clientset.Interface, cloud cloudprovide
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(logger, kubeClient, nodeInformer, allocatorParams, nodeList)
+		return NewCIDRRangeAllocator(ctx, kubeClient, nodeInformer, allocatorParams, nodeList)
 	case CloudAllocatorType:
-		return NewCloudCIDRAllocator(logger, kubeClient, cloud, nodeInformer)
+		return NewCloudCIDRAllocator(ctx, kubeClient, cloud, nodeInformer)
 	default:
 		return nil, fmt.Errorf("invalid CIDR allocator type: %v", allocatorType)
 	}
@@ -159,4 +161,15 @@ func ipnetToStringList(inCIDRs []*net.IPNet) []string {
 		outCIDRs[idx] = inCIDR.String()
 	}
 	return outCIDRs
+}
+
+// occupyServiceCIDR removes the service CIDR range from the cluster CIDR if it
+// intersects.
+func occupyServiceCIDR(set *cidrset.CidrSet, clusterCIDR, serviceCIDR *net.IPNet) error {
+	if clusterCIDR.Contains(serviceCIDR.IP) || serviceCIDR.Contains(clusterCIDR.IP) {
+		if err := set.Occupy(serviceCIDR); err != nil {
+			return err
+		}
+	}
+	return nil
 }

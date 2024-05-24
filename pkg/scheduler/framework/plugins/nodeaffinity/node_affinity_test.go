@@ -18,9 +18,11 @@ package nodeaffinity
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
@@ -1004,12 +1007,13 @@ func TestNodeAffinityPriority(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		args         config.NodeAffinityArgs
-		runPreScore  bool
+		name               string
+		pod                *v1.Pod
+		nodes              []*v1.Node
+		expectedList       framework.NodeScoreList
+		args               config.NodeAffinityArgs
+		runPreScore        bool
+		wantPreScoreStatus *framework.Status
 	}{
 		{
 			name: "all nodes are same priority as NodeAffinity is nil",
@@ -1024,7 +1028,53 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
 			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
-			runPreScore:  true,
+		},
+		{
+			// PreScore returns Skip.
+			name: "Skip is returned in PreScore when NodeAffinity is nil",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+			},
+			runPreScore:        true,
+			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			name: "PreScore returns error when an incoming Pod has a broken affinity",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+								{
+									Weight: 2,
+									Preference: v1.NodeSelectorTerm{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "invalid key",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+			},
+			runPreScore:        true,
+			wantPreScoreStatus: framework.AsStatus(fmt.Errorf(`[0].matchExpressions[0].key: Invalid value: "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`)),
 		},
 		{
 			name: "no node matches preferred scheduling requirements in NodeAffinity of pod so all nodes' priority is zero",
@@ -1148,9 +1198,16 @@ func TestNodeAffinityPriority(t *testing.T) {
 			}
 			var status *framework.Status
 			if test.runPreScore {
-				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
+				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+				if status.Code() != test.wantPreScoreStatus.Code() {
+					t.Errorf("unexpected status code from PreScore: want: %v got: %v", test.wantPreScoreStatus.Code().String(), status.Code().String())
+				}
+				if status.Message() != test.wantPreScoreStatus.Message() {
+					t.Errorf("unexpected status message from PreScore: want: %v got: %v", test.wantPreScoreStatus.Message(), status.Message())
+				}
 				if !status.IsSuccess() {
-					t.Errorf("unexpected error: %v", status)
+					// no need to proceed.
+					return
 				}
 			}
 			var gotList framework.NodeScoreList
@@ -1171,6 +1228,135 @@ func TestNodeAffinityPriority(t *testing.T) {
 			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
 				t.Errorf("obtained scores (-want,+got):\n%s", diff)
 			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterNodeChange(t *testing.T) {
+	podWithNodeAffinity := st.MakePod().NodeAffinityIn("foo", []string{"bar"})
+	testcases := map[string]struct {
+		args           *config.NodeAffinityArgs
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.Obj(),
+			newObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-old-object": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.Obj(),
+			oldObj:       "not-a-node",
+			newObj:       st.MakeNode().Obj(),
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"skip-queue-on-add": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.Obj(),
+			newObj:       st.MakeNode().Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-add": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.Obj(),
+			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
+			expectedHint: framework.Queue,
+		},
+		"skip-unrelated-changes": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.Obj(),
+			oldObj:       st.MakeNode().Obj(),
+			newObj:       st.MakeNode().Capacity(nil).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-unrelated-changes-on-labels": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.DeepCopy(),
+			oldObj:       st.MakeNode().Obj(),
+			newObj:       st.MakeNode().Label("k", "v").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-labels-changes-on-node-from-suitable-to-unsuitable": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.DeepCopy(),
+			oldObj:       st.MakeNode().Label("foo", "bar").Obj(),
+			newObj:       st.MakeNode().Label("k", "v").Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-labels-change-makes-pod-schedulable": {
+			args:         &config.NodeAffinityArgs{},
+			pod:          podWithNodeAffinity.Obj(),
+			oldObj:       st.MakeNode().Obj(),
+			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
+			expectedHint: framework.Queue,
+		},
+		"skip-queue-on-add-scheduler-enforced-node-affinity": {
+			args: &config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pod:          podWithNodeAffinity.Obj(),
+			newObj:       st.MakeNode().Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-add-scheduler-enforced-node-affinity": {
+			args: &config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pod:          podWithNodeAffinity.Obj(),
+			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := New(ctx, tc.args, nil)
+			if err != nil {
+				t.Fatalf("Creating plugin: %v", err)
+			}
+
+			actualHint, err := p.(*NodeAffinity).isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
 		})
 	}
 }

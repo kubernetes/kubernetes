@@ -17,7 +17,6 @@ limitations under the License.
 package defaulttolerationseconds
 
 import (
-	"context"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,11 +29,8 @@ import (
 )
 
 func TestAdmission(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	tCtx := ktesting.Init(t)
+	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(cfg *controlplane.Config) {
 			cfg.GenericConfig.EnableProfiling = true
 			cfg.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
@@ -60,7 +56,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(ctx, &pod, metav1.CreateOptions{})
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(tCtx, &pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating pod: %v", err)
 	}

@@ -235,7 +235,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
-		audit.AddAuditAnnotation(ctx, serviceaccount.CredentialIDKey, serviceaccount.CredentialIDForJTI(sc.ID))
+		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, serviceaccount.CredentialIDForJTI(sc.ID))
 	}
 	return out, nil
 }

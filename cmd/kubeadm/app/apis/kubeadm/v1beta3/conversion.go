@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -27,11 +28,6 @@ import (
 // Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration converts a private InitConfiguration to public InitConfiguration.
 func Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	return autoConvert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in, out, s)
-}
-
-// Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration converts a private JoinConfiguration to public JoinConfiguration.
-func Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
-	return autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in, out, s)
 }
 
 // Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration converts a public InitConfiguration to private InitConfiguration.
@@ -45,7 +41,20 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	// If we call Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration() it will receive
 	// a default value, thus here we need to reset it back to "".
 	out.EncryptionAlgorithm = ""
+	// Set default timeouts.
+	kubeadm.SetDefaultTimeouts(&out.Timeouts)
 	return err
+}
+
+// Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration converts a private JoinConfiguration to public JoinConfiguration.
+func Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	return autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in, out, s)
+}
+
+// Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration converts a public JoinConfiguration to a private JoinConfiguration.
+func Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	kubeadm.SetDefaultTimeouts(&out.Timeouts)
+	return autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 }
 
 // Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration is required due to missing EncryptionAlgorithm in v1beta3.
@@ -57,7 +66,7 @@ func Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in *ku
 func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
 	// Required to pass validation and fuzzer tests. The field is missing in v1beta3, thus we have to
 	// default it to a sane (default) value in the internal type.
-	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA
+	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
@@ -90,6 +99,7 @@ func Convert_kubeadm_LocalEtcd_To_v1beta3_LocalEtcd(in *kubeadm.LocalEtcd, out *
 // Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions converts a public NodeRegistrationOptions to private NodeRegistrationOptions.
 func Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in *NodeRegistrationOptions, out *kubeadm.NodeRegistrationOptions, s conversion.Scope) error {
 	out.KubeletExtraArgs = convertToArgs(in.KubeletExtraArgs)
+	out.ImagePullSerial = ptr.To(true)
 	return autoConvert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(in, out, s)
 }
 
@@ -134,4 +144,9 @@ func convertFromArgs(in []kubeadm.Arg) map[string]string {
 		args[arg.Name] = arg.Value
 	}
 	return args
+}
+
+// Convert_v1beta3_APIServer_To_kubeadm_APIServer is required due to missing APIServer.TimeoutForControlPlane in v1beta4.
+func Convert_v1beta3_APIServer_To_kubeadm_APIServer(in *APIServer, out *kubeadm.APIServer, s conversion.Scope) error {
+	return autoConvert_v1beta3_APIServer_To_kubeadm_APIServer(in, out, s)
 }

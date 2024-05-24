@@ -19,6 +19,7 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -31,28 +32,42 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	clientsetretry "k8s.io/client-go/util/retry"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // ConfigMapMutator is a function that mutates the given ConfigMap and optionally returns an error
 type ConfigMapMutator func(*v1.ConfigMap) error
 
+// apiCallRetryInterval holds a local copy of apiCallRetryInterval for testing purposes
+var apiCallRetryInterval = constants.KubernetesAPICallRetryInterval
+
 // TODO: We should invent a dynamic mechanism for this using the dynamic client instead of hard-coding these functions per-type
 
 // CreateOrUpdateConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error {
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create ConfigMap")
-		}
-
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update ConfigMap")
-		}
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(ctx, cm, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create ConfigMap")
+					return false, nil
+				}
+				if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(ctx, cm, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update ConfigMap")
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrMutateConfigMap tries to create the ConfigMap provided as cm. If the resource exists already, the latest version will be fetched from
@@ -61,149 +76,213 @@ func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error
 // taking place)
 func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutator ConfigMapMutator) error {
 	var lastError error
-	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
-			lastError = err
-			if apierrors.IsAlreadyExists(err) {
-				lastError = MutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
-				return lastError == nil, nil
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.Background(), cm, metav1.CreateOptions{}); err != nil {
+				lastError = err
+				if apierrors.IsAlreadyExists(err) {
+					lastError = mutateConfigMap(client, metav1.ObjectMeta{Namespace: cm.ObjectMeta.Namespace, Name: cm.ObjectMeta.Name}, mutator)
+					return lastError == nil, nil
+				}
+				return false, nil
 			}
-			return false, nil
-		}
-		return true, nil
-	})
+			return true, nil
+		})
 	if err == nil {
 		return nil
 	}
 	return lastError
 }
 
-// MutateConfigMap takes a ConfigMap Object Meta (namespace and name), retrieves the resource from the server and tries to mutate it
+// mutateConfigMap takes a ConfigMap Object Meta (namespace and name), retrieves the resource from the server and tries to mutate it
 // by calling to the mutator callback, then an Update of the mutated ConfigMap will be performed. This function is resilient
 // to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
 // taking place).
-func MutateConfigMap(client clientset.Interface, meta metav1.ObjectMeta, mutator ConfigMapMutator) error {
-	var lastError error
-	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
-		configMap, err := client.CoreV1().ConfigMaps(meta.Namespace).Get(context.TODO(), meta.Name, metav1.GetOptions{})
-		if err != nil {
-			lastError = err
-			return false, nil
-		}
-		if err = mutator(configMap); err != nil {
-			lastError = errors.Wrap(err, "unable to mutate ConfigMap")
-			return false, nil
-		}
-		_, lastError = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
-		return lastError == nil, nil
-	})
-	if err == nil {
-		return nil
+func mutateConfigMap(client clientset.Interface, meta metav1.ObjectMeta, mutator ConfigMapMutator) error {
+	ctx := context.Background()
+	configMap, err := client.CoreV1().ConfigMaps(meta.Namespace).Get(ctx, meta.Name, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrap(err, "unable to get ConfigMap")
 	}
-	return lastError
+	if err = mutator(configMap); err != nil {
+		return errors.Wrap(err, "unable to mutate ConfigMap")
+	}
+	_, err = client.CoreV1().ConfigMaps(configMap.ObjectMeta.Namespace).Update(ctx, configMap, metav1.UpdateOptions{})
+	return err
 }
 
 // CreateOrRetainConfigMap creates a ConfigMap if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.
 func CreateOrRetainConfigMap(client clientset.Interface, cm *v1.ConfigMap, configMapName string) error {
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Get(context.TODO(), configMapName, metav1.GetOptions{}); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil
-		}
-		if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{}); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return errors.Wrap(err, "unable to create ConfigMap")
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Get(ctx, configMapName, metav1.GetOptions{}); err != nil {
+				if !apierrors.IsNotFound(err) {
+					lastError = errors.Wrap(err, "unable to get ConfigMap")
+					return false, nil
+				}
+				if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Create(ctx, cm, metav1.CreateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to create ConfigMap")
+					return false, nil
+				}
 			}
-		}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateSecret creates a Secret if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateSecret(client clientset.Interface, secret *v1.Secret) error {
-	if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create secret")
-		}
-
-		if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Update(context.TODO(), secret, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update secret")
-		}
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create Secret")
+					return false, nil
+				}
+				if _, err := client.CoreV1().Secrets(secret.ObjectMeta.Namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update Secret")
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateServiceAccount creates a ServiceAccount if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateServiceAccount(client clientset.Interface, sa *v1.ServiceAccount) error {
-	if _, err := client.CoreV1().ServiceAccounts(sa.ObjectMeta.Namespace).Create(context.TODO(), sa, metav1.CreateOptions{}); err != nil {
-		// Note: We don't run .Update here afterwards as that's probably not required
-		// Only thing that could be updated is annotations/labels in .metadata, but we don't use that currently
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create serviceaccount")
-		}
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.CoreV1().ServiceAccounts(sa.ObjectMeta.Namespace).Create(ctx, sa, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create ServicAccount")
+					return false, nil
+				}
+				if _, err := client.CoreV1().ServiceAccounts(sa.ObjectMeta.Namespace).Update(ctx, sa, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update ServicAccount")
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateDeployment creates a Deployment if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateDeployment(client clientset.Interface, deploy *apps.Deployment) error {
-	if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create deployment")
-		}
-
-		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Update(context.TODO(), deploy, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update deployment")
-		}
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(ctx, deploy, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create Deployment")
+					return false, nil
+				}
+				if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Update(ctx, deploy, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update Deployment")
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrRetainDeployment creates a Deployment if the target resource doesn't exist. If the resource exists already, this function will retain the resource instead.
 func CreateOrRetainDeployment(client clientset.Interface, deploy *apps.Deployment, deployName string) error {
-	if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Get(context.TODO(), deployName, metav1.GetOptions{}); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil
-		}
-		if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(context.TODO(), deploy, metav1.CreateOptions{}); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return errors.Wrap(err, "unable to create deployment")
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Get(ctx, deployName, metav1.GetOptions{}); err != nil {
+				if !apierrors.IsNotFound(err) {
+					lastError = errors.Wrap(err, "unable to get Deployment")
+					return false, nil
+				}
+				if _, err := client.AppsV1().Deployments(deploy.ObjectMeta.Namespace).Create(ctx, deploy, metav1.CreateOptions{}); err != nil {
+					if !apierrors.IsAlreadyExists(err) {
+						lastError = errors.Wrap(err, "unable to create Deployment")
+						return false, nil
+					}
+				}
 			}
-		}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateDaemonSet creates a DaemonSet if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateDaemonSet(client clientset.Interface, ds *apps.DaemonSet) error {
-	if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Create(context.TODO(), ds, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create daemonset")
-		}
-
-		if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Update(context.TODO(), ds, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update daemonset")
-		}
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Create(ctx, ds, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create DaemonSet")
+					return false, nil
+				}
+				if _, err := client.AppsV1().DaemonSets(ds.ObjectMeta.Namespace).Update(ctx, ds, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update DaemonSet")
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 	var lastError error
-	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
-		if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(context.TODO(), role, metav1.CreateOptions{}); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				lastError = errors.Wrap(err, "unable to create RBAC role")
-				return false, nil
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Create(ctx, role, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create Role")
+					return false, nil
+				}
+				if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(ctx, role, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update Role")
+					return false, nil
+				}
 			}
-
-			if _, err := client.RbacV1().Roles(role.ObjectMeta.Namespace).Update(context.TODO(), role, metav1.UpdateOptions{}); err != nil {
-				lastError = errors.Wrap(err, "unable to update RBAC role")
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+			return true, nil
+		})
 	if err == nil {
 		return nil
 	}
@@ -213,20 +292,22 @@ func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 // CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
 	var lastError error
-	err := wait.PollImmediate(constants.APICallRetryInterval, constants.APICallWithWriteTimeout, func() (bool, error) {
-		if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(context.TODO(), roleBinding, metav1.CreateOptions{}); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				lastError = errors.Wrap(err, "unable to create RBAC rolebinding")
-				return false, nil
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Create(ctx, roleBinding, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create RoleBinding")
+					return false, nil
+				}
+				if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(ctx, roleBinding, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update RoleBinding")
+					return false, nil
+				}
 			}
-
-			if _, err := client.RbacV1().RoleBindings(roleBinding.ObjectMeta.Namespace).Update(context.TODO(), roleBinding, metav1.UpdateOptions{}); err != nil {
-				lastError = errors.Wrap(err, "unable to update RBAC rolebinding")
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+			return true, nil
+		})
 	if err == nil {
 		return nil
 	}
@@ -235,40 +316,60 @@ func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.Rol
 
 // CreateOrUpdateClusterRole creates a ClusterRole if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateClusterRole(client clientset.Interface, clusterRole *rbac.ClusterRole) error {
-	if _, err := client.RbacV1().ClusterRoles().Create(context.TODO(), clusterRole, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create RBAC clusterrole")
-		}
-
-		if _, err := client.RbacV1().ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update RBAC clusterrole")
-		}
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create ClusterRole")
+					return false, nil
+				}
+				if _, err := client.RbacV1().ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update ClusterRole")
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // CreateOrUpdateClusterRoleBinding creates a ClusterRoleBinding if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
 func CreateOrUpdateClusterRoleBinding(client clientset.Interface, clusterRoleBinding *rbac.ClusterRoleBinding) error {
-	if _, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{}); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			return errors.Wrap(err, "unable to create RBAC clusterrolebinding")
-		}
-
-		if _, err := client.RbacV1().ClusterRoleBindings().Update(context.TODO(), clusterRoleBinding, metav1.UpdateOptions{}); err != nil {
-			return errors.Wrap(err, "unable to update RBAC clusterrolebinding")
-		}
+	var lastError error
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, func(_ context.Context) (bool, error) {
+			ctx := context.Background()
+			if _, err := client.RbacV1().ClusterRoleBindings().Create(ctx, clusterRoleBinding, metav1.CreateOptions{}); err != nil {
+				if !apierrors.IsAlreadyExists(err) {
+					lastError = errors.Wrap(err, "unable to create ClusterRoleBinding")
+					return false, nil
+				}
+				if _, err := client.RbacV1().ClusterRoleBindings().Update(ctx, clusterRoleBinding, metav1.UpdateOptions{}); err != nil {
+					lastError = errors.Wrap(err, "unable to update ClusterRoleBinding")
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if err == nil {
+		return nil
 	}
-	return nil
+	return lastError
 }
 
 // PatchNodeOnce executes patchFn on the node object found by the node name.
-// This is a condition function meant to be used with wait.Poll. false, nil
-// implies it is safe to try again, an error indicates no more tries should be
-// made and true indicates success.
-func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1.Node), lastError *error) func() (bool, error) {
-	return func() (bool, error) {
+func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1.Node), lastError *error) func(context.Context) (bool, error) {
+	return func(_ context.Context) (bool, error) {
 		// First get the node object
-		n, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		ctx := context.Background()
+		n, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			*lastError = err
 			return false, nil // retry on any error
@@ -301,8 +402,8 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 			return false, *lastError
 		}
 
-		if _, err := client.CoreV1().Nodes().Patch(context.TODO(), n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
-			*lastError = errors.Wrapf(err, "error patching node %q through apiserver", n.Name)
+		if _, err := client.CoreV1().Nodes().Patch(ctx, n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+			*lastError = errors.Wrapf(err, "error patching Node %q", n.Name)
 			if apierrors.IsTimeout(err) || apierrors.IsConflict(err) || apierrors.IsServerTimeout(err) || apierrors.IsServiceUnavailable(err) {
 				return false, nil
 			}
@@ -317,30 +418,35 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 // Retries are provided by the wait package.
 func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Node)) error {
 	var lastError error
-	// wait.Poll will rerun the condition function every interval function if
-	// the function returns false. If the condition function returns an error
-	// then the retries end and the error is returned.
-	err := wait.Poll(constants.APICallRetryInterval, constants.PatchNodeTimeout, PatchNodeOnce(client, nodeName, patchFn, &lastError))
+	err := wait.PollUntilContextTimeout(context.Background(),
+		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
+		true, PatchNodeOnce(client, nodeName, patchFn, &lastError))
 	if err == nil {
 		return nil
 	}
 	return lastError
 }
 
-// GetConfigMapWithRetry tries to retrieve a ConfigMap using the given client,
-// retrying if we get an unexpected error.
-func GetConfigMapWithRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
+// GetConfigMapWithShortRetry tries to retrieve a ConfigMap using the given client, retrying for a short
+// time if it gets an unexpected error. The main usage of this function is in areas of the code that
+// fallback to a default ConfigMap value in case the one from the API cannot be quickly obtained.
+func GetConfigMapWithShortRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
 	var cm *v1.ConfigMap
 	var lastError error
-	err := wait.ExponentialBackoff(clientsetretry.DefaultBackoff, func() (bool, error) {
-		var err error
-		cm, err = client.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		if err == nil {
-			return true, nil
-		}
-		lastError = err
-		return false, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(),
+		time.Millisecond*50, time.Millisecond*350,
+		true, func(_ context.Context) (bool, error) {
+			var err error
+			// Intentionally pass a new context to this API call. This will let the API call run
+			// independently of the parent context timeout, which is quite short and can cause the API
+			// call to return abruptly.
+			cm, err = client.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			if err == nil {
+				return true, nil
+			}
+			lastError = err
+			return false, nil
+		})
 	if err == nil {
 		return cm, nil
 	}

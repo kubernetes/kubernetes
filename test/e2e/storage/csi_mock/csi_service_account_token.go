@@ -79,10 +79,8 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				// sleep to make sure RequiresRepublish triggers more than 1 NodePublishVolume
-				numNodePublishVolume := 1
 				if test.deployCSIDriverObject && csiServiceAccountTokenEnabled {
 					time.Sleep(5 * time.Second)
-					numNodePublishVolume = 2
 				}
 
 				ginkgo.By("Deleting the previously created pod")
@@ -90,7 +88,7 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
-				err = checkPodLogs(ctx, m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, numNodePublishVolume)
+				err = checkNodePublishVolume(ctx, m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled)
 				framework.ExpectNoError(err)
 			})
 		}

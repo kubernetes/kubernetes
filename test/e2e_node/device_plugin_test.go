@@ -607,7 +607,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 		})
 
-		ginkgo.It("Can schedule a pod with a restartable init container [NodeAlphaFeature:SidecarContainers]", func(ctx context.Context) {
+		f.It("Can schedule a pod with a restartable init container", nodefeature.SidecarContainers, func(ctx context.Context) {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s"
 			sleepOneSecond := "1s"
 			rl := v1.ResourceList{v1.ResourceName(SampleDeviceResourceName): *resource.NewQuantity(1, resource.DecimalSI)}
@@ -687,21 +687,21 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(resourcesForOurPod.Name).To(gomega.Equal(pod1.Name))
 			gomega.Expect(resourcesForOurPod.Namespace).To(gomega.Equal(pod1.Namespace))
 
-			// Note that the kubelet does not report resources for restartable
-			// init containers for now.
-			// See https://github.com/kubernetes/kubernetes/issues/120501.
-			// TODO: Fix this test to check the resources allocated to the
-			// restartable init container once the kubelet reports resources
-			// for restartable init containers.
-			gomega.Expect(resourcesForOurPod.Containers).To(gomega.HaveLen(1))
+			gomega.Expect(resourcesForOurPod.Containers).To(gomega.HaveLen(2))
 
-			gomega.Expect(resourcesForOurPod.Containers[0].Name).To(gomega.Equal(pod1.Spec.Containers[0].Name))
-
-			gomega.Expect(resourcesForOurPod.Containers[0].Devices).To(gomega.HaveLen(1))
-
-			gomega.Expect(resourcesForOurPod.Containers[0].Devices[0].ResourceName).To(gomega.Equal(SampleDeviceResourceName))
-
-			gomega.Expect(resourcesForOurPod.Containers[0].Devices[0].DeviceIds).To(gomega.HaveLen(1))
+			for _, container := range resourcesForOurPod.Containers {
+				if container.Name == pod1.Spec.InitContainers[1].Name {
+					gomega.Expect(container.Devices).To(gomega.HaveLen(1))
+					gomega.Expect(container.Devices[0].ResourceName).To(gomega.Equal(SampleDeviceResourceName))
+					gomega.Expect(container.Devices[0].DeviceIds).To(gomega.HaveLen(1))
+				} else if container.Name == pod1.Spec.Containers[0].Name {
+					gomega.Expect(container.Devices).To(gomega.HaveLen(1))
+					gomega.Expect(container.Devices[0].ResourceName).To(gomega.Equal(SampleDeviceResourceName))
+					gomega.Expect(container.Devices[0].DeviceIds).To(gomega.HaveLen(1))
+				} else {
+					framework.Failf("unexpected container name: %s", container.Name)
+				}
+			}
 		})
 	})
 }

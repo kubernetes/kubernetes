@@ -73,7 +73,7 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	azureSource := volume.AzureFile
 	accountName, err := getStorageAccountName(azureSource.SecretName)
 	if err != nil {
-		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
+		klog.V(5).Infof("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
 		accountName = azureSource.SecretName
 	}
 
@@ -120,7 +120,7 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 	azureSource := pv.Spec.PersistentVolumeSource.AzureFile
 	accountName, err := getStorageAccountName(azureSource.SecretName)
 	if err != nil {
-		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
+		klog.V(5).Infof("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
 		accountName = azureSource.SecretName
 	}
 	resourceGroup := ""

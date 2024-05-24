@@ -20,7 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
@@ -58,51 +57,6 @@ func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	}
 }
 
-type doNothingRESTMapper struct{}
-
-func (doNothingRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	return schema.GroupVersionKind{}, nil
-}
-func (doNothingRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
-	return nil, nil
-}
-func (doNothingRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
-	return schema.GroupVersionResource{}, nil
-}
-func (doNothingRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
-	return nil, nil
-}
-func (doNothingRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
-	return nil, nil
-}
-func (doNothingRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
-	return nil, nil
-}
-func (doNothingRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
-	return "", nil
-}
-
-type WantsRESTMapperAdmissionPlugin struct {
-	doNothingAdmission
-	doNothingPluginInitialization
-	mapper meta.RESTMapper
-}
-
-func (p *WantsRESTMapperAdmissionPlugin) SetRESTMapper(mapper meta.RESTMapper) {
-	p.mapper = mapper
-}
-
-func TestRESTMapperAdmissionPlugin(t *testing.T) {
-	mapper := doNothingRESTMapper{}
-	initializer := NewPluginInitializer(nil, mapper, nil)
-	wantsRESTMapperAdmission := &WantsRESTMapperAdmissionPlugin{}
-	initializer.Initialize(wantsRESTMapperAdmission)
-
-	if wantsRESTMapperAdmission.mapper == nil {
-		t.Errorf("Expected REST mapper to be initialized but found nil")
-	}
-}
-
 type doNothingQuotaConfiguration struct{}
 
 func (doNothingQuotaConfiguration) IgnoredResources() map[schema.GroupResource]struct{} { return nil }
@@ -121,7 +75,7 @@ func (p *WantsQuotaConfigurationAdmissionPlugin) SetQuotaConfiguration(config qu
 
 func TestQuotaConfigurationAdmissionPlugin(t *testing.T) {
 	config := doNothingQuotaConfiguration{}
-	initializer := NewPluginInitializer(nil, nil, config)
+	initializer := NewPluginInitializer(nil, config, nil)
 	wantsQuotaConfigurationAdmission := &WantsQuotaConfigurationAdmissionPlugin{}
 	initializer.Initialize(wantsQuotaConfigurationAdmission)
 

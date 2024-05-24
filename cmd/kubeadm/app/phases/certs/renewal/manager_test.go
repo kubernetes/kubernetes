@@ -17,12 +17,14 @@ limitations under the License.
 package renewal
 
 import (
+	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -30,7 +32,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -47,6 +48,23 @@ var (
 
 	testCertCfg = makeTestCertConfig(testCertOrganization)
 )
+
+type fakecertificateReadWriter struct {
+	exist bool
+	cert  *x509.Certificate
+}
+
+func (cr fakecertificateReadWriter) Exists() (bool, error) {
+	return cr.exist, nil
+}
+
+func (cr fakecertificateReadWriter) Read() (*x509.Certificate, error) {
+	return cr.cert, nil
+}
+
+func (cr fakecertificateReadWriter) Write(*x509.Certificate, crypto.Signer) error {
+	return nil
+}
 
 func TestNewManager(t *testing.T) {
 	tests := []struct {
@@ -126,22 +144,6 @@ func TestRenewUsingLocalCA(t *testing.T) {
 				return writeTestKubeconfig(t, dir, "admin.conf", testCACert, testCAKey)
 			},
 			expectedOrganization: testCertOrganization,
-		},
-		{
-			name:     "apiserver-etcd-client cert should not contain SystemPrivilegedGroup after renewal",
-			certName: "apiserver-etcd-client",
-			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver-etcd-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
-			},
-			expectedOrganization: []string{},
-		},
-		{
-			name:     "apiserver-kubelet-client cert should replace SystemPrivilegedGroup with ClusterAdminsGroup after renewal",
-			certName: "apiserver-kubelet-client",
-			createCertFunc: func() *x509.Certificate {
-				return writeTestCertificate(t, dir, "apiserver-kubelet-client", testCACert, testCAKey, []string{kubeadmconstants.SystemPrivilegedGroup})
-			},
-			expectedOrganization: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 		},
 	}
 
@@ -303,5 +305,190 @@ func makeTestCertConfig(organization []string) *pkiutil.CertConfig {
 			},
 			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
+	}
+}
+
+func TestManagerCAs(t *testing.T) {
+	tests := []struct {
+		name string
+		cas  map[string]*CAExpirationHandler
+		want []*CAExpirationHandler
+	}{
+		{
+			name: "CAExpirationHandler is sequential",
+			cas: map[string]*CAExpirationHandler{
+				"foo": {
+					Name: "1",
+				},
+				"bar": {
+					Name: "2",
+				},
+			},
+			want: []*CAExpirationHandler{
+				{
+					Name: "1",
+				},
+				{
+					Name: "2",
+				},
+			},
+		},
+		{
+			name: "CAExpirationHandler is in reverse order",
+			cas: map[string]*CAExpirationHandler{
+				"foo": {
+					Name: "2",
+				},
+				"bar": {
+					Name: "1",
+				},
+			},
+			want: []*CAExpirationHandler{
+				{
+					Name: "1",
+				},
+				{
+					Name: "2",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rm := &Manager{
+				cas: tt.cas,
+			}
+			if got := rm.CAs(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Manager.CAs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestManagerCAExists(t *testing.T) {
+	certificateReadWriterExist := fakecertificateReadWriter{
+		exist: true,
+	}
+	certificateReadWriterMissing := fakecertificateReadWriter{
+		exist: false,
+	}
+	tests := []struct {
+		name    string
+		cas     map[string]*CAExpirationHandler
+		caName  string
+		want    bool
+		wantErr bool
+	}{
+		{
+			name:    "caName does not exist in cas list",
+			cas:     map[string]*CAExpirationHandler{},
+			caName:  "foo",
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "ca exists",
+			cas: map[string]*CAExpirationHandler{
+				"foo": {
+					Name:       "foo",
+					FileName:   "test",
+					readwriter: certificateReadWriterExist,
+				},
+			},
+			caName:  "foo",
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ca does not exist",
+			cas: map[string]*CAExpirationHandler{
+				"foo": {
+					Name:       "foo",
+					FileName:   "test",
+					readwriter: certificateReadWriterMissing,
+				},
+			},
+			caName:  "foo",
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rm := &Manager{
+				cas: tt.cas,
+			}
+			got, err := rm.CAExists(tt.caName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Manager.CAExists() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Manager.CAExists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestManagerCertificateExists(t *testing.T) {
+	certificateReadWriterExist := fakecertificateReadWriter{
+		exist: true,
+	}
+	certificateReadWriterMissing := fakecertificateReadWriter{
+		exist: false,
+	}
+	tests := []struct {
+		name         string
+		certificates map[string]*CertificateRenewHandler
+		certName     string
+		want         bool
+		wantErr      bool
+	}{
+		{
+			name:         "certName does not exist in certificate list",
+			certificates: map[string]*CertificateRenewHandler{},
+			certName:     "foo",
+			want:         false,
+			wantErr:      true,
+		},
+		{
+			name: "certificate exists",
+			certificates: map[string]*CertificateRenewHandler{
+				"foo": {
+					Name:       "foo",
+					readwriter: certificateReadWriterExist,
+				},
+			},
+			certName: "foo",
+			want:     true,
+			wantErr:  false,
+		},
+		{
+			name: "certificate does not exist",
+			certificates: map[string]*CertificateRenewHandler{
+				"foo": {
+					Name:       "foo",
+					readwriter: certificateReadWriterMissing,
+				},
+			},
+			certName: "foo",
+			want:     false,
+			wantErr:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rm := &Manager{
+				certificates: tt.certificates,
+			}
+			got, err := rm.CertificateExists(tt.certName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Manager.CertificateExists() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Manager.CertificateExists() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

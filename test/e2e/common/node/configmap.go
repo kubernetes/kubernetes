@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -242,6 +243,54 @@ var _ = SIGDescribe("ConfigMap", func() {
 		framework.ExpectNoError(err, "failed to list ConfigMap by LabelSelector")
 		gomega.Expect(configMapList.Items).To(gomega.BeEmpty(), "ConfigMap is still present after being deleted by collection")
 	})
+
+	/*
+		Release: v1.30
+		Testname: ConfigMap, from environment field
+		Description: Create a Pod with an environment variable value set using a value from ConfigMap.
+		Allows users to use envFrom to set prefix starting with a digit as environment variable names.
+	*/
+	framework.It("should be consumable as environment variable names when configmap keys start with a digit",
+		feature.RelaxedEnvironmentVariableValidation, func(ctx context.Context) {
+			name := "configmap-test-" + string(uuid.NewUUID())
+			configMap := newConfigMap(f, name)
+			ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+			var err error
+			if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, configMap, metav1.CreateOptions{}); err != nil {
+				framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-configmaps-" + string(uuid.NewUUID()),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:    "env-test",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"sh", "-c", "env"},
+							EnvFrom: []v1.EnvFromSource{
+								{
+									ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+								},
+								{
+									// prefix start with a digit can be consumed as environment variables.
+									Prefix:       "1-",
+									ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+								},
+							},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			e2epodoutput.TestContainerOutput(ctx, f, "consume configMaps", pod, 0, []string{
+				"data-1=value-1", "data-2=value-2", "data-3=value-3",
+				"1-data-1=value-1", "1-data-2=value-2", "1-data-3=value-3",
+			})
+		})
 })
 
 func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {

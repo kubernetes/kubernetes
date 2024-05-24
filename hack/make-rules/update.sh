@@ -36,6 +36,7 @@ if ! ${ALL} ; then
 fi
 
 BASH_TARGETS=(
+	update-go-workspace
 	update-kubensenter
 	update-test-annotations
 	update-codegen
@@ -43,6 +44,7 @@ BASH_TARGETS=(
 	update-generated-docs
 	update-openapi-spec
 	update-gofmt
+	update-golangci-lint-config
 )
 
 for t in "${BASH_TARGETS[@]}"; do

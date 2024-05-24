@@ -18,8 +18,6 @@ package certs
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/sha256"
 	"crypto/x509"
 	"net"
 	"os"
@@ -40,20 +38,6 @@ import (
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
-
-func createTestCSR(t *testing.T) (*x509.CertificateRequest, crypto.Signer) {
-	csr, key, err := pkiutil.NewCSRAndKey(
-		&pkiutil.CertConfig{
-			Config: certutil.Config{
-				CommonName: "testCert",
-			},
-		})
-	if err != nil {
-		t.Fatalf("couldn't create test cert: %v", err)
-	}
-
-	return csr, key
-}
 
 func TestWriteCertificateAuthorityFilesIfNotExist(t *testing.T) {
 	setupCert, setupKey := certstestutil.CreateCACert(t)
@@ -235,75 +219,6 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 	}
 }
 
-func TestWriteCSRFilesIfNotExist(t *testing.T) {
-	csr, key := createTestCSR(t)
-	csr2, key2 := createTestCSR(t)
-
-	var tests = []struct {
-		name          string
-		setupFunc     func(csrPath string) error
-		expectedError bool
-		expectedCSR   *x509.CertificateRequest
-	}{
-		{
-			name:        "no files exist",
-			expectedCSR: csr,
-		},
-		{
-			name: "other key exists",
-			setupFunc: func(csrPath string) error {
-				if err := pkiutil.WriteCSR(csrPath, "dummy", csr2); err != nil {
-					return err
-				}
-				return pkiutil.WriteKey(csrPath, "dummy", key2)
-			},
-			expectedCSR: csr2,
-		},
-		{
-			name: "existing CSR is garbage",
-			setupFunc: func(csrPath string) error {
-				return os.WriteFile(filepath.Join(csrPath, "dummy.csr"), []byte("a--bunch--of-garbage"), os.ModePerm)
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
-
-			if test.setupFunc != nil {
-				if err := test.setupFunc(tmpdir); err != nil {
-					t.Fatalf("couldn't set up test: %v", err)
-				}
-			}
-
-			if err := writeCSRFilesIfNotExist(tmpdir, "dummy", csr, key); err != nil {
-				if test.expectedError {
-					return
-				}
-				t.Fatalf("unexpected error %v: ", err)
-			}
-
-			if test.expectedError {
-				t.Fatal("Expected error, but got none")
-			}
-
-			parsedCSR, _, err := pkiutil.TryLoadCSRAndKeyFromDisk(tmpdir, "dummy")
-			if err != nil {
-				t.Fatalf("couldn't load csr and key: %v", err)
-			}
-
-			if sha256.Sum256(test.expectedCSR.Raw) != sha256.Sum256(parsedCSR.Raw) {
-				t.Error("expected csr's fingerprint does not match ")
-			}
-
-		})
-	}
-
-}
-
 func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 	setupKey, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
@@ -347,7 +262,7 @@ func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 				}
 			}
 
-			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, kubeadmapi.EncryptionAlgorithmRSA)
+			err := CreateServiceAccountKeyAndPublicKeyFiles(dir, kubeadmapi.EncryptionAlgorithmRSA2048)
 			if (err != nil) != tt.expectedErr {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tt.expectedErr, err != nil, err)
 			} else if tt.expectedErr {

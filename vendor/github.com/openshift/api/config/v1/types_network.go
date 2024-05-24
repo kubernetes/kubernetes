@@ -45,11 +45,13 @@ type Network struct {
 type NetworkSpec struct {
 	// IP address pool to use for pod IPs.
 	// This field is immutable after installation.
+	// +listType=atomic
 	ClusterNetwork []ClusterNetworkEntry `json:"clusterNetwork"`
 
 	// IP address pool for services.
 	// Currently, we only support a single entry here.
 	// This field is immutable after installation.
+	// +listType=atomic
 	ServiceNetwork []string `json:"serviceNetwork"`
 
 	// NetworkType is the plugin that is to be deployed (e.g. OpenShiftSDN).
@@ -90,10 +92,12 @@ type NetworkSpec struct {
 // NetworkStatus is the current network configuration.
 type NetworkStatus struct {
 	// IP address pool to use for pod IPs.
+	// +listType=atomic
 	ClusterNetwork []ClusterNetworkEntry `json:"clusterNetwork,omitempty"`
 
 	// IP address pool for services.
 	// Currently, we only support a single entry here.
+	// +listType=atomic
 	ServiceNetwork []string `json:"serviceNetwork,omitempty"`
 
 	// NetworkType is the plugin that is deployed (e.g. OpenShiftSDN).
@@ -148,6 +152,7 @@ type ExternalIPConfig struct {
 	// ExternalIPPolicy rules.
 	// Currently, only one entry may be provided.
 	// +optional
+	// +listType=atomic
 	AutoAssignCIDRs []string `json:"autoAssignCIDRs,omitempty"`
 }
 
@@ -156,11 +161,13 @@ type ExternalIPConfig struct {
 // The policy controller always allows automatically assigned external IPs.
 type ExternalIPPolicy struct {
 	// allowedCIDRs is the list of allowed CIDRs.
+	// +listType=atomic
 	AllowedCIDRs []string `json:"allowedCIDRs,omitempty"`
 
 	// rejectedCIDRs is the list of disallowed CIDRs. These take precedence
 	// over allowedCIDRs.
 	// +optional
+	// +listType=atomic
 	RejectedCIDRs []string `json:"rejectedCIDRs,omitempty"`
 }
 

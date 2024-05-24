@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -43,12 +42,7 @@ func TestVerify(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		c := newCollector("")
-		if err := c.walk([]string{tc.path}); err != nil {
-			t.Fatalf("error walking %s: %v", tc.path, err)
-		}
-
-		errs, err := c.verify("linux/amd64")
+		errs, err := verify("linux/amd64", []string{tc.path}, nil)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if len(errs) != tc.expect {
@@ -69,20 +63,6 @@ func setEnvVars(t testing.TB) {
 	}
 	if os.Getenv("HOME") == "" {
 		t.Setenv("HOME", "/tmp")
-	}
-}
-
-func TestHandlePath(t *testing.T) {
-	c := collector{
-		ignoreDirs: standardIgnoreDirs,
-	}
-	e := errors.New("ex")
-	i, _ := os.Stat(".") // i.IsDir() == true
-	if c.handlePath("foo", nil, e) != e {
-		t.Error("handlePath not returning errors")
-	}
-	if c.handlePath("vendor", i, nil) != filepath.SkipDir {
-		t.Error("should skip vendor")
 	}
 }
 

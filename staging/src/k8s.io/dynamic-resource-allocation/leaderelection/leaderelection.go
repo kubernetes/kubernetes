@@ -161,6 +161,10 @@ func (l *leaderElection) PrepareHealthCheck(s Server) {
 }
 
 func (l *leaderElection) Run() error {
+	ctx := l.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if l.identity == "" {
 		id, err := defaultLeaderElectionIdentity()
 		if err != nil {
@@ -174,7 +178,7 @@ func (l *leaderElection) Run() error {
 		l.namespace = inClusterNamespace()
 	}
 
-	broadcaster := record.NewBroadcaster()
+	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	broadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: l.clientset.CoreV1().Events(l.namespace)})
 	eventRecorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: fmt.Sprintf("%s/%s", l.lockName, l.identity)})
 
@@ -188,10 +192,6 @@ func (l *leaderElection) Run() error {
 		return err
 	}
 
-	ctx := l.ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	leaderConfig := leaderelection.LeaderElectionConfig{
 		Lock:          lock,
 		LeaseDuration: l.leaseDuration,

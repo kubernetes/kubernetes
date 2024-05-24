@@ -223,7 +223,7 @@ func TestNamespacesForPod(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			actual, err := NamespacesForPod(test.input, &kubecontainertest.FakeRuntimeHelper{})
+			actual, err := NamespacesForPod(test.input, &kubecontainertest.FakeRuntimeHelper{}, nil)
 			require.NoError(t, err)
 			require.Equal(t, test.expected, actual)
 		})

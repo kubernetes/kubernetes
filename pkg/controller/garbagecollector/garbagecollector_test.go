@@ -30,7 +30,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 
 	"github.com/golang/groupcache/lru"
 	"github.com/google/go-cmp/cmp"
@@ -64,6 +63,7 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type testRESTMapper struct {
@@ -98,14 +98,13 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{},
+	logger, tCtx := ktesting.NewTestContext(t)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{},
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 0, len(gc.dependencyGraphBuilder.monitors))
-
-	logger, _ := ktesting.NewTestContext(t)
 
 	// Make sure resource monitor syncing creates and stops resource monitors.
 	tweakableRM.Add(schema.GroupVersionKind{Group: "tpr.io", Version: "v1", Kind: "unknown"}, nil)
@@ -121,10 +120,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	}
 	assert.Equal(t, 1, len(gc.dependencyGraphBuilder.monitors))
 
-	// Make sure the syncing mechanism also works after Run() has been called
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go gc.Run(ctx, 1)
+	go gc.Run(tCtx, 1)
 
 	err = gc.resyncMonitors(logger, twoResources)
 	if err != nil {
@@ -212,6 +208,7 @@ type garbageCollector struct {
 }
 
 func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
+	_, ctx := ktesting.NewTestContext(t)
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
@@ -221,7 +218,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -886,17 +883,17 @@ func TestGarbageCollectorSync(t *testing.T) {
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+
+	tCtx := ktesting.Init(t)
+	defer tCtx.Cancel("test has completed")
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go gc.Run(ctx, 1)
+	go gc.Run(tCtx, 1)
 	// The pseudo-code of GarbageCollector.Sync():
 	// GarbageCollector.Sync(client, period, stopCh):
 	//    wait.Until() loops with `period` until the `stopCh` is closed :
@@ -911,7 +908,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	// The 1s sleep in the test allows GetDeletableResources and
 	// gc.resyncMonitors to run ~5 times to ensure the changes to the
 	// fakeDiscoveryClient are picked up.
-	go gc.Sync(ctx, fakeDiscoveryClient, 200*time.Millisecond)
+	go gc.Sync(tCtx, fakeDiscoveryClient, 200*time.Millisecond)
 
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)

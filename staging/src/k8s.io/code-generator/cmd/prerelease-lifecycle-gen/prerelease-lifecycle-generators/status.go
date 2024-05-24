@@ -19,22 +19,18 @@ package prereleaselifecyclegenerators
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"strconv"
 	"strings"
 
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/examples/set-gen/sets"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/code-generator/cmd/prerelease-lifecycle-gen/args"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/klog/v2"
 )
-
-// CustomArgs is used tby the go2idl framework to pass args specific to this generator.
-type CustomArgs struct {
-}
 
 // This is the comment tag that carries parameters for API status generation.  Because the cadence is fixed, we can predict
 // with near certainty when this lifecycle happens as the API is introduced.
@@ -101,14 +97,14 @@ func extractRemovedTag(t *types.Type) (*tagValue, int, int, error) {
 func extractReplacementTag(t *types.Type) (group, version, kind string, hasReplacement bool, err error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
 
-	tagVals := types.ExtractCommentTags("+", comments)[replacementTagName]
+	tagVals := gengo.ExtractCommentTags("+", comments)[replacementTagName]
 	if len(tagVals) == 0 {
 		// No match for the tag.
 		return "", "", "", false, nil
 	}
 	// If there are multiple values, abort.
 	if len(tagVals) > 1 {
-		return "", "", "", false, fmt.Errorf("Found %d %s tags: %q", len(tagVals), replacementTagName, tagVals)
+		return "", "", "", false, fmt.Errorf("found %d %s tags: %q", len(tagVals), replacementTagName, tagVals)
 	}
 	tagValue := tagVals[0]
 	parts := strings.Split(tagValue, ",")
@@ -135,7 +131,7 @@ func extractReplacementTag(t *types.Type) (group, version, kind string, hasRepla
 }
 
 func extractTag(tagName string, comments []string) *tagValue {
-	tagVals := types.ExtractCommentTags("+", comments)[tagName]
+	tagVals := gengo.ExtractCommentTags("+", comments)[tagName]
 	if tagVals == nil {
 		// No match for the tag.
 		return nil
@@ -180,24 +176,19 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-// Packages makes the package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+// GetTargets makes the target definition.
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	inputs := sets.NewString(context.Inputs...)
-	packages := generator.Packages{}
-	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
+	targets := []generator.Target{}
 
-	for i := range inputs {
+	for _, i := range context.Inputs {
 		klog.V(5).Infof("Considering pkg %q", i)
+
 		pkg := context.Universe[i]
-		if pkg == nil {
-			// If the input had no Go files, for example.
-			continue
-		}
 
 		ptag := extractTag(tagEnabledName, pkg.Comments)
 		pkgNeedsGeneration := false
@@ -223,7 +214,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				if ttag != nil && ttag.value == "true" {
 					klog.V(5).Infof("    tag=true")
 					if !isAPIType(t) {
-						klog.Fatalf("Type %v requests deepcopy generation but is not copyable", t)
+						klog.Fatalf("Type %v requests prerelease generation but is not an API type", t)
 					}
 					pkgNeedsGeneration = true
 					break
@@ -232,52 +223,39 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		if pkgNeedsGeneration {
-			path := pkg.Path
-			// if the source path is within a /vendor/ directory (for example,
-			// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-			// generation to output to the proper relative path (under vendor).
-			// Otherwise, the generator will create the file in the wrong location
-			// in the output directory.
-			// TODO: build a more fundamental concept in gengo for dealing with modifications
-			// to vendored packages.
-			if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
-				expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
-				if strings.Contains(expandedPath, "/vendor/") {
-					path = expandedPath
-				}
-			}
-			packages = append(packages,
-				&generator.DefaultPackage{
-					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
-					PackagePath: path,
-					HeaderText:  header,
-					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
-						return []generator.Generator{
-							NewPrereleaseLifecycleGen(arguments.OutputFileBaseName, pkg.Path),
-						}
-					},
+			targets = append(targets,
+				&generator.SimpleTarget{
+					PkgName:       strings.Split(path.Base(pkg.Path), ".")[0],
+					PkgPath:       pkg.Path,
+					PkgDir:        pkg.Dir, // output pkg is the same as the input
+					HeaderComment: boilerplate,
 					FilterFunc: func(c *generator.Context, t *types.Type) bool {
 						return t.Name.Package == pkg.Path
+					},
+					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
+						return []generator.Generator{
+							NewPrereleaseLifecycleGen(args.OutputFile, pkg.Path),
+						}
 					},
 				})
 		}
 	}
-	return packages
+	return targets
 }
 
 // genDeepCopy produces a file with autogenerated deep-copy functions.
 type genPreleaseLifecycle struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	targetPackage string
 	imports       namer.ImportTracker
 	typesForInit  []*types.Type
 }
 
 // NewPrereleaseLifecycleGen creates a generator for the prerelease-lifecycle-generator
-func NewPrereleaseLifecycleGen(sanitizedName, targetPackage string) generator.Generator {
+func NewPrereleaseLifecycleGen(outputFilename, targetPackage string) generator.Generator {
 	return &genPreleaseLifecycle{
-		DefaultGen: generator.DefaultGen{
-			OptionalName: sanitizedName,
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: outputFilename,
 		},
 		targetPackage: targetPackage,
 		imports:       generator.NewImportTracker(),

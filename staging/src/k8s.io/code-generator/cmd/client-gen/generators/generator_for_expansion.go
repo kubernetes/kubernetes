@@ -22,13 +22,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/types"
 )
 
 // genExpansion produces a file for a group client, e.g. ExtensionsClient for the extension group.
 type genExpansion struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	groupPackagePath string
 	// types in a group
 	types []*types.Type

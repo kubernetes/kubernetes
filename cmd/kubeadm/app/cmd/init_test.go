@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -134,6 +135,7 @@ func TestNewInitData(t *testing.T) {
 							CRISocket:             expectedCRISocket,
 							IgnorePreflightErrors: []string{"c", "d"},
 							ImagePullPolicy:       "IfNotPresent",
+							ImagePullSerial:       ptr.To(true),
 						},
 						LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 							AdvertiseAddress: "1.2.3.4",
@@ -151,7 +153,7 @@ func TestNewInitData(t *testing.T) {
 						},
 					},
 				}
-				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(initData{}), cmpopts.IgnoreFields(initData{}, "client", "cfg.ClusterConfiguration", "cfg.NodeRegistration.Taints")); diff != "" {
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(initData{}), cmpopts.IgnoreFields(initData{}, "client", "cfg.ClusterConfiguration", "cfg.NodeRegistration.Taints", "cfg.Timeouts")); diff != "" {
 					t.Fatalf("newInitData returned data (-want,+got):\n%s", diff)
 				}
 			},

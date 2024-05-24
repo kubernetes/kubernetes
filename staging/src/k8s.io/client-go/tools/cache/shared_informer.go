@@ -31,6 +31,8 @@ import (
 	"k8s.io/utils/clock"
 
 	"k8s.io/klog/v2"
+
+	clientgofeaturegate "k8s.io/client-go/features"
 )
 
 // SharedInformer provides eventually consistent linkage of its
@@ -409,6 +411,10 @@ func (v *dummyController) HasSynced() bool {
 }
 
 func (v *dummyController) LastSyncResourceVersion() string {
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
+		return v.informer.LastSyncResourceVersion()
+	}
+
 	return ""
 }
 
@@ -540,8 +546,8 @@ func (s *sharedIndexInformer) AddIndexers(indexers Indexers) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if s.started {
-		return fmt.Errorf("informer has already started")
+	if s.stopped {
+		return fmt.Errorf("indexer was not added because it has stopped already")
 	}
 
 	return s.indexer.AddIndexers(indexers)

@@ -77,6 +77,25 @@ message Affinity {
   optional PodAntiAffinity podAntiAffinity = 3;
 }
 
+// AppArmorProfile defines a pod or container's AppArmor settings.
+// +union
+message AppArmorProfile {
+  // type indicates which kind of AppArmor profile will be applied.
+  // Valid options are:
+  //   Localhost - a profile pre-loaded on the node.
+  //   RuntimeDefault - the container runtime's default profile.
+  //   Unconfined - no AppArmor enforcement.
+  // +unionDiscriminator
+  optional string type = 1;
+
+  // localhostProfile indicates a profile loaded on the node that should be used.
+  // The profile must be preconfigured on the node to work.
+  // Must match the loaded name of the profile.
+  // Must be set if and only if type is "Localhost".
+  // +optional
+  optional string localhostProfile = 2;
+}
+
 // AttachedVolume describes a volume attached to a node
 message AttachedVolume {
   // Name of the attached volume
@@ -93,6 +112,7 @@ message AvoidPods {
   // Bounded-sized list of signatures of pods that should avoid this node, sorted
   // in timestamp order from oldest to newest. Size of the slice is unspecified.
   // +optional
+  // +listType=atomic
   repeated PreferAvoidPodsEntry preferAvoidPods = 1;
 }
 
@@ -269,10 +289,12 @@ message CSIVolumeSource {
 message Capabilities {
   // Added capabilities
   // +optional
+  // +listType=atomic
   repeated string add = 1;
 
   // Removed capabilities
   // +optional
+  // +listType=atomic
   repeated string drop = 2;
 }
 
@@ -281,6 +303,7 @@ message Capabilities {
 message CephFSPersistentVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -314,6 +337,7 @@ message CephFSPersistentVolumeSource {
 message CephFSVolumeSource {
   // monitors is Required: Monitors is a collection of Ceph monitors
   // More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // path is Optional: Used as the mounted root, rather than the full Ceph tree, default is /
@@ -498,6 +522,8 @@ message ComponentStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated ComponentCondition conditions = 2;
 }
 
@@ -628,6 +654,7 @@ message ConfigMapProjection {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // optional specify whether the ConfigMap or its keys must be defined
@@ -652,6 +679,7 @@ message ConfigMapVolumeSource {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // defaultMode is optional: mode bits used to set permissions on created files by default.
@@ -692,6 +720,7 @@ message Container {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string command = 3;
 
   // Arguments to the entrypoint.
@@ -703,6 +732,7 @@ message Container {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string args = 4;
 
   // Container's working directory.
@@ -734,6 +764,7 @@ message Container {
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
   // +optional
+  // +listType=atomic
   repeated EnvFromSource envFrom = 19;
 
   // List of environment variables to set in the container.
@@ -741,6 +772,8 @@ message Container {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EnvVar env = 7;
 
   // Compute Resources required by this container.
@@ -779,11 +812,15 @@ message Container {
   // +optional
   // +patchMergeKey=mountPath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
   repeated VolumeMount volumeMounts = 9;
 
   // volumeDevices is the list of block devices to be used by the container.
   // +patchMergeKey=devicePath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=devicePath
   // +optional
   repeated VolumeDevice volumeDevices = 21;
 
@@ -877,6 +914,7 @@ message ContainerImage {
   // Names by which this image is known.
   // e.g. ["kubernetes.example/hyperkube:v1.0.7", "cloud-vendor.registry.example/cloud-vendor/hyperkube:v1.0.7"]
   // +optional
+  // +listType=atomic
   repeated string names = 1;
 
   // The size of the image in bytes.
@@ -1062,6 +1100,15 @@ message ContainerStatus {
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional ResourceRequirements resources = 11;
+
+  // Status of volume mounts.
+  // +optional
+  // +patchMergeKey=mountPath
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
+  // +featureGate=RecursiveReadOnlyMounts
+  repeated VolumeMountStatus volumeMounts = 12;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1076,6 +1123,7 @@ message DaemonEndpoint {
 message DownwardAPIProjection {
   // Items is a list of DownwardAPIVolume file
   // +optional
+  // +listType=atomic
   repeated DownwardAPIVolumeFile items = 1;
 }
 
@@ -1084,7 +1132,7 @@ message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
   optional string path = 1;
 
-  // Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+  // Required: Selects a field of the pod: only annotations, labels, name, namespace and uid are supported.
   // +optional
   optional ObjectFieldSelector fieldRef = 2;
 
@@ -1108,6 +1156,7 @@ message DownwardAPIVolumeFile {
 message DownwardAPIVolumeSource {
   // Items is a list of downward API volume file
   // +optional
+  // +listType=atomic
   repeated DownwardAPIVolumeFile items = 1;
 
   // Optional: mode bits to use on created files by default. Must be a
@@ -1218,16 +1267,19 @@ message EndpointSubset {
   // IP addresses which offer the related ports that are marked as ready. These endpoints
   // should be considered safe for load balancers and clients to utilize.
   // +optional
+  // +listType=atomic
   repeated EndpointAddress addresses = 1;
 
   // IP addresses which offer the related ports but are not currently marked as ready
   // because they have not yet finished starting, have recently failed a readiness check,
   // or have recently failed a liveness check.
   // +optional
+  // +listType=atomic
   repeated EndpointAddress notReadyAddresses = 2;
 
   // Port numbers available on the related IP addresses.
   // +optional
+  // +listType=atomic
   repeated EndpointPort ports = 3;
 }
 
@@ -1258,6 +1310,7 @@ message Endpoints {
   // NotReadyAddresses in the same subset.
   // Sets of addresses and ports that comprise a service.
   // +optional
+  // +listType=atomic
   repeated EndpointSubset subsets = 2;
 }
 
@@ -1377,6 +1430,7 @@ message EphemeralContainerCommon {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string command = 3;
 
   // Arguments to the entrypoint.
@@ -1388,6 +1442,7 @@ message EphemeralContainerCommon {
   // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
+  // +listType=atomic
   repeated string args = 4;
 
   // Container's working directory.
@@ -1413,6 +1468,7 @@ message EphemeralContainerCommon {
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
   // +optional
+  // +listType=atomic
   repeated EnvFromSource envFrom = 19;
 
   // List of environment variables to set in the container.
@@ -1420,6 +1476,8 @@ message EphemeralContainerCommon {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EnvVar env = 7;
 
   // Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources
@@ -1446,11 +1504,15 @@ message EphemeralContainerCommon {
   // +optional
   // +patchMergeKey=mountPath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=mountPath
   repeated VolumeMount volumeMounts = 9;
 
   // volumeDevices is the list of block devices to be used by the container.
   // +patchMergeKey=devicePath
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=devicePath
   // +optional
   repeated VolumeDevice volumeDevices = 21;
 
@@ -1661,6 +1723,7 @@ message ExecAction {
   // a shell, you need to explicitly call out to that shell.
   // Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
   // +optional
+  // +listType=atomic
   repeated string command = 1;
 }
 
@@ -1670,6 +1733,7 @@ message ExecAction {
 message FCVolumeSource {
   // targetWWNs is Optional: FC target worldwide names (WWNs)
   // +optional
+  // +listType=atomic
   repeated string targetWWNs = 1;
 
   // lun is Optional: FC target lun number
@@ -1691,6 +1755,7 @@ message FCVolumeSource {
   // wwids Optional: FC volume world wide identifiers (wwids)
   // Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.
   // +optional
+  // +listType=atomic
   repeated string wwids = 5;
 }
 
@@ -1903,6 +1968,7 @@ message HTTPGetAction {
 
   // Custom headers to set in the request. HTTP allows repeated headers.
   // +optional
+  // +listType=atomic
   repeated HTTPHeader httpHeaders = 5;
 }
 
@@ -1923,6 +1989,7 @@ message HostAlias {
   optional string ip = 1;
 
   // Hostnames for the above IP address.
+  // +listType=atomic
   repeated string hostnames = 2;
 }
 
@@ -1982,6 +2049,7 @@ message ISCSIPersistentVolumeSource {
   // portals is the iSCSI Target Portal List. The Portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
+  // +listType=atomic
   repeated string portals = 7;
 
   // chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
@@ -2038,6 +2106,7 @@ message ISCSIVolumeSource {
   // portals is the iSCSI Target Portal List. The portal is either an IP or ip_addr:port if the port
   // is other than default (typically TCP ports 860 and 3260).
   // +optional
+  // +listType=atomic
   repeated string portals = 7;
 
   // chapAuthDiscovery defines whether support iSCSI Discovery CHAP authentication
@@ -2181,6 +2250,7 @@ message LimitRangeList {
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 message LimitRangeSpec {
   // Limits is the list of LimitRangeItem objects that are enforced.
+  // +listType=atomic
   repeated LimitRangeItem limits = 1;
 }
 
@@ -2229,6 +2299,7 @@ message LoadBalancerStatus {
   // Ingress is a list containing ingress points for the load-balancer.
   // Traffic intended for the service should be sent to these ingress points.
   // +optional
+  // +listType=atomic
   repeated LoadBalancerIngress ingress = 1;
 }
 
@@ -2347,6 +2418,7 @@ message NamespaceSpec {
   // Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
   // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
+  // +listType=atomic
   repeated string finalizers = 1;
 }
 
@@ -2361,6 +2433,8 @@ message NamespaceStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated NamespaceCondition conditions = 2;
 }
 
@@ -2414,6 +2488,7 @@ message NodeAffinity {
   // "weight" to the sum if the node matches the corresponding matchExpressions; the
   // node(s) with the highest sum are the most preferred.
   // +optional
+  // +listType=atomic
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
@@ -2524,11 +2599,24 @@ message NodeProxyOptions {
   optional string path = 1;
 }
 
-// NodeResources is an object for conveying resource information about a node.
-// see https://kubernetes.io/docs/concepts/architecture/nodes/#capacity for more details.
-message NodeResources {
-  // Capacity represents the available resources of a node
-  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
+// NodeRuntimeHandler is a set of runtime handler information.
+message NodeRuntimeHandler {
+  // Runtime handler name.
+  // Empty for the default runtime handler.
+  // +optional
+  optional string name = 1;
+
+  // Supported features.
+  // +optional
+  optional NodeRuntimeHandlerFeatures features = 2;
+}
+
+// NodeRuntimeHandlerFeatures is a set of runtime features.
+message NodeRuntimeHandlerFeatures {
+  // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional bool recursiveReadOnlyMounts = 1;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -2537,6 +2625,7 @@ message NodeResources {
 // +structType=atomic
 message NodeSelector {
   // Required. A list of node selector terms. The terms are ORed.
+  // +listType=atomic
   repeated NodeSelectorTerm nodeSelectorTerms = 1;
 }
 
@@ -2556,6 +2645,7 @@ message NodeSelectorRequirement {
   // array must have a single element, which will be interpreted as an integer.
   // This array is replaced during a strategic merge patch.
   // +optional
+  // +listType=atomic
   repeated string values = 3;
 }
 
@@ -2566,10 +2656,12 @@ message NodeSelectorRequirement {
 message NodeSelectorTerm {
   // A list of node selector requirements by node's labels.
   // +optional
+  // +listType=atomic
   repeated NodeSelectorRequirement matchExpressions = 1;
 
   // A list of node selector requirements by node's fields.
   // +optional
+  // +listType=atomic
   repeated NodeSelectorRequirement matchFields = 2;
 }
 
@@ -2584,6 +2676,7 @@ message NodeSpec {
   // each of IPv4 and IPv6.
   // +optional
   // +patchStrategy=merge
+  // +listType=set
   repeated string podCIDRs = 7;
 
   // ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
@@ -2597,6 +2690,7 @@ message NodeSpec {
 
   // If specified, the node's taints.
   // +optional
+  // +listType=atomic
   repeated Taint taints = 5;
 
   // Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.
@@ -2632,6 +2726,8 @@ message NodeStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated NodeCondition conditions = 4;
 
   // List of addresses reachable to the node.
@@ -2647,6 +2743,8 @@ message NodeStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated NodeAddress addresses = 5;
 
   // Endpoints of daemons running on the Node.
@@ -2660,19 +2758,28 @@ message NodeStatus {
 
   // List of container images on this node
   // +optional
+  // +listType=atomic
   repeated ContainerImage images = 8;
 
   // List of attachable volumes in use (mounted) by the node.
   // +optional
+  // +listType=atomic
   repeated string volumesInUse = 9;
 
   // List of volumes that are attached to the node.
   // +optional
+  // +listType=atomic
   repeated AttachedVolume volumesAttached = 10;
 
   // Status of the config assigned to the node via the dynamic Kubelet config feature.
   // +optional
   optional NodeConfigStatus config = 11;
+
+  // The available runtime handlers.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  // +listType=atomic
+  repeated NodeRuntimeHandler runtimeHandlers = 12;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -2840,7 +2947,7 @@ message PersistentVolumeClaimCondition {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // reason is a unique, this should be a short, machine understandable string that gives the reason
-  // for condition's last transition. If it reports "ResizeStarted" that means the underlying
+  // for condition's last transition. If it reports "Resizing" that means the underlying
   // persistent volume is being resized.
   // +optional
   optional string reason = 5;
@@ -2868,6 +2975,7 @@ message PersistentVolumeClaimSpec {
   // accessModes contains the desired access modes the volume should have.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
   // +optional
+  // +listType=atomic
   repeated string accessModes = 1;
 
   // selector is a label query over volumes to consider for binding.
@@ -2943,7 +3051,7 @@ message PersistentVolumeClaimSpec {
   // If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be
   // set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
   // exists.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+  // More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
   // (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
   // +featureGate=VolumeAttributesClass
   // +optional
@@ -2959,6 +3067,7 @@ message PersistentVolumeClaimStatus {
   // accessModes contains the actual access modes the volume backing the PVC has.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
   // +optional
+  // +listType=atomic
   repeated string accessModes = 2;
 
   // capacity represents the actual resources of the underlying volume.
@@ -2966,10 +3075,12 @@ message PersistentVolumeClaimStatus {
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
 
   // conditions is the current Condition of persistent volume claim. If underlying persistent volume is being
-  // resized then the Condition will be set to 'ResizeStarted'.
+  // resized then the Condition will be set to 'Resizing'.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated PersistentVolumeClaimCondition conditions = 4;
 
   // allocatedResources tracks the resources allocated to a PVC including its capacity.
@@ -3217,6 +3328,7 @@ message PersistentVolumeSpec {
   // accessModes contains all ways the volume can be mounted.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
   // +optional
+  // +listType=atomic
   repeated string accessModes = 3;
 
   // claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim.
@@ -3244,6 +3356,7 @@ message PersistentVolumeSpec {
   // simply fail if one is invalid.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
   // +optional
+  // +listType=atomic
   repeated string mountOptions = 7;
 
   // volumeMode defines if a volume is intended to be used with a formatted filesystem
@@ -3335,6 +3448,7 @@ message PodAffinity {
   // When there are multiple elements, the lists of nodes corresponding to each
   // podAffinityTerm are intersected, i.e. all terms must be satisfied.
   // +optional
+  // +listType=atomic
   repeated PodAffinityTerm requiredDuringSchedulingIgnoredDuringExecution = 1;
 
   // The scheduler will prefer to schedule pods to nodes that satisfy
@@ -3347,6 +3461,7 @@ message PodAffinity {
   // "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
   // node(s) with the highest sum are the most preferred.
   // +optional
+  // +listType=atomic
   repeated WeightedPodAffinityTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
@@ -3367,6 +3482,7 @@ message PodAffinityTerm {
   // and the ones selected by namespaceSelector.
   // null or empty namespaces list and null namespaceSelector means "this pod's namespace".
   // +optional
+  // +listType=atomic
   repeated string namespaces = 2;
 
   // This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
@@ -3386,12 +3502,12 @@ message PodAffinityTerm {
 
   // MatchLabelKeys is a set of pod label keys to select which pods will
   // be taken into consideration. The keys are used to lookup values from the
-  // incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)`
+  // incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)`
   // to select the group of existing pods which pods will be taken into consideration
   // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
   // pod labels will be ignored. The default value is empty.
-  // The same key is forbidden to exist in both MatchLabelKeys and LabelSelector.
-  // Also, MatchLabelKeys cannot be set when LabelSelector isn't set.
+  // The same key is forbidden to exist in both matchLabelKeys and labelSelector.
+  // Also, matchLabelKeys cannot be set when labelSelector isn't set.
   // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
   // +listType=atomic
   // +optional
@@ -3399,12 +3515,12 @@ message PodAffinityTerm {
 
   // MismatchLabelKeys is a set of pod label keys to select which pods will
   // be taken into consideration. The keys are used to lookup values from the
-  // incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)`
+  // incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)`
   // to select the group of existing pods which pods will be taken into consideration
   // for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
   // pod labels will be ignored. The default value is empty.
-  // The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector.
-  // Also, MismatchLabelKeys cannot be set when LabelSelector isn't set.
+  // The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
+  // Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
   // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
   // +listType=atomic
   // +optional
@@ -3421,6 +3537,7 @@ message PodAntiAffinity {
   // When there are multiple elements, the lists of nodes corresponding to each
   // podAffinityTerm are intersected, i.e. all terms must be satisfied.
   // +optional
+  // +listType=atomic
   repeated PodAffinityTerm requiredDuringSchedulingIgnoredDuringExecution = 1;
 
   // The scheduler will prefer to schedule pods to nodes that satisfy
@@ -3433,6 +3550,7 @@ message PodAntiAffinity {
   // "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
   // node(s) with the highest sum are the most preferred.
   // +optional
+  // +listType=atomic
   repeated WeightedPodAffinityTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
@@ -3504,12 +3622,14 @@ message PodDNSConfig {
   // This will be appended to the base nameservers generated from DNSPolicy.
   // Duplicated nameservers will be removed.
   // +optional
+  // +listType=atomic
   repeated string nameservers = 1;
 
   // A list of DNS search domains for host-name lookup.
   // This will be appended to the base search paths generated from DNSPolicy.
   // Duplicated search paths will be removed.
   // +optional
+  // +listType=atomic
   repeated string searches = 2;
 
   // A list of DNS resolver options.
@@ -3517,6 +3637,7 @@ message PodDNSConfig {
   // Duplicated entries will be removed. Resolution options given in Options
   // will override those that appear in the base DNSPolicy.
   // +optional
+  // +listType=atomic
   repeated PodDNSConfigOption options = 3;
 }
 
@@ -3558,6 +3679,7 @@ message PodExecOptions {
   optional string container = 5;
 
   // Command is the remote command to execute. argv array. Not executed within a shell.
+  // +listType=atomic
   repeated string command = 6;
 }
 
@@ -3652,6 +3774,7 @@ message PodPortForwardOptions {
   // List of ports to forward
   // Required when using WebSockets
   // +optional
+  // +listType=atomic
   repeated int32 ports = 1;
 }
 
@@ -3760,6 +3883,7 @@ message PodSecurityContext {
   // even if they are not included in this list.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
+  // +listType=atomic
   repeated int64 supplementalGroups = 4;
 
   // A special supplemental group that applies to all containers in a pod.
@@ -3779,6 +3903,7 @@ message PodSecurityContext {
   // sysctls (by the container runtime) might fail to launch.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
+  // +listType=atomic
   repeated Sysctl sysctls = 7;
 
   // fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
@@ -3795,6 +3920,11 @@ message PodSecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 10;
+
+  // appArmorProfile is the AppArmor options to use by the containers in this pod.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 11;
 }
 
 // Describes the class of pods that should avoid this node.
@@ -3812,6 +3942,8 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -3829,6 +3961,8 @@ message PodSpec {
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated Container initContainers = 20;
 
   // List of containers belonging to the pod.
@@ -3837,6 +3971,8 @@ message PodSpec {
   // Cannot be updated.
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated Container containers = 2;
 
   // List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
@@ -3846,6 +3982,8 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EphemeralContainer ephemeralContainers = 34;
 
   // Restart policy for all containers within the pod.
@@ -3893,7 +4031,7 @@ message PodSpec {
   // +optional
   optional string serviceAccountName = 8;
 
-  // DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
+  // DeprecatedServiceAccount is a deprecated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
   // +k8s:conversion-gen=false
   // +optional
@@ -3948,6 +4086,8 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated LocalObjectReference imagePullSecrets = 15;
 
   // Specifies the hostname of the Pod
@@ -3971,13 +4111,16 @@ message PodSpec {
 
   // If specified, the pod's tolerations.
   // +optional
+  // +listType=atomic
   repeated Toleration tolerations = 22;
 
   // HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
-  // file if specified. This is only valid for non-hostNetwork pods.
+  // file if specified.
   // +optional
   // +patchMergeKey=ip
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=ip
   repeated HostAlias hostAliases = 23;
 
   // If specified, indicates the pod's priority. "system-node-critical" and
@@ -4008,6 +4151,7 @@ message PodSpec {
   // all conditions specified in the readiness gates have status equal to "True"
   // More info: https://git.k8s.io/enhancements/keps/sig-network/580-pod-readiness-gates
   // +optional
+  // +listType=atomic
   repeated PodReadinessGate readinessGates = 28;
 
   // RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used
@@ -4069,6 +4213,7 @@ message PodSpec {
   // - spec.hostPID
   // - spec.hostIPC
   // - spec.hostUsers
+  // - spec.securityContext.appArmorProfile
   // - spec.securityContext.seLinuxOptions
   // - spec.securityContext.seccompProfile
   // - spec.securityContext.fsGroup
@@ -4078,6 +4223,7 @@ message PodSpec {
   // - spec.securityContext.runAsUser
   // - spec.securityContext.runAsGroup
   // - spec.securityContext.supplementalGroups
+  // - spec.containers[*].securityContext.appArmorProfile
   // - spec.containers[*].securityContext.seLinuxOptions
   // - spec.containers[*].securityContext.seccompProfile
   // - spec.containers[*].securityContext.capabilities
@@ -4109,13 +4255,10 @@ message PodSpec {
   //
   // SchedulingGates can only be set at pod creation time, and be removed only afterwards.
   //
-  // This is a beta feature enabled by the PodSchedulingReadiness feature gate.
-  //
   // +patchMergeKey=name
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
-  // +featureGate=PodSchedulingReadiness
   // +optional
   repeated PodSchedulingGate schedulingGates = 38;
 
@@ -4168,6 +4311,8 @@ message PodStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated PodCondition conditions = 2;
 
   // A human readable message indicating details about why the pod is in this condition.
@@ -4216,6 +4361,8 @@ message PodStatus {
   // +optional
   // +patchStrategy=merge
   // +patchMergeKey=ip
+  // +listType=map
+  // +listMapKey=ip
   repeated PodIP podIPs = 12;
 
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
@@ -4227,11 +4374,13 @@ message PodStatus {
   // init container will have ready = true, the most recently started container will have
   // startTime set.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
+  // +listType=atomic
   repeated ContainerStatus initContainerStatuses = 10;
 
   // The list has one entry per container in the manifest.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status
   // +optional
+  // +listType=atomic
   repeated ContainerStatus containerStatuses = 8;
 
   // The Quality of Service (QOS) classification assigned to the pod based on resource requirements
@@ -4242,6 +4391,7 @@ message PodStatus {
 
   // Status for any ephemeral containers that have run in this pod.
   // +optional
+  // +listType=atomic
   repeated ContainerStatus ephemeralContainerStatuses = 13;
 
   // Status of resources resize desired for pod's containers.
@@ -4459,6 +4609,7 @@ message ProbeHandler {
 message ProjectedVolumeSource {
   // sources is the list of volume projections
   // +optional
+  // +listType=atomic
   repeated VolumeProjection sources = 1;
 
   // defaultMode are the mode bits used to set permissions on created files by default.
@@ -4508,6 +4659,7 @@ message QuobyteVolumeSource {
 message RBDPersistentVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // image is the rados image name.
@@ -4559,6 +4711,7 @@ message RBDPersistentVolumeSource {
 message RBDVolumeSource {
   // monitors is a collection of Ceph monitors.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
+  // +listType=atomic
   repeated string monitors = 1;
 
   // image is the rados image name.
@@ -4733,6 +4886,8 @@ message ReplicationControllerStatus {
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
   repeated ReplicationControllerCondition conditions = 6;
 }
 
@@ -4799,6 +4954,7 @@ message ResourceQuotaSpec {
   // A collection of filters that must match each object tracked by a quota.
   // If not specified, the quota matches all objects.
   // +optional
+  // +listType=atomic
   repeated string scopes = 2;
 
   // scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
@@ -4966,6 +5122,7 @@ message ScaleIOVolumeSource {
 message ScopeSelector {
   // A list of scope selector requirements by scope of the resources.
   // +optional
+  // +listType=atomic
   repeated ScopedResourceSelectorRequirement matchExpressions = 1;
 }
 
@@ -4984,6 +5141,7 @@ message ScopedResourceSelectorRequirement {
   // the values array must be empty.
   // This array is replaced during a strategic merge patch.
   // +optional
+  // +listType=atomic
   repeated string values = 3;
 }
 
@@ -5101,6 +5259,7 @@ message SecretProjection {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // optional field specify whether the Secret or its key must be defined
@@ -5140,6 +5299,7 @@ message SecretVolumeSource {
   // the volume setup will error unless it is marked optional. Paths must be
   // relative and may not contain the '..' path or start with '..'.
   // +optional
+  // +listType=atomic
   repeated KeyToPath items = 2;
 
   // defaultMode is Optional: mode bits used to set permissions on created files by default.
@@ -5244,6 +5404,12 @@ message SecurityContext {
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   optional SeccompProfile seccompProfile = 11;
+
+  // appArmorProfile is the AppArmor options to use by this container. If set, this profile
+  // overrides the pod's appArmorProfile.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // +optional
+  optional AppArmorProfile appArmorProfile = 12;
 }
 
 // SerializedReference is a reference to serialized object.
@@ -5293,6 +5459,8 @@ message ServiceAccount {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated ObjectReference secrets = 2;
 
   // ImagePullSecrets is a list of references to secrets in the same namespace to use for pulling any images
@@ -5300,6 +5468,7 @@ message ServiceAccount {
   // can be mounted in the pod, but ImagePullSecrets are only accessed by the kubelet.
   // More info: https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod
   // +optional
+  // +listType=atomic
   repeated LocalObjectReference imagePullSecrets = 3;
 
   // AutomountServiceAccountToken indicates whether pods running as this service account should have an API token automatically mounted.
@@ -5520,6 +5689,7 @@ message ServiceSpec {
   // at a node with this IP.  A common example is external load-balancers
   // that are not part of the Kubernetes system.
   // +optional
+  // +listType=atomic
   repeated string externalIPs = 5;
 
   // Supports "ClientIP" and "None". Used to maintain session affinity.
@@ -5545,6 +5715,7 @@ message ServiceSpec {
   // cloud-provider does not support the feature."
   // More info: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/
   // +optional
+  // +listType=atomic
   repeated string loadBalancerSourceRanges = 9;
 
   // externalName is the external reference that discovery mechanisms will
@@ -5660,6 +5831,17 @@ message ServiceSpec {
   // (possibly modified by topology and other features).
   // +optional
   optional string internalTrafficPolicy = 22;
+
+  // TrafficDistribution offers a way to express preferences for how traffic is
+  // distributed to Service endpoints. Implementations can use this field as a
+  // hint, but are not required to guarantee strict adherence. If the field is
+  // not set, the implementation will apply its default routing strategy. If set
+  // to "PreferClose", implementations should prioritize endpoints that are
+  // topologically close (e.g., same zone).
+  // This is an alpha field and requires enabling ServiceTrafficDistribution feature.
+  // +featureGate=ServiceTrafficDistribution
+  // +optional
+  optional string trafficDistribution = 23;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -5838,6 +6020,7 @@ message TopologySelectorLabelRequirement {
 
   // An array of string values. One value must match the label to be selected.
   // Each entry in Values is ORed.
+  // +listType=atomic
   repeated string values = 2;
 }
 
@@ -5850,6 +6033,7 @@ message TopologySelectorLabelRequirement {
 message TopologySelectorTerm {
   // A list of topology selector requirements by labels.
   // +optional
+  // +listType=atomic
   repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
 }
 
@@ -5940,8 +6124,6 @@ message TopologySpreadConstraint {
   // In this situation, new pod with the same labelSelector cannot be scheduled,
   // because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
   // it will violate MaxSkew.
-  //
-  // This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
   // +optional
   optional int32 minDomains = 5;
 
@@ -6051,6 +6233,27 @@ message VolumeMount {
   // +optional
   optional bool readOnly = 2;
 
+  // RecursiveReadOnly specifies whether read-only mounts should be handled
+  // recursively.
+  //
+  // If ReadOnly is false, this field has no meaning and must be unspecified.
+  //
+  // If ReadOnly is true, and this field is set to Disabled, the mount is not made
+  // recursively read-only.  If this field is set to IfPossible, the mount is made
+  // recursively read-only, if it is supported by the container runtime.  If this
+  // field is set to Enabled, the mount is made recursively read-only if it is
+  // supported by the container runtime, otherwise the pod will not be started and
+  // an error will be generated to indicate the reason.
+  //
+  // If this field is set to IfPossible or Enabled, MountPropagation must be set to
+  // None (or be unspecified, which defaults to None).
+  //
+  // If this field is not specified, it is treated as an equivalent of Disabled.
+  //
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 7;
+
   // Path within the container at which the volume should be mounted.  Must
   // not contain ':'.
   optional string mountPath = 3;
@@ -6064,6 +6267,8 @@ message VolumeMount {
   // to container and the other way around.
   // When not set, MountPropagationNone is used.
   // This field is beta in 1.10.
+  // When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+  // (which defaults to None).
   // +optional
   optional string mountPropagation = 5;
 
@@ -6073,6 +6278,26 @@ message VolumeMount {
   // SubPathExpr and SubPath are mutually exclusive.
   // +optional
   optional string subPathExpr = 6;
+}
+
+// VolumeMountStatus shows status of volume mounts.
+message VolumeMountStatus {
+  // Name corresponds to the name of the original VolumeMount.
+  optional string name = 1;
+
+  // MountPath corresponds to the original VolumeMount.
+  optional string mountPath = 2;
+
+  // ReadOnly corresponds to the original VolumeMount.
+  // +optional
+  optional bool readOnly = 3;
+
+  // RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts).
+  // An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled,
+  // depending on the mount result.
+  // +featureGate=RecursiveReadOnlyMounts
+  // +optional
+  optional string recursiveReadOnly = 4;
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.

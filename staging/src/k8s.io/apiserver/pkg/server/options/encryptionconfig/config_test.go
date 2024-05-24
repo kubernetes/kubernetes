@@ -34,7 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
@@ -147,33 +147,33 @@ func TestLegacyConfig(t *testing.T) {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
 	}
 
-	expected := &apiserverconfig.EncryptionConfiguration{
-		Resources: []apiserverconfig.ResourceConfiguration{
+	expected := &apiserver.EncryptionConfiguration{
+		Resources: []apiserver.ResourceConfiguration{
 			{
 				Resources: []string{"secrets", "namespaces"},
-				Providers: []apiserverconfig.ProviderConfiguration{
-					{Identity: &apiserverconfig.IdentityConfiguration{}},
-					{AESGCM: &apiserverconfig.AESConfiguration{
-						Keys: []apiserverconfig.Key{
+				Providers: []apiserver.ProviderConfiguration{
+					{Identity: &apiserver.IdentityConfiguration{}},
+					{AESGCM: &apiserver.AESConfiguration{
+						Keys: []apiserver.Key{
 							{Name: "key1", Secret: "c2VjcmV0IGlzIHNlY3VyZQ=="},
 							{Name: "key2", Secret: "dGhpcyBpcyBwYXNzd29yZA=="},
 						},
 					}},
-					{KMS: &apiserverconfig.KMSConfiguration{
+					{KMS: &apiserver.KMSConfiguration{
 						APIVersion: "v1",
 						Name:       "testprovider",
 						Endpoint:   "unix:///tmp/testprovider.sock",
 						CacheSize:  &cacheSize,
 						Timeout:    &metav1.Duration{Duration: 3 * time.Second},
 					}},
-					{AESCBC: &apiserverconfig.AESConfiguration{
-						Keys: []apiserverconfig.Key{
+					{AESCBC: &apiserver.AESConfiguration{
+						Keys: []apiserver.Key{
 							{Name: "key1", Secret: "c2VjcmV0IGlzIHNlY3VyZQ=="},
 							{Name: "key2", Secret: "dGhpcyBpcyBwYXNzd29yZA=="},
 						},
 					}},
-					{Secretbox: &apiserverconfig.SecretboxConfiguration{
-						Keys: []apiserverconfig.Key{
+					{Secretbox: &apiserver.SecretboxConfiguration{
+						Keys: []apiserver.Key{
 							{Name: "key1", Secret: "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY="},
 						},
 					}},
@@ -388,19 +388,19 @@ func TestKMSvsEnablement(t *testing.T) {
 		kmsv2Enabled    bool
 		expectedErr     string
 		expectedTimeout time.Duration
-		config          apiserverconfig.EncryptionConfiguration
+		config          apiserver.EncryptionConfiguration
 		wantV2Used      bool
 	}{
 		{
 			name:         "with kmsv1 and kmsv2, KMSv2=true",
 			kmsv2Enabled: true,
-			config: apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{"secrets"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout: &metav1.Duration{
@@ -411,7 +411,7 @@ func TestKMSvsEnablement(t *testing.T) {
 								},
 							},
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v2",
 									Timeout: &metav1.Duration{
@@ -461,15 +461,15 @@ func TestKMSMaxTimeout(t *testing.T) {
 		name            string
 		expectedErr     string
 		expectedTimeout time.Duration
-		config          apiserverconfig.EncryptionConfiguration
+		config          apiserver.EncryptionConfiguration
 	}{
 		{
 			name: "config with bad provider",
-			config: apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{"secrets"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
 								KMS: nil,
 							},
@@ -482,13 +482,13 @@ func TestKMSMaxTimeout(t *testing.T) {
 		},
 		{
 			name: "default timeout",
-			config: apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{"secrets"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout: &metav1.Duration{
@@ -508,13 +508,13 @@ func TestKMSMaxTimeout(t *testing.T) {
 		},
 		{
 			name: "with v1 provider",
-			config: apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{"secrets"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout: &metav1.Duration{
@@ -529,9 +529,9 @@ func TestKMSMaxTimeout(t *testing.T) {
 					},
 					{
 						Resources: []string{"configmaps"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout: &metav1.Duration{
@@ -551,13 +551,13 @@ func TestKMSMaxTimeout(t *testing.T) {
 		},
 		{
 			name: "with v2 provider",
-			config: apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{"secrets"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v2",
 									Timeout: &metav1.Duration{
@@ -567,7 +567,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 								},
 							},
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "new-kms",
 									APIVersion: "v2",
 									Timeout: &metav1.Duration{
@@ -580,9 +580,9 @@ func TestKMSMaxTimeout(t *testing.T) {
 					},
 					{
 						Resources: []string{"configmaps"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v2",
 									Timeout: &metav1.Duration{
@@ -592,7 +592,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 								},
 							},
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "yet-another-kms",
 									APIVersion: "v2",
 									Timeout: &metav1.Duration{
@@ -610,13 +610,13 @@ func TestKMSMaxTimeout(t *testing.T) {
 		},
 		{
 			name: "with v1 and v2 provider",
-			config: apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{"secrets"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout: &metav1.Duration{
@@ -626,7 +626,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 								},
 							},
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v2",
 									Timeout: &metav1.Duration{
@@ -639,9 +639,9 @@ func TestKMSMaxTimeout(t *testing.T) {
 					},
 					{
 						Resources: []string{"configmaps"},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout: &metav1.Duration{
@@ -651,7 +651,7 @@ func TestKMSMaxTimeout(t *testing.T) {
 								},
 							},
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "yet-another-kms",
 									APIVersion: "v1",
 									Timeout: &metav1.Duration{
@@ -725,7 +725,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 			desc:    "Invalid config file path",
 			config:  "invalid/path",
 			want:    nil,
-			wantErr: `error opening encryption provider configuration file "invalid/path"`,
+			wantErr: `error reading encryption provider configuration file "invalid/path"`,
 		},
 		{
 			desc:    "Empty config file content",
@@ -858,22 +858,22 @@ func TestWildcardMasking(t *testing.T) {
 
 	testCases := []struct {
 		desc          string
-		config        *apiserverconfig.EncryptionConfiguration
+		config        *apiserver.EncryptionConfiguration
 		expectedError string
 	}{
 		{
 			desc: "resources masked by *. group",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"*.",
 							"secrets",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -889,15 +889,15 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "*. masked by *. group",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"*.",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -911,9 +911,9 @@ func TestWildcardMasking(t *testing.T) {
 						Resources: []string{
 							"*.",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms2",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -929,15 +929,15 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "*.foo masked by *.foo",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"*.foo",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -951,9 +951,9 @@ func TestWildcardMasking(t *testing.T) {
 						Resources: []string{
 							"*.foo",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms2",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -969,15 +969,15 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "*.* masked by *.*",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"*.*",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -991,9 +991,9 @@ func TestWildcardMasking(t *testing.T) {
 						Resources: []string{
 							"*.*",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms2",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1009,15 +1009,15 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "resources masked by *. group in multiple configurations",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1032,9 +1032,9 @@ func TestWildcardMasking(t *testing.T) {
 							"*.",
 							"secrets",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1050,17 +1050,17 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "resources masked by *.*",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"*.*",
 							"secrets",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1076,15 +1076,15 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "resources masked by *.* in multiple configurations",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1099,9 +1099,9 @@ func TestWildcardMasking(t *testing.T) {
 							"*.*",
 							"secrets",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1117,17 +1117,17 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "resources *. masked by *.*",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"*.*",
 							"*.",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1143,16 +1143,16 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "resources *. masked by *.* in multiple configurations",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"*.*",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1166,9 +1166,9 @@ func TestWildcardMasking(t *testing.T) {
 						Resources: []string{
 							"*.",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1184,17 +1184,17 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "resources not masked by any rule",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"secrets",
 							"*.*",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1209,16 +1209,16 @@ func TestWildcardMasking(t *testing.T) {
 		},
 		{
 			desc: "resources not masked by any rule in multiple configurations",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"secrets",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1232,9 +1232,9 @@ func TestWildcardMasking(t *testing.T) {
 						Resources: []string{
 							"*.*",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1267,7 +1267,7 @@ func TestWildcardStructure(t *testing.T) {
 	testCases := []struct {
 		desc                         string
 		expectedResourceTransformers map[string]string
-		config                       *apiserverconfig.EncryptionConfiguration
+		config                       *apiserver.EncryptionConfiguration
 		errorValue                   string
 	}{
 		{
@@ -1284,16 +1284,16 @@ func TestWildcardStructure(t *testing.T) {
 			},
 
 			errorValue: "",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"*.apps",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1307,9 +1307,9 @@ func TestWildcardStructure(t *testing.T) {
 						Resources: []string{
 							"secrets",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "another-kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1318,7 +1318,7 @@ func TestWildcardStructure(t *testing.T) {
 								},
 							},
 							{
-								Identity: &apiserverconfig.IdentityConfiguration{},
+								Identity: &apiserver.IdentityConfiguration{},
 							},
 						},
 					},
@@ -1326,9 +1326,9 @@ func TestWildcardStructure(t *testing.T) {
 						Resources: []string{
 							"*.",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "fancy",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1342,9 +1342,9 @@ func TestWildcardStructure(t *testing.T) {
 						Resources: []string{
 							"*.*",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "yet-another-provider",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1360,16 +1360,16 @@ func TestWildcardStructure(t *testing.T) {
 		{
 			desc:       "should result in error",
 			errorValue: "resource \"secrets\" is masked by earlier rule \"*.\"",
-			config: &apiserverconfig.EncryptionConfiguration{
-				Resources: []apiserverconfig.ResourceConfiguration{
+			config: &apiserver.EncryptionConfiguration{
+				Resources: []apiserver.ResourceConfiguration{
 					{
 						Resources: []string{
 							"configmaps",
 							"*.",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1384,9 +1384,9 @@ func TestWildcardStructure(t *testing.T) {
 							"*.*",
 							"secrets",
 						},
-						Providers: []apiserverconfig.ProviderConfiguration{
+						Providers: []apiserver.ProviderConfiguration{
 							{
-								KMS: &apiserverconfig.KMSConfiguration{
+								KMS: &apiserver.KMSConfiguration{
 									Name:       "kms",
 									APIVersion: "v1",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
@@ -1395,7 +1395,7 @@ func TestWildcardStructure(t *testing.T) {
 								},
 							},
 							{
-								Identity: &apiserverconfig.IdentityConfiguration{},
+								Identity: &apiserver.IdentityConfiguration{},
 							},
 						},
 					},
@@ -1833,7 +1833,7 @@ func errString(err error) string {
 
 func TestComputeEncryptionConfigHash(t *testing.T) {
 	// hash the empty string to be sure that sha256 is being used
-	expect := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	expect := "k8s:enc:unstable:1:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	sum := computeEncryptionConfigHash([]byte(""))
 	if expect != sum {
 		t.Errorf("expected hash %q but got %q", expect, sum)
@@ -2197,12 +2197,12 @@ func TestGetEncryptionConfigHash(t *testing.T) {
 			name:     "missing file",
 			filepath: "testdata/invalid-configs/kms/file-that-does-not-exist.yaml",
 			wantHash: "",
-			wantErr:  `error opening encryption provider configuration file "testdata/invalid-configs/kms/file-that-does-not-exist.yaml": open testdata/invalid-configs/kms/file-that-does-not-exist.yaml: no such file or directory`,
+			wantErr:  `error reading encryption provider configuration file "testdata/invalid-configs/kms/file-that-does-not-exist.yaml": open testdata/invalid-configs/kms/file-that-does-not-exist.yaml: no such file or directory`,
 		},
 		{
 			name:     "valid file",
 			filepath: "testdata/valid-configs/secret-box-first.yaml",
-			wantHash: "c638c0327dbc3276dd1fcf3e67895d19ebca16b91ae0d19af24ef0759b8e0f66",
+			wantHash: "k8s:enc:unstable:1:c638c0327dbc3276dd1fcf3e67895d19ebca16b91ae0d19af24ef0759b8e0f66",
 			wantErr:  ``,
 		},
 	}

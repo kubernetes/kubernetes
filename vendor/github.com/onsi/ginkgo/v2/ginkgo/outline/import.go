@@ -28,14 +28,7 @@ func packageNameForImport(f *ast.File, path string) *string {
 	}
 	name := spec.Name.String()
 	if name == "<nil>" {
-		// If the package name is not explicitly specified,
-		// make an educated guess. This is not guaranteed to be correct.
-		lastSlash := strings.LastIndex(path, "/")
-		if lastSlash == -1 {
-			name = path
-		} else {
-			name = path[lastSlash+1:]
-		}
+		name = "ginkgo"
 	}
 	if name == "." {
 		name = ""

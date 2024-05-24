@@ -1,8 +1,11 @@
-Scheduler Performance Test
-======
+# Scheduler Performance Test
 
-Motivation
-------
+This package contains the scheduler performance tests, often called scheduler_perf.
+We use it for benchmarking the scheduler with in-tree plugins, which is visible at [perf-dash](https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfResults&Metric=SchedulingThroughput&Name=SchedulingBasic%2F5000Nodes%2Fnamespace-2&extension_point=not%20applicable&result=not%20applicable).
+Also you can use it outside the Kubernetes repository with out-of-tree plugins by making use of `RunBenchmarkPerfScheduling`.
+
+## Motivation
+
 We already have a performance testing system -- Kubemark. However, Kubemark requires setting up and bootstrapping a whole cluster, which takes a lot of time.
 
 We want to have a standard way to reproduce scheduling latency metrics result and benchmark scheduler as simple and fast as possible. We have the following goals:
@@ -24,11 +27,9 @@ Currently the test suite has the following:
   - make use of `go test -bench` and report nanosecond/op.
   - schedule b.N pods when the cluster has N nodes and P scheduled pods. Since it takes relatively long time to finish one round, b.N is small: 10 - 100.
 
+## How To Run
 
-How To Run
-------
-
-## Benchmark tests
+### Benchmark tests
 
 ```shell
 # In Kubernetes root path
@@ -101,7 +102,7 @@ performance.
 During interactive debugging sessions it is possible to enable per-test output
 via -use-testing-log.
 
-## Integration tests
+### Integration tests
 
 To run integration tests, use:
 ```

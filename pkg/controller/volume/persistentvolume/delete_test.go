@@ -148,9 +148,9 @@ func TestDeleteSync(t *testing.T) {
 		},
 		{
 			// PV requires external deleter
-			name:            "8-10 - external deleter",
-			initialVolumes:  []*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
-			expectedVolumes: []*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10", "1Gi", "uid10-1", "claim10-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
+			name:            "8-10-1 - external deleter when volume is dynamic provisioning",
+			initialVolumes:  []*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10-1", "1Gi", "uid10-1-1", "claim10-1-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
+			expectedVolumes: []*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10-1", "1Gi", "uid10-1-1", "claim10-1-1", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
 			initialClaims:   noclaims,
 			expectedClaims:  noclaims,
 			expectedEvents:  noevents,
@@ -161,6 +161,28 @@ func TestDeleteSync(t *testing.T) {
 				test.expectedVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "external.io/test"
 				return testSyncVolume(ctrl, reactor, test)
 			},
+		},
+		{
+			// PV requires external deleter
+			name:            "8-10-2 - external deleter when volume is static provisioning",
+			initialVolumes:  []*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10-2", "1Gi", "uid10-1-2", "claim10-1-2", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
+			expectedVolumes: []*v1.PersistentVolume{newExternalProvisionedVolume("volume8-10-2", "1Gi", "uid10-1-2", "claim10-1-2", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, gceDriver, nil, volume.AnnBoundByController)},
+			initialClaims:   noclaims,
+			expectedClaims:  noclaims,
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            testSyncVolume,
+		},
+		{
+			// PV requires external deleter
+			name:            "8-10-3 - external deleter when volume is migrated",
+			initialVolumes:  []*v1.PersistentVolume{volumeWithAnnotation(volume.AnnMigratedTo, "pd.csi.storage.gke.io", volumeWithAnnotation(volume.AnnDynamicallyProvisioned, "kubernetes.io/gce-pd", newVolume("volume8-10-3", "1Gi", "uid10-1-3", "claim10-1-3", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned)))},
+			expectedVolumes: []*v1.PersistentVolume{volumeWithAnnotation(volume.AnnMigratedTo, "pd.csi.storage.gke.io", volumeWithAnnotation(volume.AnnDynamicallyProvisioned, "kubernetes.io/gce-pd", newVolume("volume8-10-3", "1Gi", "uid10-1-3", "claim10-1-3", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned)))},
+			initialClaims:   noclaims,
+			expectedClaims:  noclaims,
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            testSyncVolume,
 		},
 		{
 			// delete success - two PVs are provisioned for a single claim.

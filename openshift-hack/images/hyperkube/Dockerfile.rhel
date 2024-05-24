@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS builder
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
 RUN make WHAT='cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler cmd/kubelet cmd/watch-termination openshift-hack/cmd/k8s-tests' && \
@@ -13,4 +13,4 @@ COPY --from=builder /tmp/build/* /usr/bin/
 LABEL io.k8s.display-name="OpenShift Kubernetes Server Commands" \
       io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \
       io.openshift.tags="openshift,hyperkube" \
-      io.openshift.build.versions="kubernetes=1.29.4"
+      io.openshift.build.versions="kubernetes=1.30.0"

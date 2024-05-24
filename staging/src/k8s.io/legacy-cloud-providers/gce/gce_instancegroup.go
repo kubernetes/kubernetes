@@ -20,8 +20,6 @@ limitations under the License.
 package gce
 
 import (
-	"fmt"
-
 	compute "google.golang.org/api/compute/v1"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
@@ -54,26 +52,11 @@ func (g *Cloud) DeleteInstanceGroup(name string, zone string) error {
 
 // FilterInstanceGroupsByName lists all InstanceGroups in the project and
 // zone that match the name regexp.
-func (g *Cloud) FilterInstanceGroupsByName(namePrefix, zone string) ([]*compute.InstanceGroup, error) {
+func (g *Cloud) FilterInstanceGroupsByNamePrefix(namePrefix, zone string) ([]*compute.InstanceGroup, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 	mc := newInstanceGroupMetricContext("filter", zone)
 	v, err := g.c.InstanceGroups().List(ctx, zone, filter.Regexp("name", namePrefix+".*"))
-	return v, mc.Observe(err)
-}
-
-// ListInstanceGroupsWithPrefix lists all InstanceGroups in the project and
-// zone with given prefix.
-func (g *Cloud) ListInstanceGroupsWithPrefix(zone string, prefix string) ([]*compute.InstanceGroup, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	mc := newInstanceGroupMetricContext("list", zone)
-	f := filter.None
-	if prefix != "" {
-		f = filter.Regexp("name", fmt.Sprintf("%s.*", prefix))
-	}
-	v, err := g.c.InstanceGroups().List(ctx, zone, f)
 	return v, mc.Observe(err)
 }
 

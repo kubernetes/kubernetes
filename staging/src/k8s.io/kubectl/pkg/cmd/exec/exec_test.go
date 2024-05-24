@@ -33,8 +33,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
-
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/term"
 )
@@ -400,5 +400,39 @@ func TestSetupTTY(t *testing.T) {
 	}
 	if tty.Out != o.Out {
 		t.Errorf("attach stdin, TTY, is a terminal: tty.Out should equal o.Out")
+	}
+}
+
+func TestCreateExecutor(t *testing.T) {
+	url, err := url.Parse("http://localhost:8080/index.html")
+	if err != nil {
+		t.Fatalf("unable to parse test url: %v", err)
+	}
+	config := cmdtesting.DefaultClientConfig()
+	// First, ensure that no environment variable creates the fallback executor.
+	executor, err := createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Next, check turning on feature flag explicitly also creates fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "true")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
+	}
+	// Finally, check explicit disabling does NOT create the fallback executor.
+	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
+	executor, err = createExecutor(url, config)
+	if err != nil {
+		t.Fatalf("unable to create executor: %v", err)
+	}
+	if _, isFallback := executor.(*remotecommand.FallbackExecutor); isFallback {
+		t.Errorf("expected fallback executor, got %#v", executor)
 	}
 }

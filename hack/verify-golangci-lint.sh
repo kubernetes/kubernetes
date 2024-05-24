@@ -44,26 +44,13 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
-# Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BINPATH}"
-PATH="${GOBIN}:${PATH}"
+kube::golang::setup_env
+export GOBIN="${KUBE_OUTPUT_BIN}"
+
+kube::util::require-jq
 
 invocation=(./hack/verify-golangci-lint.sh "$@")
-
-# Disable warnings about the logcheck plugin using the old API
-# (https://github.com/golangci/golangci-lint/issues/4001).
-# Can be removed once logcheck gets updated to a newer release
-# which uses the new plugin API
-export GOLANGCI_LINT_HIDE_WARNING_ABOUT_PLUGIN_API_DEPRECATION=1
-
-# The logcheck plugin currently has to be configured via env variables
-# (https://github.com/golangci/golangci-lint/issues/1512).
-#
-# Remember to clean the golangci-lint cache when changing
-# the configuration and running this script multiple times,
-# otherwise golangci-lint will report stale results:
-# _output/local/bin/golangci-lint cache clean
-golangci=(env LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf" "${GOBIN}/golangci-lint" run)
+golangci=("${GOBIN}/golangci-lint" run)
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 strict=
@@ -127,8 +114,6 @@ if [ "$base" ]; then
     golangci+=(--new --new-from-rev="$base")
 fi
 
-kube::golang::verify_go_version
-
 # Filter out arguments that start with "-" and move them to the run flags.
 shift $((OPTIND-1))
 targets=()
@@ -140,20 +125,15 @@ for arg; do
   fi
 done
 
-kube::golang::verify_go_version
-
-# Explicitly opt into go modules, even though we're inside a GOPATH directory
-export GO111MODULE=on
-
 # Install golangci-lint
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  go install github.com/golangci/golangci-lint/cmd/golangci-lint
-  if [ "${golangci_config}" ]; then
-    # This cannot be used without a config.
-    go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
-  fi
-popd >/dev/null
+go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/cmd/golangci-lint
+if [ "${golangci_config}" ]; then
+  # This cannot be used without a config.
+  # This uses `go build` because `go install -buildmode=plugin` doesn't work
+  # (on purpose: https://github.com/golang/go/issues/64964).
+  go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+fi
 
 if [ "${golangci_config}" ]; then
   # The relative path to _output/local/bin only works if that actually is the
@@ -175,30 +155,25 @@ cd "${KUBE_ROOT}"
 
 res=0
 run () {
-  if [[ "${#targets[@]}" -gt 0 ]]; then
-    echo "running ${golangci[*]} ${targets[*]}" >&2
-    "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
-  else
-    echo "running ${golangci[*]} ./..." >&2
-    "${golangci[@]}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
-    for d in staging/src/k8s.io/*; do
-      MODPATH="staging/src/k8s.io/$(basename "${d}")"
-      echo "running ( cd ${KUBE_ROOT}/${MODPATH}; ${golangci[*]} --path-prefix ${MODPATH} ./... )"
-      pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
-        "${golangci[@]}" --path-prefix "${MODPATH}" ./... 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
-      popd >/dev/null
-    done
+  if [[ "${#targets[@]}" -eq 0 ]]; then
+    # Doing it this way is MUCH faster than simply saying "all", and there doesn't
+    # seem to be a simpler way to express "this whole workspace".
+    kube::util::read-array targets < <(
+        go work edit -json | jq -r '.Use[].DiskPath + "/..."'
+    )
   fi
+  echo "running ${golangci[*]} ${targets[*]}" >&2
+  "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
 }
 # First run with normal output.
-run "${targets[@]}"
+run
 
 # Then optionally do it again with github-actions as format.
 # Because golangci-lint caches results, this is faster than the
 # initial invocation.
 if [ "$githubactions" ]; then
-  golangci+=(--out-format=github-actions)
-  run "$${targets[@]}" >"$githubactions" 2>&1
+  golangci+=("--out-format=github-actions")
+  run >"$githubactions" 2>&1
 fi
 
 # print a message based on the result
@@ -211,18 +186,30 @@ else
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
     if [ "$strict" ]; then
-        echo 'The more strict golangci-strict.yaml was used.'
+        echo
+        echo 'golangci-strict.yaml was used as configuration. Warnings must be fixed in'
+        echo 'new or modified code.'
     elif [ "$hints" ]; then
-        echo 'The golangci-hints.yaml was used. Some of the reported issues may have to be fixed'
-        echo 'while others can be ignored, depending on the circumstances and/or personal'
-        echo 'preferences. To determine which issues have to be fixed, check the report that'
-        echo 'uses golangci-strict.yaml.'
+        echo
+        echo 'golangci-hints.yaml was used as configuration. Some of the reported issues may'
+        echo 'have to be fixed while others can be ignored, depending on the circumstances'
+        echo 'and/or personal preferences. To determine which issues have to be fixed, check'
+        echo 'the report that uses golangci-strict.yaml (= pull-kubernetes-verify-lint).'
     fi
     if [ "$strict" ] || [ "$hints" ]; then
+        echo
         echo 'If you feel that this warns about issues that should be ignored by default,'
         echo 'then please discuss with your reviewer and propose'
         echo 'a change for hack/golangci.yaml.in as part of your PR.'
+        echo
+        echo 'Please do not create PRs which fix these issues in existing code just'
+        echo 'because the linter warns about them. Often they are harmless and not'
+        echo 'worth the cost associated with a PR (time required to review, code churn).'
+        echo 'Instead, propose to fix certain linter issues in an issue first and'
+        echo 'discuss there with maintainers. PRs are welcome if they address a real'
+        echo 'problem, which then needs to be explained in the PR.'
     fi
+    echo
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
     echo ' that the project chooses to ignore.'
     echo 'See: https://golangci-lint.run/usage/false-positives/'

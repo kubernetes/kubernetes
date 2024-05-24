@@ -1509,7 +1509,6 @@ func TestReadyCondition(t *testing.T) {
 		runtimeErrors                        error
 		networkErrors                        error
 		storageErrors                        error
-		appArmorValidateHostFunc             func() error
 		cmStatus                             cm.Status
 		nodeShutdownManagerErrors            error
 		expectConditions                     []v1.NodeCondition
@@ -1523,19 +1522,6 @@ func TestReadyCondition(t *testing.T) {
 			// TODO(mtaufen): The current behavior is that we don't send an event for the initial NodeReady condition,
 			// the reason for this is unclear, so we may want to actually send an event, and change these test cases
 			// to ensure an event is sent.
-		},
-		{
-			desc:                     "new, ready: apparmor validator passed",
-			node:                     withCapacity.DeepCopy(),
-			appArmorValidateHostFunc: func() error { return nil },
-			expectConditions:         []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status. AppArmor enabled", now, now)},
-		},
-		{
-			desc:                     "new, ready: apparmor validator failed",
-			node:                     withCapacity.DeepCopy(),
-			appArmorValidateHostFunc: func() error { return fmt.Errorf("foo") },
-			// absence of an additional message is understood to mean that AppArmor is disabled
-			expectConditions: []v1.NodeCondition{*makeReadyCondition(true, "kubelet is posting ready status", now, now)},
 		},
 		{
 			desc: "new, ready: soft requirement warning",
@@ -1655,7 +1641,7 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc, !tc.disableLocalStorageCapacityIsolation)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc, !tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
 			if err := setter(ctx, tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)

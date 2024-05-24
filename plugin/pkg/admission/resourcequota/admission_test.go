@@ -31,15 +31,12 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
@@ -117,8 +114,8 @@ func createHandlerWithConfig(kubeClient kubernetes.Interface, informerFactory in
 	}
 
 	initializers := admission.PluginInitializers{
-		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, stopCh),
-		kubeapiserveradmission.NewPluginInitializer(nil, nil, quotaConfiguration),
+		genericadmissioninitializer.New(kubeClient, nil, informerFactory, nil, nil, stopCh, nil),
+		kubeapiserveradmission.NewPluginInitializer(nil, quotaConfiguration, nil),
 	}
 	initializers.Initialize(handler)
 
@@ -2113,114 +2110,5 @@ func TestAdmitAllowDecreaseUsageWithoutCoveringQuota(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Expected no error for decreasing a limited resource without quota, got %v", err)
-	}
-}
-
-func TestPodResourcesResizeWithResourceQuota(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	resourceQuota := &corev1.ResourceQuota{
-		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
-		Status: corev1.ResourceQuotaStatus{
-			Hard: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1000m"),
-				corev1.ResourceMemory: resource.MustParse("1000Mi"),
-				corev1.ResourcePods:   resource.MustParse("5"),
-			},
-			Used: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
-				corev1.ResourceMemory: resource.MustParse("500Mi"),
-				corev1.ResourcePods:   resource.MustParse("1"),
-			},
-		},
-	}
-
-	currentPod := validPod("testpod", 1, getResourceRequirements(getResourceList("500m", "500Mi"), getResourceList("500m", "500Mi")))
-	currentPod.ResourceVersion = "1"
-
-	type testCase struct {
-		newPod        *api.Pod
-		fgEnabled     bool
-		expectError   string
-		expectActions sets.String
-	}
-	testCases := map[string]testCase{
-		"pod resize featuregate enabled, increase CPU within quota": {
-			newPod:        validPod("testpod", 1, getResourceRequirements(getResourceList("990m", "500Mi"), getResourceList("990m", "500Mi"))),
-			fgEnabled:     true,
-			expectError:   "",
-			expectActions: sets.NewString(strings.Join([]string{"update", "resourcequotas", "status"}, "-")),
-		},
-		"pod resize featuregate enabled, increase memory beyond quota": {
-			newPod:        validPod("testpod", 1, getResourceRequirements(getResourceList("500m", "1100Mi"), getResourceList("500m", "1100Mi"))),
-			fgEnabled:     true,
-			expectError:   "forbidden: exceeded quota: quota, requested: memory=600Mi, used: memory=500Mi, limited: memory=1000Mi",
-			expectActions: sets.NewString(strings.Join([]string{"update", "resourcequotas", "status"}, "-")),
-		},
-		"pod resize featuregate enabled, decrease CPU within quota": {
-			newPod:        validPod("testpod", 1, getResourceRequirements(getResourceList("300m", "500Mi"), getResourceList("300m", "500Mi"))),
-			fgEnabled:     true,
-			expectError:   "",
-			expectActions: sets.NewString(strings.Join([]string{"update", "resourcequotas", "status"}, "-")),
-		},
-		"pod resize featuregate disabled, decrease memory within quota": {
-			newPod:        validPod("testpod", 1, getResourceRequirements(getResourceList("500m", "400Mi"), getResourceList("500m", "400Mi"))),
-			fgEnabled:     false,
-			expectError:   "",
-			expectActions: nil,
-		},
-		"pod resize featuregate disabled, increase CPU beyond quota": {
-			newPod:        validPod("testpod", 1, getResourceRequirements(getResourceList("1010m", "500Mi"), getResourceList("1010m", "500Mi"))),
-			fgEnabled:     false,
-			expectError:   "",
-			expectActions: nil,
-		},
-	}
-
-	for desc, tc := range testCases {
-		t.Run(desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tc.fgEnabled)()
-			kubeClient := fake.NewSimpleClientset(resourceQuota)
-			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
-			handler, err := createHandler(kubeClient, informerFactory, stopCh)
-			if err != nil {
-				t.Errorf("Error occurred while creating admission plugin: %v", err)
-			}
-			informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
-
-			tc.newPod.ResourceVersion = "2"
-			err = handler.Validate(context.TODO(), admission.NewAttributesRecord(tc.newPod, currentPod,
-				api.Kind("Pod").WithVersion("version"), tc.newPod.Namespace, tc.newPod.Name,
-				corev1.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{},
-				false, nil), nil)
-			if tc.expectError == "" {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if tc.expectActions != nil {
-					if len(kubeClient.Actions()) == 0 {
-						t.Errorf("Expected a client action")
-					}
-				} else {
-					if len(kubeClient.Actions()) > 0 {
-						t.Errorf("Got client action(s) when not expected")
-					}
-				}
-				actionSet := sets.NewString()
-				for _, action := range kubeClient.Actions() {
-					actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource,
-						action.GetSubresource()}, "-"))
-				}
-				if !actionSet.HasAll(tc.expectActions.List()...) {
-					t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", tc.expectActions,
-						actionSet, tc.expectActions.Difference(actionSet))
-				}
-			} else {
-				if err == nil || !strings.Contains(err.Error(), tc.expectError) {
-					t.Errorf("Expected error containing '%s' got err: '%v'", tc.expectError, err)
-				}
-			}
-		})
 	}
 }

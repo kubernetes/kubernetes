@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestWatchList(t *testing.T) {
@@ -415,7 +416,7 @@ func TestWatchList(t *testing.T) {
 			listWatcher.customListResponse = scenario.podList
 			listWatcher.closeAfterListRequests = scenario.closeAfterListRequests
 			if scenario.disableUseWatchList {
-				reflector.UseWatchList = false
+				reflector.UseWatchList = ptr.To(false)
 			}
 
 			err := reflector.ListAndWatch(stopCh)
@@ -505,7 +506,7 @@ func testData() (*fakeListWatcher, Store, *Reflector, chan struct{}) {
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
-	r.UseWatchList = true
+	r.UseWatchList = ptr.To(true)
 
 	return lw, s, r, stopCh
 }

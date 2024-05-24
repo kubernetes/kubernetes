@@ -23,115 +23,358 @@ import (
 )
 
 var (
-	APIServerIdentity                       = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
-	AppArmor                                = framework.WithFeature(framework.ValidFeatures.Add("AppArmor"))
-	BootstrapTokens                         = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
-	BoundServiceAccountTokenVolume          = framework.WithFeature(framework.ValidFeatures.Add("BoundServiceAccountTokenVolume"))
-	CloudProvider                           = framework.WithFeature(framework.ValidFeatures.Add("CloudProvider"))
-	ClusterAutoscalerScalability1           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability1"))
-	ClusterAutoscalerScalability2           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability2"))
-	ClusterAutoscalerScalability3           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability3"))
-	ClusterAutoscalerScalability4           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability4"))
-	ClusterAutoscalerScalability5           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability5"))
-	ClusterAutoscalerScalability6           = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability6"))
-	ClusterDowngrade                        = framework.WithFeature(framework.ValidFeatures.Add("ClusterDowngrade"))
-	ClusterSizeAutoscalingGpu               = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingGpu"))
-	ClusterSizeAutoscalingScaleDown         = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleDown"))
-	ClusterSizeAutoscalingScaleUp           = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
-	ClusterTrustBundle                      = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundle"))
-	ClusterTrustBundleProjection            = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundleProjection"))
-	ClusterUpgrade                          = framework.WithFeature(framework.ValidFeatures.Add("ClusterUpgrade"))
-	ComprehensiveNamespaceDraining          = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
-	CPUManager                              = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
-	CustomMetricsAutoscaling                = framework.WithFeature(framework.ValidFeatures.Add("CustomMetricsAutoscaling"))
-	DeviceManager                           = framework.WithFeature(framework.ValidFeatures.Add("DeviceManager"))
-	DevicePluginProbe                       = framework.WithFeature(framework.ValidFeatures.Add("DevicePluginProbe"))
-	Downgrade                               = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
-	DynamicResourceAllocation               = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
-	EphemeralStorage                        = framework.WithFeature(framework.ValidFeatures.Add("EphemeralStorage"))
-	Example                                 = framework.WithFeature(framework.ValidFeatures.Add("Example"))
-	ExperimentalResourceUsageTracking       = framework.WithFeature(framework.ValidFeatures.Add("ExperimentalResourceUsageTracking"))
-	Flexvolumes                             = framework.WithFeature(framework.ValidFeatures.Add("Flexvolumes"))
-	GKENodePool                             = framework.WithFeature(framework.ValidFeatures.Add("GKENodePool"))
-	GPUClusterDowngrade                     = framework.WithFeature(framework.ValidFeatures.Add("GPUClusterDowngrade"))
-	GPUClusterUpgrade                       = framework.WithFeature(framework.ValidFeatures.Add("GPUClusterUpgrade"))
-	GPUDevicePlugin                         = framework.WithFeature(framework.ValidFeatures.Add("GPUDevicePlugin"))
-	GPUMasterUpgrade                        = framework.WithFeature(framework.ValidFeatures.Add("GPUMasterUpgrade"))
-	GPUUpgrade                              = framework.WithFeature(framework.ValidFeatures.Add("GPUUpgrade"))
-	HAMaster                                = framework.WithFeature(framework.ValidFeatures.Add("HAMaster"))
-	HPA                                     = framework.WithFeature(framework.ValidFeatures.Add("HPA"))
-	HugePages                               = framework.WithFeature(framework.ValidFeatures.Add("HugePages"))
-	Ingress                                 = framework.WithFeature(framework.ValidFeatures.Add("Ingress"))
-	IngressScale                            = framework.WithFeature(framework.ValidFeatures.Add("IngressScale"))
-	InPlacePodVerticalScaling               = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
-	IPv6DualStack                           = framework.WithFeature(framework.ValidFeatures.Add("IPv6DualStack"))
-	Kind                                    = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
-	KubeletCredentialProviders              = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
-	KubeletSecurity                         = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
-	KubeProxyDaemonSetDowngrade             = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetDowngrade"))
-	KubeProxyDaemonSetUpgrade               = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetUpgrade"))
-	KubeProxyDaemonSetMigration             = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetMigration"))
-	LabelSelector                           = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
-	LocalStorageCapacityIsolation           = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolation"))
-	LocalStorageCapacityIsolationQuota      = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
-	MasterUpgrade                           = framework.WithFeature(framework.ValidFeatures.Add("MasterUpgrade"))
-	MemoryManager                           = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
-	NEG                                     = framework.WithFeature(framework.ValidFeatures.Add("NEG"))
-	NetworkingDNS                           = framework.WithFeature(framework.ValidFeatures.Add("Networking-DNS"))
-	NetworkingIPv4                          = framework.WithFeature(framework.ValidFeatures.Add("Networking-IPv4"))
-	NetworkingIPv6                          = framework.WithFeature(framework.ValidFeatures.Add("Networking-IPv6"))
-	NetworkingPerformance                   = framework.WithFeature(framework.ValidFeatures.Add("Networking-Performance"))
-	NetworkPolicy                           = framework.WithFeature(framework.ValidFeatures.Add("NetworkPolicy"))
-	NodeAuthenticator                       = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthenticator"))
-	NodeAuthorizer                          = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthorizer"))
-	NodeLogQuery                            = framework.WithFeature(framework.ValidFeatures.Add("NodeLogQuery"))
-	NodeOutOfServiceVolumeDetach            = framework.WithFeature(framework.ValidFeatures.Add("NodeOutOfServiceVolumeDetach"))
-	NoSNAT                                  = framework.WithFeature(framework.ValidFeatures.Add("NoSNAT"))
+	// Please keep the list in alphabetical order.
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	APIServerIdentity = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	AppArmor = framework.WithFeature(framework.ValidFeatures.Add("AppArmor"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	BootstrapTokens = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	BoundServiceAccountTokenVolume = framework.WithFeature(framework.ValidFeatures.Add("BoundServiceAccountTokenVolume"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	CloudProvider = framework.WithFeature(framework.ValidFeatures.Add("CloudProvider"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterAutoscalerScalability1 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability1"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterAutoscalerScalability2 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability2"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterAutoscalerScalability3 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability3"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterAutoscalerScalability4 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability4"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterAutoscalerScalability5 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability5"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterAutoscalerScalability6 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability6"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterDowngrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterDowngrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterScaleUpBypassScheduler = framework.WithFeature(framework.ValidFeatures.Add("ClusterScaleUpBypassScheduler"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterSizeAutoscalingGpu = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingGpu"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterSizeAutoscalingScaleDown = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleDown"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterSizeAutoscalingScaleUp = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterTrustBundle = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundle"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterTrustBundleProjection = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundleProjection"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ClusterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterUpgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	CustomMetricsAutoscaling = framework.WithFeature(framework.ValidFeatures.Add("CustomMetricsAutoscaling"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	DeviceManager = framework.WithFeature(framework.ValidFeatures.Add("DeviceManager"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	DevicePluginProbe = framework.WithFeature(framework.ValidFeatures.Add("DevicePluginProbe"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Downgrade = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	EphemeralStorage = framework.WithFeature(framework.ValidFeatures.Add("EphemeralStorage"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Example = framework.WithFeature(framework.ValidFeatures.Add("Example"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ExperimentalResourceUsageTracking = framework.WithFeature(framework.ValidFeatures.Add("ExperimentalResourceUsageTracking"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Flexvolumes = framework.WithFeature(framework.ValidFeatures.Add("Flexvolumes"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GKENodePool = framework.WithFeature(framework.ValidFeatures.Add("GKENodePool"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GPUClusterDowngrade = framework.WithFeature(framework.ValidFeatures.Add("GPUClusterDowngrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GPUClusterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUClusterUpgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GPUDevicePlugin = framework.WithFeature(framework.ValidFeatures.Add("GPUDevicePlugin"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GPUMasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUMasterUpgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	GPUUpgrade = framework.WithFeature(framework.ValidFeatures.Add("GPUUpgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	HAMaster = framework.WithFeature(framework.ValidFeatures.Add("HAMaster"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	HPA = framework.WithFeature(framework.ValidFeatures.Add("HPA"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	HugePages = framework.WithFeature(framework.ValidFeatures.Add("HugePages"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Ingress = framework.WithFeature(framework.ValidFeatures.Add("Ingress"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	IngressScale = framework.WithFeature(framework.ValidFeatures.Add("IngressScale"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	IPv6DualStack = framework.WithFeature(framework.ValidFeatures.Add("IPv6DualStack"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	KubeletSecurity = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	KubeProxyDaemonSetDowngrade = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetDowngrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	KubeProxyDaemonSetUpgrade = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetUpgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	KubeProxyDaemonSetMigration = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetMigration"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	LabelSelector = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	LocalStorageCapacityIsolation = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolation"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	MasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("MasterUpgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NEG = framework.WithFeature(framework.ValidFeatures.Add("NEG"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NetworkingDNS = framework.WithFeature(framework.ValidFeatures.Add("Networking-DNS"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NetworkingIPv4 = framework.WithFeature(framework.ValidFeatures.Add("Networking-IPv4"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NetworkingIPv6 = framework.WithFeature(framework.ValidFeatures.Add("Networking-IPv6"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NetworkingPerformance = framework.WithFeature(framework.ValidFeatures.Add("Networking-Performance"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NetworkPolicy = framework.WithFeature(framework.ValidFeatures.Add("NetworkPolicy"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NodeAuthenticator = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthenticator"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NodeAuthorizer = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthorizer"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NodeLogQuery = framework.WithFeature(framework.ValidFeatures.Add("NodeLogQuery"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NodeOutOfServiceVolumeDetach = framework.WithFeature(framework.ValidFeatures.Add("NodeOutOfServiceVolumeDetach"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	NoSNAT = framework.WithFeature(framework.ValidFeatures.Add("NoSNAT"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PersistentVolumeLastPhaseTransitionTime = framework.WithFeature(framework.ValidFeatures.Add("PersistentVolumeLastPhaseTransitionTime"))
-	PerformanceDNS                          = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
-	PodGarbageCollector                     = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
-	PodHostIPs                              = framework.WithFeature(framework.ValidFeatures.Add("PodHostIPs"))
-	PodLifecycleSleepAction                 = framework.WithFeature(framework.ValidFeatures.Add("PodLifecycleSleepAction"))
-	PodPriority                             = framework.WithFeature(framework.ValidFeatures.Add("PodPriority"))
-	PodReadyToStartContainersCondition      = framework.WithFeature(framework.ValidFeatures.Add("PodReadyToStartContainersCondition"))
-	PodResources                            = framework.WithFeature(framework.ValidFeatures.Add("PodResources"))
-	Reboot                                  = framework.WithFeature(framework.ValidFeatures.Add("Reboot"))
-	ReclaimPolicy                           = framework.WithFeature(framework.ValidFeatures.Add("ReclaimPolicy"))
-	RecoverVolumeExpansionFailure           = framework.WithFeature(framework.ValidFeatures.Add("RecoverVolumeExpansionFailure"))
-	Recreate                                = framework.WithFeature(framework.ValidFeatures.Add("Recreate"))
-	RegularResourceUsageTracking            = framework.WithFeature(framework.ValidFeatures.Add("RegularResourceUsageTracking"))
-	ScopeSelectors                          = framework.WithFeature(framework.ValidFeatures.Add("ScopeSelectors"))
-	SCTPConnectivity                        = framework.WithFeature(framework.ValidFeatures.Add("SCTPConnectivity"))
-	SeccompDefault                          = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
-	SELinux                                 = framework.WithFeature(framework.ValidFeatures.Add("SELinux"))
-	SELinuxMountReadWriteOncePod            = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePod"))
-	ServiceCIDRs                            = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
-	SidecarContainers                       = framework.WithFeature(framework.ValidFeatures.Add("SidecarContainers"))
-	StackdriverAcceleratorMonitoring        = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))
-	StackdriverCustomMetrics                = framework.WithFeature(framework.ValidFeatures.Add("StackdriverCustomMetrics"))
-	StackdriverExternalMetrics              = framework.WithFeature(framework.ValidFeatures.Add("StackdriverExternalMetrics"))
-	StackdriverMetadataAgent                = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMetadataAgent"))
-	StackdriverMonitoring                   = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMonitoring"))
-	StandaloneMode                          = framework.WithFeature(framework.ValidFeatures.Add("StandaloneMode"))
-	StatefulSet                             = framework.WithFeature(framework.ValidFeatures.Add("StatefulSet"))
-	StatefulSetStartOrdinal                 = framework.WithFeature(framework.ValidFeatures.Add("StatefulSetStartOrdinal"))
-	StatefulUpgrade                         = framework.WithFeature(framework.ValidFeatures.Add("StatefulUpgrade"))
-	StorageProvider                         = framework.WithFeature(framework.ValidFeatures.Add("StorageProvider"))
-	StorageVersionAPI                       = framework.WithFeature(framework.ValidFeatures.Add("StorageVersionAPI"))
-	TopologyHints                           = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
-	TopologyManager                         = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
-	UDP                                     = framework.WithFeature(framework.ValidFeatures.Add("UDP"))
-	Upgrade                                 = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
-	UserNamespacesSupport                   = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesSupport"))
-	ValidatingAdmissionPolicy               = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
-	Volumes                                 = framework.WithFeature(framework.ValidFeatures.Add("Volumes"))
-	VolumeSnapshotDataSource                = framework.WithFeature(framework.ValidFeatures.Add("VolumeSnapshotDataSource"))
-	VolumeSourceXFS                         = framework.WithFeature(framework.ValidFeatures.Add("VolumeSourceXFS"))
-	Vsphere                                 = framework.WithFeature(framework.ValidFeatures.Add("vsphere"))
-	WatchList                               = framework.WithFeature(framework.ValidFeatures.Add("WatchList"))
-	Windows                                 = framework.WithFeature(framework.ValidFeatures.Add("Windows"))
-	WindowsHostProcessContainers            = framework.WithFeature(framework.ValidFeatures.Add("WindowsHostProcessContainers"))
-	WindowsHyperVContainers                 = framework.WithFeature(framework.ValidFeatures.Add("WindowsHyperVContainers"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodGarbageCollector = framework.WithFeature(framework.ValidFeatures.Add("PodGarbageCollector"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodHostIPs = framework.WithFeature(framework.ValidFeatures.Add("PodHostIPs"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodLifecycleSleepAction = framework.WithFeature(framework.ValidFeatures.Add("PodLifecycleSleepAction"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodPriority = framework.WithFeature(framework.ValidFeatures.Add("PodPriority"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodReadyToStartContainersCondition = framework.WithFeature(framework.ValidFeatures.Add("PodReadyToStartContainersCondition"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	PodResources = framework.WithFeature(framework.ValidFeatures.Add("PodResources"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Reboot = framework.WithFeature(framework.ValidFeatures.Add("Reboot"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ReclaimPolicy = framework.WithFeature(framework.ValidFeatures.Add("ReclaimPolicy"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	RecoverVolumeExpansionFailure = framework.WithFeature(framework.ValidFeatures.Add("RecoverVolumeExpansionFailure"))
+
+	// RelaxedEnvironmentVariableValidation used when we verify whether the pod can consume all printable ASCII characters as environment variable names,
+	// and whether the pod can consume configmap/secret that key starts with a number.
+	RelaxedEnvironmentVariableValidation = framework.WithFeature(framework.ValidFeatures.Add("RelaxedEnvironmentVariableValidation"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Recreate = framework.WithFeature(framework.ValidFeatures.Add("Recreate"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	RegularResourceUsageTracking = framework.WithFeature(framework.ValidFeatures.Add("RegularResourceUsageTracking"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ScopeSelectors = framework.WithFeature(framework.ValidFeatures.Add("ScopeSelectors"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	SCTPConnectivity = framework.WithFeature(framework.ValidFeatures.Add("SCTPConnectivity"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	SeccompDefault = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
+
+	// Owner: sig-storage
+	// This feature marks tests that need all schedulable Linux nodes in the cluster to have SELinux enabled.
+	SELinux = framework.WithFeature(framework.ValidFeatures.Add("SELinux"))
+
+	// Owner: sig-storage
+	// This feature marks tests that need SELinuxMountReadWriteOncePod feature gate enabled and SELinuxMount **disabled**.
+	// This is a temporary feature to allow testing of metrics when SELinuxMount is disabled.
+	// TODO: remove when SELinuxMount feature gate is enabled by default.
+	SELinuxMountReadWriteOncePodOnly = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePodOnly"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ServiceCIDRs = framework.WithFeature(framework.ValidFeatures.Add("ServiceCIDRs"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	SidecarContainers = framework.WithFeature(framework.ValidFeatures.Add("SidecarContainers"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StackdriverAcceleratorMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StackdriverCustomMetrics = framework.WithFeature(framework.ValidFeatures.Add("StackdriverCustomMetrics"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StackdriverExternalMetrics = framework.WithFeature(framework.ValidFeatures.Add("StackdriverExternalMetrics"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StackdriverMetadataAgent = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMetadataAgent"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StackdriverMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMonitoring"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StandaloneMode = framework.WithFeature(framework.ValidFeatures.Add("StandaloneMode"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StatefulSet = framework.WithFeature(framework.ValidFeatures.Add("StatefulSet"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StatefulSetStartOrdinal = framework.WithFeature(framework.ValidFeatures.Add("StatefulSetStartOrdinal"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StatefulUpgrade = framework.WithFeature(framework.ValidFeatures.Add("StatefulUpgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StorageProvider = framework.WithFeature(framework.ValidFeatures.Add("StorageProvider"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	StorageVersionAPI = framework.WithFeature(framework.ValidFeatures.Add("StorageVersionAPI"))
+
+	// Owner: sig-network
+	// Marks tests that require a cluster with Topology Hints enabled.
+	TopologyHints = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
+
+	// Owner: sig-network
+	// Marks tests that require a cluster with Traffic Distribution enabled.
+	TrafficDistribution = framework.WithFeature(framework.ValidFeatures.Add("Traffic Distribution"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	TopologyManager = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	UDP = framework.WithFeature(framework.ValidFeatures.Add("UDP"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Upgrade = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	UserNamespacesSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesSupport"))
+
+	// Owned by SIG Node
+	// Can be used when the UserNamespacesPodSecurityStandards kubelet feature
+	// gate is enabled to relax the application of Pod Security Standards in a
+	// controlled way.
+	UserNamespacesPodSecurityStandards = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesPodSecurityStandards"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ValidatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Volumes = framework.WithFeature(framework.ValidFeatures.Add("Volumes"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	VolumeSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("VolumeSnapshotDataSource"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	VolumeSourceXFS = framework.WithFeature(framework.ValidFeatures.Add("VolumeSourceXFS"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Vsphere = framework.WithFeature(framework.ValidFeatures.Add("vsphere"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	WatchList = framework.WithFeature(framework.ValidFeatures.Add("WatchList"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	Windows = framework.WithFeature(framework.ValidFeatures.Add("Windows"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	WindowsHostProcessContainers = framework.WithFeature(framework.ValidFeatures.Add("WindowsHostProcessContainers"))
+
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	WindowsHyperVContainers = framework.WithFeature(framework.ValidFeatures.Add("WindowsHyperVContainers"))
+
+	// Please keep the list in alphabetical order.
 )
 
 func init() {

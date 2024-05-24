@@ -35,6 +35,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -631,6 +632,39 @@ var _ = SIGDescribe("Security Context", func() {
 			if err := createAndMatchOutput(ctx, podName, "Effective uid: 0", &apeTrue, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
+		})
+	})
+})
+
+var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", func() {
+	f := framework.NewDefaultFramework("user-namespaces-pss-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
+
+	ginkgo.Context("with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled", func() {
+		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, func(ctx context.Context) {
+			name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				Spec: v1.PodSpec{
+					RestartPolicy:   v1.RestartPolicyNever,
+					HostUsers:       ptr.To(false),
+					SecurityContext: &v1.PodSecurityContext{},
+					Containers: []v1.Container{
+						{
+							Name:    name,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"whoami"},
+							SecurityContext: &v1.SecurityContext{
+								AllowPrivilegeEscalation: ptr.To(false),
+								Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+								SeccompProfile:           &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
+							},
+						},
+					},
+				},
+			}
+
+			e2epodoutput.TestContainerOutput(ctx, f, "RunAsUser-RunAsNonRoot", pod, 0, []string{"root"})
 		})
 	})
 })

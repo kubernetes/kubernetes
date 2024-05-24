@@ -18,12 +18,16 @@ package conversion
 
 import (
 	"fmt"
+	"strings"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	typedscheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -76,17 +80,27 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDef
 
 	// Determine whether we should expect to be asked to "convert" autoscaling/v1 Scale types
 	convertScale := false
+	selectableFields := map[schema.GroupVersion]sets.Set[string]{}
 	for _, version := range crd.Spec.Versions {
+		gv := schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}
 		if version.Subresources != nil && version.Subresources.Scale != nil {
 			convertScale = true
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) {
+			fieldPaths := sets.New[string]()
+			for _, sf := range version.SelectableFields {
+				fieldPaths.Insert(strings.TrimPrefix(sf.JSONPath, "."))
+			}
+			selectableFields[gv] = fieldPaths
 		}
 	}
 
 	unsafe = &crConverter{
-		convertScale:  convertScale,
-		validVersions: validVersions,
-		clusterScoped: crd.Spec.Scope == apiextensionsv1.ClusterScoped,
-		converter:     converter,
+		convertScale:     convertScale,
+		validVersions:    validVersions,
+		clusterScoped:    crd.Spec.Scope == apiextensionsv1.ClusterScoped,
+		converter:        converter,
+		selectableFields: selectableFields,
 	}
 	return &safeConverterWrapper{unsafe}, unsafe, nil
 }
@@ -102,20 +116,26 @@ type crConverterInterface interface {
 // crConverter extends the delegate converter with generic CR conversion behaviour. The delegate will implement the
 // user defined conversion strategy given in the CustomResourceDefinition.
 type crConverter struct {
-	convertScale  bool
-	converter     crConverterInterface
-	validVersions map[schema.GroupVersion]bool
-	clusterScoped bool
+	convertScale     bool
+	converter        crConverterInterface
+	validVersions    map[schema.GroupVersion]bool
+	clusterScoped    bool
+	selectableFields map[schema.GroupVersion]sets.Set[string]
 }
 
 func (c *crConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
-	// We currently only support metadata.namespace and metadata.name.
 	switch {
 	case label == "metadata.name":
 		return label, value, nil
 	case !c.clusterScoped && label == "metadata.namespace":
 		return label, value, nil
 	default:
+		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) {
+			groupFields := c.selectableFields[gvk.GroupVersion()]
+			if groupFields != nil && groupFields.Has(label) {
+				return label, value, nil
+			}
+		}
 		return "", "", fmt.Errorf("field label not supported: %s", label)
 	}
 }

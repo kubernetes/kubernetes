@@ -103,12 +103,6 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
 	enableContentProfilingSetWithoutEnableProfiling.EnableContentionProfiling = true
 
-	metricsBindAddrInvalid := validConfig.DeepCopy()
-	metricsBindAddrInvalid.MetricsBindAddress = "0.0.0.0:9090"
-
-	healthzBindAddrInvalid := validConfig.DeepCopy()
-	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
-
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
 	percentageOfNodesToScore101.PercentageOfNodesToScore = ptr.To[int32](101)
 
@@ -235,24 +229,6 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "leaderElection.resourceLock",
-				},
-			},
-		},
-		"non-empty-metrics-bind-addr": {
-			config: metricsBindAddrInvalid,
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "metricsBindAddress",
-				},
-			},
-		},
-		"non-empty-healthz-bind-addr": {
-			config: healthzBindAddrInvalid,
-			wantErrs: field.ErrorList{
-				&field.Error{
-					Type:  field.ErrorTypeInvalid,
-					Field: "healthzBindAddress",
 				},
 			},
 		},

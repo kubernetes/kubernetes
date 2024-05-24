@@ -585,7 +585,7 @@ func TestDeployedDNSReplicas(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := newMockClientForTest(t, 2, tt.deploymentSize)
+			client := newMockClientForTest(t, 2, tt.deploymentSize, "")
 			got, err := deployedDNSReplicas(client, 5)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("deployedDNSReplicas() error = %v, wantErr %v", err, tt.wantErr)
@@ -614,7 +614,7 @@ func TestCoreDNSAddon(t *testing.T) {
 			name: "cfg is empty",
 			args: args{
 				cfg:           &kubeadmapi.ClusterConfiguration{},
-				client:        newMockClientForTest(t, 2, 1),
+				client:        newMockClientForTest(t, 2, 1, ""),
 				printManifest: false,
 			},
 			wantOut: "",
@@ -633,7 +633,7 @@ func TestCoreDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 2, 1),
+				client:        newMockClientForTest(t, 2, 1, ""),
 				printManifest: false,
 			},
 			wantOut: "[addons] Applied essential addon: CoreDNS\n",
@@ -652,7 +652,7 @@ func TestCoreDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 2, 1),
+				client:        newMockClientForTest(t, 2, 1, ""),
 				printManifest: true,
 			},
 			wantOut: dedent.Dedent(`---
@@ -899,7 +899,7 @@ func TestEnsureDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 0, 1),
+				client:        newMockClientForTest(t, 0, 1, ""),
 				printManifest: false,
 			},
 			wantOut: "[addons] Applied essential addon: CoreDNS\n",
@@ -917,7 +917,7 @@ func TestEnsureDNSAddon(t *testing.T) {
 						ServiceSubnet: "10.0.0.0/16",
 					},
 				},
-				client:        newMockClientForTest(t, 0, 1),
+				client:        newMockClientForTest(t, 0, 1, ""),
 				printManifest: true,
 			},
 			wantOut: dedent.Dedent(`---
@@ -1375,7 +1375,7 @@ func TestCreateDNSService(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := newMockClientForTest(t, 1, 1)
+			client := newMockClientForTest(t, 1, 1, "")
 			if err := createDNSService(tt.args.dnsService, tt.args.serviceBytes, client); (err != nil) != tt.wantErr {
 				t.Errorf("createDNSService() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1383,9 +1383,66 @@ func TestCreateDNSService(t *testing.T) {
 	}
 }
 
+func TestDeployedDNSAddon(t *testing.T) {
+	tests := []struct {
+		name        string
+		image       string
+		wantVersion string
+		wantErr     bool
+	}{
+		{
+			name:        "default",
+			image:       "registry.k8s.io/coredns/coredns:v1.11.1",
+			wantVersion: "v1.11.1",
+		},
+		{
+			name:        "with digest",
+			image:       "registry.k8s.io/coredns/coredns:v1.11.1@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			wantVersion: "v1.11.1",
+		},
+		{
+			name:        "without registry",
+			image:       "coredns/coredns:coredns-s390x",
+			wantVersion: "coredns-s390x",
+		},
+		{
+			name:        "without registry and tag",
+			image:       "coredns/coredns",
+			wantVersion: "",
+		},
+		{
+			name:        "with explicit port",
+			image:       "localhost:4711/coredns/coredns:v1.11.2-pre.1",
+			wantVersion: "v1.11.2-pre.1",
+		},
+		{
+			name:        "with explicit port but without tag",
+			image:       "localhost:4711/coredns/coredns@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			wantVersion: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := newMockClientForTest(t, 1, 1, tt.image)
+
+			version, err := DeployedDNSAddon(client)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeployedDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if version != tt.wantVersion {
+				t.Errorf("DeployedDNSAddon() for image %q returned %q, want %q", tt.image, version, tt.wantVersion)
+			}
+		})
+	}
+}
+
 // replicas is replica of each DNS deployment
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
-func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *clientsetfake.Clientset {
+func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string) *clientsetfake.Clientset {
+	if image == "" {
+		image = "registry.k8s.io/coredns/coredns:v1.11.1"
+	}
 	client := clientsetfake.NewSimpleClientset()
 	for i := 0; i < deploymentSize; i++ {
 		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
@@ -1402,7 +1459,11 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int) *cli
 			},
 			Spec: apps.DeploymentSpec{
 				Replicas: &replicas,
-				Template: v1.PodTemplateSpec{},
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{Image: image}},
+					},
+				},
 			},
 		}, metav1.CreateOptions{})
 		if err != nil {

@@ -75,7 +75,7 @@ func BeRunningNoRetries() types.GomegaMatcher {
 		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed, v1.PodSucceeded:
-				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead.", v1.PodRunning, pod.Status.Phase))
+				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
 			default:
 				return true, nil
 			}
@@ -335,8 +335,8 @@ func RunningReady(p *v1.Pod) bool {
 }
 
 // WaitForPodsRunning waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` are running.
-func WaitForPodsRunning(c clientset.Interface, ns string, num int, timeout time.Duration) error {
-	_, err := WaitForPods(context.TODO(), c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
+func WaitForPodsRunning(ctx context.Context, c clientset.Interface, ns string, num int, timeout time.Duration) error {
+	_, err := WaitForPods(ctx, c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
 		"be running and ready", func(pod *v1.Pod) bool {
 			ready, _ := testutils.PodRunningReady(pod)
 			return ready
@@ -345,8 +345,8 @@ func WaitForPodsRunning(c clientset.Interface, ns string, num int, timeout time.
 }
 
 // WaitForPodsSchedulingGated waits for a given `timeout` to evaluate if a certain amount of pods in given `ns` stay in scheduling gated state.
-func WaitForPodsSchedulingGated(c clientset.Interface, ns string, num int, timeout time.Duration) error {
-	_, err := WaitForPods(context.TODO(), c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
+func WaitForPodsSchedulingGated(ctx context.Context, c clientset.Interface, ns string, num int, timeout time.Duration) error {
+	_, err := WaitForPods(ctx, c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
 		"be in scheduling gated state", func(pod *v1.Pod) bool {
 			for _, condition := range pod.Status.Conditions {
 				if condition.Type == v1.PodScheduled && condition.Reason == v1.PodReasonSchedulingGated {
@@ -360,8 +360,8 @@ func WaitForPodsSchedulingGated(c clientset.Interface, ns string, num int, timeo
 
 // WaitForPodsWithSchedulingGates waits for a given `timeout` to evaluate if a certain amount of pods in given `ns`
 // match the given `schedulingGates`stay in scheduling gated state.
-func WaitForPodsWithSchedulingGates(c clientset.Interface, ns string, num int, timeout time.Duration, schedulingGates []v1.PodSchedulingGate) error {
-	_, err := WaitForPods(context.TODO(), c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
+func WaitForPodsWithSchedulingGates(ctx context.Context, c clientset.Interface, ns string, num int, timeout time.Duration, schedulingGates []v1.PodSchedulingGate) error {
+	_, err := WaitForPods(ctx, c, ns, metav1.ListOptions{}, Range{MinMatching: num, MaxMatching: num}, timeout,
 		"have certain scheduling gates", func(pod *v1.Pod) bool {
 			return reflect.DeepEqual(pod.Spec.SchedulingGates, schedulingGates)
 		})
@@ -401,14 +401,14 @@ func WaitForPodTerminatingInNamespaceTimeout(ctx context.Context, c clientset.In
 func WaitForPodSuccessInNamespaceTimeout(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(ctx, c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.DeletionTimestamp == nil && pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
-			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName))
 		}
 		switch pod.Status.Phase {
 		case v1.PodSucceeded:
 			ginkgo.By("Saw pod success")
 			return true, nil
 		case v1.PodFailed:
-			return true, fmt.Errorf("pod %q failed with status: %+v", podName, pod.Status)
+			return true, gomega.StopTrying(fmt.Sprintf("pod %q failed with status: %+v", podName, pod.Status))
 		default:
 			return false, nil
 		}
@@ -516,11 +516,6 @@ func WaitForPodNotPending(ctx context.Context, c clientset.Interface, ns, podNam
 // WaitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or until podStartupTimeout.
 func WaitForPodSuccessInNamespace(ctx context.Context, c clientset.Interface, podName string, namespace string) error {
 	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, podStartTimeout)
-}
-
-// WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
-func WaitForPodSuccessInNamespaceSlow(ctx context.Context, c clientset.Interface, podName string, namespace string) error {
-	return WaitForPodSuccessInNamespaceTimeout(ctx, c, podName, namespace, slowPodStartTimeout)
 }
 
 // WaitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.
@@ -773,6 +768,21 @@ func WaitForContainerRunning(ctx context.Context, c clientset.Interface, namespa
 			for _, cs := range statuses {
 				if cs.Name == containerName {
 					return cs.State.Running != nil, nil
+				}
+			}
+		}
+		return false, nil
+	})
+}
+
+// WaitForContainerTerminated waits for the given Pod container to have a state of terminated
+func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, namespace, podName, containerName string, timeout time.Duration) error {
+	conditionDesc := fmt.Sprintf("container %s terminated", containerName)
+	return WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
+		for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
+			for _, cs := range statuses {
+				if cs.Name == containerName {
+					return cs.State.Terminated != nil, nil
 				}
 			}
 		}

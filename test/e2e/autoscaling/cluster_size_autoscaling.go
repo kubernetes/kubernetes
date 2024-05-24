@@ -92,6 +92,8 @@ const (
 	highPriorityClassName       = "high-priority"
 
 	gpuLabel = "cloud.google.com/gke-accelerator"
+
+	nonExistingBypassedSchedulerName = "non-existing-bypassed-scheduler"
 )
 
 var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
@@ -122,7 +124,7 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 		framework.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
 		ginkgo.By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
-		framework.ExpectNotEqual(nodeCount, 0)
+		gomega.Expect(nodes.Items).ToNot(gomega.BeEmpty())
 		mem := nodes.Items[0].Status.Allocatable[v1.ResourceMemory]
 		memAllocatableMb = int((&mem).Value() / 1024 / 1024)
 
@@ -376,9 +378,9 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 	f.It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled", feature.ClusterSizeAutoscalingScaleUp, func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gke")
 
-		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
+		ginkgo.By("Creating new node-pool with e2-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
@@ -410,9 +412,9 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 	f.It("should disable node pool autoscaling", feature.ClusterSizeAutoscalingScaleUp, func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gke")
 
-		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
+		ginkgo.By("Creating new node-pool with e2-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
@@ -642,9 +644,9 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 	f.It("should scale up correct target pool", feature.ClusterSizeAutoscalingScaleUp, func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gke")
 
-		ginkgo.By("Creating new node-pool with n1-standard-4 machines")
+		ginkgo.By("Creating new node-pool with e2-standard-4 machines")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
@@ -698,7 +700,7 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 		increasedSize := manuallyIncreaseClusterSize(ctx, f, originalSizes)
 
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-1", 3)
+		addNodePool(extraPoolName, "e2-standard-2", 3)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 
@@ -754,7 +756,7 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 			// GKE-specific setup
 			ginkgo.By("Add a new node pool with 0 nodes and min size 0")
 			const extraPoolName = "extra-pool"
-			addNodePool(extraPoolName, "n1-standard-4", 0)
+			addNodePool(extraPoolName, "e2-standard-4", 0)
 			defer deleteNodePool(extraPoolName)
 			framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
 			defer disableAutoscaler(extraPoolName, 0, 1)
@@ -814,7 +816,7 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 		// GKE-specific setup
 		ginkgo.By("Add a new node pool with size 1 and min size 0")
 		const extraPoolName = "extra-pool"
-		addNodePool(extraPoolName, "n1-standard-4", 1)
+		addNodePool(extraPoolName, "e2-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		extraNodes := getPoolInitialSize(extraPoolName)
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(ctx, c, nodeCount+extraNodes, resizeTimeout))
@@ -999,6 +1001,52 @@ var _ = SIGDescribe("Cluster size autoscaling", framework.WithSlow(), func() {
 		time.Sleep(scaleDownTimeout)
 		framework.ExpectNoError(WaitForClusterSizeFunc(ctx, f.ClientSet,
 			func(size int) bool { return size == increasedSize }, time.Second))
+	})
+
+	f.It("should scale up when unprocessed pod is created and is going to be unschedulable", feature.ClusterScaleUpBypassScheduler, func(ctx context.Context) {
+		// 70% of allocatable memory of a single node * replica count, forcing a scale up in case of normal pods
+		replicaCount := 2 * nodeCount
+		reservedMemory := int(float64(replicaCount) * float64(0.7) * float64(memAllocatableMb))
+		cleanupFunc := ReserveMemoryWithSchedulerName(ctx, f, "memory-reservation", replicaCount, reservedMemory, false, 1, nonExistingBypassedSchedulerName)
+		defer framework.ExpectNoError(cleanupFunc())
+		// Verify that cluster size is increased
+		ginkgo.By("Waiting for cluster scale-up")
+		sizeFunc := func(size int) bool {
+			// Softly checks scale-up since other types of machines can be added which would affect #nodes
+			return size > nodeCount
+		}
+		framework.ExpectNoError(WaitForClusterSizeFuncWithUnready(ctx, f.ClientSet, sizeFunc, scaleUpTimeout, 0))
+	})
+	f.It("shouldn't scale up when unprocessed pod is created and is going to be schedulable", feature.ClusterScaleUpBypassScheduler, func(ctx context.Context) {
+		// 50% of allocatable memory of a single node, so that no scale up would trigger in normal cases
+		replicaCount := 1
+		reservedMemory := int(float64(0.5) * float64(memAllocatableMb))
+		cleanupFunc := ReserveMemoryWithSchedulerName(ctx, f, "memory-reservation", replicaCount, reservedMemory, false, 1, nonExistingBypassedSchedulerName)
+		defer framework.ExpectNoError(cleanupFunc())
+		// Verify that cluster size is the same
+		ginkgo.By(fmt.Sprintf("Waiting for scale up hoping it won't happen, polling cluster size for %s", scaleUpTimeout.String()))
+		sizeFunc := func(size int) bool {
+			return size == nodeCount
+		}
+		gomega.Consistently(ctx, func() error {
+			return WaitForClusterSizeFunc(ctx, f.ClientSet, sizeFunc, time.Second)
+		}).WithTimeout(scaleUpTimeout).WithPolling(framework.Poll).ShouldNot(gomega.HaveOccurred())
+	})
+	f.It("shouldn't scale up when unprocessed pod is created and scheduler is not specified to be bypassed", feature.ClusterScaleUpBypassScheduler, func(ctx context.Context) {
+		// 70% of allocatable memory of a single node * replica count, forcing a scale up in case of normal pods
+		replicaCount := 2 * nodeCount
+		reservedMemory := int(float64(replicaCount) * float64(0.7) * float64(memAllocatableMb))
+		schedulerName := "non-existent-scheduler-" + f.UniqueName
+		cleanupFunc := ReserveMemoryWithSchedulerName(ctx, f, "memory-reservation", replicaCount, reservedMemory, false, 1, schedulerName)
+		defer framework.ExpectNoError(cleanupFunc())
+		// Verify that cluster size is the same
+		ginkgo.By(fmt.Sprintf("Waiting for scale up hoping it won't happen, polling cluster size for %s", scaleUpTimeout.String()))
+		sizeFunc := func(size int) bool {
+			return size == nodeCount
+		}
+		gomega.Consistently(ctx, func() error {
+			return WaitForClusterSizeFunc(ctx, f.ClientSet, sizeFunc, time.Second)
+		}).WithTimeout(scaleUpTimeout).WithPolling(framework.Poll).ShouldNot(gomega.HaveOccurred())
 	})
 })
 
@@ -1298,7 +1346,7 @@ func getPoolSize(ctx context.Context, f *framework.Framework, poolName string) i
 	return size
 }
 
-func reserveMemory(ctx context.Context, f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, tolerations []v1.Toleration, priorityClassName string) func() error {
+func reserveMemory(ctx context.Context, f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, tolerations []v1.Toleration, priorityClassName, schedulerName string) func() error {
 	ginkgo.By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
@@ -1312,6 +1360,7 @@ func reserveMemory(ctx context.Context, f *framework.Framework, id string, repli
 		NodeSelector:      selector,
 		Tolerations:       tolerations,
 		PriorityClassName: priorityClassName,
+		SchedulerName:     schedulerName,
 	}
 	for start := time.Now(); time.Since(start) < rcCreationRetryTimeout; time.Sleep(rcCreationRetryDelay) {
 		err := e2erc.RunRC(ctx, *config)
@@ -1333,19 +1382,25 @@ func reserveMemory(ctx context.Context, f *framework.Framework, id string, repli
 // ReserveMemoryWithPriority creates a replication controller with pods with priority that, in summation,
 // request the specified amount of memory.
 func ReserveMemoryWithPriority(ctx context.Context, f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, priorityClassName string) func() error {
-	return reserveMemory(ctx, f, id, replicas, megabytes, expectRunning, timeout, nil, nil, priorityClassName)
+	return reserveMemory(ctx, f, id, replicas, megabytes, expectRunning, timeout, nil, nil, priorityClassName, "")
 }
 
 // ReserveMemoryWithSelectorAndTolerations creates a replication controller with pods with node selector that, in summation,
 // request the specified amount of memory.
 func ReserveMemoryWithSelectorAndTolerations(ctx context.Context, f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string, tolerations []v1.Toleration) func() error {
-	return reserveMemory(ctx, f, id, replicas, megabytes, expectRunning, timeout, selector, tolerations, "")
+	return reserveMemory(ctx, f, id, replicas, megabytes, expectRunning, timeout, selector, tolerations, "", "")
+}
+
+// ReserveMemoryWithSchedulerName creates a replication controller with pods with scheduler name that, in summation,
+// request the specified amount of memory.
+func ReserveMemoryWithSchedulerName(ctx context.Context, f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, schedulerName string) func() error {
+	return reserveMemory(ctx, f, id, replicas, megabytes, expectRunning, timeout, nil, nil, "", schedulerName)
 }
 
 // ReserveMemory creates a replication controller with pods that, in summation,
 // request the specified amount of memory.
 func ReserveMemory(ctx context.Context, f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) func() error {
-	return reserveMemory(ctx, f, id, replicas, megabytes, expectRunning, timeout, nil, nil, "")
+	return reserveMemory(ctx, f, id, replicas, megabytes, expectRunning, timeout, nil, nil, "", "")
 }
 
 // WaitForClusterSizeFunc waits until the cluster size matches the given function.

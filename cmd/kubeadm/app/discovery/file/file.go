@@ -91,23 +91,26 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 
 	var clusterinfoCM *v1.ConfigMap
 
-	err = wait.Poll(constants.DiscoveryRetryInterval, discoveryTimeout, func() (bool, error) {
-		var err error
-		clusterinfoCM, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsForbidden(err) {
-				// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
-				// In that case, trust the cluster admin and do not refresh the cluster-info data
-				klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
-				return true, nil
+	var lastError error
+	err = wait.PollUntilContextTimeout(context.Background(),
+		constants.DiscoveryRetryInterval, discoveryTimeout,
+		true, func(_ context.Context) (bool, error) {
+			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+			if lastError != nil {
+				if apierrors.IsForbidden(lastError) {
+					// If the request is unauthorized, the cluster admin has not granted access to the cluster info configmap for unauthenticated users
+					// In that case, trust the cluster admin and do not refresh the cluster-info data
+					klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
+					return true, nil
+				}
+				klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
+				return false, nil
 			}
-			klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err == wait.ErrWaitTimeout {
-		return nil, errors.Errorf("Abort reading the %s ConfigMap after timeout of %v", bootstrapapi.ConfigMapClusterInfo, discoveryTimeout)
+			return true, nil
+		})
+	if err != nil {
+		return nil, errors.Wrapf(lastError, "Abort reading the %s ConfigMap after timeout of %v",
+			bootstrapapi.ConfigMapClusterInfo, discoveryTimeout)
 	}
 
 	// If we couldn't fetch the cluster-info ConfigMap, just return the cluster-info object the user provided

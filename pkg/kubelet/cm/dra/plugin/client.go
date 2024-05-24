@@ -54,13 +54,14 @@ func (v1alpha2rm v1alpha2NodeResourceManager) Prepare(ctx context.Context, conn 
 	}
 
 	for _, claim := range req.Claims {
-		res, err := nodeClient.NodePrepareResource(ctx,
-			&drapbv1alpha2.NodePrepareResourceRequest{
-				Namespace:      claim.Namespace,
-				ClaimUid:       claim.Uid,
-				ClaimName:      claim.Name,
-				ResourceHandle: claim.ResourceHandle,
-			})
+		req := &drapbv1alpha2.NodePrepareResourceRequest{
+			Namespace:                claim.Namespace,
+			ClaimUid:                 claim.Uid,
+			ClaimName:                claim.Name,
+			ResourceHandle:           claim.ResourceHandle,
+			StructuredResourceHandle: claim.StructuredResourceHandle,
+		}
+		res, err := nodeClient.NodePrepareResource(ctx, req)
 		result := &drapb.NodePrepareResourceResponse{}
 		if err != nil {
 			result.Error = err.Error()
@@ -153,7 +154,7 @@ func (p *plugin) NodePrepareResources(
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.clientTimeout)
 	defer cancel()
 
 	version := p.getVersion()
@@ -182,7 +183,7 @@ func (p *plugin) NodeUnprepareResources(
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, PluginClientTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.clientTimeout)
 	defer cancel()
 
 	version := p.getVersion()
@@ -196,4 +197,21 @@ func (p *plugin) NodeUnprepareResources(
 	response, err := resourceManager.Unprepare(ctx, conn, p, req)
 	logger.V(4).Info(log("done calling NodeUnprepareResources rpc"), "response", response, "err", err)
 	return response, err
+}
+
+func (p *plugin) NodeListAndWatchResources(
+	ctx context.Context,
+	req *drapb.NodeListAndWatchResourcesRequest,
+	opts ...grpc.CallOption,
+) (drapb.Node_NodeListAndWatchResourcesClient, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(log("calling NodeListAndWatchResources rpc"), "request", req)
+
+	conn, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		return nil, err
+	}
+
+	nodeClient := drapb.NewNodeClient(conn)
+	return nodeClient.NodeListAndWatchResources(ctx, req, opts...)
 }

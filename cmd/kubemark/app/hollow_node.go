@@ -18,7 +18,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	goflag "flag"
 	"fmt"
 	"time"
@@ -42,7 +41,6 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	fakesysctl "k8s.io/component-helpers/node/util/sysctl/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -53,8 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubemark"
 	kubemarkproxy "k8s.io/kubernetes/pkg/proxy/kubemark"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
-	fakeexec "k8s.io/utils/exec/testing"
 )
 
 type hollowNodeConfig struct {
@@ -67,14 +63,16 @@ type hollowNodeConfig struct {
 	NodeName                string
 	ServerPort              int
 	ContentType             string
-	UseRealProxier          bool
-	ProxierSyncPeriod       time.Duration
-	ProxierMinSyncPeriod    time.Duration
 	NodeLabels              map[string]string
 	RegisterWithTaints      []v1.Taint
 	MaxPods                 int
 	ExtendedResources       map[string]string
 	UseHostImageService     bool
+
+	// Deprecated config; remove these with the corresponding flags
+	UseRealProxier       bool
+	ProxierSyncPeriod    time.Duration
+	ProxierMinSyncPeriod time.Duration
 }
 
 const (
@@ -96,9 +94,6 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
 	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
 	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType of requests sent to apiserver.")
-	fs.BoolVar(&c.UseRealProxier, "use-real-proxier", true, "Set to true if you want to use real proxier inside hollow-proxy.")
-	fs.DurationVar(&c.ProxierSyncPeriod, "proxier-sync-period", 30*time.Second, "Period that proxy rules are refreshed in hollow-proxy.")
-	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
 	bindableNodeLabels := cliflag.ConfigurationMap(c.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "Additional node labels")
 	fs.Var(utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
@@ -106,6 +101,13 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	bindableExtendedResources := cliflag.ConfigurationMap(c.ExtendedResources)
 	fs.Var(&bindableExtendedResources, "extended-resources", "Register the node with extended resources (comma separated \"<name>=<quantity>\")")
 	fs.BoolVar(&c.UseHostImageService, "use-host-image-service", true, "Set to true if the hollow-kubelet should use the host image service. If set to false the fake image service will be used")
+
+	fs.BoolVar(&c.UseRealProxier, "use-real-proxier", true, "Has no effect.")
+	_ = fs.MarkDeprecated("use-real-proxier", "This flag is deprecated and will be removed in a future release.")
+	fs.DurationVar(&c.ProxierSyncPeriod, "proxier-sync-period", 30*time.Second, "Has no effect.")
+	_ = fs.MarkDeprecated("proxier-sync-period", "This flag is deprecated and will be removed in a future release.")
+	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Has no effect.")
+	_ = fs.MarkDeprecated("proxier-min-sync-period", "This flag is deprecated and will be removed in a future release.")
 }
 
 func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
@@ -272,30 +274,16 @@ func run(config *hollowNodeConfig) error {
 		if err != nil {
 			return fmt.Errorf("Failed to create API Server client, error: %w", err)
 		}
-		iptInterface := fakeiptables.NewFake()
-		sysctl := fakesysctl.NewFake()
-		execer := &fakeexec.FakeExec{
-			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
-		}
 		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "kube-proxy")
 
-		hollowProxy, err := kubemarkproxy.NewHollowProxyOrDie(
+		hollowProxy := kubemarkproxy.NewHollowProxy(
 			config.NodeName,
 			client,
 			client.CoreV1(),
-			iptInterface,
-			sysctl,
-			execer,
 			eventBroadcaster,
 			recorder,
-			config.UseRealProxier,
-			config.ProxierSyncPeriod,
-			config.ProxierMinSyncPeriod,
 		)
-		if err != nil {
-			return fmt.Errorf("Failed to create hollowProxy instance, error: %w", err)
-		}
 		return hollowProxy.Run()
 	}
 

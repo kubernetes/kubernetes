@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	"k8s.io/gengo/examples/set-gen/sets"
 )
 
 // Test_Controller validates the garbage collection logic for the apiserverleasegc controller.
@@ -124,13 +123,16 @@ func Test_Controller(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			got := sets.NewString()
+			got := map[string]bool{}
 			for _, ns := range namespaces {
-				got.Insert(ns.Name)
+				got[ns.Name] = true
 			}
 
-			if !got.HasAll(systemNamespaces...) {
-				t.Errorf("unexpected namespaces: %v", got.List())
+			for _, ns := range systemNamespaces {
+				if !got[ns] {
+					t.Errorf("unexpected namespaces: %v", namespaces)
+					break
+				}
 			}
 		})
 	}

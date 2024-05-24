@@ -116,6 +116,14 @@
             }
           ]
         },
+        "successPolicy": {
+          "rules": [
+            {
+              "succeededIndexes": "succeededIndexesValue",
+              "succeededCount": 2
+            }
+          ]
+        },
         "backoffLimit": 7,
         "backoffLimitPerIndex": 12,
         "maxFailedIndexes": 13,
@@ -654,6 +662,7 @@
                   {
                     "name": "nameValue",
                     "readOnly": true,
+                    "recursiveReadOnly": "recursiveReadOnlyValue",
                     "mountPath": "mountPathValue",
                     "subPath": "subPathValue",
                     "mountPropagation": "mountPropagationValue",
@@ -851,6 +860,10 @@
                   "allowPrivilegeEscalation": true,
                   "procMount": "procMountValue",
                   "seccompProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  },
+                  "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
                   }
@@ -944,6 +957,7 @@
                   {
                     "name": "nameValue",
                     "readOnly": true,
+                    "recursiveReadOnly": "recursiveReadOnlyValue",
                     "mountPath": "mountPathValue",
                     "subPath": "subPathValue",
                     "mountPropagation": "mountPropagationValue",
@@ -1141,6 +1155,10 @@
                   "allowPrivilegeEscalation": true,
                   "procMount": "procMountValue",
                   "seccompProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
+                  },
+                  "appArmorProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
                   }
@@ -1234,6 +1252,7 @@
                   {
                     "name": "nameValue",
                     "readOnly": true,
+                    "recursiveReadOnly": "recursiveReadOnlyValue",
                     "mountPath": "mountPathValue",
                     "subPath": "subPathValue",
                     "mountPropagation": "mountPropagationValue",
@@ -1433,6 +1452,10 @@
                   "seccompProfile": {
                     "type": "typeValue",
                     "localhostProfile": "localhostProfileValue"
+                  },
+                  "appArmorProfile": {
+                    "type": "typeValue",
+                    "localhostProfile": "localhostProfileValue"
                   }
                 },
                 "stdin": true,
@@ -1484,6 +1507,10 @@
               ],
               "fsGroupChangePolicy": "fsGroupChangePolicyValue",
               "seccompProfile": {
+                "type": "typeValue",
+                "localhostProfile": "localhostProfileValue"
+              },
+              "appArmorProfile": {
                 "type": "typeValue",
                 "localhostProfile": "localhostProfileValue"
               }
@@ -1822,7 +1849,8 @@
         "ttlSecondsAfterFinished": 8,
         "completionMode": "completionModeValue",
         "suspend": true,
-        "podReplacementPolicy": "podReplacementPolicyValue"
+        "podReplacementPolicy": "podReplacementPolicyValue",
+        "managedBy": "managedByValue"
       }
     },
     "successfulJobsHistoryLimit": 6,

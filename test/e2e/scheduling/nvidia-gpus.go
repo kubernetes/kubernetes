@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -59,34 +62,40 @@ var (
 
 func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 	podName := testPodNamePrefix + string(uuid.NewUUID())
+	testContainers := []v1.Container{
+		{
+			Name:  "vector-addition-cuda8",
+			Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
+			Resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+			},
+		},
+		{
+			Name:  "vector-addition-cuda10",
+			Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd2),
+			Resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+			},
+		},
+	}
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyNever,
-			Containers: []v1.Container{
-				{
-					Name:  "vector-addition-cuda8",
-					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
-						},
-					},
-				},
-				{
-					Name:  "vector-addition-cuda10",
-					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd2),
-					Resources: v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
-						},
-					},
-				},
-			},
 		},
 	}
+
+	testPod.Spec.Containers = testContainers
+	if os.Getenv("TEST_MAX_GPU_COUNT") == "1" {
+		testPod.Spec.Containers = []v1.Container{testContainers[0]}
+	}
+	framework.Logf("testPod.Spec.Containers {%#v}", testPod.Spec.Containers)
 	return testPod
 }
 
@@ -98,21 +107,38 @@ func logOSImages(ctx context.Context, f *framework.Framework) {
 	}
 }
 
+func isControlPlaneNode(node v1.Node) bool {
+	_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
+	if isControlPlane {
+		framework.Logf("Node: %q is a control-plane node (label)", node.Name)
+		return true
+	}
+
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == "node-role.kubernetes.io/control-plane" {
+			framework.Logf("Node: %q is a control-plane node (taint)", node.Name)
+			return true
+		}
+	}
+	framework.Logf("Node: %q is NOT a control-plane node", node.Name)
+	return false
+}
+
 func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, f *framework.Framework) bool {
 	framework.Logf("Getting list of Nodes from API server")
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
-		if node.Spec.Unschedulable {
+		if node.Spec.Unschedulable || isControlPlaneNode(node) {
 			continue
 		}
-		framework.Logf("gpuResourceName %s", gpuResourceName)
+
 		if val, ok := node.Status.Capacity[gpuResourceName]; !ok || val.Value() == 0 {
 			framework.Logf("Nvidia GPUs not available on Node: %q", node.Name)
 			return false
 		}
 	}
-	framework.Logf("Nvidia GPUs exist on all schedulable nodes")
+	framework.Logf("Nvidia GPUs exist on all schedulable worker nodes")
 	return true
 }
 
@@ -150,7 +176,8 @@ func SetupNVIDIAGPUNode(ctx context.Context, f *framework.Framework, setupResour
 	}
 	gpuResourceName = e2egpu.NVIDIAGPUResourceName
 	ds.Namespace = f.Namespace.Name
-	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ctx, ds, metav1.CreateOptions{})
+
+	_, err = f.ClientSet.AppsV1().DaemonSets(ds.Namespace).Create(ctx, ds, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
 	framework.Logf("Successfully created daemonset to install Nvidia drivers.")
 

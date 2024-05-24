@@ -4,13 +4,13 @@ package v1
 
 import (
 	apiconfigv1 "github.com/openshift/api/config/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // RequiredHSTSPolicyApplyConfiguration represents an declarative configuration of the RequiredHSTSPolicy type for use
 // with apply.
 type RequiredHSTSPolicyApplyConfiguration struct {
-	NamespaceSelector       *v1.LabelSelector                    `json:"namespaceSelector,omitempty"`
+	NamespaceSelector       *v1.LabelSelectorApplyConfiguration  `json:"namespaceSelector,omitempty"`
 	DomainPatterns          []string                             `json:"domainPatterns,omitempty"`
 	MaxAge                  *MaxAgePolicyApplyConfiguration      `json:"maxAge,omitempty"`
 	PreloadPolicy           *apiconfigv1.PreloadPolicy           `json:"preloadPolicy,omitempty"`
@@ -26,8 +26,8 @@ func RequiredHSTSPolicy() *RequiredHSTSPolicyApplyConfiguration {
 // WithNamespaceSelector sets the NamespaceSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NamespaceSelector field is set to the value of the last call.
-func (b *RequiredHSTSPolicyApplyConfiguration) WithNamespaceSelector(value v1.LabelSelector) *RequiredHSTSPolicyApplyConfiguration {
-	b.NamespaceSelector = &value
+func (b *RequiredHSTSPolicyApplyConfiguration) WithNamespaceSelector(value *v1.LabelSelectorApplyConfiguration) *RequiredHSTSPolicyApplyConfiguration {
+	b.NamespaceSelector = value
 	return b
 }
 

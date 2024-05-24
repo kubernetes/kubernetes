@@ -346,7 +346,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 		}
 		if volume == nil {
 			logger.V(4).Info("Synchronizing unbound PersistentVolumeClaim, no volume found", "PVC", klog.KObj(claim))
-			// No PV could be found
+			// No PV could be found. Try to provision one if possible.
 			// OBSERVATION: pvc is "Pending", will retry
 
 			logger.V(4).Info("Attempting to assign storage class to unbound PersistentVolumeClaim", "PVC", klog.KObj(claim))
@@ -363,10 +363,15 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 
 			switch {
 			case delayBinding && !storagehelpers.IsDelayBindingProvisioning(claim):
+				// Scheduler does not observe any pod using this claim.
 				if err = ctrl.emitEventForUnboundDelayBindingClaim(claim); err != nil {
 					return err
 				}
 			case storagehelpers.GetPersistentVolumeClaimClass(claim) != "":
+				// The provisionClaim function may start a new asynchronous operation to provision a volume,
+				// or the operation is already running. The claim will be updated in the asynchronous operation,
+				// so the branch should be returned directly and the bind operation is expected to continue in
+				// the next sync loop.
 				if err = ctrl.provisionClaim(ctx, claim); err != nil {
 					return err
 				}
@@ -1950,6 +1955,18 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 				return nil, err
 			}
 			return plugin, nil
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		if metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnMigratedTo) {
+			// CSI migration scenario - do not depend on in-tree plugin
+			return nil, nil
+		}
+
+		if volume.Spec.CSI != nil {
+			// CSI volume source scenario - external provisioner is requested
+			return nil, nil
 		}
 	}
 

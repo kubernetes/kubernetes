@@ -574,3 +574,31 @@ func TestTransformingInformer(t *testing.T) {
 
 	close(stopCh)
 }
+
+func TestDeletionHandlingObjectToName(t *testing.T) {
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testname",
+			Namespace: "testnamespace",
+		},
+	}
+	stringKey, err := MetaNamespaceKeyFunc(cm)
+	if err != nil {
+		t.Error(err)
+	}
+	deleted := DeletedFinalStateUnknown{
+		Key: stringKey,
+		Obj: cm,
+	}
+	expected, err := ObjectToName(cm)
+	if err != nil {
+		t.Error(err)
+	}
+	actual, err := DeletionHandlingObjectToName(deleted)
+	if err != nil {
+		t.Error(err)
+	}
+	if expected != actual {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+}

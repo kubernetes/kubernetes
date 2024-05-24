@@ -140,6 +140,9 @@ linters:
     - ginkgolinter
     - gocritic
     - govet
+    {{- if .Hints}}
+    - errorlint
+    {{- end}}
     - ineffassign
     - logcheck
     - revive
@@ -159,6 +162,9 @@ linters-settings: # please keep this alphabetized
       path: ../_output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/logtools/logcheck
+      settings:
+        config: |
+          {{include "hack/logcheck.conf" | indent 10 | trim}}
   forbidigo:
     analyze-types: true
     forbid:
@@ -168,6 +174,14 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+    {{- if .Hints}}
+    - p: ^gomega\.BeTrue$
+      pkg: ^github.com/onsi/gomega$
+      msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    - p: ^gomega\.BeFalse$
+      pkg: ^github.com/onsi/gomega$
+      msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+    {{- end}}
   {{- if .Base }}
   gocritic:
     enabled-checks:

@@ -1,14 +1,16 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 reviewers:
   - harshanarayana
+  - mengjiao-liu
   - pohly
 approvers:
   - dims
+  - pohly
   - thockin
-  - serathius
 emeritus_approvers:
   - brancz
   - justinsb
   - lavalamp
   - piosz
+  - serathius
   - tallclair

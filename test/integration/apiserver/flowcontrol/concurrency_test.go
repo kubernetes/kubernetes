@@ -48,10 +48,9 @@ const (
 )
 
 func setup(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFlight int) (context.Context, *rest.Config, framework.TearDownFunc) {
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	tCtx := ktesting.Init(t)
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure all clients are allowed to send requests.
 			opts.Authorization.Modes = []string{"AlwaysAllow"}
@@ -61,10 +60,10 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFligh
 	})
 
 	newTeardown := func() {
-		cancel()
+		tCtx.Cancel("tearing down apiserver")
 		tearDownFn()
 	}
-	return ctx, kubeConfig, newTeardown
+	return tCtx, kubeConfig, newTeardown
 }
 
 func TestPriorityLevelIsolation(t *testing.T) {

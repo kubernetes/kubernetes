@@ -15,22 +15,10 @@ Load passes most patterns directly to the underlying build tool.
 The default build tool is the go command.
 Its supported patterns are described at
 https://pkg.go.dev/cmd/go#hdr-Package_lists_and_patterns.
+Other build systems may be supported by providing a "driver";
+see [The driver protocol].
 
-Load may be used in Go projects that use alternative build systems, by
-installing an appropriate "driver" program for the build system and
-specifying its location in the GOPACKAGESDRIVER environment variable.
-For example,
-https://github.com/bazelbuild/rules_go/wiki/Editor-and-tool-integration
-explains how to use the driver for Bazel.
-The driver program is responsible for interpreting patterns in its
-preferred notation and reporting information about the packages that
-they identify.
-(See driverRequest and driverResponse types for the JSON
-schema used by the protocol.
-Though the protocol is supported, these types are currently unexported;
-see #64608 for a proposal to publish them.)
-
-Regardless of driver, all patterns with the prefix "query=", where query is a
+All patterns with the prefix "query=", where query is a
 non-empty string of letters from [a-z], are reserved and may be
 interpreted as query operators.
 
@@ -86,7 +74,29 @@ for details.
 Most tools should pass their command-line arguments (after any flags)
 uninterpreted to [Load], so that it can interpret them
 according to the conventions of the underlying build system.
+
 See the Example function for typical usage.
+
+# The driver protocol
+
+[Load] may be used to load Go packages even in Go projects that use
+alternative build systems, by installing an appropriate "driver"
+program for the build system and specifying its location in the
+GOPACKAGESDRIVER environment variable.
+For example,
+https://github.com/bazelbuild/rules_go/wiki/Editor-and-tool-integration
+explains how to use the driver for Bazel.
+
+The driver program is responsible for interpreting patterns in its
+preferred notation and reporting information about the packages that
+those patterns identify. Drivers must also support the special "file="
+and "pattern=" patterns described above.
+
+The patterns are provided as positional command-line arguments. A
+JSON-encoded [DriverRequest] message providing additional information
+is written to the driver's standard input. The driver must write a
+JSON-encoded [DriverResponse] message to its standard output. (This
+message differs from the JSON schema produced by 'go list'.)
 */
 package packages // import "golang.org/x/tools/go/packages"
 

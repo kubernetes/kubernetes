@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-export GO111MODULE=on
+kube::golang::setup_env
 
 staging_repos=()
 kube::util::read-array staging_repos < <(kube::util::list_staging_repos)
@@ -34,7 +34,7 @@ staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")
 cd "${KUBE_ROOT}"
 
 # Check for any module that is not main or staging and depends on main or staging
-bad_deps=$(go mod graph | grep -vE "^k8s.io\/(kubernetes|${staging_repos_pattern})" | grep -E "\sk8s.io\/(kubernetes|${staging_repos_pattern})" || true)
+bad_deps=$(go mod graph | grep -vE "^k8s.io/(kubernetes|${staging_repos_pattern})" | grep -E "\sk8s.io/(kubernetes|${staging_repos_pattern})" || true)
 if [[ -n "${bad_deps}" ]]; then
   echo "Found disallowed dependencies that transitively depend on k8s.io/kubernetes or staging modules:"
   echo "${bad_deps}"

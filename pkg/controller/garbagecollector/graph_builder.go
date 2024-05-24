@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
-
+	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
@@ -97,7 +97,8 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
-	eventRecorder record.EventRecorder
+	eventRecorder    record.EventRecorder
+	eventBroadcaster record.EventBroadcaster
 
 	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
@@ -133,6 +134,39 @@ func (m *monitor) Run() {
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
+
+func NewDependencyGraphBuilder(
+	ctx context.Context,
+	metadataClient metadata.Interface,
+	mapper meta.ResettableRESTMapper,
+	ignoredResources map[schema.GroupResource]struct{},
+	sharedInformers informerfactory.InformerFactory,
+	informersStarted <-chan struct{},
+) *GraphBuilder {
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+
+	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
+	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
+	absentOwnerCache := NewReferenceCache(500)
+	graphBuilder := &GraphBuilder{
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"}),
+		eventBroadcaster: eventBroadcaster,
+		metadataClient:   metadataClient,
+		informersStarted: informersStarted,
+		restMapper:       mapper,
+		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		uidToNode: &concurrentUIDToNode{
+			uidToNode: make(map[types.UID]*node),
+		},
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
+		absentOwnerCache: absentOwnerCache,
+		sharedInformers:  sharedInformers,
+		ignoredResources: ignoredResources,
+	}
+
+	return graphBuilder
+}
 
 func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -934,4 +968,63 @@ func getAlternateOwnerIdentity(deps []*node, verifiedAbsentIdentity objectRefere
 	}
 	// otherwise return the first alternate identity
 	return first
+}
+
+func (gb *GraphBuilder) GetGraphResources() (
+	attemptToDelete workqueue.RateLimitingInterface,
+	attemptToOrphan workqueue.RateLimitingInterface,
+	absentOwnerCache *ReferenceCache,
+) {
+	return gb.attemptToDelete, gb.attemptToOrphan, gb.absentOwnerCache
+}
+
+type Monitor struct {
+	Store      cache.Store
+	Controller cache.Controller
+}
+
+// GetMonitor returns a monitor for the given resource.
+// If the monitor is not synced, it will return an error and the monitor to allow the caller to decide whether to retry.
+// If the monitor is not found, it will return only an error.
+func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVersionResource) (*Monitor, error) {
+	gb.monitorLock.RLock()
+	defer gb.monitorLock.RUnlock()
+
+	var monitor *monitor
+	if m, ok := gb.monitors[resource]; ok {
+		monitor = m
+	} else {
+		for monitorGVR, m := range gb.monitors {
+			if monitorGVR.Group == resource.Group && monitorGVR.Resource == resource.Resource {
+				monitor = m
+				break
+			}
+		}
+	}
+
+	if monitor == nil {
+		return nil, fmt.Errorf("no monitor found for resource %s", resource.String())
+	}
+
+	resourceMonitor := &Monitor{
+		Store:      monitor.store,
+		Controller: monitor.controller,
+	}
+
+	if !cache.WaitForNamedCacheSync(
+		gb.Name(),
+		ctx.Done(),
+		func() bool {
+			return monitor.controller.HasSynced()
+		},
+	) {
+		// returning monitor to allow the caller to decide whether to retry as it can be synced later
+		return resourceMonitor, fmt.Errorf("dependency graph for resource %s is not synced", resource.String())
+	}
+
+	return resourceMonitor, nil
+}
+
+func (gb *GraphBuilder) Name() string {
+	return "dependencygraphbuilder"
 }

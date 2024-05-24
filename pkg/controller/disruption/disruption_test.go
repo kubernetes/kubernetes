@@ -1538,12 +1538,10 @@ func TestStalePodDisruption(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			dc, _ := newFakeDisruptionControllerWithTime(ctx, now)
-			go dc.Run(ctx)
-			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(ctx, tc.pod, metav1.CreateOptions{}); err != nil {
+			tCtx := ktesting.Init(t)
+			dc, _ := newFakeDisruptionControllerWithTime(tCtx, now)
+			go dc.Run(tCtx)
+			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(tCtx, tc.pod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
 			dc.clock.Sleep(tc.timePassed)
@@ -1552,7 +1550,7 @@ func TestStalePodDisruption(t *testing.T) {
 			}
 			diff := ""
 			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				pod, err := dc.kubeClient.CoreV1().Pods(tc.pod.Namespace).Get(ctx, tc.pod.Name, metav1.GetOptions{})
+				pod, err := dc.kubeClient.CoreV1().Pods(tc.pod.Namespace).Get(tCtx, tc.pod.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("Failed getting updated pod: %v", err)
 				}

@@ -17,6 +17,8 @@ cgroupsPerQOS: true
 configMapAndSecretChangeDetectionStrategy: Watch
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
+containerLogMaxWorkers: 1
+containerLogMonitorInterval: 10s
 containerRuntimeEndpoint: unix:///run/containerd/containerd.sock
 contentType: application/vnd.kubernetes.protobuf
 cpuCFSQuota: true
@@ -57,6 +59,8 @@ logging:
   options:
     json:
       infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
   verbosity: 0
 makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
@@ -69,6 +73,7 @@ nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
+podLogsDir: /var/log/pods
 podPidsLimit: -1
 port: 10250
 registerNode: true

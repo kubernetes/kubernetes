@@ -58,6 +58,7 @@ type configOptions struct {
 	vmoduleFlagName   string
 	verbosityDefault  int
 	fixedTime         *time.Time
+	unwind            func(int) (string, int)
 	output            io.Writer
 }
 
@@ -105,6 +106,21 @@ func FixedTime(ts time.Time) ConfigOption {
 	}
 }
 
+// Backtrace overrides the default mechanism for determining the call site.
+// The callback is invoked with the number of function calls between itself
+// and the call site. It must return the file name and line number. An empty
+// file name indicates that the information is unknown.
+//
+// # Experimental
+//
+// Notice: This function is EXPERIMENTAL and may be changed or removed in a
+// later release.
+func Backtrace(unwind func(skip int) (filename string, line int)) ConfigOption {
+	return func(co *configOptions) {
+		co.unwind = unwind
+	}
+}
+
 // NewConfig returns a configuration with recommended defaults and optional
 // modifications. Command line flags are not bound to any FlagSet yet.
 func NewConfig(opts ...ConfigOption) *Config {
@@ -114,6 +130,7 @@ func NewConfig(opts ...ConfigOption) *Config {
 			verbosityFlagName: "v",
 			vmoduleFlagName:   "vmodule",
 			verbosityDefault:  0,
+			unwind:            runtimeBacktrace,
 			output:            os.Stderr,
 		},
 	}
@@ -127,6 +144,10 @@ func NewConfig(opts ...ConfigOption) *Config {
 }
 
 // AddFlags registers the command line flags that control the configuration.
+//
+// The default flag names are the same as in klog, so unless those defaults
+// are changed, either klog.InitFlags or Config.AddFlags can be used for the
+// same flag set, but not both.
 func (c *Config) AddFlags(fs *flag.FlagSet) {
 	fs.Var(c.Verbosity(), c.co.verbosityFlagName, "number for the log level verbosity of the testing logger")
 	fs.Var(c.VModule(), c.co.vmoduleFlagName, "comma-separated list of pattern=N log level settings for files matching the patterns")

@@ -17,24 +17,27 @@ limitations under the License.
 package authorizer
 
 import (
-	"errors"
+	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
 
-	"k8s.io/kubernetes/openshift-kube-apiserver/authorization/browsersafe"
-	"k8s.io/kubernetes/openshift-kube-apiserver/authorization/scopeauthorizer"
-
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/apis/apiserver/load"
+	"k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
-	"k8s.io/apiserver/pkg/authorization/union"
-	webhookutil "k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
+	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
+	"k8s.io/kubernetes/openshift-kube-apiserver/authorization/scopeauthorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -60,6 +63,8 @@ type Config struct {
 	// Optional field, custom dial function used to connect to webhook
 	CustomDial utilnet.DialFunc
 
+	// ReloadFile holds the filename to reload authorization configuration from
+	ReloadFile string
 	// AuthorizationConfiguration stores the configuration for the Authorizer chain
 	// It will deprecate most of the above flags when GA
 	AuthorizationConfiguration *authzconfig.AuthorizationConfiguration
@@ -67,26 +72,32 @@ type Config struct {
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.
-func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, error) {
+// stopCh is used to shut down config reload goroutines when the server is shutting down.
+func (config Config) New(ctx context.Context, serverID string) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(config.AuthorizationConfiguration.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
-	var (
-		authorizers   []authorizer.Authorizer
-		ruleResolvers []authorizer.RuleResolver
-	)
-
-	if !skipSystemMastersAuthorizer {
-		// Add SystemPrivilegedGroup as an authorizing group
-		superuserAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-		authorizers = append(authorizers, superuserAuthorizer)
+	r := &reloadableAuthorizerResolver{
+		initialConfig:    config,
+		apiServerID:      serverID,
+		lastLoadedConfig: config.AuthorizationConfiguration,
+		reloadInterval:   time.Minute,
 	}
 
+	seenTypes := sets.New[authzconfig.AuthorizerType]()
+
+	// Build and store authorizers which will persist across reloads
 	for _, configuredAuthorizer := range config.AuthorizationConfiguration.Authorizers {
+		seenTypes.Insert(configuredAuthorizer.Type)
+
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch configuredAuthorizer.Type {
 		case authzconfig.AuthorizerType(modes.ModeNode):
+			var slices resourcev1alpha2informers.ResourceSliceInformer
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+				slices = config.VersionedInformerFactory.Resource().V1alpha2().ResourceSlices()
+			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
@@ -95,77 +106,108 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				config.VersionedInformerFactory.Core().V1().Pods(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
+				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.
 			)
-			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
-			authorizers = append(authorizers, nodeAuthorizer)
-			ruleResolvers = append(ruleResolvers, nodeAuthorizer)
+			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 
-		case authzconfig.AuthorizerType(modes.ModeAlwaysAllow):
-			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
-			authorizers = append(authorizers, alwaysAllowAuthorizer)
-			ruleResolvers = append(ruleResolvers, alwaysAllowAuthorizer)
-		case authzconfig.AuthorizerType(modes.ModeAlwaysDeny):
-			alwaysDenyAuthorizer := authorizerfactory.NewAlwaysDenyAuthorizer()
-			authorizers = append(authorizers, alwaysDenyAuthorizer)
-			ruleResolvers = append(ruleResolvers, alwaysDenyAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeABAC):
-			abacAuthorizer, err := abac.NewFromFile(config.PolicyFile)
+			var err error
+			r.abacAuthorizer, err = abac.NewFromFile(config.PolicyFile)
 			if err != nil {
 				return nil, nil, err
 			}
-			authorizers = append(authorizers, abacAuthorizer)
-			ruleResolvers = append(ruleResolvers, abacAuthorizer)
-		case authzconfig.AuthorizerType(modes.ModeWebhook):
-			if config.WebhookRetryBackoff == nil {
-				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
-			}
-			clientConfig, err := webhookutil.LoadKubeconfig(*configuredAuthorizer.Webhook.ConnectionInfo.KubeConfigFile, config.CustomDial)
-			if err != nil {
-				return nil, nil, err
-			}
-			var decisionOnError authorizer.Decision
-			switch configuredAuthorizer.Webhook.FailurePolicy {
-			case authzconfig.FailurePolicyNoOpinion:
-				decisionOnError = authorizer.DecisionNoOpinion
-			case authzconfig.FailurePolicyDeny:
-				decisionOnError = authorizer.DecisionDeny
-			default:
-				return nil, nil, fmt.Errorf("unknown failurePolicy %q", configuredAuthorizer.Webhook.FailurePolicy)
-			}
-			webhookAuthorizer, err := webhook.New(clientConfig,
-				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
-				configuredAuthorizer.Webhook.AuthorizedTTL.Duration,
-				configuredAuthorizer.Webhook.UnauthorizedTTL.Duration,
-				*config.WebhookRetryBackoff,
-				decisionOnError,
-				configuredAuthorizer.Webhook.MatchConditions,
-			)
-			if err != nil {
-				return nil, nil, err
-			}
-			authorizers = append(authorizers, webhookAuthorizer)
-			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeRBAC):
-			rbacAuthorizer := rbac.New(
+			r.rbacAuthorizer = rbac.New(
 				&rbac.RoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().Roles().Lister()},
 				&rbac.RoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().RoleBindings().Lister()},
 				&rbac.ClusterRoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister()},
 				&rbac.ClusterRoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoleBindings().Lister()},
 			)
-			// Wrap with an authorizer that detects unsafe requests and modifies verbs/resources appropriately so policy can address them separately
-			authorizers = append(authorizers, browsersafe.NewBrowserSafeAuthorizer(rbacAuthorizer, user.AllAuthenticated))
-			ruleResolvers = append(ruleResolvers, rbacAuthorizer)
 		case authzconfig.AuthorizerType(modes.ModeScope):
 			// Wrap with an authorizer that detects unsafe requests and modifies verbs/resources appropriately so policy can address them separately
-			scopeLimitedAuthorizer := scopeauthorizer.NewAuthorizer(config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister())
-			authorizers = append(authorizers, browsersafe.NewBrowserSafeAuthorizer(scopeLimitedAuthorizer, user.AllAuthenticated))
-		case authzconfig.AuthorizerType(modes.ModeSystemMasters):
-			// no browsersafeauthorizer here becase that rewrites the resources.  This authorizer matches no matter which resource matches.
-			authorizers = append(authorizers, authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup))
-		default:
-			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", configuredAuthorizer.Type)
+			r.scopeLimitedAuthorizer = scopeauthorizer.NewAuthorizer(config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister())
 		}
 	}
 
-	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
+	// Require all non-webhook authorizer types to remain specified in the file on reload
+	seenTypes.Delete(authzconfig.TypeWebhook)
+	r.requireNonWebhookTypes = seenTypes
+
+	// Construct the authorizers / ruleResolvers for the given configuration
+	authorizer, ruleResolver, err := r.newForConfig(r.initialConfig.AuthorizationConfiguration)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r.current.Store(&authorizerResolver{
+		authorizer:   authorizer,
+		ruleResolver: ruleResolver,
+	})
+
+	if r.initialConfig.ReloadFile != "" {
+		go r.runReload(ctx)
+	}
+
+	return r, r, nil
+}
+
+// RepeatableAuthorizerTypes is the list of Authorizer that can be repeated in the Authorization Config
+var repeatableAuthorizerTypes = []string{modes.ModeWebhook}
+
+// GetNameForAuthorizerMode returns the name to be set for the mode in AuthorizationConfiguration
+// For now, lower cases the mode name
+func GetNameForAuthorizerMode(mode string) string {
+	return strings.ToLower(mode)
+}
+
+func LoadAndValidateFile(configFile string, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, err
+	}
+	return LoadAndValidateData(data, requireNonWebhookTypes)
+}
+
+func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+	// load the file and check for errors
+	authorizationConfiguration, err := load.LoadFromData(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AuthorizationConfiguration from file: %w", err)
+	}
+
+	// validate the file and return any error
+	if errors := validation.ValidateAuthorizationConfiguration(nil, authorizationConfiguration,
+		sets.NewString(modes.AuthorizationModeChoices...),
+		sets.NewString(repeatableAuthorizerTypes...),
+	); len(errors) != 0 {
+		return nil, fmt.Errorf(errors.ToAggregate().Error())
+	}
+
+	// test to check if the authorizer names passed conform to the authorizers for type!=Webhook
+	// this test is only for kube-apiserver and hence checked here
+	// it preserves compatibility with o.buildAuthorizationConfiguration
+	var allErrors []error
+	seenModes := sets.New[authzconfig.AuthorizerType]()
+	for _, authorizer := range authorizationConfiguration.Authorizers {
+		if string(authorizer.Type) == modes.ModeWebhook {
+			continue
+		}
+		seenModes.Insert(authorizer.Type)
+
+		expectedName := GetNameForAuthorizerMode(string(authorizer.Type))
+		if expectedName != authorizer.Name {
+			allErrors = append(allErrors, fmt.Errorf("expected name %s for authorizer %s instead of %s", expectedName, authorizer.Type, authorizer.Name))
+		}
+
+	}
+
+	if missingTypes := requireNonWebhookTypes.Difference(seenModes); missingTypes.Len() > 0 {
+		allErrors = append(allErrors, fmt.Errorf("missing required types: %v", sets.List(missingTypes)))
+	}
+
+	if len(allErrors) > 0 {
+		return nil, utilerrors.NewAggregate(allErrors)
+	}
+
+	return authorizationConfiguration, nil
 }

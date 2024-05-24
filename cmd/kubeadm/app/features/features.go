@@ -38,13 +38,16 @@ const (
 	EtcdLearnerMode = "EtcdLearnerMode"
 	// UpgradeAddonsBeforeControlPlane is expected to be in deprecated in v1.28 and will be removed in future release
 	UpgradeAddonsBeforeControlPlane = "UpgradeAddonsBeforeControlPlane"
+	// WaitForAllControlPlaneComponents is expected to be alpha in v1.30
+	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
 )
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
 	PublicKeysECDSA: {
-		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
-		DeprecationMessage: "The PublicKeysECDSA feature gate is deprecated and will be removed after the feature 'ClusterConfiguration.EncryptionAlgorithm' is added.",
+		FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
+		DeprecationMessage: "The PublicKeysECDSA feature gate is deprecated and will be removed when v1beta3 is removed." +
+			" v1beta4 supports a new option 'ClusterConfiguration.EncryptionAlgorithm'.",
 	},
 	RootlessControlPlane: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	EtcdLearnerMode:      {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
@@ -52,6 +55,7 @@ var InitFeatureGates = FeatureList{
 		FeatureSpec:        featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Deprecated},
 		DeprecationMessage: "The UpgradeAddonsBeforeControlPlane feature gate is deprecated and will be removed in a future release.",
 	},
+	WaitForAllControlPlaneComponents: {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 }
 
 // Feature represents a feature being gated

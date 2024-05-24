@@ -33,6 +33,7 @@ import (
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		fuzzBootstrapToken,
+		fuzzUpgradePlan,
 	}
 }
 
@@ -44,4 +45,11 @@ func fuzzBootstrapToken(obj *output.BootstrapToken, c fuzz.Continue) {
 	obj.TTL = &metav1.Duration{Duration: time.Hour * 24}
 	obj.Usages = []string{"authentication", "signing"}
 	obj.Groups = []string{constants.NodeBootstrapTokenAuthGroup}
+}
+
+// TODO: Remove this func when v1alpha2 is removed
+func fuzzUpgradePlan(obj *output.UpgradePlan, c fuzz.Continue) {
+	// Pin the value to avoid round tripping the AvailableUpgrades field
+	// which is not present in the v1alpha2 version.
+	obj.AvailableUpgrades = nil
 }

@@ -149,7 +149,7 @@ var _ = SIGDescribe(framework.WithDisruptive(), "NodeLease", func() {
 				deletedNodeName = originalNodeName
 				break
 			}
-			framework.ExpectNotEqual(deletedNodeName, "")
+			gomega.Expect(deletedNodeName).NotTo(gomega.BeEmpty())
 			gomega.Eventually(ctx, func() error {
 				if _, err := leaseClient.Get(ctx, deletedNodeName, metav1.GetOptions{}); err == nil {
 					return fmt.Errorf("node lease is not deleted yet for node %q", deletedNodeName)

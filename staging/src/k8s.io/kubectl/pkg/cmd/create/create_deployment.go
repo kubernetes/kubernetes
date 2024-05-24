@@ -53,7 +53,10 @@ var (
 	kubectl create deployment my-dep --image=nginx --replicas=3
 
 	# Create a deployment named my-dep that runs the busybox image and expose port 5701
-	kubectl create deployment my-dep --image=busybox --port=5701`))
+	kubectl create deployment my-dep --image=busybox --port=5701
+
+	# Create a deployment named my-dep that runs multiple containers
+	kubectl create deployment my-dep --image=busybox:latest --image=ubuntu:latest --image=nginx`))
 )
 
 // CreateDeploymentOptions is returned by NewCmdCreateDeployment
@@ -112,9 +115,9 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericiooptions.IOStre
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringSliceVar(&o.Images, "image", o.Images, "Image names to run.")
+	cmd.Flags().StringSliceVar(&o.Images, "image", o.Images, "Image names to run. A deployment can have multiple images set for multi-container pod.")
 	cmd.MarkFlagRequired("image")
-	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The port that this container exposes.")
+	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The containerPort that this deployment exposes.")
 	cmd.Flags().Int32VarP(&o.Replicas, "replicas", "r", o.Replicas, "Number of replicas to create. Default is 1.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 

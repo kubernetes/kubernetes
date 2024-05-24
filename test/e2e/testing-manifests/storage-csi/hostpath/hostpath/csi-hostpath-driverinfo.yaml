@@ -15,3 +15,6 @@ spec:
   # To determine at runtime which mode a volume uses, pod info and its
   # "csi.storage.k8s.io/ephemeral" entry are needed.
   podInfoOnMount: true
+  # Kubernetes may use fsGroup to change permissions and ownership 
+  # of the volume to match user requested fsGroup in the pod's SecurityPolicy
+  fsGroupPolicy: File

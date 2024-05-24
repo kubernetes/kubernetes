@@ -423,48 +423,5 @@ func certToConfig(cert *x509.Certificate) certutil.Config {
 }
 
 func loadCertConfigMutators(certBaseName string) []certConfigMutatorFunc {
-	// TODO: Remove these mutators after the organization migration is complete in a future release
-	// https://github.com/kubernetes/kubeadm/issues/2414
-	switch certBaseName {
-	case kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
-		kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName:
-		return []certConfigMutatorFunc{
-			removeSystemPrivilegedGroupMutator(),
-		}
-	case kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName:
-		return []certConfigMutatorFunc{
-			removeSystemPrivilegedGroupMutator(),
-			addClusterAdminsGroupMutator(),
-		}
-	}
 	return nil
-}
-
-func removeSystemPrivilegedGroupMutator() certConfigMutatorFunc {
-	return func(c *certutil.Config) error {
-		organizations := make([]string, 0, len(c.Organization))
-		for _, org := range c.Organization {
-			if org != kubeadmconstants.SystemPrivilegedGroup {
-				organizations = append(organizations, org)
-			}
-		}
-		c.Organization = organizations
-		return nil
-	}
-}
-
-func addClusterAdminsGroupMutator() certConfigMutatorFunc {
-	return func(c *certutil.Config) error {
-		found := false
-		for _, org := range c.Organization {
-			if org == kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding {
-				found = true
-				break
-			}
-		}
-		if !found {
-			c.Organization = append(c.Organization, kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding)
-		}
-		return nil
-	}
 }

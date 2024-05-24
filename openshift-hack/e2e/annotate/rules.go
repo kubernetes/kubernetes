@@ -10,13 +10,17 @@ var (
 		// alpha features that are not gated
 		"[Disabled:Alpha]": {
 			`\[Feature:StorageVersionAPI\]`,
-			`\[Feature:UserNamespacesSupport\]`,
 			`\[Feature:InPlacePodVerticalScaling\]`,
 			`\[Feature:RecoverVolumeExpansionFailure\]`,
 			`\[Feature:WatchList\]`,
 			`\[Feature:ServiceCIDRs\]`,
-			`\[Feature:PodLifecycleSleepAction\]`,
 			`\[Feature:ClusterTrustBundle\]`,
+			`\[Feature:SELinuxMount\]`,
+			`\[FeatureGate:SELinuxMount\]`,
+			`\[Feature:RelaxedEnvironmentVariableValidation\]`,
+			`\[Feature:UserNamespacesPodSecurityStandards\]`,
+			`\[Feature:Traffic Distribution\]`,
+			`\[Feature:UserNamespacesSupport\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -149,9 +153,6 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-17194
 			`\[sig-node\] ImageCredentialProvider \[Feature:KubeletCredentialProviders\] should be able to create pod with image credentials fetched from external credential provider`,
-
-			// https://issues.redhat.com/browse/OCPBUGS-17202
-			`\[sig-apps\] StatefulSet Scaling StatefulSetStartOrdinal \[Feature:StatefulSetStartOrdinal\] Removing \.start\.ordinal`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
@@ -311,6 +312,7 @@ var (
 			`\[sig-node\] NoExecuteTaintManager Single Pod \[Serial\] eventually evict pod with finite tolerations from tainted nodes`,
 			`\[sig-node\] NoExecuteTaintManager Single Pod \[Serial\] evicts pods from tainted nodes`,
 			`\[sig-node\] NoExecuteTaintManager Single Pod \[Serial\] removing taint cancels eviction \[Disruptive\] \[Conformance\]`,
+			`\[sig-node\] NoExecuteTaintManager Single Pod \[Serial\] pods evicted from tainted nodes have pod disruption condition`,
 			`\[sig-node\] NoExecuteTaintManager Multiple Pods \[Serial\] evicts pods with minTolerationSeconds \[Disruptive\] \[Conformance\]`,
 			`\[sig-node\] NoExecuteTaintManager Multiple Pods \[Serial\] only evicts pods without tolerations from tainted nodes`,
 			`\[sig-cli\] Kubectl client Kubectl taint \[Serial\] should remove all the taints with the same key off a node`,

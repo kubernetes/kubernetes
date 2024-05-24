@@ -43,6 +43,18 @@ type EtcdSpec struct {
 	// +openshift:enable:FeatureGate=HardwareSpeed
 	// +optional
 	HardwareSpeed ControlPlaneHardwareSpeed `json:"controlPlaneHardwareSpeed"`
+
+	// backendQuotaGiB sets the etcd backend storage size limit in gibibytes.
+	// The value should be an integer not less than 8 and not more than 32.
+	// When not specified, the default value is 8.
+	// +kubebuilder:default:=8
+	// +kubebuilder:validation:Minimum=8
+	// +kubebuilder:validation:Maximum=32
+	// +kubebuilder:validation:XValidation:rule="self>=oldSelf",message="etcd backendQuotaGiB may not be decreased"
+	// +openshift:enable:FeatureGate=EtcdBackendQuota
+	// +default=8
+	// +optional
+	BackendQuotaGiB int32 `json:"backendQuotaGiB,omitempty"`
 }
 
 type EtcdStatus struct {

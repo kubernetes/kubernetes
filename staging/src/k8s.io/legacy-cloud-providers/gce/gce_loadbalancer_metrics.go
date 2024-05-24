@@ -111,12 +111,12 @@ func newLoadBalancerMetrics() loadbalancerMetricsCollector {
 func (lm *LoadBalancerMetrics) Run(stopCh <-chan struct{}) {
 	klog.V(3).Infof("Loadbalancer Metrics initialized. Metrics will be exported at an interval of %v", metricsInterval)
 	// Compute and export metrics periodically.
-	go func() {
-		// Wait for service states to be populated in the cache before computing metrics.
-		time.Sleep(metricsInterval)
+	select {
+	case <-stopCh:
+		return
+	case <-time.After(metricsInterval): // Wait for service states to be populated in the cache before computing metrics.
 		wait.Until(lm.export, metricsInterval, stopCh)
-	}()
-	<-stopCh
+	}
 }
 
 // SetL4ILBService implements loadbalancerMetricsCollector.

@@ -19,8 +19,12 @@ package customresource
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
@@ -41,11 +45,11 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic"
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"k8s.io/client-go/util/jsonpath"
 )
 
 // customResourceStrategy implements behavior for CustomResources for a single
@@ -54,22 +58,29 @@ type customResourceStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 
-	namespaceScoped  bool
-	validator        customResourceValidator
-	structuralSchema *structuralschema.Structural
-	celValidator     *cel.Validator
-	status           *apiextensions.CustomResourceSubresourceStatus
-	scale            *apiextensions.CustomResourceSubresourceScale
-	kind             schema.GroupVersionKind
+	namespaceScoped    bool
+	validator          customResourceValidator
+	structuralSchema   *structuralschema.Structural
+	celValidator       *cel.Validator
+	status             *apiextensions.CustomResourceSubresourceStatus
+	scale              *apiextensions.CustomResourceSubresourceScale
+	kind               schema.GroupVersionKind
+	selectableFieldSet []selectableField
 }
 
-func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchema *structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
+type selectableField struct {
+	name      string
+	fieldPath *jsonpath.JSONPath
+	err       error
+}
+
+func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator validation.SchemaValidator, structuralSchema *structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale, selectableFields []v1.SelectableField) customResourceStrategy {
 	var celValidator *cel.Validator
 	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
 		celValidator = cel.NewValidator(structuralSchema, true, celconfig.PerCallLimit) // CEL programs are compiled and cached here
 	}
 
-	return customResourceStrategy{
+	strategy := customResourceStrategy{
 		ObjectTyper:     typer,
 		NameGenerator:   names.SimpleNameGenerator,
 		namespaceScoped: namespaceScoped,
@@ -85,6 +96,34 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 		celValidator:     celValidator,
 		kind:             kind,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) {
+		strategy.selectableFieldSet = prepareSelectableFields(selectableFields)
+	}
+	return strategy
+}
+
+func prepareSelectableFields(selectableFields []v1.SelectableField) []selectableField {
+	result := make([]selectableField, len(selectableFields))
+	for i, sf := range selectableFields {
+		name := strings.TrimPrefix(sf.JSONPath, ".")
+
+		parser := jsonpath.New("selectableField")
+		parser.AllowMissingKeys(true)
+		err := parser.Parse("{" + sf.JSONPath + "}")
+		if err == nil {
+			result[i] = selectableField{
+				name:      name,
+				fieldPath: parser,
+			}
+		} else {
+			result[i] = selectableField{
+				name: name,
+				err:  err,
+			}
+		}
+	}
+
+	return result
 }
 
 func (a customResourceStrategy) NamespaceScoped() bool {
@@ -293,7 +332,52 @@ func (a customResourceStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields
 	if err != nil {
 		return nil, nil, err
 	}
-	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), nil
+	sFields, err := a.selectableFields(obj, accessor)
+	if err != nil {
+		return nil, nil, err
+	}
+	return accessor.GetLabels(), sFields, nil
+}
+
+// selectableFields returns a field set that can be used for filter selection.
+// This includes metadata.name, metadata.namespace and all custom selectable fields.
+func (a customResourceStrategy) selectableFields(obj runtime.Object, objectMeta metav1.Object) (fields.Set, error) {
+	objectMetaFields := objectMetaFieldsSet(objectMeta, a.namespaceScoped)
+	var selectableFieldsSet fields.Set
+
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && len(a.selectableFieldSet) > 0 {
+		us, ok := obj.(runtime.Unstructured)
+		if !ok {
+			return nil, fmt.Errorf("unexpected error casting a custom resource to unstructured")
+		}
+		uc := us.UnstructuredContent()
+
+		selectableFieldsSet = fields.Set{}
+		for _, sf := range a.selectableFieldSet {
+			if sf.err != nil {
+				return nil, fmt.Errorf("unexpected error parsing jsonPath: %w", sf.err)
+			}
+			results, err := sf.fieldPath.FindResults(uc)
+			if err != nil {
+				return nil, fmt.Errorf("unexpected error finding value with jsonPath: %w", err)
+			}
+			var value any
+
+			if len(results) > 0 && len(results[0]) > 0 {
+				if len(results) > 1 || len(results[0]) > 1 {
+					return nil, fmt.Errorf("unexpectedly received more than one JSON path result")
+				}
+				value = results[0][0].Interface()
+			}
+
+			if value != nil {
+				selectableFieldsSet[sf.name] = fmt.Sprint(value)
+			} else {
+				selectableFieldsSet[sf.name] = ""
+			}
+		}
+	}
+	return generic.MergeFieldsSets(objectMetaFields, selectableFieldsSet), nil
 }
 
 // objectMetaFieldsSet returns a fields that represent the ObjectMeta.

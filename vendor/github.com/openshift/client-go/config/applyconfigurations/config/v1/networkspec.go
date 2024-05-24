@@ -10,6 +10,7 @@ type NetworkSpecApplyConfiguration struct {
 	NetworkType          *string                                 `json:"networkType,omitempty"`
 	ExternalIP           *ExternalIPConfigApplyConfiguration     `json:"externalIP,omitempty"`
 	ServiceNodePortRange *string                                 `json:"serviceNodePortRange,omitempty"`
+	NetworkDiagnostics   *NetworkDiagnosticsApplyConfiguration   `json:"networkDiagnostics,omitempty"`
 }
 
 // NetworkSpecApplyConfiguration constructs an declarative configuration of the NetworkSpec type for use with
@@ -62,5 +63,13 @@ func (b *NetworkSpecApplyConfiguration) WithExternalIP(value *ExternalIPConfigAp
 // If called multiple times, the ServiceNodePortRange field is set to the value of the last call.
 func (b *NetworkSpecApplyConfiguration) WithServiceNodePortRange(value string) *NetworkSpecApplyConfiguration {
 	b.ServiceNodePortRange = &value
+	return b
+}
+
+// WithNetworkDiagnostics sets the NetworkDiagnostics field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NetworkDiagnostics field is set to the value of the last call.
+func (b *NetworkSpecApplyConfiguration) WithNetworkDiagnostics(value *NetworkDiagnosticsApplyConfiguration) *NetworkSpecApplyConfiguration {
+	b.NetworkDiagnostics = value
 	return b
 }

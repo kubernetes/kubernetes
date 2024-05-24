@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Uber Technologies, Inc.
+// Copyright (c) 2016-2022 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,9 +21,8 @@
 package zapcore
 
 import (
+	"sync/atomic"
 	"time"
-
-	"go.uber.org/atomic"
 )
 
 const (
@@ -66,16 +65,16 @@ func (c *counter) IncCheckReset(t time.Time, tick time.Duration) uint64 {
 	tn := t.UnixNano()
 	resetAfter := c.resetAt.Load()
 	if resetAfter > tn {
-		return c.counter.Inc()
+		return c.counter.Add(1)
 	}
 
 	c.counter.Store(1)
 
 	newResetAfter := tn + tick.Nanoseconds()
-	if !c.resetAt.CAS(resetAfter, newResetAfter) {
+	if !c.resetAt.CompareAndSwap(resetAfter, newResetAfter) {
 		// We raced with another goroutine trying to reset, and it also reset
 		// the counter to 1, so we need to reincrement the counter.
-		return c.counter.Inc()
+		return c.counter.Add(1)
 	}
 
 	return 1
@@ -113,12 +112,12 @@ func nopSamplingHook(Entry, SamplingDecision) {}
 // This hook may be used to get visibility into the performance of the sampler.
 // For example, use it to track metrics of dropped versus sampled logs.
 //
-//  var dropped atomic.Int64
-//  zapcore.SamplerHook(func(ent zapcore.Entry, dec zapcore.SamplingDecision) {
-//    if dec&zapcore.LogDropped > 0 {
-//      dropped.Inc()
-//    }
-//  })
+//	var dropped atomic.Int64
+//	zapcore.SamplerHook(func(ent zapcore.Entry, dec zapcore.SamplingDecision) {
+//	  if dec&zapcore.LogDropped > 0 {
+//	    dropped.Inc()
+//	  }
+//	})
 func SamplerHook(hook func(entry Entry, dec SamplingDecision)) SamplerOption {
 	return optionFunc(func(s *sampler) {
 		s.hook = hook
@@ -133,10 +132,21 @@ func SamplerHook(hook func(entry Entry, dec SamplingDecision)) SamplerOption {
 // each tick. If more Entries with the same level and message are seen during
 // the same interval, every Mth message is logged and the rest are dropped.
 //
+// For example,
+//
+//	core = NewSamplerWithOptions(core, time.Second, 10, 5)
+//
+// This will log the first 10 log entries with the same level and message
+// in a one second interval as-is. Following that, it will allow through
+// every 5th log entry with the same level and message in that interval.
+//
+// If thereafter is zero, the Core will drop all log entries after the first N
+// in that interval.
+//
 // Sampler can be configured to report sampling decisions with the SamplerHook
 // option.
 //
-// Keep in mind that zap's sampling implementation is optimized for speed over
+// Keep in mind that Zap's sampling implementation is optimized for speed over
 // absolute precision; under load, each tick may be slightly over- or
 // under-sampled.
 func NewSamplerWithOptions(core Core, tick time.Duration, first, thereafter int, opts ...SamplerOption) Core {
@@ -164,6 +174,11 @@ type sampler struct {
 	hook              func(Entry, SamplingDecision)
 }
 
+var (
+	_ Core           = (*sampler)(nil)
+	_ leveledEnabler = (*sampler)(nil)
+)
+
 // NewSampler creates a Core that samples incoming entries, which
 // caps the CPU and I/O load of logging while attempting to preserve a
 // representative subset of your logs.
@@ -179,6 +194,10 @@ type sampler struct {
 // Deprecated: use NewSamplerWithOptions.
 func NewSampler(core Core, tick time.Duration, first, thereafter int) Core {
 	return NewSamplerWithOptions(core, tick, first, thereafter)
+}
+
+func (s *sampler) Level() Level {
+	return LevelOf(s.Core)
 }
 
 func (s *sampler) With(fields []Field) Core {
@@ -200,7 +219,7 @@ func (s *sampler) Check(ent Entry, ce *CheckedEntry) *CheckedEntry {
 	if ent.Level >= _minLevel && ent.Level <= _maxLevel {
 		counter := s.counts.get(ent.Level, ent.Message)
 		n := counter.IncCheckReset(ent.Time, s.tick)
-		if n > s.first && (n-s.first)%s.thereafter != 0 {
+		if n > s.first && (s.thereafter == 0 || (n-s.first)%s.thereafter != 0) {
 			s.hook(ent, LogDropped)
 			return ce
 		}

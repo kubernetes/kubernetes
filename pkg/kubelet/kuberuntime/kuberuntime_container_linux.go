@@ -168,6 +168,12 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 		return
 	}
 	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo)
+	if m.memorySwapBehavior == kubelettypes.LimitedSwap {
+		if !isCgroup2UnifiedMode() {
+			swapConfigurationHelper.ConfigureNoSwap(lcr)
+			return
+		}
+	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
@@ -177,10 +183,12 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 	// NOTE(ehashman): Behavior is defined in the opencontainers runtime spec:
 	// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 	switch m.memorySwapBehavior {
+	case kubelettypes.NoSwap:
+		swapConfigurationHelper.ConfigureNoSwap(lcr)
 	case kubelettypes.LimitedSwap:
 		swapConfigurationHelper.ConfigureLimitedSwap(lcr, pod, container)
 	default:
-		swapConfigurationHelper.ConfigureUnlimitedSwap(lcr)
+		swapConfigurationHelper.ConfigureNoSwap(lcr)
 	}
 }
 
@@ -399,19 +407,6 @@ func (m swapConfigurationHelper) ConfigureNoSwap(lcr *runtimeapi.LinuxContainerR
 	}
 
 	m.configureSwap(lcr, 0)
-}
-
-func (m swapConfigurationHelper) ConfigureUnlimitedSwap(lcr *runtimeapi.LinuxContainerResources) {
-	if !isCgroup2UnifiedMode() {
-		m.ConfigureNoSwap(lcr)
-		return
-	}
-
-	if lcr.Unified == nil {
-		lcr.Unified = map[string]string{}
-	}
-
-	lcr.Unified[cm.Cgroup2MaxSwapFilename] = "max"
 }
 
 func (m swapConfigurationHelper) configureSwap(lcr *runtimeapi.LinuxContainerResources, swapMemory int64) {

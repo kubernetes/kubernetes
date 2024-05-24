@@ -52,38 +52,55 @@ func (u *Upgrade) CanUpgradeKubelets() bool {
 	return !sameVersionFound
 }
 
-// CanUpgradeEtcd returns whether an upgrade of etcd is possible
-func (u *Upgrade) CanUpgradeEtcd() bool {
-	return u.Before.EtcdVersion != u.After.EtcdVersion
-}
-
-// ClusterState describes the state of certain versions for a cluster
+// ClusterState describes the state of certain versions for a cluster during an upgrade
 type ClusterState struct {
-	// KubeVersion describes the version of the Kubernetes API Server, Controller Manager, Scheduler and Proxy.
+	// KubeVersion describes the version of latest Kubernetes API Server in the cluster.
 	KubeVersion string
 	// DNSVersion describes the version of the DNS add-on.
 	DNSVersion string
 	// KubeadmVersion describes the version of the kubeadm CLI
 	KubeadmVersion string
-	// KubeletVersions is a map with a version number linked to the amount of kubelets running that version in the cluster
-	KubeletVersions map[string]uint16
 	// EtcdVersion represents the version of etcd used in the cluster
 	EtcdVersion string
+
+	// The following maps describe the versions of the different components in the cluster.
+	// The key is the version string and the value is a list of nodes that have that version.
+	KubeAPIServerVersions         map[string][]string
+	KubeControllerManagerVersions map[string][]string
+	KubeSchedulerVersions         map[string][]string
+	EtcdVersions                  map[string][]string
+	KubeletVersions               map[string][]string
 }
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed, externalEtcd bool, client clientset.Interface, manifestsDir string, printer output.Printer) ([]Upgrade, error) {
+func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, client clientset.Interface, printer output.Printer) ([]Upgrade, error) {
 	printer.Printf("[upgrade] Fetching available versions to upgrade to\n")
 
 	// Collect the upgrades kubeadm can do in this list
 	var upgrades []Upgrade
 
-	// Get the cluster version
-	clusterVersionStr, clusterVersion, err := versionGetterImpl.ClusterVersion()
+	// Get the kube-apiserver versions in the cluster
+	kubeAPIServerVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.KubeAPIServer)
 	if err != nil {
 		return upgrades, err
 	}
+	if len(kubeAPIServerVersions) > 1 {
+		verMsg := []string{}
+		for version, nodes := range kubeAPIServerVersions {
+			verMsg = append(verMsg, fmt.Sprintf("%s on nodes %v", version, nodes))
+		}
+		klog.Warningf("Different API server versions in the cluster were discovered: %v. Please upgrade your control plane"+
+			" nodes to the same version of Kubernetes", strings.Join(verMsg, ", "))
+	}
+
+	// Get the lastest cluster version
+	clusterVersion, err := getLatestClusterVersion(kubeAPIServerVersions)
+	if err != nil {
+		return upgrades, err
+	}
+	clusterVersionStr := clusterVersion.String()
+
 	printer.Printf("[upgrade/versions] Cluster version: %s\n", clusterVersionStr)
 
 	// Get current kubeadm CLI version
@@ -109,14 +126,24 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		return upgrades, err
 	}
 
-	// Get current stacked etcd version on the local node
-	var etcdVersion string
-	if !externalEtcd {
-		etcdVersion, err = GetEtcdImageTagFromStaticPod(manifestsDir)
-		if err != nil {
-			return upgrades, err
-		}
+	// Get the kube-controller-manager versions in the cluster
+	kubeControllerManagerVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.KubeControllerManager)
+	if err != nil {
+		return upgrades, err
 	}
+
+	// Get the kube-scheduler versions in the cluster
+	kubeSchedulerVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.KubeScheduler)
+	if err != nil {
+		return upgrades, err
+	}
+
+	// Get the etcd versions in the cluster
+	etcdVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.Etcd)
+	if err != nil {
+		return upgrades, err
+	}
+	isExternalEtcd := len(etcdVersions) == 0
 
 	dnsVersion, err := dns.DeployedDNSAddon(client)
 	if err != nil {
@@ -125,11 +152,14 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 
 	// Construct a descriptor for the current state of the world
 	beforeState := ClusterState{
-		KubeVersion:     clusterVersionStr,
-		DNSVersion:      dnsVersion,
-		KubeadmVersion:  kubeadmVersionStr,
-		KubeletVersions: kubeletVersions,
-		EtcdVersion:     etcdVersion,
+		KubeVersion:                   clusterVersionStr,
+		DNSVersion:                    dnsVersion,
+		KubeadmVersion:                kubeadmVersionStr,
+		KubeAPIServerVersions:         kubeAPIServerVersions,
+		KubeControllerManagerVersions: kubeControllerManagerVersions,
+		KubeSchedulerVersions:         kubeSchedulerVersions,
+		KubeletVersions:               kubeletVersions,
+		EtcdVersions:                  etcdVersions,
 	}
 
 	// Do a "dumb guess" that a new minor upgrade is available just because the latest stable version is higher than the cluster version
@@ -173,8 +203,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 						KubeVersion:    patchVersionStr,
 						DNSVersion:     kubeadmconstants.CoreDNSVersion,
 						KubeadmVersion: newKubeadmVer,
-						EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, patchVersionStr),
-						// KubeletVersions is unset here as it is not used anywhere in .After
+						EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, patchVersionStr),
 					},
 				})
 			}
@@ -189,8 +218,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				KubeVersion:    stableVersionStr,
 				DNSVersion:     kubeadmconstants.CoreDNSVersion,
 				KubeadmVersion: stableVersionStr,
-				EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, stableVersionStr),
-				// KubeletVersions is unset here as it is not used anywhere in .After
+				EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, stableVersionStr),
 			},
 		})
 	}
@@ -216,7 +244,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			return upgrades, err
 		}
-		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "experimental version", latestVersionStr)
+		_, _ = printer.Printf("[upgrade/versions] Latest %s: %s\n", "experimental version", latestVersionStr)
 
 		minorUnstable := latestVersion.Components()[1]
 		// Get and output the current latest unstable version
@@ -225,7 +253,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		if err != nil {
 			return upgrades, err
 		}
-		fmt.Printf("[upgrade/versions] Latest %s: %s\n", "previous version", previousBranchLatestVersionStr)
+		_, _ = printer.Printf("[upgrade/versions] Latest %s: %s\n", "previous version", previousBranchLatestVersionStr)
 
 		// If that previous latest version is an RC, RCs are allowed and the cluster version is lower than the RC version, show the upgrade
 		if rcUpgradesAllowed && rcUpgradePossible(clusterVersion, previousBranchLatestVersion) {
@@ -236,8 +264,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					KubeVersion:    previousBranchLatestVersionStr,
 					DNSVersion:     kubeadmconstants.CoreDNSVersion,
 					KubeadmVersion: previousBranchLatestVersionStr,
-					EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, previousBranchLatestVersionStr),
-					// KubeletVersions is unset here as it is not used anywhere in .After
+					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, previousBranchLatestVersionStr),
 				},
 			})
 		}
@@ -260,8 +287,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					KubeVersion:    unstableKubeVersion,
 					DNSVersion:     kubeadmconstants.CoreDNSVersion,
 					KubeadmVersion: unstableKubeVersion,
-					EtcdVersion:    getSuggestedEtcdVersion(externalEtcd, unstableKubeVersion),
-					// KubeletVersions is unset here as it is not used anywhere in .After
+					EtcdVersion:    getSuggestedEtcdVersion(isExternalEtcd, unstableKubeVersion),
 				},
 			})
 		}
@@ -294,8 +320,8 @@ func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *versionut
 	return patchVersion.LessThan(stableVersion)
 }
 
-func getSuggestedEtcdVersion(externalEtcd bool, kubernetesVersion string) string {
-	if externalEtcd {
+func getSuggestedEtcdVersion(isExternalEtcd bool, kubernetesVersion string) string {
+	if isExternalEtcd {
 		return ""
 	}
 	etcdVersion, warning, err := kubeadmconstants.EtcdSupportedVersion(kubeadmconstants.SupportedEtcdVersion, kubernetesVersion)
@@ -307,4 +333,19 @@ func getSuggestedEtcdVersion(externalEtcd bool, kubernetesVersion string) string
 		klog.V(1).Infof("[upgrade/versions] WARNING: %v", warning)
 	}
 	return etcdVersion.String()
+}
+
+func getLatestClusterVersion(kubeAPIServerVersions map[string][]string) (*versionutil.Version, error) {
+	var latestVersion *versionutil.Version
+	for versionStr, nodes := range kubeAPIServerVersions {
+		ver, err := versionutil.ParseSemantic(versionStr)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse kube-apiserver version %s from nodes %v", versionStr, nodes)
+		}
+		if latestVersion == nil || ver.AtLeast(latestVersion) {
+			latestVersion = ver
+		}
+	}
+
+	return latestVersion, nil
 }

@@ -275,7 +275,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			outputBytes, err := configutil.MigrateOldConfig(oldCfgBytes, allowExperimental)
+			outputBytes, err := configutil.MigrateOldConfig(oldCfgBytes, allowExperimental, nil)
 			if err != nil {
 				return err
 			}

@@ -46,6 +46,8 @@ logging:
   options:
     json:
       infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
   verbosity: 0
 metricsBindAddress: 127.0.0.1:10249
 mode: ""

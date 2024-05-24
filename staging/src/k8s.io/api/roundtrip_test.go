@@ -25,6 +25,7 @@ import (
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
 	admissionregv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -74,6 +75,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -91,6 +93,7 @@ var groups = []runtime.SchemeBuilder{
 	admissionregv1.SchemeBuilder,
 	apiserverinternalv1alpha1.SchemeBuilder,
 	apidiscoveryv2beta1.SchemeBuilder,
+	apidiscoveryv2.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
 	appsv1beta2.SchemeBuilder,
 	appsv1.SchemeBuilder,
@@ -138,6 +141,7 @@ var groups = []runtime.SchemeBuilder{
 	storagev1alpha1.SchemeBuilder,
 	storagev1beta1.SchemeBuilder,
 	storagev1.SchemeBuilder,
+	svmv1alpha1.SchemeBuilder,
 }
 
 func TestRoundTripExternalTypes(t *testing.T) {

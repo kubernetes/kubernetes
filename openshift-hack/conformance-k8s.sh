@@ -72,7 +72,7 @@ e2e_test="$( which e2e.test )"
 
 # shellcheck disable=SC2086
 ginkgo \
-  -nodes 1 -noColor '-focus=(\[Conformance\].*\[Serial\]|\[Serial\].*\[Conformance\])' \
+  -nodes 1 -no-color '-focus=(\[Conformance\].*\[Serial\]|\[Serial\].*\[Conformance\])' \
   ${e2e_test} -- \
   -report-dir "${test_report_dir}" \
   -allowed-not-ready-nodes ${unschedulable} \

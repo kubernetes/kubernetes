@@ -612,7 +612,7 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 }
 
 // serveWatch will serve a watch response according to the watcher and watchServer.
-// Before watchServer.ServeHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
+// Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
 func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preServeErr error) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer watcher.Stop()
@@ -622,7 +622,7 @@ func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preS
 			return
 		}
 
-		watchServer.ServeHTTP(w, req)
+		watchServer.HandleHTTP(w, req)
 	}
 }
 

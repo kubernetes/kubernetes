@@ -97,26 +97,26 @@ func Test_PVLAdmission(t *testing.T) {
 			handler:   newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeFailure(errors.New("invalid volume")),
 			preAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{Name: "vSpherePV", Namespace: "myns"},
+				ObjectMeta: metav1.ObjectMeta{Name: "gcepd", Namespace: "myns"},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "123",
 						},
 					},
 				},
 			},
 			postAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{Name: "vSpherePV", Namespace: "myns"},
+				ObjectMeta: metav1.ObjectMeta{Name: "gcepd", Namespace: "myns"},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "123",
 						},
 					},
 				},
 			},
-			err: apierrors.NewForbidden(schema.ParseGroupResource("persistentvolumes"), "vSpherePV", errors.New("error querying vSphere Volume 123: invalid volume")),
+			err: apierrors.NewForbidden(schema.ParseGroupResource("persistentvolumes"), "gcepd", errors.New("error querying GCE PD volume 123: invalid volume")),
 		},
 		{
 			name:      "cloud provider returns no labels",
@@ -315,7 +315,7 @@ func Test_PVLAdmission(t *testing.T) {
 			}),
 			preAdmissionPV: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "vSpherePV", Namespace: "myns",
+					Name: "gcePV", Namespace: "myns",
 					Labels: map[string]string{
 						v1.LabelTopologyZone:   "existingDomain",
 						v1.LabelTopologyRegion: "existingRegion",
@@ -323,15 +323,15 @@ func Test_PVLAdmission(t *testing.T) {
 				},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "123",
 						},
 					},
 				},
 			},
 			postAdmissionPV: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vSpherePV",
+					Name:      "gcePV",
 					Namespace: "myns",
 					Labels: map[string]string{
 						v1.LabelTopologyZone:   "domain1",
@@ -340,8 +340,8 @@ func Test_PVLAdmission(t *testing.T) {
 				},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
+						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+							PDName: "123",
 						},
 					},
 					NodeAffinity: &api.VolumeNodeAffinity{
@@ -431,252 +431,6 @@ func Test_PVLAdmission(t *testing.T) {
 			},
 			err: nil,
 		},
-		{
-			name:    "Azure Disk PV labeled correctly",
-			handler: newPersistentVolumeLabel(),
-			pvlabeler: mockVolumeLabels(map[string]string{
-				"a":                           "1",
-				"b":                           "2",
-				v1.LabelFailureDomainBetaZone: "1__2__3",
-			}),
-			preAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "azurepd",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						AzureDisk: &api.AzureDiskVolumeSource{
-							DiskName: "123",
-						},
-					},
-				},
-			},
-			postAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "azurepd",
-					Namespace: "myns",
-					Labels: map[string]string{
-						"a":                           "1",
-						"b":                           "2",
-						v1.LabelFailureDomainBetaZone: "1__2__3",
-					},
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						AzureDisk: &api.AzureDiskVolumeSource{
-							DiskName: "123",
-						},
-					},
-					NodeAffinity: &api.VolumeNodeAffinity{
-						Required: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
-											Key:      "a",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1"},
-										},
-										{
-											Key:      "b",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"2"},
-										},
-										{
-											Key:      v1.LabelFailureDomainBetaZone,
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1", "2", "3"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			err: nil,
-		},
-		{
-			name:    "vSphere PV non-conflicting affinity rules added",
-			handler: newPersistentVolumeLabel(),
-			pvlabeler: mockVolumeLabels(map[string]string{
-				"d": "1",
-				"e": "2",
-				"f": "3",
-			}),
-			preAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vSpherePV",
-					Namespace: "myns",
-					Labels: map[string]string{
-						"a": "1",
-						"b": "2",
-						"c": "3",
-					},
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
-						},
-					},
-					NodeAffinity: &api.VolumeNodeAffinity{
-						Required: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
-											Key:      "a",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1"},
-										},
-										{
-											Key:      "b",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"2"},
-										},
-										{
-											Key:      "c",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"3"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			postAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vSpherePV",
-					Namespace: "myns",
-					Labels: map[string]string{
-						"a": "1",
-						"b": "2",
-						"c": "3",
-						"d": "1",
-						"e": "2",
-						"f": "3",
-					},
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
-						},
-					},
-					NodeAffinity: &api.VolumeNodeAffinity{
-						Required: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
-											Key:      "a",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1"},
-										},
-										{
-											Key:      "b",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"2"},
-										},
-										{
-											Key:      "c",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"3"},
-										},
-										{
-											Key:      "d",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1"},
-										},
-										{
-											Key:      "e",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"2"},
-										},
-										{
-											Key:      "f",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"3"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			err: nil,
-		},
-		{
-			name:    "vSphere PV labeled correctly",
-			handler: newPersistentVolumeLabel(),
-			pvlabeler: mockVolumeLabels(map[string]string{
-				"a":                           "1",
-				"b":                           "2",
-				v1.LabelFailureDomainBetaZone: "1__2__3",
-			}),
-			preAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vSpherePV",
-					Namespace: "myns",
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
-						},
-					},
-				},
-			},
-			postAdmissionPV: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "vSpherePV",
-					Namespace: "myns",
-					Labels: map[string]string{
-						"a":                           "1",
-						"b":                           "2",
-						v1.LabelFailureDomainBetaZone: "1__2__3",
-					},
-				},
-				Spec: api.PersistentVolumeSpec{
-					PersistentVolumeSource: api.PersistentVolumeSource{
-						VsphereVolume: &api.VsphereVirtualDiskVolumeSource{
-							VolumePath: "123",
-						},
-					},
-					NodeAffinity: &api.VolumeNodeAffinity{
-						Required: &api.NodeSelector{
-							NodeSelectorTerms: []api.NodeSelectorTerm{
-								{
-									MatchExpressions: []api.NodeSelectorRequirement{
-										{
-											Key:      "a",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1"},
-										},
-										{
-											Key:      "b",
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"2"},
-										},
-										{
-											Key:      v1.LabelFailureDomainBetaZone,
-											Operator: api.NodeSelectorOpIn,
-											Values:   []string{"1", "2", "3"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			err: nil,
-		},
 	}
 
 	for _, testcase := range testcases {
@@ -709,8 +463,6 @@ func Test_PVLAdmission(t *testing.T) {
 // the provider is then decided based on the type of PV (EBS, GCEPD, Azure Disk, etc)
 func setPVLabeler(handler *persistentVolumeLabel, pvlabeler cloudprovider.PVLabeler) {
 	handler.gcePVLabeler = pvlabeler
-	handler.azurePVLabeler = pvlabeler
-	handler.vspherePVLabeler = pvlabeler
 }
 
 // sortMatchExpressions sorts a PV's node selector match expressions by key name if it is not nil

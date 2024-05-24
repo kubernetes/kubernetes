@@ -66,12 +66,20 @@ func SetResetDynamicDefaults(cfg *kubeadmapi.ResetConfiguration, skipCRIDetect b
 // Right thereafter, the configuration is defaulted again with dynamic values
 // Lastly, the internal config is validated and returned.
 func LoadOrDefaultResetConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1.ResetConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.ResetConfiguration, error) {
+	var (
+		config *kubeadmapi.ResetConfiguration
+		err    error
+	)
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
-		return LoadResetConfigurationFromFile(cfgPath, opts)
+		config, err = LoadResetConfigurationFromFile(cfgPath, opts)
+	} else {
+		config, err = DefaultedResetConfiguration(defaultversionedcfg, opts)
 	}
-
-	return DefaultedResetConfiguration(defaultversionedcfg, opts)
+	if err == nil {
+		prepareStaticVariables(config)
+	}
+	return config, err
 }
 
 // LoadResetConfigurationFromFile loads versioned ResetConfiguration from file, converts it to internal, defaults and validates it

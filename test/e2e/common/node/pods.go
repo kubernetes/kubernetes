@@ -1042,7 +1042,7 @@ var _ = SIGDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to delete Pod by collection")
 
 		ginkgo.By("watching for the Pod to be deleted")
-		ctxUntil, cancel = context.WithTimeout(ctx, 1*time.Minute)
+		ctxUntil, cancel = context.WithTimeout(ctx, f.Timeouts.PodDelete)
 		defer cancel()
 		_, err = watchtools.Until(ctxUntil, preDeleteResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {

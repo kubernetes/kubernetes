@@ -91,7 +91,7 @@ func NewProvider(ctx context.Context,
 }
 
 // WithTracing adds tracing to requests if the incoming request is sampled
-func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, serviceName string) http.Handler {
+func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, spanName string) http.Handler {
 	opts := []otelhttp.Option{
 		otelhttp.WithPropagators(Propagators()),
 		otelhttp.WithTracerProvider(tp),
@@ -106,7 +106,7 @@ func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, serviceName 
 	})
 	// With Noop TracerProvider, the otelhttp still handles context propagation.
 	// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
-	return otelhttp.NewHandler(wrappedHandler, serviceName, opts...)
+	return otelhttp.NewHandler(wrappedHandler, spanName, opts...)
 }
 
 // WrapperFor can be used to add tracing to a *rest.Config.

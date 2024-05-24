@@ -19,33 +19,32 @@ package fake
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"strings"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 // genClientset generates a package for a clientset.
 type genClientset struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	groups               []clientgentypes.GroupVersions
 	groupGoNames         map[clientgentypes.GroupVersion]string
-	fakeClientsetPackage string
-	outputPackage        string
+	fakeClientsetPackage string // must be a Go import-path
 	imports              namer.ImportTracker
 	clientsetGenerated   bool
 	// the import path of the generated real clientset.
-	realClientsetPackage string
+	realClientsetPackage string // must be a Go import-path
 }
 
 var _ generator.Generator = &genClientset{}
 
 func (g *genClientset) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
-		"raw": namer.NewRawNamer(g.outputPackage, g.imports),
+		"raw": namer.NewRawNamer(g.fakeClientsetPackage, g.imports),
 	}
 }
 
@@ -60,8 +59,8 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
-			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
+			groupClientPackage := path.Join(g.fakeClientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
+			fakeGroupClientPackage := path.Join(groupClientPackage, "fake")
 
 			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}])
 			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), groupClientPackage))

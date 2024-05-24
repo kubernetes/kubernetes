@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // UserRestrictionApplyConfiguration represents an declarative configuration of the UserRestriction type for use
 // with apply.
 type UserRestrictionApplyConfiguration struct {
-	Users     []string           `json:"users,omitempty"`
-	Groups    []string           `json:"groups,omitempty"`
-	Selectors []v1.LabelSelector `json:"labels,omitempty"`
+	Users     []string                             `json:"users,omitempty"`
+	Groups    []string                             `json:"groups,omitempty"`
+	Selectors []v1.LabelSelectorApplyConfiguration `json:"labels,omitempty"`
 }
 
 // UserRestrictionApplyConfiguration constructs an declarative configuration of the UserRestriction type for use with
@@ -43,9 +43,12 @@ func (b *UserRestrictionApplyConfiguration) WithGroups(values ...string) *UserRe
 // WithSelectors adds the given value to the Selectors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Selectors field.
-func (b *UserRestrictionApplyConfiguration) WithSelectors(values ...v1.LabelSelector) *UserRestrictionApplyConfiguration {
+func (b *UserRestrictionApplyConfiguration) WithSelectors(values ...*v1.LabelSelectorApplyConfiguration) *UserRestrictionApplyConfiguration {
 	for i := range values {
-		b.Selectors = append(b.Selectors, values[i])
+		if values[i] == nil {
+			panic("nil value passed to WithSelectors")
+		}
+		b.Selectors = append(b.Selectors, *values[i])
 	}
 	return b
 }

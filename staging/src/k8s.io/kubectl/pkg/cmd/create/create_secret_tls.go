@@ -46,7 +46,7 @@ var (
 
 	secretForTLSExample = templates.Examples(i18n.T(`
 	  # Create a new TLS secret named tls-secret with the given key pair
-	  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`))
+	  kubectl create secret tls tls-secret --cert=path/to/tls.crt --key=path/to/tls.key`))
 )
 
 // CreateSecretTLSOptions holds the options for 'create secret tls' sub command

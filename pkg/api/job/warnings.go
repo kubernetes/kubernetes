@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -36,8 +36,8 @@ const (
 func WarningsForJobSpec(ctx context.Context, path *field.Path, spec, oldSpec *batch.JobSpec) []string {
 	var warnings []string
 	if spec.CompletionMode != nil && *spec.CompletionMode == batch.IndexedCompletion {
-		completions := pointer.Int32Deref(spec.Completions, 0)
-		parallelism := pointer.Int32Deref(spec.Parallelism, 0)
+		completions := ptr.Deref(spec.Completions, 0)
+		parallelism := ptr.Deref(spec.Parallelism, 0)
 		if completions > completionsSoftLimit && parallelism > parallelismSoftLimitForUnlimitedCompletions {
 			msg := "In Indexed Jobs with a number of completions higher than 10^5 and a parallelism higher than 10^4, Kubernetes might not be able to track completedIndexes when a big number of indexes fail"
 			warnings = append(warnings, fmt.Sprintf("%s: %s", path, msg))

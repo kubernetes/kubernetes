@@ -20,12 +20,14 @@ limitations under the License.
 package filesystem
 
 import (
+	"math/rand"
 	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	winio "github.com/Microsoft/go-winio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,4 +88,13 @@ func TestPendingUnixDomainSocket(t *testing.T) {
 	// Wait for the goroutine to finish, then close the socket
 	wg.Wait()
 	unixln.Close()
+}
+
+func TestAbsWithSlash(t *testing.T) {
+	// On Windows, filepath.IsAbs will not return True for paths prefixed with a slash
+	assert.True(t, IsAbs("/test"))
+	assert.True(t, IsAbs("\\test"))
+
+	assert.False(t, IsAbs("./local"))
+	assert.False(t, IsAbs("local"))
 }

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
@@ -198,11 +199,12 @@ func TestValidateAPIApproval(t *testing.T) {
 // TestDropDisabledFields tests if the drop functionality is working fine or not with feature gate switch
 func TestDropDisabledFields(t *testing.T) {
 	testCases := []struct {
-		name             string
-		enableRatcheting bool
-		crd              *apiextensions.CustomResourceDefinition
-		oldCRD           *apiextensions.CustomResourceDefinition
-		expectedCRD      *apiextensions.CustomResourceDefinition
+		name                   string
+		enableRatcheting       bool
+		enableSelectableFields bool
+		crd                    *apiextensions.CustomResourceDefinition
+		oldCRD                 *apiextensions.CustomResourceDefinition
+		expectedCRD            *apiextensions.CustomResourceDefinition
 	}{
 		{
 			name:             "Ratcheting, For creation, FG disabled, no OptionalOldSelf, no field drop",
@@ -693,10 +695,612 @@ func TestDropDisabledFields(t *testing.T) {
 				},
 			},
 		},
+		// SelectableFields
+		{
+			name:                   "SelectableFields, For create, FG disabled, SelectableFields in update, dropped",
+			enableSelectableFields: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field",
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "SelectableFields, For create, FG enabled, no SelectableFields in update, no drop",
+			enableSelectableFields: true,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "SelectableFields, For create, FG enabled, SelectableFields in update, no drop",
+			enableSelectableFields: true,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field",
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "SelectableFields, For update, FG disabled, oldCRD has SelectableFields, SelectableFields in update, no drop",
+			enableSelectableFields: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+						{
+							JSONPath: ".field2",
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+						{
+							JSONPath: ".field2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "SelectableFields, For update, FG disabled, oldCRD does not have SelectableFields, no SelectableFields in update, no drop",
+			enableSelectableFields: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "SelectableFields, For update, FG disabled, oldCRD does not have SelectableFields, SelectableFields in update, dropped",
+			enableSelectableFields: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+						{
+							JSONPath: ".field2",
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "SelectableFields, For update, FG enabled, oldCRD has SelectableFields, SelectableFields in update, no drop",
+			enableSelectableFields: true,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+						{
+							JSONPath: ".field2",
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+						{
+							JSONPath: ".field2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "SelectableFields, For update, FG enabled, oldCRD does not have SelectableFields, SelectableFields in update, no drop",
+			enableSelectableFields: true,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+						{
+							JSONPath: ".field2",
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type: "string",
+								},
+								"field2": {
+									Type: "string",
+								},
+							},
+						},
+					},
+					SelectableFields: []apiextensions.SelectableField{
+						{
+							JSONPath: ".field1",
+						},
+						{
+							JSONPath: ".field2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                   "pre-version SelectableFields, For update, FG disabled, oldCRD does not have SelectableFields, SelectableFields in update, dropped",
+			enableSelectableFields: false,
+			crd: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name: "v1",
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"field1": {
+											Type: "string",
+										},
+										"field2": {
+											Type: "string",
+										},
+									},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{
+								{
+									JSONPath: ".field1",
+								},
+								{
+									JSONPath: ".field2",
+								},
+							},
+						},
+						{
+							Name: "v2",
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"field3": {
+											Type: "string",
+										},
+										"field4": {
+											Type: "string",
+										},
+									},
+								},
+							},
+							SelectableFields: []apiextensions.SelectableField{
+								{
+									JSONPath: ".field3",
+								},
+								{
+									JSONPath: ".field4",
+								},
+							},
+						},
+					},
+				},
+			},
+			oldCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name: "v1",
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"field1": {
+											Type: "string",
+										},
+										"field2": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "v2",
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"field3": {
+											Type: "string",
+										},
+										"field4": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCRD: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "foos.sigs.k8s.io", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: "valid"}, ResourceVersion: "1"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name: "v1",
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"field1": {
+											Type: "string",
+										},
+										"field2": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "v2",
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"field3": {
+											Type: "string",
+										},
+										"field4": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CRDValidationRatcheting, tc.enableRatcheting)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, tc.enableSelectableFields)()
 			old := tc.oldCRD.DeepCopy()
 
 			dropDisabledFields(tc.crd, tc.oldCRD)

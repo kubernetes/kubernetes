@@ -89,7 +89,7 @@ func (s *server) Start() error {
 		}
 	}
 
-	// For now we leave cleanup of the *entire* directory up to the Handler
+	// For now, we leave cleanup of the *entire* directory up to the Handler
 	// (even though we should in theory be able to just wipe the whole directory)
 	// because the Handler stores its checkpoint file (amongst others) in here.
 	if err := s.rhandler.CleanupPluginDirectory(s.socketDir); err != nil {

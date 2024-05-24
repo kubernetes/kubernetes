@@ -61,7 +61,7 @@ func init() {
 
 var _ = ginkgo.Describe("e2e", func() {
 	ginkgo.BeforeEach(func() {
-		framework.Logf("before")
+		logBeforeHelper()
 	})
 
 	f := framework.NewDefaultFramework("test-namespace")
@@ -107,34 +107,41 @@ var _ = ginkgo.Describe("e2e", func() {
 	})
 })
 
+// logBeforeHelper must be skipped when doing stack unwinding in the logging
+// implementation.
+func logBeforeHelper() {
+	ginkgo.GinkgoHelper()
+	framework.Logf("before")
+}
+
 const (
 	ginkgoOutput = `> Enter [BeforeEach] e2e - cleanup_test.go:63 <time>
-INFO: before
+<klog> cleanup_test.go:64] before
 < Exit [BeforeEach] e2e - cleanup_test.go:63 <time>
 > Enter [BeforeEach] e2e - set up framework | framework.go:xxx <time>
 STEP: Creating a kubernetes client - framework.go:xxx <time>
 STEP: Building a namespace api object, basename test-namespace - framework.go:xxx <time>
-INFO: Skipping waiting for service account
+<klog> framework.go:xxx] Skipping waiting for service account
 < Exit [BeforeEach] e2e - set up framework | framework.go:xxx <time>
 > Enter [BeforeEach] e2e - cleanup_test.go:56 <time>
-INFO: extension before
+<klog> cleanup_test.go:56] extension before
 < Exit [BeforeEach] e2e - cleanup_test.go:56 <time>
 > Enter [BeforeEach] e2e - cleanup_test.go:71 <time>
-INFO: before #1
+<klog> cleanup_test.go:72] before #1
 < Exit [BeforeEach] e2e - cleanup_test.go:71 <time>
 > Enter [BeforeEach] e2e - cleanup_test.go:75 <time>
-INFO: before #2
+<klog> cleanup_test.go:76] before #2
 < Exit [BeforeEach] e2e - cleanup_test.go:75 <time>
 > Enter [It] works - cleanup_test.go:90 <time>
 < Exit [It] works - cleanup_test.go:90 <time>
 > Enter [AfterEach] e2e - cleanup_test.go:57 <time>
-INFO: extension after
+<klog> cleanup_test.go:57] extension after
 < Exit [AfterEach] e2e - cleanup_test.go:57 <time>
 > Enter [AfterEach] e2e - cleanup_test.go:79 <time>
-INFO: after #1
+<klog> cleanup_test.go:80] after #1
 < Exit [AfterEach] e2e - cleanup_test.go:79 <time>
 > Enter [AfterEach] e2e - cleanup_test.go:86 <time>
-INFO: after #2
+<klog> cleanup_test.go:87] after #2
 < Exit [AfterEach] e2e - cleanup_test.go:86 <time>
 > Enter [DeferCleanup (Each)] e2e - cleanup_test.go:103 <time>
 [FAILED] DeferCleanup callback returned error: fake error for "failure"
@@ -143,10 +150,10 @@ In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
 > Enter [DeferCleanup (Each)] e2e - cleanup_test.go:99 <time>
 < Exit [DeferCleanup (Each)] e2e - cleanup_test.go:99 <time>
 > Enter [DeferCleanup (Each)] e2e - cleanup_test.go:95 <time>
-INFO: cleanup first
+<klog> cleanup_test.go:96] cleanup first
 < Exit [DeferCleanup (Each)] e2e - cleanup_test.go:95 <time>
 > Enter [DeferCleanup (Each)] e2e - cleanup_test.go:92 <time>
-INFO: cleanup last
+<klog> cleanup_test.go:93] cleanup last
 < Exit [DeferCleanup (Each)] e2e - cleanup_test.go:92 <time>
 > Enter [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
 < Exit [DeferCleanup (Each)] e2e - dump namespaces | framework.go:xxx <time>
@@ -227,7 +234,7 @@ In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
 func normalizeOutput(output string) string {
 	for exp, replacement := range map[string]string{
 		// Ignore line numbers inside framework source code (likely to change).
-		`framework\.go:\d+`: `framework.go:xxx`,
+		`(framework|util)\.go:\d+`: `$1.go:xxx`,
 		// Config file name varies for each run.
 		`kubeConfig: .*/kube.config`: `kubeConfig: yyy/kube.config`,
 		// Random suffix for namespace.

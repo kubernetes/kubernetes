@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/image"
 )
 
 const (
@@ -48,7 +49,7 @@ const (
 	coreDNSReplicas       = 2
 )
 
-// DeployedDNSAddon returns the type of DNS addon currently deployed
+// DeployedDNSAddon returns the image tag of the DNS addon currently deployed
 func DeployedDNSAddon(client clientset.Interface) (string, error) {
 	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
 	deployments, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
@@ -60,10 +61,7 @@ func DeployedDNSAddon(client clientset.Interface) (string, error) {
 	case 0:
 		return "", nil
 	case 1:
-		addonImage := deployments.Items[0].Spec.Template.Spec.Containers[0].Image
-		addonImageParts := strings.Split(addonImage, ":")
-		addonVersion := addonImageParts[len(addonImageParts)-1]
-		return addonVersion, nil
+		return image.TagFromImage(deployments.Items[0].Spec.Template.Spec.Containers[0].Image), nil
 	default:
 		return "", errors.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
 	}

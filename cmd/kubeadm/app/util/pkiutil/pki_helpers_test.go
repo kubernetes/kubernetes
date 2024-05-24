@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 		Config: certutil.Config{
 			CommonName: "Root CA 1",
 		},
-		EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA,
+		EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmRSA2048,
 	})
 	if err != nil {
 		panic(fmt.Sprintf("Failed generating Root CA: %v", err))
@@ -141,7 +141,7 @@ func TestHasServerAuth(t *testing.T) {
 					CommonName: "test",
 					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 				},
-				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSA,
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
 			},
 			expected: true,
 		},
@@ -936,6 +936,27 @@ func TestVerifyCertChain(t *testing.T) {
 					rt.expected,
 					(actual == nil),
 				)
+			}
+		})
+	}
+}
+
+func TestRSAKeySizeFromAlgorithmType(t *testing.T) {
+	var tests = []struct {
+		algorithm    kubeadmapi.EncryptionAlgorithmType
+		expectedSize int
+	}{
+		{algorithm: "unknown", expectedSize: 0},
+		{algorithm: "", expectedSize: 2048},
+		{algorithm: kubeadmapi.EncryptionAlgorithmRSA2048, expectedSize: 2048},
+		{algorithm: kubeadmapi.EncryptionAlgorithmRSA3072, expectedSize: 3072},
+		{algorithm: kubeadmapi.EncryptionAlgorithmRSA4096, expectedSize: 4096},
+	}
+	for _, rt := range tests {
+		t.Run(string(rt.algorithm), func(t *testing.T) {
+			size := rsaKeySizeFromAlgorithmType(rt.algorithm)
+			if size != rt.expectedSize {
+				t.Errorf("expected size: %d, got: %d", rt.expectedSize, size)
 			}
 		})
 	}

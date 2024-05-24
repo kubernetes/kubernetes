@@ -91,6 +91,10 @@ const (
 	// affinity is enabled.
 	AffinityConfirmCount = 15
 
+	// SessionAffinityTimeout is the number of seconds to wait between requests for
+	// session affinity to timeout before trying a load-balancer request again
+	SessionAffinityTimeout = 125
+
 	// label define which is used to find kube-proxy and kube-apiserver pod
 	kubeProxyLabelName     = "kube-proxy"
 	clusterAddonLabelKey   = "k8s-app"
@@ -1073,7 +1077,7 @@ var _ = common.SIGDescribe("Services", func() {
 		pausePods, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{LabelSelector: labelSelector.String()})
 		framework.ExpectNoError(err, "Error in listing pods associated with pause pod deployments")
 
-		framework.ExpectNotEqual(pausePods.Items[0].Spec.NodeName, pausePods.Items[1].Spec.NodeName)
+		gomega.Expect(pausePods.Items[0].Spec.NodeName).NotTo(gomega.Equal(pausePods.Items[1].Spec.NodeName))
 
 		serviceAddress := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 
@@ -2769,7 +2773,7 @@ var _ = common.SIGDescribe("Services", func() {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				framework.Logf("unexpected error trying to connect to nodeport %s : %v", healthCheckNodePortAddr, err)
 				return false, nil
 			}
 
@@ -2792,7 +2796,7 @@ var _ = common.SIGDescribe("Services", func() {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				framework.Logf("unexpected error trying to connect to nodeport %d : %v", healthCheckNodePortAddr, err)
+				framework.Logf("unexpected error trying to connect to nodeport %s : %v", healthCheckNodePortAddr, err)
 				return false, nil
 			}
 
@@ -3107,15 +3111,18 @@ var _ = common.SIGDescribe("Services", func() {
 			// pausePod0 and pausePod1 are on node0 and node1 respectively.
 			// pausePod0 -> node1 node port fails because it's "external" and there are no local endpoints
 			// pausePod1 -> node0 node port succeeds because webserver0 is running on node0
-			// pausePod0 -> node0 and pausePod1 -> node1 both succeed because pod-to-same-node-NodePort
-			// connections are neither internal nor external and always get Cluster traffic policy.
+			// pausePod0 -> node0 node port succeeds because webserver0 is running on node0
+			//
+			// NOTE: pausePod1 -> node1 will succeed for kube-proxy because kube-proxy considers pod-to-same-node-NodePort
+			// connections as neither internal nor external and always get Cluster traffic policy. However, we do not test
+			// this here because not all Network implementations follow kube-proxy's interpretation of "destination"
+			// traffic policy. See: https://github.com/kubernetes/kubernetes/pull/123622
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
 			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			gomega.Expect(err).To(gomega.HaveOccurred(), "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
 			execHostnameTest(*pausePod1, nodePortAddress0, webserverPod0.Name)
-			execHostnameTest(*pausePod1, nodePortAddress1, webserverPod0.Name)
 
 			time.Sleep(5 * time.Second)
 		}
@@ -3892,19 +3899,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 	ginkgo.By("creating service in namespace " + ns)
 	serviceType := svc.Spec.Type
 	// set an affinity timeout equal to the number of connection requests
-	svcSessionAffinityTimeout := int32(AffinityConfirmCount)
-	if proxyMode, err := proxyMode(ctx, f); err == nil {
-		if proxyMode == "ipvs" {
-			// session affinity timeout must be greater than 120 in ipvs mode,
-			// because IPVS module has a hardcoded TIME_WAIT timeout of 120s,
-			// and that value can't be sysctl'ed now.
-			// Ref: https://github.com/torvalds/linux/blob/master/net/netfilter/ipvs/ip_vs_proto_tcp.c
-			// TODO: remove this to speed up testing when IPVS does really respect session affinity timeout
-			svcSessionAffinityTimeout = int32(125)
-		}
-	} else {
-		framework.Logf("Couldn't detect KubeProxy mode - test failure may be expected: %v", err)
-	}
+	svcSessionAffinityTimeout := int32(SessionAffinityTimeout)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
 		ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
@@ -3925,7 +3920,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 			family = v1.IPv6Protocol
 		}
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
@@ -4008,7 +4003,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 			family = v1.IPv6Protocol
 		}
 		svcIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		framework.ExpectNotEqual(svcIP, "", "failed to get Node internal IP for family: %s", family)
+		gomega.Expect(svcIP).NotTo(gomega.BeEmpty(), "failed to get Node internal IP for family: %s", family)
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
 		svcIP = svc.Spec.ClusterIP
@@ -4170,22 +4165,6 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		return true, nil
 	})
 	framework.ExpectNoError(err)
-}
-
-// proxyMode returns a proxyMode of a kube-proxy.
-func proxyMode(ctx context.Context, f *framework.Framework) (string, error) {
-	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "kube-proxy-mode-detector", nil, nil, nil)
-	pod.Spec.HostNetwork = true
-	e2epod.NewPodClient(f).CreateSync(ctx, pod)
-	ginkgo.DeferCleanup(e2epod.NewPodClient(f).DeleteSync, pod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
-
-	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := e2eoutput.RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
-		return "", err
-	}
-	framework.Logf("proxyMode: %s", stdout)
-	return stdout, nil
 }
 
 // enableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer

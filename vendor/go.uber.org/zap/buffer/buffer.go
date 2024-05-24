@@ -42,6 +42,11 @@ func (b *Buffer) AppendByte(v byte) {
 	b.bs = append(b.bs, v)
 }
 
+// AppendBytes writes a single byte to the Buffer.
+func (b *Buffer) AppendBytes(v []byte) {
+	b.bs = append(b.bs, v...)
+}
+
 // AppendString writes a string to the Buffer.
 func (b *Buffer) AppendString(s string) {
 	b.bs = append(b.bs, s...)

@@ -136,6 +136,7 @@ message HPAScalingRules {
   // policies is a list of potential scaling polices which can be used during scaling.
   // At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
   // +optional
+  // +listType=atomic
   repeated HPAScalingPolicy policies = 2;
 }
 
@@ -238,6 +239,7 @@ message HorizontalPodAutoscalerSpec {
   // more information about how each type of metric must respond.
   // If not set, the default metric will be set to 80% average CPU utilization.
   // +optional
+  // +listType=atomic
   repeated MetricSpec metrics = 4;
 
   // behavior configures the scaling behavior of the target
@@ -268,11 +270,13 @@ message HorizontalPodAutoscalerStatus {
 
   // currentMetrics is the last read state of the metrics used by this autoscaler.
   // +optional
+  // +listType=atomic
   repeated MetricStatus currentMetrics = 5;
 
   // conditions is the set of conditions required for this autoscaler to scale its target,
   // and indicates whether or not those conditions are met.
   // +optional
+  // +listType=atomic
   repeated HorizontalPodAutoscalerCondition conditions = 6;
 }
 

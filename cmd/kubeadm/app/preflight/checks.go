@@ -54,8 +54,6 @@ import (
 )
 
 const (
-	bridgenf                    = "/proc/sys/net/bridge/bridge-nf-call-iptables"
-	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
 	ipv4Forward                 = "/proc/sys/net/ipv4/ip_forward"
 	ipv6DefaultForwarding       = "/proc/sys/net/ipv6/conf/default/forwarding"
 	externalEtcdRequestTimeout  = 10 * time.Second
@@ -815,6 +813,7 @@ type ImagePullCheck struct {
 	imageList       []string
 	sandboxImage    string
 	imagePullPolicy v1.PullPolicy
+	imagePullSerial bool
 }
 
 // Name returns the label for ImagePullCheck
@@ -824,22 +823,39 @@ func (ImagePullCheck) Name() string {
 
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
+	// Handle unsupported image pull policy and policy Never.
 	policy := ipc.imagePullPolicy
-	klog.V(1).Infof("using image pull policy: %s", policy)
-	for _, image := range ipc.imageList {
-		if image == ipc.sandboxImage {
-			criSandboxImage, err := ipc.runtime.SandboxImage()
-			if err != nil {
-				klog.V(4).Infof("failed to detect the sandbox image for local container runtime, %v", err)
-			} else if criSandboxImage != ipc.sandboxImage {
-				klog.Warningf("detected that the sandbox image %q of the container runtime is inconsistent with that used by kubeadm. It is recommended that using %q as the CRI sandbox image.",
-					criSandboxImage, ipc.sandboxImage)
-			}
+	switch policy {
+	case v1.PullAlways, v1.PullIfNotPresent:
+		klog.V(1).Infof("using image pull policy: %s", policy)
+	case v1.PullNever:
+		klog.V(1).Infof("skipping the pull of all images due to policy: %s", policy)
+		return warnings, errorList
+	default:
+		errorList = append(errorList, errors.Errorf("unsupported pull policy %q", policy))
+		return warnings, errorList
+	}
+
+	// Handle CRI sandbox image warnings.
+	criSandboxImage, err := ipc.runtime.SandboxImage()
+	if err != nil {
+		klog.V(4).Infof("failed to detect the sandbox image for local container runtime, %v", err)
+	} else if criSandboxImage != ipc.sandboxImage {
+		klog.Warningf("detected that the sandbox image %q of the container runtime is inconsistent with that used by kubeadm."+
+			"It is recommended to use %q as the CRI sandbox image.", criSandboxImage, ipc.sandboxImage)
+	}
+
+	// Perform parallel pulls.
+	if !ipc.imagePullSerial {
+		if err := ipc.runtime.PullImagesInParallel(ipc.imageList, policy == v1.PullIfNotPresent); err != nil {
+			errorList = append(errorList, err)
 		}
+		return warnings, errorList
+	}
+
+	// Perform serial pulls.
+	for _, image := range ipc.imageList {
 		switch policy {
-		case v1.PullNever:
-			klog.V(1).Infof("skipping pull of image: %s", image)
-			continue
 		case v1.PullIfNotPresent:
 			ret, err := ipc.runtime.ImageExists(image)
 			if ret && err == nil {
@@ -853,14 +869,11 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 		case v1.PullAlways:
 			klog.V(1).Infof("pulling: %s", image)
 			if err := ipc.runtime.PullImage(image); err != nil {
-				errorList = append(errorList, errors.Wrapf(err, "failed to pull image %s", image))
+				errorList = append(errorList, errors.WithMessagef(err, "failed to pull image %s", image))
 			}
-		default:
-			// If the policy is unknown return early with an error
-			errorList = append(errorList, errors.Errorf("unsupported pull policy %q", policy))
-			return warnings, errorList
 		}
 	}
+
 	return warnings, errorList
 }
 
@@ -1096,12 +1109,18 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 		return &Error{Msg: err.Error()}
 	}
 
+	serialPull := true
+	if cfg.NodeRegistration.ImagePullSerial != nil {
+		serialPull = *cfg.NodeRegistration.ImagePullSerial
+	}
+
 	checks := []Checker{
 		ImagePullCheck{
 			runtime:         containerRuntime,
 			imageList:       images.GetControlPlaneImages(&cfg.ClusterConfiguration),
 			sandboxImage:    images.GetPauseImage(&cfg.ClusterConfiguration),
 			imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy,
+			imagePullSerial: serialPull,
 		},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)

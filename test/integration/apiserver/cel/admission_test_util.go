@@ -143,6 +143,18 @@ var (
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):         true,
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies/status"):  true,
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicybindings"):   true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):              true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies/status"):       true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicybindings"):        true,
+		// transient resource exemption
+		gvr("authentication.k8s.io", "v1", "selfsubjectreviews"):       true,
+		gvr("authentication.k8s.io", "v1beta1", "selfsubjectreviews"):  true,
+		gvr("authentication.k8s.io", "v1alpha1", "selfsubjectreviews"): true,
+		gvr("authentication.k8s.io", "v1", "tokenreviews"):             true,
+		gvr("authorization.k8s.io", "v1", "localsubjectaccessreviews"): true,
+		gvr("authorization.k8s.io", "v1", "selfsubjectaccessreviews"):  true,
+		gvr("authorization.k8s.io", "v1", "selfsubjectrulesreviews"):   true,
+		gvr("authorization.k8s.io", "v1", "subjectaccessreviews"):      true,
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{

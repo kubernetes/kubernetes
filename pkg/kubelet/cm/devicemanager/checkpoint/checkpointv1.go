@@ -63,7 +63,7 @@ type DataV1 struct {
 }
 
 // NewV1 returns an instance of Checkpoint, in V1 (k8s <= 1.19) format.
-// Users should avoid creating checkpoints in formats different than the most recent one,
+// Users should avoid creating checkpoints in formats different from the most recent one,
 // use the old formats only to validate existing checkpoint and convert them to most recent
 // format. The only exception should be test code.
 func NewV1(devEntries []PodDevicesEntryV1,

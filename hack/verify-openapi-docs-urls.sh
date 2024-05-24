@@ -28,12 +28,12 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 SPECROOT="${KUBE_ROOT}/api/openapi-spec"
 SPECV3PATH="${SPECROOT}/v3"
 
-_tmp="${KUBE_ROOT}/_tmp"
-mkdir -p "${_tmp}"
-trap 'rm -rf ${_tmp}' EXIT SIGINT
+_tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
+mkdir -p "${_tmpdir}"
+trap 'rm -rf ${_tmpdir}' EXIT SIGINT
 trap "echo Aborted; exit;" SIGINT SIGTERM
 
-TMP_URLS="${_tmp}/docs_urls.txt"
+TMP_URLS="${_tmpdir}/docs_urls.txt"
 touch "${TMP_URLS}"
 
 

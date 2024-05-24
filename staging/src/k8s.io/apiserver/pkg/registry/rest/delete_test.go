@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type mockStrategy struct {
@@ -295,10 +296,10 @@ func TestBeforeDelete(t *testing.T) {
 				t.Errorf("BeforeDelete() gotGracefulPending = %v, want %v", gotGracefulPending, tt.wantGracefulPending)
 			}
 			if !utilpointer.Int64Equal(tt.args.pod.DeletionGracePeriodSeconds, tt.wantDeletionGracePeriodSeconds) {
-				t.Errorf("metadata.DeletionGracePeriodSeconds = %v, want %v", utilpointer.Int64Deref(tt.args.pod.DeletionGracePeriodSeconds, 0), utilpointer.Int64Deref(tt.wantDeletionGracePeriodSeconds, 0))
+				t.Errorf("metadata.DeletionGracePeriodSeconds = %v, want %v", ptr.Deref(tt.args.pod.DeletionGracePeriodSeconds, 0), ptr.Deref(tt.wantDeletionGracePeriodSeconds, 0))
 			}
 			if !utilpointer.Int64Equal(tt.args.options.GracePeriodSeconds, tt.wantGracePeriodSeconds) {
-				t.Errorf("options.GracePeriodSeconds = %v, want %v", utilpointer.Int64Deref(tt.args.options.GracePeriodSeconds, 0), utilpointer.Int64Deref(tt.wantGracePeriodSeconds, 0))
+				t.Errorf("options.GracePeriodSeconds = %v, want %v", ptr.Deref(tt.args.options.GracePeriodSeconds, 0), ptr.Deref(tt.wantGracePeriodSeconds, 0))
 			}
 		})
 	}

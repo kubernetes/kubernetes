@@ -62,13 +62,20 @@ func SetJoinControlPlaneDefaults(cfg *kubeadmapi.JoinControlPlane) error {
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
 func LoadOrDefaultJoinConfiguration(cfgPath string, defaultversionedcfg *kubeadmapiv1.JoinConfiguration, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.JoinConfiguration, error) {
+	var (
+		config *kubeadmapi.JoinConfiguration
+		err    error
+	)
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
-		// Nb. --config overrides command line flags, TODO: fix this
-		return LoadJoinConfigurationFromFile(cfgPath, opts)
+		config, err = LoadJoinConfigurationFromFile(cfgPath, opts)
+	} else {
+		config, err = DefaultedJoinConfiguration(defaultversionedcfg, opts)
 	}
-
-	return DefaultedJoinConfiguration(defaultversionedcfg, opts)
+	if err == nil {
+		prepareStaticVariables(config)
+	}
+	return config, err
 }
 
 // LoadJoinConfigurationFromFile loads versioned JoinConfiguration from file, converts it to internal, defaults and validates it

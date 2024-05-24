@@ -23,9 +23,11 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 var (
@@ -43,16 +46,14 @@ var (
 	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
 )
 
-func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
-	return v1.NodeResources{
-		Capacity: v1.ResourceList{
-			v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
-			v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
-			extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
-			v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
-			hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
-		},
+func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.ResourceList {
+	return v1.ResourceList{
+		v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
+		v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
+		extendedResourceA:           *resource.NewQuantity(extendedA, resource.DecimalSI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
+		hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
 	}
 }
 
@@ -489,7 +490,7 @@ func TestEnoughRequests(t *testing.T) {
 
 	for _, test := range enoughPodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
+			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
 			if test.args.ScoringStrategy == nil {
@@ -641,7 +642,7 @@ func TestStorageRequests(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
+			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
@@ -694,16 +695,16 @@ func TestRestartableInitContainers(t *testing.T) {
 		name                    string
 		pod                     *v1.Pod
 		enableSidecarContainers bool
-		wantStatus              *framework.Status
+		wantPreFilterStatus     *framework.Status
 	}{
 		{
 			name: "allow pod without restartable init containers if sidecar containers is disabled",
 			pod:  newPod(),
 		},
 		{
-			name:       "not allow pod with restartable init containers if sidecar containers is disabled",
-			pod:        newPodWithRestartableInitContainers(),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
+			name:                "not allow pod with restartable init containers if sidecar containers is disabled",
+			pod:                 newPodWithRestartableInitContainers(),
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
 		},
 		{
 			name:                    "allow pod without restartable init containers if sidecar containers is enabled",
@@ -732,13 +733,16 @@ func TestRestartableInitContainers(t *testing.T) {
 			}
 			cycleState := framework.NewCycleState()
 			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), cycleState, test.pod)
+			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
+				t.Error("status does not match (-expected +actual):\n", diff)
+			}
 			if !preFilterStatus.IsSuccess() {
-				t.Errorf("prefilter failed with status: %v", preFilterStatus)
+				return
 			}
 
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, nodeInfo)
-			if diff := cmp.Diff(gotStatus, test.wantStatus); diff != "" {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			filterStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, nodeInfo)
+			if !filterStatus.IsSuccess() {
+				t.Error("status does not match (-expected +actual):\n- Success\n +\n", filterStatus.Code())
 			}
 		})
 	}
@@ -947,7 +951,7 @@ func TestFitScore(t *testing.T) {
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
 				if test.runPreScore {
-					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, test.nodes)
+					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.requestedPod, tf.BuildNodeInfos(test.nodes))
 					if !status.IsSuccess() {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 					}
@@ -1109,8 +1113,245 @@ func TestEventsToRegister(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fp := &Fit{enableInPlacePodVerticalScaling: test.inPlacePodVerticalScalingEnabled}
 			actualClusterEvents := fp.EventsToRegister()
+			for i := range actualClusterEvents {
+				actualClusterEvents[i].QueueingHintFn = nil
+			}
 			if diff := cmp.Diff(test.expectedClusterEvents, actualClusterEvents); diff != "" {
 				t.Error("Cluster Events doesn't match extected events (-expected +actual):\n", diff)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterPodChange(t *testing.T) {
+	testcases := map[string]struct {
+		pod                             *v1.Pod
+		oldObj, newObj                  interface{}
+		enableInPlacePodVerticalScaling bool
+		expectedHint                    framework.QueueingHint
+		expectedErr                     bool
+	}{
+		"backoff-wrong-old-object": {
+			pod:                             &v1.Pod{},
+			oldObj:                          "not-a-pod",
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.Queue,
+			expectedErr:                     true,
+		},
+		"backoff-wrong-new-object": {
+			pod:                             &v1.Pod{},
+			newObj:                          "not-a-pod",
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.Queue,
+			expectedErr:                     true,
+		},
+		"queue-on-deleted": {
+			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.Queue,
+		},
+		"skip-queue-on-unscheduled-pod-deleted": {
+			pod:                             &v1.Pod{},
+			oldObj:                          &v1.Pod{},
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.QueueSkip,
+		},
+		"skip-queue-on-disable-inplace-pod-vertical-scaling": {
+			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
+			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
+			enableInPlacePodVerticalScaling: false,
+			expectedHint:                    framework.QueueSkip,
+		},
+		"skip-queue-on-unscheduled-pod": {
+			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.QueueSkip,
+		},
+		"skip-queue-on-non-resource-changes": {
+			pod:                             &v1.Pod{},
+			oldObj:                          st.MakePod().Label("k", "v").Node("fake").Obj(),
+			newObj:                          st.MakePod().Label("foo", "bar").Node("fake").Obj(),
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.QueueSkip,
+		},
+		"skip-queue-on-unrelated-resource-changes": {
+			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Node("fake").Obj(),
+			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceMemory: "1"}).Node("fake").Obj(),
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.QueueSkip,
+		},
+		"skip-queue-on-resource-scale-up": {
+			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
+			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.QueueSkip,
+		},
+		"queue-on-some-resource-scale-down": {
+			pod:                             st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
+			newObj:                          st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
+			enableInPlacePodVerticalScaling: true,
+			expectedHint:                    framework.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableInPlacePodVerticalScaling: tc.enableInPlacePodVerticalScaling,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*Fit).isSchedulableAfterPodChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
+		})
+	}
+}
+
+func Test_isSchedulableAfterNodeChange(t *testing.T) {
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   framework.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-new-object": {
+			pod:          &v1.Pod{},
+			newObj:       "not-a-node",
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-old-object": {
+			pod:          &v1.Pod{},
+			oldObj:       "not-a-node",
+			newObj:       &v1.Node{},
+			expectedHint: framework.Queue,
+			expectedErr:  true,
+		},
+		"skip-queue-on-node-add-without-sufficient-resources": {
+			pod: newResourcePod(framework.Resource{Memory: 2}),
+			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "1",
+			}).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"skip-queue-on-node-add-without-required-resource-type": {
+			pod: newResourcePod(framework.Resource{
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}},
+			),
+			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				extendedResourceB: "1",
+			}).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-node-add-with-sufficient-resources": {
+			pod: newResourcePod(framework.Resource{
+				Memory:          2,
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			}),
+			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "4",
+				extendedResourceA: "2",
+			}).Obj(),
+			expectedHint: framework.Queue,
+		},
+		// uncomment this case when the isSchedulableAfterNodeChange also check the
+		// original node's resources.
+		// "skip-queue-on-node-unrelated-changes": {
+		// 	pod:          &v1.Pod{},
+		// 	oldObj:       st.MakeNode().Obj(),
+		// 	newObj:       st.MakeNode().Label("foo", "bar").Obj(),
+		// 	expectedHint: framework.QueueSkip,
+		// },
+		"skip-queue-on-node-changes-from-suitable-to-unsuitable": {
+			pod: newResourcePod(framework.Resource{
+				Memory:          2,
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			}),
+			oldObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "4",
+				extendedResourceA: "2",
+			}).Obj(),
+			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "1",
+				extendedResourceA: "2",
+			}).Obj(),
+			expectedHint: framework.QueueSkip,
+		},
+		"queue-on-node-changes-from-unsuitable-to-suitable": {
+			pod: newResourcePod(framework.Resource{
+				Memory:          2,
+				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
+			}),
+			oldObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "1",
+				extendedResourceA: "2",
+			}).Obj(),
+			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "4",
+				extendedResourceA: "2",
+			}).Obj(),
+			expectedHint: framework.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*Fit).isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedHint, actualHint)
+		})
+	}
+}
+
+func TestIsFit(t *testing.T) {
+	testCases := map[string]struct {
+		pod      *v1.Pod
+		node     *v1.Node
+		expected bool
+	}{
+		"nil node": {
+			pod:      &v1.Pod{},
+			expected: false,
+		},
+		"insufficient resource": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expected: false,
+		},
+		"sufficient resource": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			expected: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if got := isFit(tc.pod, tc.node); got != tc.expected {
+				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
 	}

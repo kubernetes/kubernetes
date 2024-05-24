@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
 
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
@@ -41,6 +40,9 @@ import (
 func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
 	if config.Mode == "" {
 		config.Mode = proxyconfigapi.ProxyModeKernelspace
+	}
+	if config.Winkernel.RootHnsEndpointName == "" {
+		config.Winkernel.RootHnsEndpointName = "cbr0"
 	}
 }
 
@@ -83,11 +85,6 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 	if initOnly {
 		return nil, fmt.Errorf("--init-only is not implemented on Windows")
 	}
-	var healthzPort int
-	if len(config.HealthzBindAddress) > 0 {
-		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
-		healthzPort, _ = strconv.Atoi(port)
-	}
 
 	var proxier proxy.Provider
 	var err error
@@ -96,26 +93,24 @@ func (s *ProxyServer) createProxier(config *proxyconfigapi.KubeProxyConfiguratio
 		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.ClusterCIDR,
 			s.Hostname,
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
+			config.HealthzBindAddress,
 			config.Winkernel,
-			healthzPort,
 		)
 	} else {
 		proxier, err = winkernel.NewProxier(
 			s.PrimaryIPFamily,
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
-			config.ClusterCIDR,
 			s.Hostname,
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,
+			config.HealthzBindAddress,
 			config.Winkernel,
-			healthzPort,
 		)
 	}
 	if err != nil {

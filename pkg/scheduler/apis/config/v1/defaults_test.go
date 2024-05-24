@@ -117,6 +117,9 @@ var pluginConfigs = []configv1.PluginConfig{
 
 func TestSchedulerDefaults(t *testing.T) {
 	enable := true
+	unknownPluginConfigs := append([]configv1.PluginConfig{}, pluginConfigs...)
+	unknownPluginConfigs[0].Args = runtime.RawExtension{Object: &runtime.Unknown{}}
+
 	tests := []struct {
 		name     string
 		config   *configv1.KubeSchedulerConfiguration
@@ -328,6 +331,7 @@ func TestSchedulerDefaults(t *testing.T) {
 						Plugins: &configv1.Plugins{
 							MultiPoint: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
+									{Name: names.SchedulingGates},
 									{Name: names.PrioritySort},
 									{Name: names.NodeUnschedulable},
 									{Name: names.NodeName},
@@ -348,7 +352,6 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 									{Name: names.DefaultBinder},
-									{Name: names.SchedulingGates},
 								},
 							},
 							Bind: configv1.PluginSet{
@@ -599,7 +602,49 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "unknown plugin config",
+			config: &configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{
+					{
+						PluginConfig: unknownPluginConfigs,
+					},
+				},
+			},
+			expected: &configv1.KubeSchedulerConfiguration{
+				Parallelism: ptr.To[int32](16),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       ptr.To(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: ptr.To[int32](config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: ptr.To[int64](1),
+				PodMaxBackoffSeconds:     ptr.To[int64](10),
+				Profiles: []configv1.KubeSchedulerProfile{
+					{
+						Plugins:       getDefaultPlugins(),
+						PluginConfig:  unknownPluginConfigs,
+						SchedulerName: ptr.To("default-scheduler"),
+					},
+				},
+			},
+		},
 	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
@@ -800,7 +845,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
 			}
 			scheme.Default(tc.in)
-			if diff := cmp.Diff(tc.in, tc.want); diff != "" {
+			if diff := cmp.Diff(tc.want, tc.in); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)
 			}
 		})

@@ -131,7 +131,15 @@
               "name": "nameValue"
             }
           ]
-        }
+        },
+        "volumeMounts": [
+          {
+            "name": "nameValue",
+            "mountPath": "mountPathValue",
+            "readOnly": true,
+            "recursiveReadOnly": "recursiveReadOnlyValue"
+          }
+        ]
       }
     ],
     "containerStatuses": [
@@ -194,7 +202,15 @@
               "name": "nameValue"
             }
           ]
-        }
+        },
+        "volumeMounts": [
+          {
+            "name": "nameValue",
+            "mountPath": "mountPathValue",
+            "readOnly": true,
+            "recursiveReadOnly": "recursiveReadOnlyValue"
+          }
+        ]
       }
     ],
     "qosClass": "qosClassValue",
@@ -258,7 +274,15 @@
               "name": "nameValue"
             }
           ]
-        }
+        },
+        "volumeMounts": [
+          {
+            "name": "nameValue",
+            "mountPath": "mountPathValue",
+            "readOnly": true,
+            "recursiveReadOnly": "recursiveReadOnlyValue"
+          }
+        ]
       }
     ],
     "resize": "resizeValue",

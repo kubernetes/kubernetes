@@ -186,15 +186,15 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	ginkgo.It("should support volume SELinux relabeling [Flaky] [LinuxOnly]", func(ctx context.Context) {
+	f.It("should support volume SELinux relabeling", f.WithFlaky(), f.WithLabel("LinuxOnly"), func(ctx context.Context) {
 		testPodSELinuxLabeling(ctx, f, false, false)
 	})
 
-	ginkgo.It("should support volume SELinux relabeling when using hostIPC [Flaky] [LinuxOnly]", func(ctx context.Context) {
+	f.It("should support volume SELinux relabeling when using hostIPC", f.WithFlaky(), f.WithLabel("LinuxOnly"), func(ctx context.Context) {
 		testPodSELinuxLabeling(ctx, f, true, false)
 	})
 
-	ginkgo.It("should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly]", func(ctx context.Context) {
+	f.It("should support volume SELinux relabeling when using hostPID", f.WithFlaky(), f.WithLabel("LinuxOnly"), func(ctx context.Context) {
 		testPodSELinuxLabeling(ctx, f, false, true)
 	})
 

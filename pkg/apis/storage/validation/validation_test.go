@@ -1715,6 +1715,17 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		modify: func(new *storage.CSIDriver) {
 			new.Spec.SELinuxMount = &notSELinuxMount
 		},
+	}, {
+		name: "change PodInfoOnMount",
+		modify: func(new *storage.CSIDriver) {
+			new.Spec.PodInfoOnMount = &podInfoOnMount
+		},
+	}, {
+		name: "change FSGroupPolicy",
+		modify: func(new *storage.CSIDriver) {
+			fileFSGroupPolicy := storage.FileFSGroupPolicy
+			new.Spec.FSGroupPolicy = &fileFSGroupPolicy
+		},
 	}}
 	for _, test := range successCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -1756,11 +1767,6 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 			new.Spec.PodInfoOnMount = nil
 		},
 	}, {
-		name: "PodInfoOnMount changed",
-		modify: func(new *storage.CSIDriver) {
-			new.Spec.PodInfoOnMount = &podInfoOnMount
-		},
-	}, {
 		name: "invalid volume lifecycle mode",
 		modify: func(new *storage.CSIDriver) {
 			new.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
@@ -1791,12 +1797,6 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		modify: func(new *storage.CSIDriver) {
 			invalidFSGroupPolicy := storage.FSGroupPolicy("invalid")
 			new.Spec.FSGroupPolicy = &invalidFSGroupPolicy
-		},
-	}, {
-		name: "FSGroupPolicy changed",
-		modify: func(new *storage.CSIDriver) {
-			fileFSGroupPolicy := storage.FileFSGroupPolicy
-			new.Spec.FSGroupPolicy = &fileFSGroupPolicy
 		},
 	}, {
 		name: "TokenRequests invalidated",

@@ -38,6 +38,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -421,7 +422,14 @@ kind: KubeProxyConfiguration
 		},
 		Options: logsapi.FormatOptions{
 			JSON: logsapi.JSONOptions{
-				InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				OutputRoutingOptions: logsapi.OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
+			},
+			Text: logsapi.TextOptions{
+				OutputRoutingOptions: logsapi.OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
 			},
 		},
 	}
@@ -646,7 +654,8 @@ func Test_getNodeIPs(t *testing.T) {
 		nodeName := fmt.Sprintf("node%d", i+1)
 		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
 		go func() {
-			ips := getNodeIPs(client, nodeName)
+			logger, _ := ktesting.NewTestContext(t)
+			ips := getNodeIPs(logger, client, nodeName)
 			if len(ips) == 0 {
 				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
 			} else if ips[0].String() != expectIP {
@@ -825,7 +834,8 @@ func Test_detectNodeIPs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			primaryFamily, ips := detectNodeIPs(c.rawNodeIPs, c.bindAddress)
+			logger, _ := ktesting.NewTestContext(t)
+			primaryFamily, ips := detectNodeIPs(logger, c.rawNodeIPs, c.bindAddress)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}

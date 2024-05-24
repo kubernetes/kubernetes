@@ -30,7 +30,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -99,8 +98,12 @@ var _ = sigDescribe(feature.GPUDevicePlugin, "Device Plugin", skipUnlessWindows(
 		_, err := cs.AppsV1().DaemonSets(sysNs).Create(ctx, ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
+		// Windows device plugin tests require the *full* windows image (not nanoserver or servercore)
+		// because those images do not contain the necessary DirectX components.
+		fullWindowsContainerImage := "mcr.microsoft.com/windows:ltsc2019"
+
 		ginkgo.By("creating Windows testing Pod")
-		windowsPod := createTestPod(f, imageutils.GetE2EImage(imageutils.WindowsServer), windowsOS)
+		windowsPod := createTestPod(f, fullWindowsContainerImage, windowsOS)
 		windowsPod.Spec.Containers[0].Args = []string{"powershell.exe", "Start-Sleep", "3600"}
 		windowsPod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
 			"microsoft.com/directx": resource.MustParse("1"),

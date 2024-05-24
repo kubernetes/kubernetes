@@ -85,7 +85,7 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 	}
 
 	// Otherwise the result is the same as for GetNodeAddressesFromNodeIP
-	return GetNodeAddressesFromNodeIP(nodeIP.String(), cloudNodeAddresses, false)
+	return GetNodeAddressesFromNodeIP(nodeIP.String(), cloudNodeAddresses)
 }
 
 // GetNodeAddressesFromNodeIP filters the provided list of nodeAddresses to match the
@@ -102,8 +102,8 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 // GetNodeAddressesFromNodeIPLegacy, because that case never occurs for external cloud
 // providers, because kubelet does not set the `provided-node-ip` annotation in that
 // case.)
-func GetNodeAddressesFromNodeIP(providedNodeIP string, cloudNodeAddresses []v1.NodeAddress, allowDualStack bool) ([]v1.NodeAddress, error) {
-	nodeIPs, err := nodeutil.ParseNodeIPAnnotation(providedNodeIP, allowDualStack)
+func GetNodeAddressesFromNodeIP(providedNodeIP string, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
+	nodeIPs, err := nodeutil.ParseNodeIPAnnotation(providedNodeIP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse node IP %q: %v", providedNodeIP, err)
 	}

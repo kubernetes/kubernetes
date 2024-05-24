@@ -4,19 +4,19 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/config/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ComponentRouteStatusApplyConfiguration represents an declarative configuration of the ComponentRouteStatus type for use
 // with apply.
 type ComponentRouteStatusApplyConfiguration struct {
-	Namespace        *string                             `json:"namespace,omitempty"`
-	Name             *string                             `json:"name,omitempty"`
-	DefaultHostname  *v1.Hostname                        `json:"defaultHostname,omitempty"`
-	ConsumingUsers   []v1.ConsumingUser                  `json:"consumingUsers,omitempty"`
-	CurrentHostnames []v1.Hostname                       `json:"currentHostnames,omitempty"`
-	Conditions       []metav1.Condition                  `json:"conditions,omitempty"`
-	RelatedObjects   []ObjectReferenceApplyConfiguration `json:"relatedObjects,omitempty"`
+	Namespace        *string                              `json:"namespace,omitempty"`
+	Name             *string                              `json:"name,omitempty"`
+	DefaultHostname  *v1.Hostname                         `json:"defaultHostname,omitempty"`
+	ConsumingUsers   []v1.ConsumingUser                   `json:"consumingUsers,omitempty"`
+	CurrentHostnames []v1.Hostname                        `json:"currentHostnames,omitempty"`
+	Conditions       []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
+	RelatedObjects   []ObjectReferenceApplyConfiguration  `json:"relatedObjects,omitempty"`
 }
 
 // ComponentRouteStatusApplyConfiguration constructs an declarative configuration of the ComponentRouteStatus type for use with
@@ -72,9 +72,12 @@ func (b *ComponentRouteStatusApplyConfiguration) WithCurrentHostnames(values ...
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *ComponentRouteStatusApplyConfiguration) WithConditions(values ...metav1.Condition) *ComponentRouteStatusApplyConfiguration {
+func (b *ComponentRouteStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *ComponentRouteStatusApplyConfiguration {
 	for i := range values {
-		b.Conditions = append(b.Conditions, values[i])
+		if values[i] == nil {
+			panic("nil value passed to WithConditions")
+		}
+		b.Conditions = append(b.Conditions, *values[i])
 	}
 	return b
 }

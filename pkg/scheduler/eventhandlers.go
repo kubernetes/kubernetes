@@ -19,12 +19,12 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -72,8 +72,8 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 		return
 	}
 
-	nodeInfo := sched.Cache.AddNode(logger, node)
 	logger.V(3).Info("Add event for node", "node", klog.KObj(node))
+	nodeInfo := sched.Cache.AddNode(logger, node)
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.NodeAdd, nil, node, preCheckForNode(nodeInfo))
 }
 
@@ -90,10 +90,11 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 		return
 	}
 
+	logger.V(4).Info("Update event for node", "node", klog.KObj(newNode))
 	nodeInfo := sched.Cache.UpdateNode(logger, oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
-	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != nil {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, *event, oldNode, newNode, preCheckForNode(nodeInfo))
+	for _, evt := range nodeSchedulingPropertiesChange(newNode, oldNode) {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldNode, newNode, preCheckForNode(nodeInfo))
 	}
 }
 
@@ -114,6 +115,7 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		logger.Error(nil, "Cannot convert to *v1.Node", "obj", t)
 		return
 	}
+
 	logger.V(3).Info("Delete event for node", "node", klog.KObj(node))
 	if err := sched.Cache.RemoveNode(logger, node); err != nil {
 		logger.Error(err, "Scheduler cache RemoveNode failed")
@@ -146,6 +148,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		return
 	}
 
+	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	if err := sched.SchedulingQueue.Update(logger, oldPod, newPod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
@@ -168,6 +171,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
 		return
 	}
+
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
@@ -194,8 +198,8 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", obj)
 		return
 	}
-	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 
+	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
 		logger.Error(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
@@ -215,8 +219,8 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		logger.Error(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
-	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 
+	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 	if err := sched.Cache.UpdatePod(logger, oldPod, newPod); err != nil {
 		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
@@ -241,6 +245,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t)
 		return
 	}
+
 	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.RemovePod(logger, pod); err != nil {
 		logger.Error(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
@@ -467,6 +472,24 @@ func addAllEventHandlers(
 				}
 				handlers = append(handlers, handlerRegistration)
 			}
+		case framework.ResourceClaimParameters:
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClaimParameters().Informer().AddEventHandler(
+					buildEvtResHandler(at, framework.ResourceClaimParameters, "ResourceClaimParameters"),
+				); err != nil {
+					return err
+				}
+				handlers = append(handlers, handlerRegistration)
+			}
+		case framework.ResourceClassParameters:
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClassParameters().Informer().AddEventHandler(
+					buildEvtResHandler(at, framework.ResourceClassParameters, "ResourceClassParameters"),
+				); err != nil {
+					return err
+				}
+				handlers = append(handlers, handlerRegistration)
+			}
 		case framework.StorageClass:
 			if at&framework.Add != 0 {
 				if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
@@ -522,36 +545,41 @@ func addAllEventHandlers(
 	return nil
 }
 
-func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
+func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framework.ClusterEvent {
+	var events []framework.ClusterEvent
+
 	if nodeSpecUnschedulableChanged(newNode, oldNode) {
-		return &queue.NodeSpecUnschedulableChange
+		events = append(events, queue.NodeSpecUnschedulableChange)
 	}
 	if nodeAllocatableChanged(newNode, oldNode) {
-		return &queue.NodeAllocatableChange
+		events = append(events, queue.NodeAllocatableChange)
 	}
 	if nodeLabelsChanged(newNode, oldNode) {
-		return &queue.NodeLabelChange
+		events = append(events, queue.NodeLabelChange)
 	}
 	if nodeTaintsChanged(newNode, oldNode) {
-		return &queue.NodeTaintChange
+		events = append(events, queue.NodeTaintChange)
 	}
 	if nodeConditionsChanged(newNode, oldNode) {
-		return &queue.NodeConditionChange
+		events = append(events, queue.NodeConditionChange)
+	}
+	if nodeAnnotationsChanged(newNode, oldNode) {
+		events = append(events, queue.NodeAnnotationChange)
 	}
 
-	return nil
+	return events
 }
 
 func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
+	return !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
 }
 
 func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
+	return !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
 }
 
 func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !reflect.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
+	return !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
 }
 
 func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
@@ -562,11 +590,15 @@ func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 		}
 		return conditionStatuses
 	}
-	return !reflect.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
+	return !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
 }
 
 func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable
+}
+
+func nodeAnnotationsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations())
 }
 
 func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {

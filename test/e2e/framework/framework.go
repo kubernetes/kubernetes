@@ -66,7 +66,7 @@ var (
 	//
 	// This can be used by extensions of the core framework to modify
 	// settings in the framework instance or to add additional callbacks
-	// with gingko.BeforeEach/AfterEach/DeferCleanup.
+	// with ginkgo.BeforeEach/AfterEach/DeferCleanup.
 	//
 	// When a test runs, functions will be invoked in this order:
 	// - BeforeEaches defined by tests before f.NewDefaultFramework

@@ -27,9 +27,10 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"sigs.k8s.io/yaml"
+
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/yaml"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -479,7 +480,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 	})
 
 	// Marked as flaky until https://github.com/kubernetes/kubernetes/issues/65517 is solved.
-	ginkgo.It("[Flaky] kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
+	f.It(f.WithFlaky(), "kubectl explain works for CR with the same resource name as built-in object.", func(ctx context.Context) {
 		customServiceShortName := fmt.Sprintf("ksvc-%d", time.Now().Unix()) // make short name unique
 		opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.ObjectMeta = metav1.ObjectMeta{Name: "services." + crd.Spec.Group}
@@ -719,6 +720,7 @@ func dropDefaults(s *spec.Schema) {
 	delete(s.Properties, "apiVersion")
 	delete(s.Properties, "kind")
 	delete(s.Extensions, "x-kubernetes-group-version-kind")
+	delete(s.Extensions, "x-kubernetes-selectable-fields")
 }
 
 func verifyKubectlExplain(ns, name, pattern string) error {

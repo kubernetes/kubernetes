@@ -271,6 +271,30 @@
   labels:
   - action
   - error
+- name: job_finished_indexes_total
+  subsystem: job_controller
+  help: "`The number of finished indexes. Possible values for the\n\t\t\tstatus label
+    are: \"succeeded\", \"failed\". Possible values for the\n\t\t\tbackoffLimit label
+    are: \"perIndex\" and \"global\"`"
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - backoffLimit
+  - status
+- name: job_pods_creation_total
+  subsystem: job_controller
+  help: |-
+    `The number of Pods created by the Job controller labelled with a reason for the Pod creation.
+    This metric also distinguishes between Pods created using different PodReplacementPolicy settings.
+    Possible values of the "reason" label are:
+    "new", "recreate_terminating_or_failed", "recreate_failed".
+    Possible values of the "status" label are:
+    "succeeded", "failed".`
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - reason
+  - status
 - name: pod_failures_handled_by_failure_policy_total
   subsystem: job_controller
   help: "`The number of failed Pods handled by failure policy with\n\t\t\trespect
@@ -381,47 +405,6 @@
   stabilityLevel: ALPHA
   labels:
   - clusterCIDR
-- name: multicidrset_allocation_tries_per_request
-  subsystem: node_ipam_controller
-  help: Histogram measuring CIDR allocation tries per request.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - clusterCIDR
-  buckets:
-  - 1
-  - 5
-  - 25
-  - 125
-  - 625
-- name: multicidrset_cidrs_allocations_total
-  subsystem: node_ipam_controller
-  help: Counter measuring total number of CIDR allocations.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - clusterCIDR
-- name: multicidrset_cidrs_releases_total
-  subsystem: node_ipam_controller
-  help: Counter measuring total number of CIDR releases.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - clusterCIDR
-- name: multicidrset_usage_cidrs
-  subsystem: node_ipam_controller
-  help: Gauge measuring percentage of allocated CIDRs.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - clusterCIDR
-- name: multicirdset_max_cidrs
-  subsystem: node_ipam_controller
-  help: Maximum number of CIDRs that can be allocated.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - clusterCIDR
 - name: force_delete_pod_errors_total
   subsystem: pod_gc_collector
   help: Number of errors encountered when forcefully deleting the pods since the Pod
@@ -443,8 +426,8 @@
 - name: sorting_deletion_age_ratio
   subsystem: replicaset_controller
   help: The ratio of chosen deleted pod's ages to the current youngest pod's age (at
-    the time). Should be <2.The intent of this metric is to measure the rough efficacy
-    of the LogarithmicScaleDown feature gate's effect onthe sorting (and deletion)
+    the time). Should be <2. The intent of this metric is to measure the rough efficacy
+    of the LogarithmicScaleDown feature gate's effect on the sorting (and deletion)
     of pods when a replicaset scales down. This only considers Ready pods when calculating
     and reporting.
   type: Histogram
@@ -466,26 +449,30 @@
   help: Number of ResourceClaims creation request failures
   type: Counter
   stabilityLevel: ALPHA
-- name: job_deletion_duration_seconds
-  subsystem: ttl_after_finished_controller
-  help: The time it took to delete the job since it became eligible for deletion
+- name: pod_deletion_duration_seconds
+  subsystem: taint_eviction_controller
+  help: Latency, in seconds, between the time when a taint effect has been activated
+    for the Pod and its deletion via TaintEvictionController.
   type: Histogram
   stabilityLevel: ALPHA
   buckets:
+  - 0.005
+  - 0.025
   - 0.1
-  - 0.2
-  - 0.4
-  - 0.8
-  - 1.6
-  - 3.2
-  - 6.4
-  - 12.8
-  - 25.6
-  - 51.2
-  - 102.4
-  - 204.8
-  - 409.6
-  - 819.2
+  - 0.5
+  - 1
+  - 2.5
+  - 10
+  - 30
+  - 60
+  - 120
+  - 180
+  - 240
+- name: pod_deletions_total
+  subsystem: taint_eviction_controller
+  help: Total number of Pods deleted by TaintEvictionController since its start.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: job_pods_finished_total
   subsystem: job_controller
   help: The number of finished Pods that are fully tracked
@@ -504,8 +491,6 @@
   - completion_mode
   - result
   buckets:
-  - 0.001
-  - 0.002
   - 0.004
   - 0.008
   - 0.016
@@ -519,6 +504,8 @@
   - 4.096
   - 8.192
   - 16.384
+  - 32.768
+  - 65.536
 - name: job_syncs_total
   subsystem: job_controller
   help: The number of job syncs
@@ -678,6 +665,26 @@
   labels:
   - node
   - volume_plugin
+- name: job_deletion_duration_seconds
+  subsystem: ttl_after_finished_controller
+  help: The time it took to delete the job since it became eligible for deletion
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.8
+  - 1.6
+  - 3.2
+  - 6.4
+  - 12.8
+  - 25.6
+  - 51.2
+  - 102.4
+  - 204.8
+  - 409.6
+  - 819.2
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
@@ -852,6 +859,12 @@
   help: Last graceful shutdown start time since unix epoch in seconds
   type: Gauge
   stabilityLevel: ALPHA
+- name: image_garbage_collected_total
+  subsystem: kubelet
+  help: Total number of images garbage collected by the kubelet, whether through disk
+    usage or image age.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: lifecycle_handler_http_fallbacks_total
   subsystem: kubelet
   help: The number of times lifecycle handlers successfully fell back to http from
@@ -876,6 +889,31 @@
   stabilityLevel: ALPHA
   labels:
   - node
+- name: node_startup_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds of node startup in total.
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: node_startup_post_registration_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds of node startup after registration.
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: node_startup_pre_kubelet_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds of node startup before kubelet starts.
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: node_startup_pre_registration_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds of node startup before registration.
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: node_startup_registration_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds of node startup during registration.
+  type: Gauge
+  stabilityLevel: ALPHA
 - name: orphan_pod_cleaned_volumes
   subsystem: kubelet
   help: The total number of orphaned Pods whose volumes were cleaned in the last periodic
@@ -1003,22 +1041,69 @@
   type: Histogram
   stabilityLevel: ALPHA
   buckets:
-  - 0.005
-  - 0.01
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.25
   - 0.5
   - 1
-  - 2.5
+  - 2
+  - 3
+  - 4
   - 5
+  - 6
+  - 8
   - 10
+  - 20
+  - 30
+  - 45
+  - 60
+  - 120
+  - 180
+  - 240
+  - 300
+  - 360
+  - 480
+  - 600
+  - 900
+  - 1200
+  - 1800
+  - 2700
+  - 3600
 - name: pod_start_sli_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to start a pod, excluding time to pull images and run
     init containers, measured from pod creation timestamp to when all its containers
     are reported as started and observed via watch
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.5
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 20
+  - 30
+  - 45
+  - 60
+  - 120
+  - 180
+  - 240
+  - 300
+  - 360
+  - 480
+  - 600
+  - 900
+  - 1200
+  - 1800
+  - 2700
+  - 3600
+- name: pod_start_total_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to start a pod since creation, including time to pull
+    images and run init containers, measured from pod creation timestamp to when all
+    its containers are reported as started and observed via watch
   type: Histogram
   stabilityLevel: ALPHA
   buckets:
@@ -1761,6 +1846,8 @@
     Pods.
   type: Gauge
   stabilityLevel: ALPHA
+  labels:
+  - volume_plugin
 - name: volume_manager_selinux_volume_context_mismatch_warnings_total
   help: Number of errors when a Pod uses a volume that is already mounted with a different
     SELinux context than the Pod needs. They are not errors yet, but they will become
@@ -1768,11 +1855,15 @@
     access modes.
   type: Gauge
   stabilityLevel: ALPHA
+  labels:
+  - volume_plugin
 - name: volume_manager_selinux_volumes_admitted_total
   help: Number of volumes whose SELinux context was fine and will be mounted with
     mount -o context option.
   type: Gauge
   stabilityLevel: ALPHA
+  labels:
+  - volume_plugin
 - name: volume_manager_total_volumes
   help: Number of volumes in Volume Manager
   type: Custom
@@ -1798,6 +1889,30 @@
   stabilityLevel: ALPHA
   labels:
   - signerName
+- name: ip_errors_total
+  subsystem: clusterip_repair
+  namespace: apiserver
+  help: 'Number of errors detected on clusterips by the repair loop broken down by
+    type of error: leak, repair, full, outOfRange, duplicate, unknown, invalid'
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - type
+- name: reconcile_errors_total
+  subsystem: clusterip_repair
+  namespace: apiserver
+  help: Number of reconciliation failures on the clusterip repair reconcile loop
+  type: Counter
+  stabilityLevel: ALPHA
+- name: port_errors_total
+  subsystem: nodeport_repair
+  namespace: apiserver
+  help: 'Number of errors detected on ports by the repair loop broken down by type
+    of error: leak, repair, full, outOfRange, duplicate, unknown'
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - type
 - name: allocated_ips
   subsystem: clusterip_allocator
   namespace: kube_apiserver
@@ -2000,6 +2115,11 @@
   stabilityLevel: ALPHA
   labels:
   - operation
+- name: invalid_legacy_auto_token_uses_total
+  subsystem: serviceaccount
+  help: Cumulative invalid auto-generated legacy tokens used
+  type: Counter
+  stabilityLevel: ALPHA
 - name: legacy_auto_token_uses_total
   subsystem: serviceaccount
   help: Cumulative auto-generated legacy tokens used
@@ -2304,6 +2424,24 @@
   - 0.0512
   - 0.1024
   - 0.2048
+- name: ratcheting_seconds
+  subsystem: validation
+  namespace: apiextensions_apiserver
+  help: Time for comparison of old to new for the purposes of CRDValidationRatcheting
+    during an UPDATE in seconds.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 1e-05
+  - 4e-05
+  - 0.00016
+  - 0.00064
+  - 0.00256
+  - 0.01024
+  - 0.04096
+  - 0.16384
+  - 0.65536
+  - 2.62144
 - name: conversion_webhook_duration_seconds
   namespace: apiserver
   help: Conversion webhook request latency
@@ -2833,9 +2971,9 @@
   - subresource
   - verb
   - version
-- name: request_body_sizes
+- name: request_body_size_bytes
   subsystem: apiserver
-  help: Apiserver request body sizes broken out by size.
+  help: Apiserver request body size in bytes broken out by resource and verb.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
@@ -3071,7 +3209,7 @@
   type: Custom
   stabilityLevel: ALPHA
   labels:
-  - cluster
+  - storage_cluster_id
 - name: terminated_watchers_total
   namespace: apiserver
   help: Counter of watchers closed due to unresponsiveness broken by resource type.
@@ -3135,6 +3273,35 @@
   - group
   - kind
   - version
+- name: watch_list_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution in seconds for watch list requests broken by
+    group, version, resource and scope.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  - scope
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 2
+  - 4
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: authenticated_user_requests
   help: Counter of authenticated requests broken out by username.
   type: Counter
@@ -3422,7 +3589,8 @@
   - 1e+08
   - 1e+09
 - name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind.
+  help: Number of stored objects at the time of last check split by kind. In case
+    of a fetching error, the value will be -1.
   type: Gauge
   stabilityLevel: STABLE
   labels:
@@ -4165,6 +4333,84 @@
   - 4096
   - 8192
   - 16384
+- name: changes
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice changes
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+- name: desired_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices that would exist with perfect endpoint allocation
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: endpoints_added_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints added on each Service sync
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: endpoints_desired
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints desired
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: endpoints_removed_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of endpoints removed on each Service sync
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 2048
+  - 4096
+  - 8192
+  - 16384
+  - 32768
+- name: endpointslices_changed_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices changed on each Service sync
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - topology
+- name: num_endpoint_slices
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: syncs
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlice syncs
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - result
 - name: kubernetes_build_info
   help: A metric with a constant '1' value labeled by major, minor, git version, git
     commit, git tree state, build date, Go version, and compiler from which Kubernetes
@@ -4186,6 +4432,13 @@
     backup, 1 indicates master. 'name' is the string used to identify the lease. Please
     make sure to group by name.
   type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - name
+- name: leader_election_slowpath_total
+  help: Total number of slow path exercised in renewing leader leases. 'name' is the
+    string used to identify the lease. Please make sure to group by name.
+  type: Counter
   stabilityLevel: ALPHA
   labels:
   - name
@@ -4444,23 +4697,6 @@
   labels:
   - name
   - stage
-- name: healthcheck
-  namespace: kubernetes
-  help: This metric records the result of a single healthcheck.
-  type: Gauge
-  stabilityLevel: BETA
-  labels:
-  - name
-  - type
-- name: healthchecks_total
-  namespace: kubernetes
-  help: This metric records the results of all healthcheck.
-  type: Counter
-  stabilityLevel: BETA
-  labels:
-  - name
-  - status
-  - type
 - name: registered_metrics_total
   help: The count of registered metrics broken by stability level and deprecation
     version.
@@ -4469,100 +4705,23 @@
   labels:
   - deprecated_version
   - stability_level
-- name: x509_insecure_sha1_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers with insecure SHA1 signatures in
-    their serving certificate OR the number of connection failures due to the insecure
-    SHA1 signatures (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
-- name: x509_missing_san_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers missing SAN extension in their serving
-    certificate OR the number of connection failures due to the lack of x509 certificate
-    SAN extension missing (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
-- name: changes
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlice changes
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - operation
-- name: desired_endpoint_slices
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlices that would exist with perfect endpoint allocation
+- name: healthcheck
+  namespace: kubernetes
+  help: This metric records the result of a single healthcheck.
   type: Gauge
-  stabilityLevel: ALPHA
-- name: endpoints_added_per_sync
-  subsystem: endpoint_slice_controller
-  help: Number of endpoints added on each Service sync
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 2
-  - 4
-  - 8
-  - 16
-  - 32
-  - 64
-  - 128
-  - 256
-  - 512
-  - 1024
-  - 2048
-  - 4096
-  - 8192
-  - 16384
-  - 32768
-- name: endpoints_desired
-  subsystem: endpoint_slice_controller
-  help: Number of endpoints desired
-  type: Gauge
-  stabilityLevel: ALPHA
-- name: endpoints_removed_per_sync
-  subsystem: endpoint_slice_controller
-  help: Number of endpoints removed on each Service sync
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 2
-  - 4
-  - 8
-  - 16
-  - 32
-  - 64
-  - 128
-  - 256
-  - 512
-  - 1024
-  - 2048
-  - 4096
-  - 8192
-  - 16384
-  - 32768
-- name: endpointslices_changed_per_sync
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlices changed on each Service sync
-  type: Histogram
-  stabilityLevel: ALPHA
+  stabilityLevel: STABLE
   labels:
-  - topology
-- name: num_endpoint_slices
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlices
-  type: Gauge
-  stabilityLevel: ALPHA
-- name: syncs
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlice syncs
+  - name
+  - type
+- name: healthchecks_total
+  namespace: kubernetes
+  help: This metric records the results of all healthcheck.
   type: Counter
-  stabilityLevel: ALPHA
+  stabilityLevel: STABLE
   labels:
-  - result
+  - name
+  - status
+  - type
 - name: aggregator_openapi_v2_regeneration_count
   help: Counter of OpenAPI v2 spec regeneration count broken down by causing APIService
     name and reason.
@@ -4592,6 +4751,22 @@
   labels:
   - name
   - reason
+- name: x509_insecure_sha1_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers with insecure SHA1 signatures in
+    their serving certificate OR the number of connection failures due to the insecure
+    SHA1 signatures (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
+- name: x509_missing_san_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers missing SAN extension in their serving
+    certificate OR the number of connection failures due to the lack of x509 certificate
+    SAN extension missing (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
 - name: api_request_duration_seconds
   namespace: cloudprovider_azure
   help: Latency of an Azure API call

@@ -42,27 +42,28 @@ var (
 )
 
 const (
-	legacyGroup                = ""
-	appsGroup                  = "apps"
-	authenticationGroup        = "authentication.k8s.io"
-	authorizationGroup         = "authorization.k8s.io"
-	autoscalingGroup           = "autoscaling"
-	batchGroup                 = "batch"
-	certificatesGroup          = "certificates.k8s.io"
-	coordinationGroup          = "coordination.k8s.io"
-	discoveryGroup             = "discovery.k8s.io"
-	extensionsGroup            = "extensions"
-	policyGroup                = "policy"
-	rbacGroup                  = "rbac.authorization.k8s.io"
-	resourceGroup              = "resource.k8s.io"
-	storageGroup               = "storage.k8s.io"
-	resMetricsGroup            = "metrics.k8s.io"
-	customMetricsGroup         = "custom.metrics.k8s.io"
-	externalMetricsGroup       = "external.metrics.k8s.io"
-	networkingGroup            = "networking.k8s.io"
-	eventsGroup                = "events.k8s.io"
-	internalAPIServerGroup     = "internal.apiserver.k8s.io"
-	admissionRegistrationGroup = "admissionregistration.k8s.io"
+	legacyGroup                  = ""
+	appsGroup                    = "apps"
+	authenticationGroup          = "authentication.k8s.io"
+	authorizationGroup           = "authorization.k8s.io"
+	autoscalingGroup             = "autoscaling"
+	batchGroup                   = "batch"
+	certificatesGroup            = "certificates.k8s.io"
+	coordinationGroup            = "coordination.k8s.io"
+	discoveryGroup               = "discovery.k8s.io"
+	extensionsGroup              = "extensions"
+	policyGroup                  = "policy"
+	rbacGroup                    = "rbac.authorization.k8s.io"
+	resourceGroup                = "resource.k8s.io"
+	storageGroup                 = "storage.k8s.io"
+	resMetricsGroup              = "metrics.k8s.io"
+	customMetricsGroup           = "custom.metrics.k8s.io"
+	externalMetricsGroup         = "external.metrics.k8s.io"
+	networkingGroup              = "networking.k8s.io"
+	eventsGroup                  = "events.k8s.io"
+	internalAPIServerGroup       = "internal.apiserver.k8s.io"
+	admissionRegistrationGroup   = "admissionregistration.k8s.io"
+	storageVersionMigrationGroup = "storagemigration.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -543,6 +544,10 @@ func clusterRoles() []rbacv1.ClusterRole {
 
 		eventsRule(),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(networkingGroup).Resources("servicecidrs").RuleOrDie())
+	}
+
 	nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
 	roles = append(roles, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
@@ -581,11 +586,13 @@ func clusterRoles() []rbacv1.ClusterRole {
 	// Needed for dynamic resource allocation.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
-			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclaims", "resourceclasses").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceclasses").RuleOrDie(),
+			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulingcontexts").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulingcontexts/status").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceslices", "resourceclassparameters", "resourceclaimparameters").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{

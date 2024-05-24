@@ -87,6 +87,7 @@ message TokenReviewSpec {
   // this list. If no audiences are provided, the audience will default to the
   // audience of the Kubernetes apiserver.
   // +optional
+  // +listType=atomic
   repeated string audiences = 2;
 }
 
@@ -110,6 +111,7 @@ message TokenReviewStatus {
   // status.audience field where status.authenticated is "true", the token is
   // valid against the audience of the Kubernetes API server.
   // +optional
+  // +listType=atomic
   repeated string audiences = 4;
 
   // Error indicates that the token couldn't be checked
@@ -132,6 +134,7 @@ message UserInfo {
 
   // The names of groups this user is a part of.
   // +optional
+  // +listType=atomic
   repeated string groups = 3;
 
   // Any additional information provided by the authenticator.

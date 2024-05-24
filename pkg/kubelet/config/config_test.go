@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -93,7 +94,7 @@ func CreatePodUpdate(op kubetypes.PodOperation, source string, pods ...*v1.Pod) 
 }
 
 func createPodConfigTester(ctx context.Context, mode PodConfigNotificationMode) (chan<- interface{}, <-chan kubetypes.PodUpdate, *PodConfig) {
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	config := NewPodConfig(mode, eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
 	channel := config.Channel(ctx, TestSource)
 	ch := config.Updates()
@@ -136,10 +137,9 @@ func expectNoPodUpdate(t *testing.T, ch <-chan kubetypes.PodUpdate) {
 }
 
 func TestNewPodAdded(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, config := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// see an update
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"))
@@ -151,10 +151,9 @@ func TestNewPodAdded(t *testing.T) {
 }
 
 func TestNewPodAddedInvalidNamespace(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, config := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// see an update
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", ""))
@@ -166,10 +165,9 @@ func TestNewPodAddedInvalidNamespace(t *testing.T) {
 }
 
 func TestNewPodAddedDefaultNamespace(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, config := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// see an update
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "default"))
@@ -181,10 +179,9 @@ func TestNewPodAddedDefaultNamespace(t *testing.T) {
 }
 
 func TestNewPodAddedDifferentNamespaces(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, config := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// see an update
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "default"))
@@ -201,10 +198,9 @@ func TestNewPodAddedDifferentNamespaces(t *testing.T) {
 }
 
 func TestInvalidPodFiltered(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, _ := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, _ := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// see an update
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"))
@@ -218,10 +214,9 @@ func TestInvalidPodFiltered(t *testing.T) {
 }
 
 func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(ctx, PodConfigNotificationSnapshotAndUpdates)
+	channel, ch, config := createPodConfigTester(tCtx, PodConfigNotificationSnapshotAndUpdates)
 
 	// see an set
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"))
@@ -239,10 +234,9 @@ func TestNewPodAddedSnapshotAndUpdates(t *testing.T) {
 }
 
 func TestNewPodAddedSnapshot(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, config := createPodConfigTester(ctx, PodConfigNotificationSnapshot)
+	channel, ch, config := createPodConfigTester(tCtx, PodConfigNotificationSnapshot)
 
 	// see an set
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"))
@@ -260,10 +254,9 @@ func TestNewPodAddedSnapshot(t *testing.T) {
 }
 
 func TestNewPodAddedUpdatedRemoved(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, _ := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, _ := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// should register an add
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"))
@@ -286,10 +279,9 @@ func TestNewPodAddedUpdatedRemoved(t *testing.T) {
 }
 
 func TestNewPodAddedDelete(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, _ := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, _ := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// should register an add
 	addedPod := CreateValidPod("foo", "new")
@@ -308,10 +300,9 @@ func TestNewPodAddedDelete(t *testing.T) {
 }
 
 func TestNewPodAddedUpdatedSet(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, _ := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, _ := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	// should register an add
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "new"), CreateValidPod("foo2", "new"), CreateValidPod("foo3", "new"))
@@ -333,8 +324,7 @@ func TestNewPodAddedUpdatedSet(t *testing.T) {
 }
 
 func TestNewPodAddedSetReconciled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	// Create and touch new test pods, return the new pods and touched pod. We should create new pod list
 	// before touching to avoid data race.
@@ -358,7 +348,7 @@ func TestNewPodAddedSetReconciled(t *testing.T) {
 	} {
 		var podWithStatusChange *v1.Pod
 		pods, _ := newTestPods(false, false)
-		channel, ch, _ := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+		channel, ch, _ := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 		// Use SET to initialize the config, especially initialize the source set
 		channel <- CreatePodUpdate(kubetypes.SET, TestSource, pods...)
@@ -381,8 +371,7 @@ func TestNewPodAddedSetReconciled(t *testing.T) {
 }
 
 func TestInitialEmptySet(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
 	for _, test := range []struct {
 		mode PodConfigNotificationMode
@@ -392,7 +381,7 @@ func TestInitialEmptySet(t *testing.T) {
 		{PodConfigNotificationSnapshot, kubetypes.SET},
 		{PodConfigNotificationSnapshotAndUpdates, kubetypes.SET},
 	} {
-		channel, ch, _ := createPodConfigTester(ctx, test.mode)
+		channel, ch, _ := createPodConfigTester(tCtx, test.mode)
 
 		// should register an empty PodUpdate operation
 		podUpdate := CreatePodUpdate(kubetypes.SET, TestSource)
@@ -409,10 +398,9 @@ func TestInitialEmptySet(t *testing.T) {
 }
 
 func TestPodUpdateAnnotations(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, _ := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, _ := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	pod := CreateValidPod("foo2", "new")
 	pod.Annotations = make(map[string]string)
@@ -441,10 +429,9 @@ func TestPodUpdateAnnotations(t *testing.T) {
 }
 
 func TestPodUpdateLabels(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tCtx := ktesting.Init(t)
 
-	channel, ch, _ := createPodConfigTester(ctx, PodConfigNotificationIncremental)
+	channel, ch, _ := createPodConfigTester(tCtx, PodConfigNotificationIncremental)
 
 	pod := CreateValidPod("foo2", "new")
 	pod.Labels = make(map[string]string)
@@ -464,7 +451,9 @@ func TestPodUpdateLabels(t *testing.T) {
 }
 
 func TestPodConfigRace(t *testing.T) {
-	eventBroadcaster := record.NewBroadcaster()
+	tCtx := ktesting.Init(t)
+
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
 	config := NewPodConfig(PodConfigNotificationIncremental, eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
 	seenSources := sets.NewString(TestSource)
 	var wg sync.WaitGroup
@@ -472,7 +461,7 @@ func TestPodConfigRace(t *testing.T) {
 	wg.Add(2)
 
 	go func() {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(tCtx)
 		defer cancel()
 		defer wg.Done()
 		for i := 0; i < iterations; i++ {

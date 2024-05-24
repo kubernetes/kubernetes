@@ -23,7 +23,7 @@ rules:
     resources:
       - deployments
     resourceNames:
-      - metrics-server-v0.6.3
+      - metrics-server-v0.7.0
     verbs:
       - get
       - patch

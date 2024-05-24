@@ -97,7 +97,7 @@ func (d *namespacedResourcesDeleter) Delete(ctx context.Context, nsName string) 
 	// Multiple controllers may edit a namespace during termination
 	// first get the latest state of the namespace before proceeding
 	// if the namespace was deleted already, don't do anything
-	namespace, err := d.nsClient.Get(context.TODO(), nsName, metav1.GetOptions{})
+	namespace, err := d.nsClient.Get(ctx, nsName, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -112,7 +112,7 @@ func (d *namespacedResourcesDeleter) Delete(ctx context.Context, nsName string) 
 
 	// ensure that the status is up to date on the namespace
 	// if we get a not found error, we assume the namespace is truly gone
-	namespace, err = d.retryOnConflictError(namespace, d.updateNamespaceStatusFunc)
+	namespace, err = d.retryOnConflictError(ctx, namespace, d.updateNamespaceStatusFunc)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
@@ -140,7 +140,7 @@ func (d *namespacedResourcesDeleter) Delete(ctx context.Context, nsName string) 
 	}
 
 	// we have removed content, so mark it finalized by us
-	_, err = d.retryOnConflictError(namespace, d.finalizeNamespace)
+	_, err = d.retryOnConflictError(ctx, namespace, d.finalizeNamespace)
 	if err != nil {
 		// in normal practice, this should not be possible, but if a deployment is running
 		// two controllers to do namespace deletion that share a common finalizer token it's
@@ -237,15 +237,15 @@ func (o *operationNotSupportedCache) setNotSupported(key operationKey) {
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
-type updateNamespaceFunc func(namespace *v1.Namespace) (*v1.Namespace, error)
+type updateNamespaceFunc func(ctx context.Context, namespace *v1.Namespace) (*v1.Namespace, error)
 
 // retryOnConflictError retries the specified fn if there was a conflict error
 // it will return an error if the UID for an object changes across retry operations.
 // TODO RetryOnConflict should be a generic concept in client code
-func (d *namespacedResourcesDeleter) retryOnConflictError(namespace *v1.Namespace, fn updateNamespaceFunc) (result *v1.Namespace, err error) {
+func (d *namespacedResourcesDeleter) retryOnConflictError(ctx context.Context, namespace *v1.Namespace, fn updateNamespaceFunc) (result *v1.Namespace, err error) {
 	latestNamespace := namespace
 	for {
-		result, err = fn(latestNamespace)
+		result, err = fn(ctx, latestNamespace)
 		if err == nil {
 			return result, nil
 		}
@@ -253,7 +253,7 @@ func (d *namespacedResourcesDeleter) retryOnConflictError(namespace *v1.Namespac
 			return nil, err
 		}
 		prevNamespace := latestNamespace
-		latestNamespace, err = d.nsClient.Get(context.TODO(), latestNamespace.Name, metav1.GetOptions{})
+		latestNamespace, err = d.nsClient.Get(ctx, latestNamespace.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -264,13 +264,13 @@ func (d *namespacedResourcesDeleter) retryOnConflictError(namespace *v1.Namespac
 }
 
 // updateNamespaceStatusFunc will verify that the status of the namespace is correct
-func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *v1.Namespace) (*v1.Namespace, error) {
+func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(ctx context.Context, namespace *v1.Namespace) (*v1.Namespace, error) {
 	if namespace.DeletionTimestamp.IsZero() || namespace.Status.Phase == v1.NamespaceTerminating {
 		return namespace, nil
 	}
 	newNamespace := namespace.DeepCopy()
 	newNamespace.Status.Phase = v1.NamespaceTerminating
-	return d.nsClient.UpdateStatus(context.TODO(), newNamespace, metav1.UpdateOptions{})
+	return d.nsClient.UpdateStatus(ctx, newNamespace, metav1.UpdateOptions{})
 }
 
 // finalized returns true if the namespace.Spec.Finalizers is an empty list
@@ -279,7 +279,7 @@ func finalized(namespace *v1.Namespace) bool {
 }
 
 // finalizeNamespace removes the specified finalizerToken and finalizes the namespace
-func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) (*v1.Namespace, error) {
+func (d *namespacedResourcesDeleter) finalizeNamespace(ctx context.Context, namespace *v1.Namespace) (*v1.Namespace, error) {
 	namespaceFinalize := v1.Namespace{}
 	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
 	namespaceFinalize.Spec = namespace.Spec
@@ -293,7 +293,7 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(namespace *v1.Namespace) 
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, v1.FinalizerName(value))
 	}
-	namespace, err := d.nsClient.Finalize(context.Background(), &namespaceFinalize, metav1.UpdateOptions{})
+	namespace, err := d.nsClient.Finalize(ctx, &namespaceFinalize, metav1.UpdateOptions{})
 	if err != nil {
 		// it was removed already, so life is good
 		if errors.IsNotFound(err) {
@@ -321,8 +321,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(ctx context.Context, gvr s
 	// namespace itself.
 	background := metav1.DeletePropagationBackground
 	opts := metav1.DeleteOptions{PropagationPolicy: &background}
-	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(context.TODO(), opts, metav1.ListOptions{})
-
+	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(ctx, opts, metav1.ListOptions{})
 	if err == nil {
 		return true, nil
 	}
@@ -357,7 +356,7 @@ func (d *namespacedResourcesDeleter) listCollection(ctx context.Context, gvr sch
 		return nil, false, nil
 	}
 
-	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
+	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err == nil {
 		return partialList, true, nil
 	}
@@ -379,17 +378,17 @@ func (d *namespacedResourcesDeleter) listCollection(ctx context.Context, gvr sch
 func (d *namespacedResourcesDeleter) deleteEachItem(ctx context.Context, gvr schema.GroupVersionResource, namespace string) error {
 	klog.FromContext(ctx).V(5).Info("Namespace controller - deleteEachItem", "namespace", namespace, "resource", gvr)
 
-	unstructuredList, listSupported, err := d.listCollection(ctx, gvr, namespace)
+	partialList, listSupported, err := d.listCollection(ctx, gvr, namespace)
 	if err != nil {
 		return err
 	}
 	if !listSupported {
 		return nil
 	}
-	for _, item := range unstructuredList.Items {
+	for _, item := range partialList.Items {
 		background := metav1.DeletePropagationBackground
 		opts := metav1.DeleteOptions{PropagationPolicy: &background}
-		if err = d.metadataClient.Resource(gvr).Namespace(namespace).Delete(context.TODO(), item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
+		if err = d.metadataClient.Resource(gvr).Namespace(namespace).Delete(ctx, item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
 	}
@@ -554,7 +553,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 	// we need to reflect that information.  Recall that additional finalizers can be set on namespaces, so this finalizer may clear itself and
 	// NOT remove the resource instance.
 	if hasChanged := conditionUpdater.Update(ns); hasChanged {
-		if _, err = d.nsClient.UpdateStatus(context.TODO(), ns, metav1.UpdateOptions{}); err != nil {
+		if _, err = d.nsClient.UpdateStatus(ctx, ns, metav1.UpdateOptions{}); err != nil {
 			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
 		}
 	}
@@ -595,7 +594,7 @@ func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ctx cont
 	if podsGetter == nil || reflect.ValueOf(podsGetter).IsNil() {
 		return 0, fmt.Errorf("unexpected: podsGetter is nil. Cannot estimate grace period seconds for pods")
 	}
-	items, err := podsGetter.Pods(ns).List(context.TODO(), metav1.ListOptions{})
+	items, err := podsGetter.Pods(ns).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return 0, err
 	}

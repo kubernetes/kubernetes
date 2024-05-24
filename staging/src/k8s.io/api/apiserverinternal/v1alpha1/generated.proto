@@ -77,7 +77,6 @@ message StorageVersionCondition {
   optional int64 observedGeneration = 3;
 
   // Last time the condition transitioned from one status to another.
-  // +required
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
   // The reason for the condition's last transition.

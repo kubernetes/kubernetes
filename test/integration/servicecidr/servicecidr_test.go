@@ -65,6 +65,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 	resyncPeriod := 12 * time.Hour
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
+		ctx,
 		informerFactory.Networking().V1alpha1().ServiceCIDRs(),
 		informerFactory.Networking().V1alpha1().IPAddresses(),
 		client,
@@ -165,6 +166,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	resyncPeriod := 12 * time.Hour
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
+		ctx,
 		informerFactory.Networking().V1alpha1().ServiceCIDRs(),
 		informerFactory.Networking().V1alpha1().IPAddresses(),
 		client,

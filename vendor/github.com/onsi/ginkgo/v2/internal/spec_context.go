@@ -17,7 +17,7 @@ type specContext struct {
 	context.Context
 	*ProgressReporterManager
 
-	cancel context.CancelFunc
+	cancel context.CancelCauseFunc
 
 	suite *Suite
 }
@@ -30,7 +30,7 @@ Note that while SpecContext is used to enforce deadlines by Ginkgo it is not con
 This is because Ginkgo needs finer control over when the context is canceled.  Specifically, Ginkgo needs to generate a ProgressReport before it cancels the context to ensure progress is captured where the spec is currently running.  The only way to avoid a race here is to manually control the cancellation.
 */
 func NewSpecContext(suite *Suite) *specContext {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancelCause(context.Background())
 	sc := &specContext{
 		cancel:                  cancel,
 		suite:                   suite,

@@ -17,25 +17,18 @@ limitations under the License.
 package upgrade
 
 import (
-	"context"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	clientset "k8s.io/client-go/kubernetes"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -236,107 +229,4 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 		}
 	}
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
-}
-
-// TODO: Remove this unit test during the 1.30 release cycle:
-// https://github.com/kubernetes/kubeadm/issues/2414
-func TestCreateSuperAdminKubeConfig(t *testing.T) {
-	dir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dir)
-
-	cfg := testutil.GetDefaultInternalConfig(t)
-	cfg.CertificatesDir = dir
-
-	ca := certsphase.KubeadmCertRootCA()
-	_, _, err := ca.CreateAsCA(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := []struct {
-		name                  string
-		kubeConfigExist       bool
-		expectRBACError       bool
-		expectedError         bool
-		expectKubeConfigError bool
-	}{
-		{
-			name: "no error",
-		},
-		{
-			name:            "no error, kubeconfig files already exist",
-			kubeConfigExist: true,
-		},
-		{
-			name:            "return RBAC error",
-			expectRBACError: true,
-			expectedError:   true,
-		},
-		{
-			name:                  "return kubeconfig error",
-			expectKubeConfigError: true,
-			expectedError:         true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-
-			// Define a custom RBAC test function, so that there is no test coverage overlap.
-			ensureRBACFunc := func(context.Context, clientset.Interface, clientset.Interface,
-				time.Duration, time.Duration) (clientset.Interface, error) {
-
-				if tc.expectRBACError {
-					return nil, errors.New("ensureRBACFunc error")
-				}
-				return nil, nil
-			}
-
-			// Define a custom kubeconfig function so that we can fail at least one call.
-			kubeConfigFunc := func(a string, b string, cfg *kubeadmapi.InitConfiguration) error {
-				if tc.expectKubeConfigError {
-					return errors.New("kubeConfigFunc error")
-				}
-				return kubeconfigphase.CreateKubeConfigFile(a, b, cfg)
-			}
-
-			// If kubeConfigExist is true, pre-create the admin.conf and super-admin.conf files.
-			if tc.kubeConfigExist {
-				b := []byte("foo")
-				if err := os.WriteFile(filepath.Join(dir, constants.AdminKubeConfigFileName), b, 0644); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(filepath.Join(dir, constants.SuperAdminKubeConfigFileName), b, 0644); err != nil {
-					t.Fatal(err)
-				}
-			}
-
-			// Call createSuperAdminKubeConfig() with a custom ensureRBACFunc().
-			err := createSuperAdminKubeConfig(cfg, dir, false, ensureRBACFunc, kubeConfigFunc)
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("expected error: %v, got: %v, error: %v", err != nil, tc.expectedError, err)
-			}
-
-			// Obtain the list of files in the directory after createSuperAdminKubeConfig() is done.
-			var files []string
-			fileInfo, err := os.ReadDir(dir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, file := range fileInfo {
-				files = append(files, file.Name())
-			}
-
-			// Verify the expected files.
-			expectedFiles := []string{
-				constants.AdminKubeConfigFileName,
-				constants.CACertName,
-				constants.CAKeyName,
-				constants.SuperAdminKubeConfigFileName,
-			}
-			if !reflect.DeepEqual(expectedFiles, files) {
-				t.Fatalf("expected files: %v, got: %v", expectedFiles, files)
-			}
-		})
-	}
 }

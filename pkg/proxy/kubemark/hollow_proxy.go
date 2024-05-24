@@ -27,20 +27,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
-	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
-	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/proxy/iptables"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
-	utilexec "k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-
-	"k8s.io/klog/v2"
 )
 
 type HollowProxy struct {
@@ -63,68 +53,15 @@ func (*FakeProxier) OnEndpointSliceAdd(slice *discoveryv1.EndpointSlice)        
 func (*FakeProxier) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointSlice) {}
 func (*FakeProxier) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice)           {}
 func (*FakeProxier) OnEndpointSlicesSynced()                                          {}
+func (*FakeProxier) OnServiceCIDRsChanged(_ []string)                                 {}
 
-func NewHollowProxyOrDie(
+func NewHollowProxy(
 	nodeName string,
 	client clientset.Interface,
 	eventClient v1core.EventsGetter,
-	iptInterface utiliptables.Interface,
-	sysctl utilsysctl.Interface,
-	execer utilexec.Interface,
 	broadcaster events.EventBroadcaster,
 	recorder events.EventRecorder,
-	useRealProxier bool,
-	proxierSyncPeriod time.Duration,
-	proxierMinSyncPeriod time.Duration,
-) (*HollowProxy, error) {
-	// Create proxier and service/endpoint handlers.
-	var proxier proxy.Provider
-	var err error
-
-	if useRealProxier {
-		nodeIP := utilnode.GetNodeIP(client, nodeName)
-		if nodeIP == nil {
-			klog.InfoS("Can't determine this node's IP, assuming 127.0.0.1")
-			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
-		}
-		family := v1.IPv4Protocol
-		if iptInterface.IsIPv6() {
-			family = v1.IPv6Protocol
-		}
-		// Real proxier with fake iptables, sysctl, etc underneath it.
-		//var err error
-		proxier, err = iptables.NewProxier(
-			family,
-			iptInterface,
-			sysctl,
-			execer,
-			proxierSyncPeriod,
-			proxierMinSyncPeriod,
-			false,
-			false,
-			0,
-			proxyutiliptables.NewNoOpLocalDetector(),
-			nodeName,
-			nodeIP,
-			recorder,
-			nil,
-			[]string{},
-			false,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create proxier: %v", err)
-		}
-	} else {
-		proxier = &FakeProxier{}
-	}
-
-	// Create a Hollow Proxy instance.
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      nodeName,
-		UID:       types.UID(nodeName),
-		Namespace: "",
-	}
+) *HollowProxy {
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
 			Config: &proxyconfigapi.KubeProxyConfiguration{
@@ -134,12 +71,17 @@ func NewHollowProxyOrDie(
 			},
 
 			Client:      client,
-			Proxier:     proxier,
+			Proxier:     &FakeProxier{},
 			Broadcaster: broadcaster,
 			Recorder:    recorder,
-			NodeRef:     nodeRef,
+			NodeRef: &v1.ObjectReference{
+				Kind:      "Node",
+				Name:      nodeName,
+				UID:       types.UID(nodeName),
+				Namespace: "",
+			},
 		},
-	}, nil
+	}
 }
 
 func (hp *HollowProxy) Run() error {

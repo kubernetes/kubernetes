@@ -70,6 +70,18 @@ func (m Map) HandlesSchedulerName(name string) bool {
 	return ok
 }
 
+// Close closes all frameworks registered in this map.
+func (m Map) Close() error {
+	var errs []error
+	for name, f := range m {
+		err := f.Close()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("framework %s failed to close: %w", name, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // NewRecorderFactory returns a RecorderFactory for the broadcaster.
 func NewRecorderFactory(b events.EventBroadcaster) RecorderFactory {
 	return func(name string) events.EventRecorder {

@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -77,11 +80,6 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		firewallTestSourceRanges := []string{"0.0.0.0/1", "128.0.0.0/1"}
 		serviceName := "firewall-test-loadbalancer"
 
-		ginkgo.By("Getting cluster ID")
-		clusterID, err := gce.GetClusterID(ctx, cs)
-		framework.ExpectNoError(err)
-		framework.Logf("Got cluster ID: %v", clusterID)
-
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
@@ -98,6 +96,13 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			svc.Spec.LoadBalancerSourceRanges = firewallTestSourceRanges
 		})
 		framework.ExpectNoError(err)
+
+		// This configmap is guaranteed to exist after a Loadbalancer type service is created
+		ginkgo.By("Getting cluster ID")
+		clusterID, err := gce.GetClusterID(ctx, cs)
+		framework.ExpectNoError(err)
+		framework.Logf("Got cluster ID: %v", clusterID)
+
 		defer func() {
 			_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeNodePort

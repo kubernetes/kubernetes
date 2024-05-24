@@ -236,7 +236,7 @@ func parse(fset *token.FileSet, filename string, src []byte, opt *Options) (*ast
 			src = src[:len(src)-len("}\n")]
 			// Gofmt has also indented the function body one level.
 			// Remove that indent.
-			src = bytes.Replace(src, []byte("\n\t"), []byte("\n"), -1)
+			src = bytes.ReplaceAll(src, []byte("\n\t"), []byte("\n"))
 			return matchSpace(orig, src)
 		}
 		return file, adjust, nil

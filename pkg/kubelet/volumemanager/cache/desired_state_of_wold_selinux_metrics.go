@@ -25,37 +25,45 @@ import (
 
 var (
 	// TODO: add plugin name + access mode labels to all these metrics
-	seLinuxContainerContextErrors = compbasemetrics.NewGauge(
+	seLinuxContainerContextErrors = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "volume_manager_selinux_container_errors_total",
 			Help:           "Number of errors when kubelet cannot compute SELinux context for a container. Kubelet can't start such a Pod then and it will retry, therefore value of this metric may not represent the actual nr. of containers.",
 			StabilityLevel: compbasemetrics.ALPHA,
-		})
-	seLinuxContainerContextWarnings = compbasemetrics.NewGauge(
+		},
+		[]string{"access_mode"},
+	)
+	seLinuxContainerContextWarnings = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "volume_manager_selinux_container_warnings_total",
 			StabilityLevel: compbasemetrics.ALPHA,
 			Help:           "Number of errors when kubelet cannot compute SELinux context for a container that are ignored. They will become real errors when SELinuxMountReadWriteOncePod feature is expanded to all volume access modes.",
-		})
-	seLinuxPodContextMismatchErrors = compbasemetrics.NewGauge(
+		},
+		[]string{"access_mode"},
+	)
+	seLinuxPodContextMismatchErrors = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "volume_manager_selinux_pod_context_mismatch_errors_total",
 			Help:           "Number of errors when a Pod defines different SELinux contexts for its containers that use the same volume. Kubelet can't start such a Pod then and it will retry, therefore value of this metric may not represent the actual nr. of Pods.",
 			StabilityLevel: compbasemetrics.ALPHA,
-		})
-	seLinuxPodContextMismatchWarnings = compbasemetrics.NewGauge(
+		},
+		[]string{"access_mode"},
+	)
+	seLinuxPodContextMismatchWarnings = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "volume_manager_selinux_pod_context_mismatch_warnings_total",
 			Help:           "Number of errors when a Pod defines different SELinux contexts for its containers that use the same volume. They are not errors yet, but they will become real errors when SELinuxMountReadWriteOncePod feature is expanded to all volume access modes.",
 			StabilityLevel: compbasemetrics.ALPHA,
-		})
+		},
+		[]string{"access_mode"},
+	)
 	seLinuxVolumeContextMismatchErrors = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "volume_manager_selinux_volume_context_mismatch_errors_total",
 			Help:           "Number of errors when a Pod uses a volume that is already mounted with a different SELinux context than the Pod needs. Kubelet can't start such a Pod then and it will retry, therefore value of this metric may not represent the actual nr. of Pods.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"volume_plugin"},
+		[]string{"volume_plugin", "access_mode"},
 	)
 	seLinuxVolumeContextMismatchWarnings = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -63,7 +71,7 @@ var (
 			Help:           "Number of errors when a Pod uses a volume that is already mounted with a different SELinux context than the Pod needs. They are not errors yet, but they will become real errors when SELinuxMountReadWriteOncePod feature is expanded to all volume access modes.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"volume_plugin"},
+		[]string{"volume_plugin", "access_mode"},
 	)
 	seLinuxVolumesAdmitted = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -71,7 +79,7 @@ var (
 			Help:           "Number of volumes whose SELinux context was fine and will be mounted with mount -o context option.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"volume_plugin"},
+		[]string{"volume_plugin", "access_mode"},
 	)
 
 	registerMetrics sync.Once

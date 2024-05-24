@@ -18,6 +18,7 @@ package noderestriction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -25,7 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,6 +41,7 @@ import (
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/resource"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -71,7 +73,8 @@ type Plugin struct {
 	podsGetter     corev1lister.PodLister
 	nodesGetter    corev1lister.NodeLister
 
-	expansionRecoveryEnabled bool
+	expansionRecoveryEnabled         bool
+	dynamicResourceAllocationEnabled bool
 }
 
 var (
@@ -83,6 +86,7 @@ var (
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
+	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
 }
 
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
@@ -106,12 +110,13 @@ func (p *Plugin) ValidateInitialization() error {
 }
 
 var (
-	podResource     = api.Resource("pods")
-	nodeResource    = api.Resource("nodes")
-	pvcResource     = api.Resource("persistentvolumeclaims")
-	svcacctResource = api.Resource("serviceaccounts")
-	leaseResource   = coordapi.Resource("leases")
-	csiNodeResource = storage.Resource("csinodes")
+	podResource           = api.Resource("pods")
+	nodeResource          = api.Resource("nodes")
+	pvcResource           = api.Resource("persistentvolumeclaims")
+	svcacctResource       = api.Resource("serviceaccounts")
+	leaseResource         = coordapi.Resource("leases")
+	csiNodeResource       = storage.Resource("csinodes")
+	resourceSliceResource = resource.Resource("resourceslices")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
@@ -163,6 +168,9 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	case csiNodeResource:
 		return p.admitCSINode(nodeName, a)
 
+	case resourceSliceResource:
+		return p.admitResourceSlice(nodeName, a)
+
 	default:
 		return nil
 	}
@@ -178,7 +186,7 @@ func (p *Plugin) admitPod(nodeName string, a admission.Attributes) error {
 	case admission.Delete:
 		// get the existing pod
 		existingPod, err := p.podsGetter.Pods(a.GetNamespace()).Get(a.GetName())
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return err
 		}
 		if err != nil {
@@ -233,7 +241,7 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 
 		// Verify the node UID.
 		node, err := p.nodesGetter.Get(nodeName)
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return err
 		}
 		if err != nil {
@@ -351,7 +359,7 @@ func (p *Plugin) admitPodEviction(nodeName string, a admission.Attributes) error
 		}
 		// get the existing pod
 		existingPod, err := p.podsGetter.Pods(a.GetNamespace()).Get(podName)
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return err
 		}
 		if err != nil {
@@ -412,7 +420,7 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 
 		// ensure no metadata changed. nodes should not be able to relabel, add finalizers/owners, etc
 		if !apiequality.Semantic.DeepEqual(oldPVC, newPVC) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.capacity and status.conditions: %v", nodeName, cmp.Diff(oldPVC, newPVC)))
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.quantity and status.conditions: %v", nodeName, cmp.Diff(oldPVC, newPVC)))
 		}
 
 		return nil
@@ -570,7 +578,7 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 		return admission.NewForbidden(a, fmt.Errorf("node requested token with a pod binding without a uid"))
 	}
 	pod, err := p.podsGetter.Pods(a.GetNamespace()).Get(ref.Name)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return err
 	}
 	if err != nil {
@@ -582,6 +590,12 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	if pod.Spec.NodeName != nodeName {
 		return admission.NewForbidden(a, fmt.Errorf("node requested token bound to a pod scheduled on a different node"))
 	}
+
+	// Note: A token may only be bound to one object at a time. By requiring
+	// the Pod binding, noderestriction eliminates the opportunity to spoof
+	// a Node binding. Instead, kube-apiserver automatically infers and sets
+	// the Node binding when it receives a Pod binding. See:
+	// https://github.com/kubernetes/kubernetes/issues/121723 for more info.
 
 	return nil
 }
@@ -625,6 +639,23 @@ func (p *Plugin) admitCSINode(nodeName string, a admission.Attributes) error {
 	} else {
 		if a.GetName() != nodeName {
 			return admission.NewForbidden(a, fmt.Errorf("can only access CSINode with the same name as the requesting node"))
+		}
+	}
+
+	return nil
+}
+
+func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) error {
+	// The create request must come from a node with the same name as the NodeName field.
+	// Other requests gets checked by the node authorizer.
+	if a.GetOperation() == admission.Create {
+		slice, ok := a.GetObject().(*resource.ResourceSlice)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+
+		if slice.NodeName != nodeName {
+			return admission.NewForbidden(a, errors.New("can only create ResourceSlice with the same NodeName as the requesting node"))
 		}
 	}
 

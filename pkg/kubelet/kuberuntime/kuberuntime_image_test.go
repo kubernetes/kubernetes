@@ -149,6 +149,20 @@ func TestGetImageRef(t *testing.T) {
 	assert.Equal(t, image, imageRef)
 }
 
+func TestImageSize(t *testing.T) {
+	ctx := context.Background()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	const imageSize = uint64(64)
+	fakeImageService.SetFakeImageSize(imageSize)
+	image := "busybox"
+	fakeImageService.SetFakeImages([]string{image})
+	actualSize, err := fakeManager.GetImageSize(ctx, kubecontainer.ImageSpec{Image: image})
+	assert.NoError(t, err)
+	assert.Equal(t, imageSize, actualSize)
+}
+
 func TestGetImageRefImageNotAvailableLocally(t *testing.T) {
 	ctx := context.Background()
 	_, _, fakeManager, err := createTestRuntimeManager()
