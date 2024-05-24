@@ -164,8 +164,8 @@ func TestListKubeContainers(t *testing.T) {
 func TestSandboxImage(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:3.9"), nil, nil },
-			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:3.9\n"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:ver"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:ver\n"), nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
@@ -181,8 +181,8 @@ func TestSandboxImage(t *testing.T) {
 		expected string
 		isError  bool
 	}{
-		{"valid: read sandbox image normally", "registry.k8s.io/pause:3.9", false},
-		{"valid: read sandbox image with leading/trailing white spaces", "registry.k8s.io/pause:3.9", false},
+		{"valid: read sandbox image normally", "registry.k8s.io/pause:ver", false},
+		{"valid: read sandbox image with leading/trailing white spaces", "registry.k8s.io/pause:ver", false},
 		{"invalid: read empty sandbox image", "", true},
 		{"invalid: failed to read sandbox image", "", true},
 	}

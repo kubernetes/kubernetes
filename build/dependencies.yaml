@@ -189,17 +189,14 @@ dependencies:
     - path: build/common.sh
       match: __default_go_runner_version=
 
-  # TODO: enable once pause 3.10 is promoted
-  # https://github.com/kubernetes/kubernetes/issues/125092
-  #
-  # - name: "registry.k8s.io/pause"
-  #   version: 3.10
-  #   refPaths:
-  #   - path: build/pause/Makefile
-  #     match: TAG\s*\?=
+  - name: "registry.k8s.io/pause"
+    version: 3.10
+    refPaths:
+    - path: build/pause/Makefile
+      match: TAG\s*\?=
 
   - name: "registry.k8s.io/pause: dependents"
-    version: 3.9
+    version: 3.10
     refPaths:
     - path: cluster/gce/config-common.sh
       match: registry.k8s.io\/pause:\d+\.\d+
@@ -209,12 +206,6 @@ dependencies:
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
-    - path: cmd/kubeadm/app/util/template_test.go
-      match: validTmpl\s+=
-    - path: cmd/kubeadm/app/util/template_test.go
-      match: validTmplOut\s+=
-    - path: cmd/kubeadm/app/util/template_test.go
-      match: doNothing\s+=
     - path: cmd/kubelet/app/options/container_runtime.go
       match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
@@ -248,8 +239,6 @@ dependencies:
     - path: test/integration/scheduler_perf/config/pod-with-secret-volume.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-topology-spreading.yaml
-      match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/utils/runners.go
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}

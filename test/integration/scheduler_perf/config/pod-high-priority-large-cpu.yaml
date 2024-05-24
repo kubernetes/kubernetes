@@ -5,7 +5,7 @@ metadata:
 spec:
   priority: 10
   containers:
-  - image: registry.k8s.io/pause:3.9
+  - image: registry.k8s.io/pause:3.10
     name: pause
     ports:
     - containerPort: 80
