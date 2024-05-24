@@ -140,30 +140,41 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 
 type immediateTickerFactory struct{}
 
-func (t *immediateTickerFactory) NewTicker(d time.Duration) clock.Ticker {
-	return &immediateTicker{stopCh: make(chan struct{})}
+func (t *immediateTickerFactory) NewTimer(d time.Duration) clock.Timer {
+	timer := immediateTicker{
+		c: make(chan time.Time),
+	}
+	timer.Reset(d)
+	return &timer
 }
 
 type immediateTicker struct {
-	stopCh chan struct{}
+	c chan time.Time
+}
+
+func (t *immediateTicker) Reset(d time.Duration) (active bool) {
+	select {
+	case <-t.c:
+		active = true
+	default:
+	}
+	go func() {
+		t.c <- time.Now()
+	}()
+	return active
 }
 
 func (t *immediateTicker) C() <-chan time.Time {
-	ch := make(chan time.Time)
-	go func() {
-		for {
-			select {
-			case ch <- time.Now():
-			case <-t.stopCh:
-				return
-			}
-		}
-	}()
-	return ch
+	return t.c
 }
 
-func (t *immediateTicker) Stop() {
-	close(t.stopCh)
+func (t *immediateTicker) Stop() bool {
+	select {
+	case <-t.c:
+		return true
+	default:
+		return false
+	}
 }
 
 func (w *testWatchCache) RequestWatchProgress(ctx context.Context) error {

@@ -49,7 +49,7 @@ func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester
 type WatchProgressRequester func(ctx context.Context) error
 
 type TickerFactory interface {
-	NewTicker(time.Duration) clock.Ticker
+	NewTimer(time.Duration) clock.Timer
 }
 
 // conditionalProgressRequester will request progress notification if there
@@ -78,8 +78,8 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 		pr.stopped = true
 		pr.cond.Signal()
 	}()
-	ticker := pr.clock.NewTicker(progressRequestPeriod)
-	defer ticker.Stop()
+	timer := pr.clock.NewTimer(progressRequestPeriod)
+	defer timer.Stop()
 	for {
 		stopped := func() bool {
 			pr.mux.RLock()
@@ -94,7 +94,8 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 		}
 
 		select {
-		case <-ticker.C():
+		case <-timer.C():
+			timer.Reset(progressRequestPeriod)
 			shouldRequest := func() bool {
 				pr.mux.RLock()
 				defer pr.mux.RUnlock()
