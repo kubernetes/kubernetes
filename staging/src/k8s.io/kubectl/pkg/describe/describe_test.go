@@ -681,6 +681,7 @@ func TestDescribeService(t *testing.T) {
 					LoadBalancerIP:        "5.6.7.8",
 					SessionAffinity:       corev1.ServiceAffinityNone,
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
 					HealthCheckNodePort:   32222,
 				},
 			},
@@ -720,6 +721,7 @@ func TestDescribeService(t *testing.T) {
 				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527
 				Session Affinity:         None
 				External Traffic Policy:  Local
+				Internal Traffic Policy:  Cluster
 				HealthCheck NodePort:     32222
 				Events:                   <none>
 			`)[1:],
@@ -746,6 +748,7 @@ func TestDescribeService(t *testing.T) {
 					LoadBalancerIP:        "5.6.7.8",
 					SessionAffinity:       corev1.ServiceAffinityNone,
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
 					HealthCheckNodePort:   32222,
 				},
 			},
@@ -805,6 +808,7 @@ func TestDescribeService(t *testing.T) {
 				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527 + 2 more...
 				Session Affinity:         None
 				External Traffic Policy:  Local
+				Internal Traffic Policy:  Local
 				HealthCheck NodePort:     32222
 				Events:                   <none>
 			`)[1:],
