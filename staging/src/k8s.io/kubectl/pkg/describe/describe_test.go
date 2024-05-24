@@ -724,7 +724,7 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      <none>
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
 				LoadBalancer Ingress:     5.6.7.8 (VIP)
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               9527/TCP
@@ -821,7 +821,7 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      <none>
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
 				LoadBalancer Ingress:     5.6.7.8
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
@@ -886,7 +886,7 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      <none>
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP
@@ -935,7 +935,7 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      1.2.3.4
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP
