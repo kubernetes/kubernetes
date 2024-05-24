@@ -10658,6 +10658,15 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
+		"pod tolerations unique with key and effect": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-forgiveness-invalid",
+				Namespace: "ns",
+			},
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{
+				{Key: "foo", Operator: "Exists", Effect: "NoSchedule"},
+				{Key: "foo", Operator: "Equal", Effect: "NoExecute", Value: "bar1"}}),
+		},
 		"runtime default seccomp profile": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
@@ -12372,6 +12381,18 @@ func TestValidatePod(t *testing.T) {
 					Namespace: "ns",
 				},
 				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
+			},
+		},
+		"pod tolerations must be unique with key and effect": {
+			expectedError: `spec.tolerations[1]: Duplicate value: core.Toleration{Key:"foo", Operator:"Equal", Value:"bar1", Effect:"NoSchedule", TolerationSeconds:(*int64)(nil)}: taints must be unique by key and effect pair`,
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-forgiveness-invalid",
+					Namespace: "ns",
+				},
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []core.Toleration{
+					{Key: "foo", Operator: "Exists", Effect: "NoSchedule"},
+					{Key: "foo", Operator: "Equal", Effect: "NoSchedule", Value: "bar1"}}),
 			},
 		},
 		"must be a valid pod seccomp profile": {
@@ -14336,6 +14357,28 @@ func TestValidatePodUpdate(t *testing.T) {
 					NodeName: "node1", Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				}},
 			err:  "spec.tolerations[1].effect",
+			test: "added invalid new toleration to existing tolerations in pod spec updates",
+		}, {
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{
+					NodeName: "node1",
+					Tolerations: []core.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key1", Value: "value2", Operator: "Equal", Effect: "NoExecute"},
+					},
+				}},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					NodeName: "node1",
+					Tolerations: []core.Toleration{
+						{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
+						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule"},
+					},
+				}},
+			err:  `spec.tolerations[1]: Duplicate value: core.Toleration{Key:"key1", Operator:"Equal", Value:"value2", Effect:"NoExecute", TolerationSeconds:(*int64)(nil)}: taints must be unique by key and effect pair`,
 			test: "added invalid new toleration to existing tolerations in pod spec updates",
 		}, {
 			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
