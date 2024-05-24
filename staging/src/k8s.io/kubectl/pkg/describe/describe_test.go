@@ -684,6 +684,16 @@ func TestDescribeService(t *testing.T) {
 					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
 					HealthCheckNodePort:   32222,
 				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
+							{
+								IP:     "5.6.7.8",
+								IPMode: ptr.To(corev1.LoadBalancerIPModeVIP),
+							},
+						},
+					},
+				},
 			},
 			endpointSlices: []*discoveryv1.EndpointSlice{{
 				ObjectMeta: metav1.ObjectMeta{
@@ -715,6 +725,7 @@ func TestDescribeService(t *testing.T) {
 				IP:                       1.2.3.4
 				IPs:                      <none>
 				IP:                       5.6.7.8
+				LoadBalancer Ingress:     5.6.7.8 (VIP)
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               9527/TCP
 				NodePort:                 port-tcp  31111/TCP
@@ -750,6 +761,15 @@ func TestDescribeService(t *testing.T) {
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
 					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
 					HealthCheckNodePort:   32222,
+				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
+							{
+								IP: "5.6.7.8",
+							},
+						},
+					},
 				},
 			},
 			endpointSlices: []*discoveryv1.EndpointSlice{
@@ -802,6 +822,7 @@ func TestDescribeService(t *testing.T) {
 				IP:                       1.2.3.4
 				IPs:                      <none>
 				IP:                       5.6.7.8
+				LoadBalancer Ingress:     5.6.7.8
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP

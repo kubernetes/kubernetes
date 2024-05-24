@@ -2984,6 +2984,9 @@ func buildIngressString(ingress []corev1.LoadBalancerIngress) string {
 		}
 		if ingress[i].IP != "" {
 			buffer.WriteString(ingress[i].IP)
+			if ingress[i].IPMode != nil {
+				buffer.WriteString(fmt.Sprintf(" (%s)", *ingress[i].IPMode))
+			}
 		} else {
 			buffer.WriteString(ingress[i].Hostname)
 		}
