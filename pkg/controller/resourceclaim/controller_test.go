@@ -647,10 +647,8 @@ func reserveClaim(claim *resourcev1alpha2.ResourceClaim, pod *v1.Pod) *resourcev
 
 func makePodResourceClaim(name, templateName string) *v1.PodResourceClaim {
 	return &v1.PodResourceClaim{
-		Name: name,
-		Source: v1.ClaimSource{
-			ResourceClaimTemplateName: &templateName,
-		},
+		Name:                      name,
+		ResourceClaimTemplateName: &templateName,
 	}
 }
 

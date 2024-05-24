@@ -22650,8 +22650,8 @@ func TestValidateOSFields(t *testing.T) {
 		"PriorityClassName",
 		"ReadinessGates",
 		"ResourceClaims[*].Name",
-		"ResourceClaims[*].Source.ResourceClaimName",
-		"ResourceClaims[*].Source.ResourceClaimTemplateName",
+		"ResourceClaims[*].ResourceClaimName",
+		"ResourceClaims[*].ResourceClaimTemplateName",
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
@@ -25857,9 +25857,6 @@ func TestValidatePVSecretReference(t *testing.T) {
 func TestValidateDynamicResourceAllocation(t *testing.T) {
 	externalClaimName := "some-claim"
 	externalClaimTemplateName := "some-claim-template"
-	goodClaimSource := core.ClaimSource{
-		ResourceClaimName: &externalClaimName,
-	}
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
@@ -25871,10 +25868,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		RestartPolicy: core.RestartPolicyAlways,
 		DNSPolicy:     core.DNSClusterFirst,
 		ResourceClaims: []core.PodResourceClaim{{
-			Name: "my-claim-template",
-			Source: core.ClaimSource{
-				ResourceClaimTemplateName: &externalClaimTemplateName,
-			},
+			Name:                      "my-claim-template",
+			ResourceClaimTemplateName: &externalClaimTemplateName,
 		}},
 	}
 	goodClaimReference := core.PodSpec{
@@ -25882,10 +25877,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		RestartPolicy: core.RestartPolicyAlways,
 		DNSPolicy:     core.DNSClusterFirst,
 		ResourceClaims: []core.PodResourceClaim{{
-			Name: "my-claim-reference",
-			Source: core.ClaimSource{
-				ResourceClaimName: &externalClaimName,
-			},
+			Name:              "my-claim-reference",
+			ResourceClaimName: &externalClaimName,
 		}},
 	}
 
@@ -25897,11 +25890,11 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}, {
-				Name:   "another-claim",
-				Source: goodClaimSource,
+				Name:              "another-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"init container": {
@@ -25910,8 +25903,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy:  core.RestartPolicyAlways,
 			DNSPolicy:      core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 	}
@@ -25929,8 +25922,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "../my-claim",
-				Source: goodClaimSource,
+				Name:              "../my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"pod claim name with path": {
@@ -25938,8 +25931,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my/claim",
-				Source: goodClaimSource,
+				Name:              "my/claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"pod claim name empty": {
@@ -25947,8 +25940,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "",
-				Source: goodClaimSource,
+				Name:              "",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"duplicate pod claim entries": {
@@ -25956,11 +25949,11 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}, {
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"resource claim source empty": {
@@ -25968,8 +25961,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: core.ClaimSource{},
+				Name: "my-claim",
 			}},
 		},
 		"resource claim reference and template": {
@@ -25977,11 +25969,9 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name: "my-claim",
-				Source: core.ClaimSource{
-					ResourceClaimName:         &externalClaimName,
-					ResourceClaimTemplateName: &externalClaimTemplateName,
-				},
+				Name:                      "my-claim",
+				ResourceClaimName:         &externalClaimName,
+				ResourceClaimTemplateName: &externalClaimTemplateName,
 			}},
 		},
 		"claim not found": {
@@ -25989,8 +25979,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"claim name empty": {
@@ -25998,8 +25988,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"pod claim name duplicates": {
@@ -26007,8 +25997,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"no claims defined": {
@@ -26021,11 +26011,11 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}, {
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"ephemeral container don't support resource requirements": {
@@ -26034,20 +26024,20 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy:       core.RestartPolicyAlways,
 			DNSPolicy:           core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"invalid claim template name": func() core.PodSpec {
 			spec := goodClaimTemplate.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].Source.ResourceClaimTemplateName = &notLabel
+			spec.ResourceClaims[0].ResourceClaimTemplateName = &notLabel
 			return *spec
 		}(),
 		"invalid claim reference name": func() core.PodSpec {
 			spec := goodClaimReference.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].Source.ResourceClaimName = &notLabel
+			spec.ResourceClaims[0].ResourceClaimName = &notLabel
 			return *spec
 		}(),
 	}

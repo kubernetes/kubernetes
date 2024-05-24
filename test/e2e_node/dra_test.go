@@ -502,10 +502,8 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			NodeName: nodename, // Assign the node as the scheduler is not running
 			ResourceClaims: []v1.PodResourceClaim{
 				{
-					Name: podClaimName,
-					Source: v1.ClaimSource{
-						ResourceClaimName: &claimName,
-					},
+					Name:              podClaimName,
+					ResourceClaimName: &claimName,
 				},
 			},
 			Containers: []v1.Container{

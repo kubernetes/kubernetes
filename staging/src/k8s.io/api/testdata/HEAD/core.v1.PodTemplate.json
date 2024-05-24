@@ -1740,10 +1740,8 @@
       "resourceClaims": [
         {
           "name": "nameValue",
-          "source": {
-            "resourceClaimName": "resourceClaimNameValue",
-            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
-          }
+          "resourceClaimName": "resourceClaimNameValue",
+          "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
         }
       ]
     }

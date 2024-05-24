@@ -422,30 +422,6 @@ message CinderVolumeSource {
   optional LocalObjectReference secretRef = 4;
 }
 
-// ClaimSource describes a reference to a ResourceClaim.
-//
-// Exactly one of these fields should be set.  Consumers of this type must
-// treat an empty object as if it has an unknown value.
-message ClaimSource {
-  // ResourceClaimName is the name of a ResourceClaim object in the same
-  // namespace as this pod.
-  optional string resourceClaimName = 1;
-
-  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
-  // object in the same namespace as this pod.
-  //
-  // The template will be used to create a new ResourceClaim, which will
-  // be bound to this pod. When this pod is deleted, the ResourceClaim
-  // will also be deleted. The pod name and resource name, along with a
-  // generated component, will be used to form a unique name for the
-  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
-  //
-  // This field is immutable and no changes will be made to the
-  // corresponding ResourceClaim by the control plane after creating the
-  // ResourceClaim.
-  optional string resourceClaimTemplateName = 2;
-}
-
 // ClientIPConfig represents the configurations of Client IP based session affinity.
 message ClientIPConfig {
   // timeoutSeconds specifies the seconds of ClientIP type session sticky time.
@@ -3827,7 +3803,10 @@ message PodReadinessGate {
   optional string conditionType = 1;
 }
 
-// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// PodResourceClaim references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim
+// for the pod.
+//
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
 message PodResourceClaim {
@@ -3835,8 +3814,29 @@ message PodResourceClaim {
   // This must be a DNS_LABEL.
   optional string name = 1;
 
-  // Source describes where to find the ResourceClaim.
-  optional ClaimSource source = 2;
+  // ResourceClaimName is the name of a ResourceClaim object in the same
+  // namespace as this pod.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  optional string resourceClaimName = 3;
+
+  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+  // object in the same namespace as this pod.
+  //
+  // The template will be used to create a new ResourceClaim, which will
+  // be bound to this pod. When this pod is deleted, the ResourceClaim
+  // will also be deleted. The pod name and resource name, along with a
+  // generated component, will be used to form a unique name for the
+  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
+  //
+  // This field is immutable and no changes will be made to the
+  // corresponding ResourceClaim by the control plane after creating the
+  // ResourceClaim.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  optional string resourceClaimTemplateName = 4;
 }
 
 // PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim

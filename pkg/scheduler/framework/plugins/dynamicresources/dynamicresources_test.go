@@ -102,15 +102,15 @@ var (
 
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
 	otherPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID + "-II").
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
 				Obj()
 	podWithClaimTemplateInStatus = func() *v1.Pod {
 		pod := podWithClaimTemplate.DeepCopy()
@@ -124,8 +124,8 @@ var (
 	}()
 	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, Source: v1.ClaimSource{ResourceClaimName: &claimName2}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
 				Obj()
 
 	workerNode      = &st.MakeNode().Name("worker").Label("kubernetes.io/hostname", "worker").Node

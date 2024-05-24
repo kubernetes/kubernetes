@@ -11,5 +11,4 @@ spec:
       - name: resource
   resourceClaims:
   - name: resource
-    source:
-      resourceClaimTemplateName: test-claim-template
+    resourceClaimTemplateName: test-claim-template

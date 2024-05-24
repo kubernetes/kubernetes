@@ -641,8 +641,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):
 		return &applyconfigurationscorev1.CinderVolumeSourceApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("ClaimSource"):
-		return &applyconfigurationscorev1.ClaimSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ClientIPConfig"):
 		return &applyconfigurationscorev1.ClientIPConfigApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ClusterTrustBundleProjection"):

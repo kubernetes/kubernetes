@@ -722,10 +722,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					pod1claim2 := b2.externalClaim(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
 					pod1.Spec.ResourceClaims = append(pod1.Spec.ResourceClaims,
 						v1.PodResourceClaim{
-							Name: "claim-other",
-							Source: v1.ClaimSource{
-								ResourceClaimName: &pod1claim2.Name,
-							},
+							Name:              "claim-other",
+							ResourceClaimName: &pod1claim2.Name,
 						},
 					)
 
@@ -1137,10 +1135,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				claim := claim
 				pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims,
 					v1.PodResourceClaim{
-						Name: fmt.Sprintf("claim%d", i+1),
-						Source: v1.ClaimSource{
-							ResourceClaimName: &claim.Name,
-						},
+						Name:              fmt.Sprintf("claim%d", i+1),
+						ResourceClaimName: &claim.Name,
 					},
 				)
 			}
@@ -1421,10 +1417,8 @@ func (b *builder) podInline(allocationMode resourcev1alpha2.AllocationMode) (*v1
 	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
-			Name: podClaimName,
-			Source: v1.ClaimSource{
-				ResourceClaimTemplateName: ptr.To(pod.Name),
-			},
+			Name:                      podClaimName,
+			ResourceClaimTemplateName: ptr.To(pod.Name),
 		},
 	}
 	template := &resourcev1alpha2.ResourceClaimTemplate{
@@ -1464,10 +1458,8 @@ func (b *builder) podExternal() *v1.Pod {
 	externalClaimName := "external-claim" + b.driver.NameSuffix
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
-			Name: podClaimName,
-			Source: v1.ClaimSource{
-				ResourceClaimName: &externalClaimName,
-			},
+			Name:              podClaimName,
+			ResourceClaimName: &externalClaimName,
 		},
 	}
 	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
