@@ -55,6 +55,12 @@ type ExamplePlugin struct {
 	gRPCCalls      []GRPCCall
 
 	block bool
+
+	prepareResourcesFailure   error
+	failPrepareResourcesMutex sync.Mutex
+
+	unprepareResourcesFailure   error
+	failUnprepareResourcesMutex sync.Mutex
 }
 
 type GRPCCall struct {
@@ -166,6 +172,52 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 // to emulate time consuming or stuck calls
 func (ex *ExamplePlugin) Block() {
 	ex.block = true
+}
+
+func (ex *ExamplePlugin) withLock(mutex *sync.Mutex, f func()) {
+	mutex.Lock()
+	f()
+	mutex.Unlock()
+}
+
+// SetNodePrepareResourcesFailureMode sets the failure mode for NodePrepareResources call
+// and returns a function to unset the failure mode
+func (ex *ExamplePlugin) SetNodePrepareResourcesFailureMode() func() {
+	ex.failPrepareResourcesMutex.Lock()
+	ex.prepareResourcesFailure = errors.New("simulated PrepareResources failure")
+	ex.failPrepareResourcesMutex.Unlock()
+
+	return func() {
+		ex.failPrepareResourcesMutex.Lock()
+		ex.prepareResourcesFailure = nil
+		ex.failPrepareResourcesMutex.Unlock()
+	}
+}
+
+func (ex *ExamplePlugin) getPrepareResourcesFailure() error {
+	ex.failPrepareResourcesMutex.Lock()
+	defer ex.failPrepareResourcesMutex.Unlock()
+	return ex.prepareResourcesFailure
+}
+
+// SetNodeUnprepareResourcesFailureMode sets the failure mode for NodeUnprepareResources call
+// and returns a function to unset the failure mode
+func (ex *ExamplePlugin) SetNodeUnprepareResourcesFailureMode() func() {
+	ex.failUnprepareResourcesMutex.Lock()
+	ex.unprepareResourcesFailure = errors.New("simulated UnprepareResources failure")
+	ex.failUnprepareResourcesMutex.Unlock()
+
+	return func() {
+		ex.failUnprepareResourcesMutex.Lock()
+		ex.unprepareResourcesFailure = nil
+		ex.failUnprepareResourcesMutex.Unlock()
+	}
+}
+
+func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
+	ex.failUnprepareResourcesMutex.Lock()
+	defer ex.failUnprepareResourcesMutex.Unlock()
+	return ex.unprepareResourcesFailure
 }
 
 // NodePrepareResource ensures that the CDI file for the claim exists. It uses
@@ -309,6 +361,11 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1a
 	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
 		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
 	}
+
+	if failure := ex.getPrepareResourcesFailure(); failure != nil {
+		return resp, failure
+	}
+
 	for _, claimReq := range req.Claims {
 		cdiDevices, err := ex.nodePrepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
 		if err != nil {
@@ -381,6 +438,11 @@ func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv
 	resp := &drapbv1alpha3.NodeUnprepareResourcesResponse{
 		Claims: make(map[string]*drapbv1alpha3.NodeUnprepareResourceResponse),
 	}
+
+	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
+		return resp, failure
+	}
+
 	for _, claimReq := range req.Claims {
 		err := ex.nodeUnprepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
 		if err != nil {
