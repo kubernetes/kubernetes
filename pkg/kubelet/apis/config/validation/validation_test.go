@@ -166,6 +166,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.ImageGCHighThresholdPercent = 85
 			conf.EvictionHard = map[string]string{"imagefs.available": "15%"}
+			conf.FeatureGates = map[string]bool{
+				"ImageGCHighThresholdAccurate": true,
+			}
 			return conf
 		},
 		errMsg: "invalid configuration: imageGCHighThresholdPercent (--image-gc-high-threshold) 85 must be less than evict hard (imagefs.available) 100 - 15",
