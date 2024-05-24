@@ -125,5 +125,4 @@ func (pr *conditionalProgressRequester) Remove() {
 	pr.mux.Lock()
 	defer pr.mux.Unlock()
 	pr.waiting -= 1
-	pr.cond.Signal()
 }
