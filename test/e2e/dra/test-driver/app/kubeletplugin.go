@@ -54,7 +54,8 @@ type ExamplePlugin struct {
 	prepared       map[ClaimID]any
 	gRPCCalls      []GRPCCall
 
-	block bool
+	blockPrepareResourcesMutex   sync.Mutex
+	blockUnprepareResourcesMutex sync.Mutex
 
 	prepareResourcesFailure   error
 	failPrepareResourcesMutex sync.Mutex
@@ -168,16 +169,20 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
-// Block sets a flag to block Node[Un]PrepareResources
-// to emulate time consuming or stuck calls
-func (ex *ExamplePlugin) Block() {
-	ex.block = true
+// BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
+func (ex *ExamplePlugin) BlockNodePrepareResources() func() {
+	ex.blockPrepareResourcesMutex.Lock()
+	return func() {
+		ex.blockPrepareResourcesMutex.Unlock()
+	}
 }
 
-func (ex *ExamplePlugin) withLock(mutex *sync.Mutex, f func()) {
-	mutex.Lock()
-	f()
-	mutex.Unlock()
+// BlockNodeUnprepareResources locks blockUnprepareResourcesMutex and returns unlocking function for it
+func (ex *ExamplePlugin) BlockNodeUnprepareResources() func() {
+	ex.blockUnprepareResourcesMutex.Lock()
+	return func() {
+		ex.blockUnprepareResourcesMutex.Unlock()
+	}
 }
 
 // SetNodePrepareResourcesFailureMode sets the failure mode for NodePrepareResources call
@@ -227,15 +232,10 @@ func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
 func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) ([]string, error) {
 	logger := klog.FromContext(ctx)
 
-	// Block to emulate plugin stuckness or slowness.
-	// By default the call will not be blocked as ex.block = false.
-	if ex.block {
-		<-ctx.Done()
-		return nil, ctx.Err()
-	}
-
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
+	ex.blockPrepareResourcesMutex.Lock()
+	defer ex.blockPrepareResourcesMutex.Unlock()
 
 	deviceName := "claim-" + claimUID
 	vendor := ex.driverName
@@ -385,14 +385,10 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1a
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
 func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) error {
-	logger := klog.FromContext(ctx)
+	ex.blockUnprepareResourcesMutex.Lock()
+	defer ex.blockUnprepareResourcesMutex.Unlock()
 
-	// Block to emulate plugin stuckness or slowness.
-	// By default the call will not be blocked as ex.block = false.
-	if ex.block {
-		<-ctx.Done()
-		return ctx.Err()
-	}
+	logger := klog.FromContext(ctx)
 
 	filePath := ex.getJSONFilePath(claimUID)
 	if err := ex.fileOps.Remove(filePath); err != nil {
