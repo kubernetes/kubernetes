@@ -1591,3 +1591,91 @@ func TestValidateCertValidity(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateResetConfiguration(t *testing.T) {
+	var tests = []struct {
+		name           string
+		cfg            *kubeadmapi.ResetConfiguration
+		expectedErrors int
+	}{
+		{
+			name: "expect 3 errors",
+			cfg: &kubeadmapi.ResetConfiguration{
+				CRISocket:       "foo",
+				CertificatesDir: "bar",
+				UnmountFlags:    []string{"baz"},
+			},
+			expectedErrors: 3,
+		},
+		{
+			name: "expect 0 errors",
+			cfg: &kubeadmapi.ResetConfiguration{
+				CRISocket:       fmt.Sprintf("%s:///var/run/containerd/containerd.sock", kubeadmapiv1.DefaultContainerRuntimeURLScheme),
+				CertificatesDir: "/foo/bar", // this is work on Windows too because of the local isAbs()
+				UnmountFlags:    []string{kubeadmapi.UnmountFlagMNTForce},
+			},
+			expectedErrors: 0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ValidateResetConfiguration(tc.cfg)
+			if len(actual) != tc.expectedErrors {
+				t.Errorf("expected errors: %d, got: %+v", tc.expectedErrors, actual)
+			}
+		})
+	}
+}
+
+func TestValidateUpgradeConfiguration(t *testing.T) {
+	var tests = []struct {
+		name           string
+		cfg            *kubeadmapi.UpgradeConfiguration
+		expectedErrors int
+	}{
+		{
+			name: "expect 4 errors",
+			cfg: &kubeadmapi.UpgradeConfiguration{
+				Apply: kubeadmapi.UpgradeApplyConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "foo",
+					},
+					ImagePullPolicy: "bar",
+				},
+				Node: kubeadmapi.UpgradeNodeConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "foo",
+					},
+					ImagePullPolicy: "bar",
+				},
+			},
+			expectedErrors: 4,
+		},
+		{
+			name: "expect 0 errors",
+			cfg: &kubeadmapi.UpgradeConfiguration{
+				Apply: kubeadmapi.UpgradeApplyConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "/foo/bar",
+					},
+					ImagePullPolicy: corev1.PullAlways,
+				},
+				Node: kubeadmapi.UpgradeNodeConfiguration{
+					Patches: &kubeadmapi.Patches{
+						Directory: "/foo/bar",
+					},
+					ImagePullPolicy: corev1.PullAlways,
+				},
+			},
+			expectedErrors: 0,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ValidateUpgradeConfiguration(tc.cfg)
+			if len(actual) != tc.expectedErrors {
+				t.Errorf("expected errors: %d, got: %+v", tc.expectedErrors, actual)
+			}
+		})
+	}
+}
