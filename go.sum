@@ -368,8 +368,8 @@ github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Z
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.0.1 h1:gK4Kx5IaGY9CD5sPJ36FHiBJ6ZXl0kilRiiCj+jdYp4=
 github.com/google/btree v1.0.1/go.mod h1:xXMiIv4Fb/0kKde4SpL7qlzvu5cMJDRkFDxJfI9uaxA=
-github.com/google/cadvisor v0.49.0 h1:1PYeiORXmcFYi609M4Qvq5IzcvcVaWgYxDt78uH8jYA=
-github.com/google/cadvisor v0.49.0/go.mod h1:s6Fqwb2KiWG6leCegVhw4KW40tf9f7m+SF1aXiE8Wsk=
+github.com/google/cadvisor v0.49.1 h1:9M++63nWvdq6Oci6wUDuAfQNTZpuz1ZObln0Bhs9xN0=
+github.com/google/cadvisor v0.49.1/go.mod h1:s6Fqwb2KiWG6leCegVhw4KW40tf9f7m+SF1aXiE8Wsk=
 github.com/google/cel-go v0.20.1 h1:nDx9r8S3L4pE61eDdt8igGj8rf5kjYR3ILxWIpWNi84=
 github.com/google/cel-go v0.20.1/go.mod h1:kWcIzTsPX0zmQ+H3TirHstLLf9ep5QTsZBN9u4dOYLg=
 github.com/google/gnostic-models v0.6.8 h1:yo/ABAfM5IMRsS1VnXjTBvUb61tFIHozhlYvRgGre9I=

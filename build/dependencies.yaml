@@ -251,7 +251,7 @@ dependencies:
 
   # cadvisor
   - name: "gcr.io/cadvisor/cadvisor: dependents"
-    version: "v0.47.2"
+    version: "v0.49.1"
     refPaths:
     - path: test/e2e_node/resource_collector.go
       match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
