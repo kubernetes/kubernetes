@@ -93,23 +93,23 @@ func setCount(event v1.Event, count int) v1.Event {
 	return event
 }
 
-func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v1.Event, t *testing.T) (*v1.Event, error) {
+func validateEvent(actualEvent *v1.Event, expectedEvent *v1.Event, t *testing.T) *v1.Event {
 	recvEvent := *actualEvent
 	expectCompression := expectedEvent.Count > 1
-	t.Logf("%v - expectedEvent.Count is %d\n", messagePrefix, expectedEvent.Count)
+	t.Logf("expectedEvent.Count is %d\n", expectedEvent.Count)
 	// Just check that the timestamp was set.
 	if recvEvent.FirstTimestamp.IsZero() || recvEvent.LastTimestamp.IsZero() {
-		t.Errorf("%v - timestamp wasn't set: %#v", messagePrefix, recvEvent)
+		t.Errorf("timestamp wasn't set: %#v", recvEvent)
 	}
 	actualFirstTimestamp := recvEvent.FirstTimestamp
 	actualLastTimestamp := recvEvent.LastTimestamp
 	if actualFirstTimestamp.Equal(&actualLastTimestamp) {
 		if expectCompression {
-			t.Errorf("%v - FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", messagePrefix, actualFirstTimestamp, actualLastTimestamp, recvEvent)
+			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be different to indicate event compression happened, but were the same. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, recvEvent)
 		}
 	} else {
 		if expectedEvent.Count == 1 {
-			t.Errorf("%v - FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurrence of the event, but were different. Actual Event: %#v", messagePrefix, actualFirstTimestamp, actualLastTimestamp, recvEvent)
+			t.Errorf("FirstTimestamp (%q) and LastTimestamp (%q) must be equal to indicate only one occurrence of the event, but were different. Actual Event: %#v", actualFirstTimestamp, actualLastTimestamp, recvEvent)
 		}
 	}
 	// Temp clear time stamps for comparison because actual values don't matter for comparison
@@ -120,15 +120,15 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 
 	// Check that name has the right prefix.
 	if n, en := recvEvent.Name, expectedEvent.Name; !strings.HasPrefix(n, en) {
-		t.Errorf("%v - Name '%v' does not contain prefix '%v'", messagePrefix, n, en)
+		t.Errorf("Name '%v' does not contain prefix '%v'", n, en)
 	}
 	recvEvent.Name = expectedEvent.Name
 	if e, a := expectedEvent, &recvEvent; !reflect.DeepEqual(e, a) {
-		t.Errorf("%v - diff: %s", messagePrefix, cmp.Diff(e, a))
+		t.Errorf("diff: %s", cmp.Diff(e, a))
 	}
 	recvEvent.FirstTimestamp = actualFirstTimestamp
 	recvEvent.LastTimestamp = actualLastTimestamp
-	return actualEvent, nil
+	return actualEvent
 }
 
 // TestEventAggregatorByReasonFunc ensures that two events are aggregated if they vary only by event.message
@@ -236,49 +236,47 @@ func TestEventCorrelator(t *testing.T) {
 	}
 
 	for testScenario, testInput := range scenario {
-		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
-		clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
-		correlator := NewEventCorrelator(&clock)
-		for i := range testInput.previousEvents {
-			event := testInput.previousEvents[i]
+		t.Run(testScenario, func(t *testing.T) {
+			eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
+			clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
+			correlator := NewEventCorrelator(&clock)
+			for i := range testInput.previousEvents {
+				event := testInput.previousEvents[i]
+				now := metav1.NewTime(clock.Now())
+				event.FirstTimestamp = now
+				event.LastTimestamp = now
+				result, err := correlator.EventCorrelate(&event)
+				if err != nil {
+					t.Errorf("scenario %v: unexpected error playing back prevEvents %v", testScenario, err)
+				}
+				// if we are skipping the event, we can avoid updating state
+				if !result.Skip {
+					correlator.UpdateState(result.Event)
+				}
+			}
+
+			// update the input to current clock value
 			now := metav1.NewTime(clock.Now())
-			event.FirstTimestamp = now
-			event.LastTimestamp = now
-			result, err := correlator.EventCorrelate(&event)
+			testInput.newEvent.FirstTimestamp = now
+			testInput.newEvent.LastTimestamp = now
+			result, err := correlator.EventCorrelate(&testInput.newEvent)
 			if err != nil {
-				t.Errorf("scenario %v: unexpected error playing back prevEvents %v", testScenario, err)
+				t.Errorf("scenario %v: unexpected error correlating input event %v", testScenario, err)
 			}
-			// if we are skipping the event, we can avoid updating state
-			if !result.Skip {
-				correlator.UpdateState(result.Event)
+
+			// verify we did not get skip from filter function unexpectedly...
+			if result.Skip != testInput.expectedSkip {
+				t.Fatalf("scenario %v: expected skip %v, but got %v", testScenario, testInput.expectedSkip, result.Skip)
 			}
-		}
 
-		// update the input to current clock value
-		now := metav1.NewTime(clock.Now())
-		testInput.newEvent.FirstTimestamp = now
-		testInput.newEvent.LastTimestamp = now
-		result, err := correlator.EventCorrelate(&testInput.newEvent)
-		if err != nil {
-			t.Errorf("scenario %v: unexpected error correlating input event %v", testScenario, err)
-		}
+			// we wanted to actually skip, so no event is needed to validate
+			if testInput.expectedSkip {
+				return
+			}
 
-		// verify we did not get skip from filter function unexpectedly...
-		if result.Skip != testInput.expectedSkip {
-			t.Errorf("scenario %v: expected skip %v, but got %v", testScenario, testInput.expectedSkip, result.Skip)
-			continue
-		}
-
-		// we wanted to actually skip, so no event is needed to validate
-		if testInput.expectedSkip {
-			continue
-		}
-
-		// validate event
-		_, err = validateEvent(testScenario, result.Event, &testInput.expectedEvent, t)
-		if err != nil {
-			t.Errorf("scenario %v: unexpected error validating result %v", testScenario, err)
-		}
+			// validate event
+			validateEvent(result.Event, &testInput.expectedEvent, t)
+		})
 	}
 }
 
@@ -338,42 +336,40 @@ func TestEventSpamFilter(t *testing.T) {
 	}
 
 	for testDescription, testInput := range testCases {
-		c := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
-		correlator := NewEventCorrelatorWithOptions(CorrelatorOptions{
-			Clock:       &c,
-			SpamKeyFunc: testInput.spamKeyFunc,
-			BurstSize:   burstSize,
+		t.Run(testDescription, func(t *testing.T) {
+			c := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
+			correlator := NewEventCorrelatorWithOptions(CorrelatorOptions{
+				Clock:       &c,
+				SpamKeyFunc: testInput.spamKeyFunc,
+				BurstSize:   burstSize,
+			})
+			// emitting original event
+			result, err := correlator.EventCorrelate(&originalEvent)
+			if err != nil {
+				t.Errorf("unexpected error correlating originalEvent %v", err)
+			}
+			// if we are skipping the event, we can avoid updating state
+			if !result.Skip {
+				correlator.UpdateState(result.Event)
+			}
+
+			result, err = correlator.EventCorrelate(&testInput.newEvent)
+			if err != nil {
+				t.Errorf("unexpected error correlating input event %v", err)
+			}
+
+			// verify we did not get skip from filter function unexpectedly...
+			if result.Skip != testInput.expectedSkip {
+				t.Fatalf("expected skip %v, but got %v", testInput.expectedSkip, result.Skip)
+			}
+
+			// we wanted to actually skip, so no event is needed to validate
+			if testInput.expectedSkip {
+				return
+			}
+
+			// validate event
+			validateEvent(result.Event, &testInput.expectedEvent, t)
 		})
-		// emitting original event
-		result, err := correlator.EventCorrelate(&originalEvent)
-		if err != nil {
-			t.Errorf("scenario %v: unexpected error correlating originalEvent %v", testDescription, err)
-		}
-		// if we are skipping the event, we can avoid updating state
-		if !result.Skip {
-			correlator.UpdateState(result.Event)
-		}
-
-		result, err = correlator.EventCorrelate(&testInput.newEvent)
-		if err != nil {
-			t.Errorf("scenario %v: unexpected error correlating input event %v", testDescription, err)
-		}
-
-		// verify we did not get skip from filter function unexpectedly...
-		if result.Skip != testInput.expectedSkip {
-			t.Errorf("scenario %v: expected skip %v, but got %v", testDescription, testInput.expectedSkip, result.Skip)
-			continue
-		}
-
-		// we wanted to actually skip, so no event is needed to validate
-		if testInput.expectedSkip {
-			continue
-		}
-
-		// validate event
-		_, err = validateEvent(testDescription, result.Event, &testInput.expectedEvent, t)
-		if err != nil {
-			t.Errorf("scenario %v: unexpected error validating result %v", testDescription, err)
-		}
 	}
 }
