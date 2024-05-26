@@ -2732,8 +2732,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	require.Equal(t,
-		true,
+	require.True(t,
 		taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
 		"test unschedulable taint for TaintNodesByCondition")
 }

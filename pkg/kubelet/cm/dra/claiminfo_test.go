@@ -488,7 +488,7 @@ func TestClaimInfoSetPrepared(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			test.claimInfo.setPrepared()
-			assert.Equal(t, test.claimInfo.isPrepared(), true)
+			assert.True(t, test.claimInfo.isPrepared())
 		})
 	}
 }

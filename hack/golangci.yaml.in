@@ -148,6 +148,9 @@ linters:
     - revive
     - staticcheck
     - stylecheck
+    {{- if .Strict}}
+    - testifylint
+    {{- end}}
     - unused
   {{- if .Strict}}
   disable:
@@ -205,4 +208,19 @@ linters-settings: # please keep this alphabetized
   stylecheck:
     checks:
       - "ST1019"   # Importing the same package multiple times
+  {{- end}}
+  {{- if .Strict}}
+  testifylint:
+    enable-all: true
+    disable:
+      - compares
+      - empty
+      - error-is-as
+      - error-nil
+      - expected-actual
+      - float-compare
+      - go-require
+      - len
+      - nil-compare
+      - require-error    
   {{- end}}

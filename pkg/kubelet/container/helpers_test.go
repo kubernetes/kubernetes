@@ -680,21 +680,21 @@ func TestShouldRecordEvent(t *testing.T) {
 	}
 
 	_, actual := innerEventRecorder.shouldRecordEvent(nil)
-	assert.Equal(t, false, actual)
+	assert.False(t, actual)
 
 	var obj = &v1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"}
 
 	_, actual = innerEventRecorder.shouldRecordEvent(obj)
-	assert.Equal(t, true, actual)
+	assert.True(t, actual)
 
 	obj = &v1.ObjectReference{Namespace: "system", Name: "infra", FieldPath: "implicitly required container "}
 
 	_, actual = innerEventRecorder.shouldRecordEvent(obj)
-	assert.Equal(t, false, actual)
+	assert.False(t, actual)
 
 	var nilObj *v1.ObjectReference = nil
 	_, actual = innerEventRecorder.shouldRecordEvent(nilObj)
-	assert.Equal(t, false, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
+	assert.False(t, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
 }
 
 func TestHasWindowsHostProcessContainer(t *testing.T) {

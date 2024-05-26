@@ -1685,7 +1685,7 @@ func TestPodDeleteBatching(t *testing.T) {
 
 				old, exists, err := esController.podStore.GetByKey(fmt.Sprintf("%s/%s", ns, update.podName))
 				assert.Nil(t, err, "error while retrieving old value of %q: %v", update.podName, err)
-				assert.Equal(t, true, exists, "pod should exist")
+				assert.True(t, exists, "pod should exist")
 				esController.podStore.Delete(old)
 				esController.deletePod(old)
 			}
