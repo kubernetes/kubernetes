@@ -124,6 +124,30 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 	return events
 }
 
+func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, newPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"PersistentVolume", klog.KObj(newPV),
+	)
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.PersistentVolumeClaim != nil || vol.Ephemeral != nil {
+			// This Pod might have got unschedulable due to PersistentVolume in a past scheduling cycle.
+			logger.V(5).Info("PersistentVolume was created or updated, potentially making the target Pod schedulable")
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("PersistentVolume was created or updated, but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
+}
+
 // podHasPVCs returns 2 values:
 // - the first one to denote if the given "pod" has any PVC defined.
 // - the second one to return any error if the requested PVC is illegal.
@@ -169,29 +193,6 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 		}
 	}
 	return hasPVC, nil
-}
-
-func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	_, newPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
-	if err != nil {
-		return framework.Queue, err
-	}
-
-	logger = klog.LoggerWithValues(
-		logger,
-		"Pod", klog.KObj(pod),
-		"PersistentVolume", klog.KObj(newPV),
-	)
-
-	for _, vol := range pod.Spec.Volumes {
-		if vol.Name == newPV.Name {
-			logger.V(4).Info("PersistentVolume referenced by the Pod was created or updated")
-			return framework.Queue, nil
-		}
-	}
-
-	logger.V(4).Info("PersistentVolume was created or updated, but it doesn't make this pod schedulable")
-	return framework.QueueSkip, nil
 }
 
 // PreFilter invoked at the prefilter extension point to check if pod has all

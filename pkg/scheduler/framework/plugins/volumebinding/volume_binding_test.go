@@ -901,67 +901,52 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 		err    bool
 	}{
 		{
-			name:   "pod has no pvs",
-			pod:    makePod("pod-a").Pod,
+			name: "pod has no pvc or generic ephemeral volumes",
+			pod:  makePod("pod-a").withEmptyDirVolume().Pod,
+			oldPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-a",
+				},
+			},
+			newPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-a",
+				},
+			},
+			err:    false,
 			expect: framework.QueueSkip,
-			err:    false,
 		},
 		{
-			name: "pod has pvs with no changes",
-			pod: func() *v1.Pod {
-				pod := makePod("pod-a").Pod
-				pod.Spec.Volumes = append(pod.Spec.Volumes, []v1.Volume{
-					{
-						Name: "pv-a",
-					},
-					{
-						Name: "pv-b",
-					},
-				}...)
-				return pod
-			}(),
-			oldPV:  makePV("pv-b", "sc-b").PersistentVolume,
-			newPV:  makePV("pv-b", "sc-b").PersistentVolume,
-			expect: framework.Queue,
+			name: "pod has one or more pvcs",
+			pod:  makePod("pod-a").withPVCVolume("pvc-a", "").Pod,
+			oldPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-a",
+				},
+			},
+			newPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-a",
+				},
+			},
 			err:    false,
+			expect: framework.Queue,
 		},
 		{
-			name: "pod has a newly added pv",
-			pod: func() *v1.Pod {
-				pod := makePod("pod-a").Pod
-				pod.Spec.Volumes = append(pod.Spec.Volumes, []v1.Volume{
-					{
-						Name: "pv-a",
-					},
-					{
-						Name: "pv-b",
-					},
-				}...)
-				return pod
-			}(),
-			oldPV:  nil,
-			newPV:  makePV("pv-b", "sc-b").PersistentVolume,
-			expect: framework.Queue,
+			name: "pod has one or more generic ephemeral volumes",
+			pod:  makePod("pod-a").withGenericEphemeralVolume("ephemeral-a").Pod,
+			oldPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-a",
+				},
+			},
+			newPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pv-a",
+				},
+			},
 			err:    false,
-		},
-		{
-			name: "pod has pvs with changed fields",
-			pod: func() *v1.Pod {
-				pod := makePod("pod-a").Pod
-				pod.Spec.Volumes = append(pod.Spec.Volumes, []v1.Volume{
-					{
-						Name: "pv-a",
-					},
-					{
-						Name: "pv-b",
-					},
-				}...)
-				return pod
-			}(),
-			oldPV:  makePV("pv-b", "sc-b").withPhase(v1.VolumeAvailable).PersistentVolume,
-			newPV:  makePV("pv-b", "sc-b").withPhase(v1.VolumeBound).PersistentVolume,
 			expect: framework.Queue,
-			err:    false,
 		},
 		{
 			name:   "type conversion error",
