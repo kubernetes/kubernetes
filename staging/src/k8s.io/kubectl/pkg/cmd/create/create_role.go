@@ -116,7 +116,7 @@ var (
 func AddSpecialVerb(verb string, gr schema.GroupResource) {
 	resources, ok := specialVerbs[verb]
 	if !ok {
-		resources = make([]schema.GroupResource, 1)
+		resources = make([]schema.GroupResource, 0, 1)
 	}
 	resources = append(resources, gr)
 	specialVerbs[verb] = resources
