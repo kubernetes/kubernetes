@@ -641,7 +641,6 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestCSILimitsAddedPVCQHint(t *testing.T) {
 	tests := []struct {
 		test        string
@@ -669,7 +668,35 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 			attachedPvc: st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").Obj(),
 			addedPvc:    st.MakePersistentVolumeClaim().Name("pvc2").Namespace("ns1").Obj(),
 			wantQHint:   framework.QueueSkip,
-=======
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.test, func(t *testing.T) {
+			p := &CSILimits{}
+			logger, _ := ktesting.NewTestContext(t)
+
+			if test.attachedPvc != nil {
+				test.newPod.Spec.Volumes = append(test.newPod.Spec.Volumes, v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: test.attachedPvc.Name,
+						},
+					},
+				})
+			}
+
+			qhint, err := p.isSchedulableAfterPVCAdded(logger, test.newPod, nil, test.addedPvc)
+			if err != nil {
+				t.Errorf("isSchedulableAfterPVCAdded failed: %v", err)
+			}
+			if qhint != test.wantQHint {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
+			}
+		})
+	}
+}
+
 func TestCSILimitsQHint(t *testing.T) {
 	podEbs := st.MakePod().PVC("csi-ebs.csi.aws.com-2")
 
@@ -704,30 +731,11 @@ func TestCSILimitsQHint(t *testing.T) {
 			deletedPodNotScheduled: true,
 			test:                   "return a QueueSkip when a deleted pod is not scheduled.",
 			wantQHint:              framework.QueueSkip,
->>>>>>> a31030543c47aac36cf323b885cfb6d8b0a2435f
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
-<<<<<<< HEAD
-			p := &CSILimits{}
-			logger, _ := ktesting.NewTestContext(t)
-
-			if test.attachedPvc != nil {
-				test.newPod.Spec.Volumes = append(test.newPod.Spec.Volumes, v1.Volume{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: test.attachedPvc.Name,
-						},
-					},
-				})
-			}
-
-			qhint, err := p.isSchedulableAfterPVCAdded(logger, test.newPod, nil, test.addedPvc)
-			if err != nil {
-				t.Errorf("isSchedulableAfterPVCAdded failed: %v", err)
-=======
 			node, csiNode := getNodeWithPodAndVolumeLimits("csiNode", []*v1.Pod{}, 1, "")
 			if csiNode != nil {
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSDriverName)
@@ -746,7 +754,6 @@ func TestCSILimitsQHint(t *testing.T) {
 			qhint, err := p.isSchedulableAfterPodDeleted(logger, test.newPod, test.deletedPod, nil)
 			if err != nil {
 				t.Errorf("isSchedulableAfterPodDeleted failed: %v", err)
->>>>>>> a31030543c47aac36cf323b885cfb6d8b0a2435f
 			}
 			if qhint != test.wantQHint {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
