@@ -296,6 +296,18 @@ func TestEventSpamFilter(t *testing.T) {
 		},
 			"")
 	}
+	spamKeyFuncBasedOnObjects := func(e *v1.Event) string {
+		return strings.Join([]string{
+			e.Source.Component,
+			e.Source.Host,
+			e.InvolvedObject.Kind,
+			e.InvolvedObject.Namespace,
+			e.InvolvedObject.Name,
+			string(e.InvolvedObject.UID),
+			e.InvolvedObject.APIVersion,
+		},
+			"")
+	}
 	burstSize := 1
 	eventInterval := time.Duration(1) * time.Second
 	originalEvent := makeEvent("original", "i am first", makeObjectReference("Pod", "my-pod", "my-ns"))
@@ -307,17 +319,18 @@ func TestEventSpamFilter(t *testing.T) {
 		expectedSkip  bool
 		spamKeyFunc   EventSpamKeyFunc
 	}{
-		"event should be reported as spam if object reference is the same for default spam filter": {
+		"objects-positive": {
 			newEvent:     differentReasonEvent,
 			expectedSkip: true,
+			spamKeyFunc:  spamKeyFuncBasedOnObjects,
 		},
-		"event should not be reported as spam if object reference is the same, but reason is different for custom spam filter": {
+		"objectsAndReason-negative": {
 			newEvent:      differentReasonEvent,
 			expectedEvent: differentReasonEvent,
 			expectedSkip:  false,
 			spamKeyFunc:   spamKeyFuncBasedOnObjectsAndReason,
 		},
-		"event should  be reported as spam if object reference and reason is the same, but message is different for custom spam filter": {
+		"objectsAndReason-positive": {
 			newEvent:     spamEvent,
 			expectedSkip: true,
 			spamKeyFunc:  spamKeyFuncBasedOnObjectsAndReason,

@@ -41,8 +41,8 @@ const (
 	defaultAggregateMaxEvents         = 10
 	defaultAggregateIntervalInSeconds = 600
 
-	// by default, allow a source to send 25 events about an object
-	// but control the refill rate to 1 new event every 5 minutes
+	// by default, allow an aggregated event to be updated 25 times
+	// but control the refill rate to 1 update every 5 minutes
 	// this helps control the long-tail of events for things that are always
 	// unhealthy
 	defaultSpamBurst = 25
@@ -67,26 +67,11 @@ func getEventKey(event *v1.Event) string {
 		"")
 }
 
-// getSpamKey builds unique event key based on source, involvedObject
-func getSpamKey(event *v1.Event) string {
-	return strings.Join([]string{
-		event.Source.Component,
-		event.Source.Host,
-		event.InvolvedObject.Kind,
-		event.InvolvedObject.Namespace,
-		event.InvolvedObject.Name,
-		string(event.InvolvedObject.UID),
-		event.InvolvedObject.APIVersion,
-		event.Type,
-	},
-		"")
-}
-
 // EventSpamKeyFunc is a function that returns unique key based on provided event
 type EventSpamKeyFunc func(event *v1.Event) string
 
 // EventFilterFunc is a function that returns true if the event should be skipped
-type EventFilterFunc func(event *v1.Event) bool
+type EventFilterFunc func(key string) bool
 
 // EventSourceObjectSpamFilter is responsible for throttling
 // the amount of events a source and object can produce.
@@ -104,19 +89,15 @@ type EventSourceObjectSpamFilter struct {
 
 	// clock is used to allow for testing over a time interval
 	clock clock.PassiveClock
-
-	// spamKeyFunc is a func used to create a key based on an event, which is later used to filter spam events.
-	spamKeyFunc EventSpamKeyFunc
 }
 
 // NewEventSourceObjectSpamFilter allows burst events from a source about an object with the specified qps refill.
-func NewEventSourceObjectSpamFilter(lruCacheSize, burst int, qps float32, clock clock.PassiveClock, spamKeyFunc EventSpamKeyFunc) *EventSourceObjectSpamFilter {
+func NewEventSourceObjectSpamFilter(lruCacheSize, burst int, qps float32, clock clock.PassiveClock) *EventSourceObjectSpamFilter {
 	return &EventSourceObjectSpamFilter{
-		cache:       lru.New(lruCacheSize),
-		burst:       burst,
-		qps:         qps,
-		clock:       clock,
-		spamKeyFunc: spamKeyFunc,
+		cache: lru.New(lruCacheSize),
+		burst: burst,
+		qps:   qps,
+		clock: clock,
 	}
 }
 
@@ -127,11 +108,8 @@ type spamRecord struct {
 }
 
 // Filter controls that a given source+object are not exceeding the allowed rate.
-func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
+func (f *EventSourceObjectSpamFilter) Filter(eventKey string) bool {
 	var record spamRecord
-
-	// controls our cached information about this event
-	eventKey := f.spamKeyFunc(event)
 
 	// do we have a record of similar events in our cache?
 	f.Lock()
@@ -410,6 +388,8 @@ type EventCorrelator struct {
 	aggregator *EventAggregator
 	// the object that observes events as they come through
 	logger *eventLogger
+	// spamKeyFunc is a func used to create a key based on an event, which is later used to filter spam events.
+	spamKeyFunc EventSpamKeyFunc
 }
 
 // EventCorrelateResult is the result of a Correlate
@@ -435,11 +415,11 @@ type EventCorrelateResult struct {
 //     the same reason.
 //   - Events are incrementally counted if the exact same event is encountered multiple
 //     times.
-//   - A source may burst 25 events about an object, but has a refill rate budget
-//     per object of 1 event every 5 minutes to control long-tail of spam.
+//   - An Aggregated event may burst 25 updates, but has a refill rate budget
+//     of 1 update every 5 minutes to control long-tail of spam.
 func NewEventCorrelator(clock clock.PassiveClock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries
-	spamFilter := NewEventSourceObjectSpamFilter(cacheSize, defaultSpamBurst, defaultSpamQPS, clock, getSpamKey)
+	spamFilter := NewEventSourceObjectSpamFilter(cacheSize, defaultSpamBurst, defaultSpamQPS, clock)
 	return &EventCorrelator{
 		filterFunc: spamFilter.Filter,
 		aggregator: NewEventAggregator(
@@ -461,9 +441,10 @@ func NewEventCorrelatorWithOptions(options CorrelatorOptions) *EventCorrelator {
 		optionsWithDefaults.BurstSize,
 		optionsWithDefaults.QPS,
 		optionsWithDefaults.Clock,
-		optionsWithDefaults.SpamKeyFunc)
+	)
 	return &EventCorrelator{
-		filterFunc: spamFilter.Filter,
+		filterFunc:  spamFilter.Filter,
+		spamKeyFunc: optionsWithDefaults.SpamKeyFunc,
 		aggregator: NewEventAggregator(
 			optionsWithDefaults.LRUCacheSize,
 			optionsWithDefaults.KeyFunc,
@@ -501,9 +482,6 @@ func populateDefaults(options CorrelatorOptions) CorrelatorOptions {
 	if options.Clock == nil {
 		options.Clock = clock.RealClock{}
 	}
-	if options.SpamKeyFunc == nil {
-		options.SpamKeyFunc = getSpamKey
-	}
 	return options
 }
 
@@ -514,7 +492,11 @@ func (c *EventCorrelator) EventCorrelate(newEvent *v1.Event) (*EventCorrelateRes
 	}
 	aggregateEvent, ckey := c.aggregator.EventAggregate(newEvent)
 	observedEvent, patch, err := c.logger.eventObserve(aggregateEvent, ckey)
-	if c.filterFunc(observedEvent) {
+	spamKey := ckey
+	if c.spamKeyFunc != nil {
+		spamKey = c.spamKeyFunc(newEvent)
+	}
+	if c.filterFunc(spamKey) {
 		return &EventCorrelateResult{Skip: true}, nil
 	}
 	return &EventCorrelateResult{Event: observedEvent, Patch: patch}, err
