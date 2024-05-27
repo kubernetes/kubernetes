@@ -57,7 +57,7 @@ fi
 ./hack/update-internal-modules.sh
 ./hack/lint-dependencies.sh
 
-sed -i '' -e "s/const kustomizeVersion.*$/const kustomizeVersion = \"${LATEST_KUSTOMIZE}\"/" staging/src/k8s.io/kubectl/pkg/cmd/version/version.go
+sed -i'' -e "s/const kustomizeVersion.*$/const kustomizeVersion = \"${LATEST_KUSTOMIZE}\"/" staging/src/k8s.io/kubectl/pkg/cmd/version/version.go
 
 echo -e "\n${color_blue}Committing changes${color_norm}"
 git add .
