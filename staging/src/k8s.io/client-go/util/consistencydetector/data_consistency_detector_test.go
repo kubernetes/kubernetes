@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package consistencydetector
 
 import (
 	"context"
@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -157,4 +158,8 @@ func (lw *listWrapper) List(_ context.Context, opts metav1.ListOptions) (*v1.Pod
 	lw.counter++
 	lw.requestOptions = append(lw.requestOptions, opts)
 	return lw.response, nil
+}
+
+func makePod(name, rv string) *v1.Pod {
+	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv, UID: types.UID(name)}}
 }
