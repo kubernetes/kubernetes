@@ -39,9 +39,9 @@ func init() {
 	dataConsistencyDetectionForWatchListEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"))
 }
 
-type retrieveItemsFunc[U any] func() []U
+type RetrieveItemsFunc[U any] func() []U
 
-type listFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOptions) (T, error)
+type ListFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOptions) (T, error)
 
 // checkWatchListDataConsistencyIfRequested performs a data consistency check only when
 // the KUBE_WATCHLIST_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
@@ -52,21 +52,21 @@ type listFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOpt
 //
 // Note that this function will panic when data inconsistency is detected.
 // This is intentional because we want to catch it in the CI.
-func checkWatchListDataConsistencyIfRequested[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn listFunc[T], retrieveItemsFn retrieveItemsFunc[U]) {
+func checkWatchListDataConsistencyIfRequested[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], retrieveItemsFn RetrieveItemsFunc[U]) {
 	if !dataConsistencyDetectionForWatchListEnabled {
 		return
 	}
 	// for informers we pass an empty ListOptions because
 	// listFn might be wrapped for filtering during informer construction.
-	checkDataConsistency(ctx, identity, lastSyncedResourceVersion, listFn, metav1.ListOptions{}, retrieveItemsFn)
+	CheckDataConsistency(ctx, identity, lastSyncedResourceVersion, listFn, metav1.ListOptions{}, retrieveItemsFn)
 }
 
-// checkDataConsistency exists solely for testing purposes.
+// CheckDataConsistency exists solely for testing purposes.
 // we cannot use checkWatchListDataConsistencyIfRequested because
 // it is guarded by an environmental variable.
 // we cannot manipulate the environmental variable because
 // it will affect other tests in this package.
-func checkDataConsistency[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn listFunc[T], listOptions metav1.ListOptions, retrieveItemsFn retrieveItemsFunc[U]) {
+func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], listOptions metav1.ListOptions, retrieveItemsFn RetrieveItemsFunc[U]) {
 	klog.Warningf("data consistency check for %s is enabled, this will result in an additional call to the API server.", identity)
 	listOptions.ResourceVersion = lastSyncedResourceVersion
 	listOptions.ResourceVersionMatch = metav1.ResourceVersionMatchExact

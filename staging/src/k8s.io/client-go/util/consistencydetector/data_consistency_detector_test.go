@@ -106,10 +106,10 @@ func TestDataConsistencyChecker(t *testing.T) {
 
 			if scenario.expectPanic {
 				require.Panics(t, func() {
-					checkDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
+					CheckDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
 				})
 			} else {
-				checkDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
+				CheckDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
 			}
 
 			require.Equal(t, fakeLister.counter, scenario.expectedListRequests)
@@ -131,7 +131,7 @@ func TestDataConsistencyCheckerRetry(t *testing.T) {
 	stopListErrorAfter := 5
 	fakeErrLister := &errorLister{stopErrorAfter: stopListErrorAfter}
 
-	checkDataConsistency(ctx, "", "", fakeErrLister.List, metav1.ListOptions{}, retrievedItemsFunc)
+	CheckDataConsistency(ctx, "", "", fakeErrLister.List, metav1.ListOptions{}, retrievedItemsFunc)
 	require.Equal(t, fakeErrLister.listCounter, fakeErrLister.stopErrorAfter)
 }
 
