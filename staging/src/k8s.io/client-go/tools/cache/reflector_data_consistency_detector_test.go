@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -25,62 +26,71 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/ptr"
 )
 
-func TestWatchListConsistency(t *testing.T) {
+func TestDataConsistencyChecker(t *testing.T) {
 	scenarios := []struct {
 		name string
 
-		podList      *v1.PodList
-		storeContent []*v1.Pod
+		podList        *v1.PodList
+		storeContent   []*v1.Pod
+		requestOptions metav1.ListOptions
 
 		expectedRequestOptions []metav1.ListOptions
 		expectedListRequests   int
 		expectPanic            bool
 	}{
 		{
-			name: "watchlist consistency check won't panic when data is consistent",
+			name: "data consistency check won't panic when data is consistent",
 			podList: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
 			},
+			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
 			storeContent:         []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					ResourceVersion:      "2",
 					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					TimeoutSeconds:       ptr.To(int64(39)),
 				},
 			},
 		},
 
 		{
-			name: "watchlist consistency check won't panic when there is no data",
+			name: "data consistency check won't panic when there is no data",
 			podList: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 			},
+			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					ResourceVersion:      "2",
 					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					TimeoutSeconds:       ptr.To(int64(39)),
 				},
 			},
 		},
 
 		{
-			name: "watchlist consistency panics when data is inconsistent",
+			name: "data consistency panics when data is inconsistent",
 			podList: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
 			},
+			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
 			storeContent:         []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					ResourceVersion:      "2",
 					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					TimeoutSeconds:       ptr.To(int64(39)),
 				},
 			},
 			expectPanic: true,
@@ -90,15 +100,18 @@ func TestWatchListConsistency(t *testing.T) {
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			listWatcher, store, _, stopCh := testData()
+			ctx := wait.ContextForChannel(stopCh)
 			for _, obj := range scenario.storeContent {
 				require.NoError(t, store.Add(obj))
 			}
 			listWatcher.customListResponse = scenario.podList
 
 			if scenario.expectPanic {
-				require.Panics(t, func() { checkWatchListConsistency(stopCh, "", scenario.podList.ResourceVersion, listWatcher, store) })
+				require.Panics(t, func() {
+					checkDataConsistency(ctx, "", scenario.podList.ResourceVersion, wrapListFuncWithContext(listWatcher.List), scenario.requestOptions, store.List)
+				})
 			} else {
-				checkWatchListConsistency(stopCh, "", scenario.podList.ResourceVersion, listWatcher, store)
+				checkDataConsistency(ctx, "", scenario.podList.ResourceVersion, wrapListFuncWithContext(listWatcher.List), scenario.requestOptions, store.List)
 			}
 
 			verifyListCounter(t, listWatcher, scenario.expectedListRequests)
@@ -108,20 +121,18 @@ func TestWatchListConsistency(t *testing.T) {
 }
 
 func TestDriveWatchLisConsistencyIfRequired(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	checkWatchListConsistencyIfRequested(stopCh, "", "", nil, nil)
+	ctx := context.TODO()
+	checkWatchListDataConsistencyIfRequested[runtime.Object, runtime.Object](ctx, "", "", nil, nil)
 }
 
-func TestWatchListConsistencyRetry(t *testing.T) {
+func TestDataConsistencyCheckerRetry(t *testing.T) {
 	store := NewStore(MetaNamespaceKeyFunc)
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	ctx := context.TODO()
 
 	stopListErrorAfter := 5
 	errLister := &errorLister{stopErrorAfter: stopListErrorAfter}
 
-	checkWatchListConsistency(stopCh, "", "", errLister, store)
+	checkDataConsistency(ctx, "", "", wrapListFuncWithContext(errLister.List), metav1.ListOptions{}, store.List)
 	require.Equal(t, errLister.listCounter, errLister.stopErrorAfter)
 }
 
