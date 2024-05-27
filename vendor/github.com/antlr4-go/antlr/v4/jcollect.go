@@ -8,7 +8,6 @@ import (
 	"container/list"
 	"runtime/debug"
 	"sort"
-	"sync"
 )
 
 // Collectable is an interface that a struct should implement if it is to be
@@ -587,12 +586,12 @@ type VisitRecord struct {
 
 type VisitList struct {
 	cache *list.List
-	lock  sync.RWMutex
+	lock  RWMutex
 }
 
 var visitListPool = VisitList{
 	cache: list.New(),
-	lock:  sync.RWMutex{},
+	lock:  RWMutex{},
 }
 
 // NewVisitRecord returns a new VisitRecord instance from the pool if available.

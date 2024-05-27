@@ -1,0 +1,3 @@
+run:
+  skip-dirs:
+    - examples/*.go

@@ -359,7 +359,7 @@ func findObject(pd *container, path string) (container, string) {
 
 		next, ok := doc.get(decodePatchKey(part))
 
-		if next == nil || ok != nil {
+		if next == nil || ok != nil || next.raw == nil {
 			return nil, ""
 		}
 
@@ -688,7 +688,7 @@ func (p Patch) test(doc *container, op Operation) error {
 	}
 
 	if val == nil {
-		if op.value().raw == nil {
+		if op.value() == nil || op.value().raw == nil {
 			return nil
 		}
 		return errors.Wrapf(ErrTestFailed, "testing value %s failed", path)

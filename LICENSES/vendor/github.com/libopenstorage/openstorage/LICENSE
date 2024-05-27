@@ -178,7 +178,7 @@
 
    END OF TERMS AND CONDITIONS
 
-   Copyright 2015 Openstorage.org.
+   Copyright 2020 Openstorage.org.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -192,4 +192,4 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-= vendor/github.com/libopenstorage/openstorage/LICENSE 40c3e1c9eacda859a17048003909a2f8
+= vendor/github.com/libopenstorage/openstorage/LICENSE 071370a42458d051035f159562f11575

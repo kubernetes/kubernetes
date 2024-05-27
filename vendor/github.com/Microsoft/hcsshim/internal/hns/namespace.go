@@ -1,3 +1,5 @@
+//go:build windows
+
 package hns
 
 import (
@@ -54,7 +56,7 @@ func issueNamespaceRequest(id *string, method, subpath string, request interface
 		if strings.Contains(err.Error(), "Element not found.") {
 			return nil, os.ErrNotExist
 		}
-		return nil, fmt.Errorf("%s %s: %s", method, hnspath, err)
+		return nil, fmt.Errorf("%s %s: %w", method, hnspath, err)
 	}
 	return &ns, err
 }
@@ -84,7 +86,7 @@ func GetNamespaceEndpoints(id string) ([]string, error) {
 			var endpoint namespaceEndpointRequest
 			err = json.Unmarshal(rsrc.Data, &endpoint)
 			if err != nil {
-				return nil, fmt.Errorf("unmarshal endpoint: %s", err)
+				return nil, fmt.Errorf("unmarshal endpoint: %w", err)
 			}
 			endpoints = append(endpoints, endpoint.ID)
 		}

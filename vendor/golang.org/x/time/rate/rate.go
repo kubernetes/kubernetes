@@ -52,6 +52,8 @@ func Every(interval time.Duration) Limit {
 // or its associated context.Context is canceled.
 //
 // The methods AllowN, ReserveN, and WaitN consume n tokens.
+//
+// Limiter is safe for simultaneous use by multiple goroutines.
 type Limiter struct {
 	mu     sync.Mutex
 	limit  Limit

@@ -10,7 +10,7 @@ import "go.starlark.net/syntax"
 // We cannot guarantee API stability for these types
 // as they are closely tied to the implementation.
 
-// A Binding contains resolver information about an identifer.
+// A Binding contains resolver information about an identifier.
 // The resolver populates the Binding field of each syntax.Identifier.
 // The Binding ties together all identifiers that denote the same variable.
 type Binding struct {

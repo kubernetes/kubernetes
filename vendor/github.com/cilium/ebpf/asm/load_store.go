@@ -1,13 +1,13 @@
 package asm
 
-//go:generate stringer -output load_store_string.go -type=Mode,Size
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -output load_store_string.go -type=Mode,Size
 
 // Mode for load and store operations
 //
-//    msb      lsb
-//    +---+--+---+
-//    |MDE|sz|cls|
-//    +---+--+---+
+//	msb      lsb
+//	+---+--+---+
+//	|MDE|sz|cls|
+//	+---+--+---+
 type Mode uint8
 
 const modeMask OpCode = 0xe0
@@ -24,16 +24,18 @@ const (
 	IndMode Mode = 0x40
 	// MemMode - load from memory
 	MemMode Mode = 0x60
+	// MemSXMode - load from memory, sign extension
+	MemSXMode Mode = 0x80
 	// XAddMode - add atomically across processors.
 	XAddMode Mode = 0xc0
 )
 
 // Size of load and store operations
 //
-//    msb      lsb
-//    +---+--+---+
-//    |mde|SZ|cls|
-//    +---+--+---+
+//	msb      lsb
+//	+---+--+---+
+//	|mde|SZ|cls|
+//	+---+--+---+
 type Size uint8
 
 const sizeMask OpCode = 0x18
@@ -73,10 +75,29 @@ func LoadMemOp(size Size) OpCode {
 	return OpCode(LdXClass).SetMode(MemMode).SetSize(size)
 }
 
+// LoadMemSXOp returns the OpCode to load a value of given size from memory sign extended.
+func LoadMemSXOp(size Size) OpCode {
+	return OpCode(LdXClass).SetMode(MemSXMode).SetSize(size)
+}
+
 // LoadMem emits `dst = *(size *)(src + offset)`.
 func LoadMem(dst, src Register, offset int16, size Size) Instruction {
 	return Instruction{
 		OpCode: LoadMemOp(size),
+		Dst:    dst,
+		Src:    src,
+		Offset: offset,
+	}
+}
+
+// LoadMemSX emits `dst = *(size *)(src + offset)` but sign extends dst.
+func LoadMemSX(dst, src Register, offset int16, size Size) Instruction {
+	if size == DWord {
+		return Instruction{OpCode: InvalidOpCode}
+	}
+
+	return Instruction{
+		OpCode: LoadMemSXOp(size),
 		Dst:    dst,
 		Src:    src,
 		Offset: offset,

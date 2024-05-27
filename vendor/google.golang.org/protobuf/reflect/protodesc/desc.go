@@ -13,6 +13,7 @@
 package protodesc
 
 import (
+	"google.golang.org/protobuf/internal/editionssupport"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/filedesc"
 	"google.golang.org/protobuf/internal/pragma"
@@ -91,15 +92,17 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 	switch fd.GetSyntax() {
 	case "proto2", "":
 		f.L1.Syntax = protoreflect.Proto2
+		f.L1.Edition = filedesc.EditionProto2
 	case "proto3":
 		f.L1.Syntax = protoreflect.Proto3
+		f.L1.Edition = filedesc.EditionProto3
 	case "editions":
 		f.L1.Syntax = protoreflect.Editions
 		f.L1.Edition = fromEditionProto(fd.GetEdition())
 	default:
 		return nil, errors.New("invalid syntax: %q", fd.GetSyntax())
 	}
-	if f.L1.Syntax == protoreflect.Editions && (fd.GetEdition() < SupportedEditionsMinimum || fd.GetEdition() > SupportedEditionsMaximum) {
+	if f.L1.Syntax == protoreflect.Editions && (fd.GetEdition() < editionssupport.Minimum || fd.GetEdition() > editionssupport.Maximum) {
 		return nil, errors.New("use of edition %v not yet supported by the Go Protobuf runtime", fd.GetEdition())
 	}
 	f.L1.Path = fd.GetName()
@@ -114,9 +117,7 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 		opts = proto.Clone(opts).(*descriptorpb.FileOptions)
 		f.L2.Options = func() protoreflect.ProtoMessage { return opts }
 	}
-	if f.L1.Syntax == protoreflect.Editions {
-		initFileDescFromFeatureSet(f, fd.GetOptions().GetFeatures())
-	}
+	initFileDescFromFeatureSet(f, fd.GetOptions().GetFeatures())
 
 	f.L2.Imports = make(filedesc.FileImports, len(fd.GetDependency()))
 	for _, i := range fd.GetPublicDependency() {
@@ -219,10 +220,10 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 	if err := validateEnumDeclarations(f.L1.Enums.List, fd.GetEnumType()); err != nil {
 		return nil, err
 	}
-	if err := validateMessageDeclarations(f.L1.Messages.List, fd.GetMessageType()); err != nil {
+	if err := validateMessageDeclarations(f, f.L1.Messages.List, fd.GetMessageType()); err != nil {
 		return nil, err
 	}
-	if err := validateExtensionDeclarations(f.L1.Extensions.List, fd.GetExtension()); err != nil {
+	if err := validateExtensionDeclarations(f, f.L1.Extensions.List, fd.GetExtension()); err != nil {
 		return nil, err
 	}
 

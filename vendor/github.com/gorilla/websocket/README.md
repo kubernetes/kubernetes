@@ -1,17 +1,14 @@
-# Gorilla WebSocket
+# gorilla/websocket
 
-[![GoDoc](https://godoc.org/github.com/gorilla/websocket?status.svg)](https://godoc.org/github.com/gorilla/websocket)
-[![CircleCI](https://circleci.com/gh/gorilla/websocket.svg?style=svg)](https://circleci.com/gh/gorilla/websocket)
+![testing](https://github.com/gorilla/websocket/actions/workflows/test.yml/badge.svg)
+[![codecov](https://codecov.io/github/gorilla/websocket/branch/main/graph/badge.svg)](https://codecov.io/github/gorilla/websocket)
+[![godoc](https://godoc.org/github.com/gorilla/websocket?status.svg)](https://godoc.org/github.com/gorilla/websocket)
+[![sourcegraph](https://sourcegraph.com/github.com/gorilla/websocket/-/badge.svg)](https://sourcegraph.com/github.com/gorilla/websocket?badge)
 
-Gorilla WebSocket is a [Go](http://golang.org/) implementation of the
-[WebSocket](http://www.rfc-editor.org/rfc/rfc6455.txt) protocol.
+Gorilla WebSocket is a [Go](http://golang.org/) implementation of the [WebSocket](http://www.rfc-editor.org/rfc/rfc6455.txt) protocol.
 
+![Gorilla Logo](https://github.com/gorilla/.github/assets/53367916/d92caabf-98e0-473e-bfbf-ab554ba435e5)
 
----
-
-⚠️ **[The Gorilla WebSocket Package is looking for a new maintainer](https://github.com/gorilla/websocket/issues/370)**
-
----
 
 ### Documentation
 
@@ -20,6 +17,7 @@ Gorilla WebSocket is a [Go](http://golang.org/) implementation of the
 * [Command example](https://github.com/gorilla/websocket/tree/master/examples/command)
 * [Client and server example](https://github.com/gorilla/websocket/tree/master/examples/echo)
 * [File watch example](https://github.com/gorilla/websocket/tree/master/examples/filewatch)
+* [Write buffer pool example](https://github.com/gorilla/websocket/tree/master/examples/bufferpool)
 
 ### Status
 
@@ -36,4 +34,3 @@ package API is stable.
 The Gorilla WebSocket package passes the server tests in the [Autobahn Test
 Suite](https://github.com/crossbario/autobahn-testsuite) using the application in the [examples/autobahn
 subdirectory](https://github.com/gorilla/websocket/tree/master/examples/autobahn).
-

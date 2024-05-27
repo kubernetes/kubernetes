@@ -74,15 +74,15 @@ func parseSwapString(swapString string) (*Swap, error) {
 
 	swap.Size, err = strconv.Atoi(swapFields[2])
 	if err != nil {
-		return nil, fmt.Errorf("%s: invalid swap size: %s: %w", ErrFileParse, swapFields[2], err)
+		return nil, fmt.Errorf("%w: invalid swap size: %s: %w", ErrFileParse, swapFields[2], err)
 	}
 	swap.Used, err = strconv.Atoi(swapFields[3])
 	if err != nil {
-		return nil, fmt.Errorf("%s: invalid swap used: %s: %w", ErrFileParse, swapFields[3], err)
+		return nil, fmt.Errorf("%w: invalid swap used: %s: %w", ErrFileParse, swapFields[3], err)
 	}
 	swap.Priority, err = strconv.Atoi(swapFields[4])
 	if err != nil {
-		return nil, fmt.Errorf("%s: invalid swap priority: %s: %w", ErrFileParse, swapFields[4], err)
+		return nil, fmt.Errorf("%w: invalid swap priority: %s: %w", ErrFileParse, swapFields[4], err)
 	}
 
 	return swap, nil

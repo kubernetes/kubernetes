@@ -9,7 +9,6 @@ package syntax
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
@@ -287,7 +286,7 @@ func readSource(filename string, src interface{}) ([]byte, error) {
 	case []byte:
 		return src, nil
 	case io.Reader:
-		data, err := ioutil.ReadAll(src)
+		data, err := io.ReadAll(src)
 		if err != nil {
 			err = &os.PathError{Op: "read", Path: filename, Err: err}
 			return nil, err
@@ -296,7 +295,7 @@ func readSource(filename string, src interface{}) ([]byte, error) {
 	case FilePortion:
 		return src.Content, nil
 	case nil:
-		return ioutil.ReadFile(filename)
+		return os.ReadFile(filename)
 	default:
 		return nil, fmt.Errorf("invalid source: %T", src)
 	}
@@ -1107,6 +1106,8 @@ var keywordToken = map[string]Token{
 	// reserved words:
 	"as": ILLEGAL,
 	// "assert":   ILLEGAL, // heavily used by our tests
+	"async":    ILLEGAL,
+	"await":    ILLEGAL,
 	"class":    ILLEGAL,
 	"del":      ILLEGAL,
 	"except":   ILLEGAL,

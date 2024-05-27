@@ -37,6 +37,9 @@ const DefaultLineEnding = "\n"
 const OmitKey = ""
 
 // A LevelEncoder serializes a Level to a primitive type.
+//
+// This function must make exactly one call
+// to a PrimitiveArrayEncoder's Append* method.
 type LevelEncoder func(Level, PrimitiveArrayEncoder)
 
 // LowercaseLevelEncoder serializes a Level to a lowercase string. For example,
@@ -90,6 +93,9 @@ func (e *LevelEncoder) UnmarshalText(text []byte) error {
 }
 
 // A TimeEncoder serializes a time.Time to a primitive type.
+//
+// This function must make exactly one call
+// to a PrimitiveArrayEncoder's Append* method.
 type TimeEncoder func(time.Time, PrimitiveArrayEncoder)
 
 // EpochTimeEncoder serializes a time.Time to a floating-point number of seconds
@@ -219,6 +225,9 @@ func (e *TimeEncoder) UnmarshalJSON(data []byte) error {
 }
 
 // A DurationEncoder serializes a time.Duration to a primitive type.
+//
+// This function must make exactly one call
+// to a PrimitiveArrayEncoder's Append* method.
 type DurationEncoder func(time.Duration, PrimitiveArrayEncoder)
 
 // SecondsDurationEncoder serializes a time.Duration to a floating-point number of seconds elapsed.
@@ -262,6 +271,9 @@ func (e *DurationEncoder) UnmarshalText(text []byte) error {
 }
 
 // A CallerEncoder serializes an EntryCaller to a primitive type.
+//
+// This function must make exactly one call
+// to a PrimitiveArrayEncoder's Append* method.
 type CallerEncoder func(EntryCaller, PrimitiveArrayEncoder)
 
 // FullCallerEncoder serializes a caller in /full/path/to/package/file:line
@@ -292,6 +304,9 @@ func (e *CallerEncoder) UnmarshalText(text []byte) error {
 
 // A NameEncoder serializes a period-separated logger name to a primitive
 // type.
+//
+// This function must make exactly one call
+// to a PrimitiveArrayEncoder's Append* method.
 type NameEncoder func(string, PrimitiveArrayEncoder)
 
 // FullNameEncoder serializes the logger name as-is.

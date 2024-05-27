@@ -1,16 +1,16 @@
 package asm
 
-//go:generate stringer -output jump_string.go -type=JumpOp
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -output jump_string.go -type=JumpOp
 
 // JumpOp affect control flow.
 //
-//    msb      lsb
-//    +----+-+---+
-//    |OP  |s|cls|
-//    +----+-+---+
+//	msb      lsb
+//	+----+-+---+
+//	|OP  |s|cls|
+//	+----+-+---+
 type JumpOp uint8
 
-const jumpMask OpCode = aluMask
+const jumpMask OpCode = 0xf0
 
 const (
 	// InvalidJumpOp is returned by getters when invoked
@@ -103,11 +103,19 @@ func (op JumpOp) Reg32(dst, src Register, label string) Instruction {
 }
 
 func (op JumpOp) opCode(class Class, source Source) OpCode {
-	if op == Exit || op == Call || op == Ja {
+	if op == Exit || op == Call {
 		return InvalidOpCode
 	}
 
 	return OpCode(class).SetJumpOp(op).SetSource(source)
+}
+
+// LongJump returns a jump always instruction with a range of [-2^31, 2^31 - 1].
+func LongJump(label string) Instruction {
+	return Instruction{
+		OpCode:   Ja.opCode(Jump32Class, ImmSource),
+		Constant: -1,
+	}.WithReference(label)
 }
 
 // Label adjusts PC to the address of the label.

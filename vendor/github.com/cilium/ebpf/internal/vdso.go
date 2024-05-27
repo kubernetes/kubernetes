@@ -19,13 +19,11 @@ var (
 // vdsoVersion returns the LINUX_VERSION_CODE embedded in the vDSO library
 // linked into the current process image.
 func vdsoVersion() (uint32, error) {
-	// Read data from the auxiliary vector, which is normally passed directly
-	// to the process. Go does not expose that data, so we must read it from procfs.
-	// https://man7.org/linux/man-pages/man3/getauxval.3.html
-	av, err := os.Open("/proc/self/auxv")
+	av, err := newAuxvRuntimeReader()
 	if err != nil {
-		return 0, fmt.Errorf("opening auxv: %w", err)
+		return 0, err
 	}
+
 	defer av.Close()
 
 	vdsoAddr, err := vdsoMemoryAddress(av)
@@ -51,24 +49,19 @@ func vdsoVersion() (uint32, error) {
 
 // vdsoMemoryAddress returns the memory address of the vDSO library
 // linked into the current process image. r is an io.Reader into an auxv blob.
-func vdsoMemoryAddress(r io.Reader) (uint64, error) {
-	const (
-		_AT_NULL         = 0  // End of vector
-		_AT_SYSINFO_EHDR = 33 // Offset to vDSO blob in process image
-	)
-
+func vdsoMemoryAddress(r auxvPairReader) (uintptr, error) {
 	// Loop through all tag/value pairs in auxv until we find `AT_SYSINFO_EHDR`,
 	// the address of a page containing the virtual Dynamic Shared Object (vDSO).
-	aux := struct{ Tag, Val uint64 }{}
 	for {
-		if err := binary.Read(r, NativeEndian, &aux); err != nil {
-			return 0, fmt.Errorf("reading auxv entry: %w", err)
+		tag, value, err := r.ReadAuxvPair()
+		if err != nil {
+			return 0, err
 		}
 
-		switch aux.Tag {
+		switch tag {
 		case _AT_SYSINFO_EHDR:
-			if aux.Val != 0 {
-				return aux.Val, nil
+			if value != 0 {
+				return uintptr(value), nil
 			}
 			return 0, fmt.Errorf("invalid vDSO address in auxv")
 		// _AT_NULL is always the last tag/val pair in the aux vector
@@ -117,7 +110,7 @@ func vdsoLinuxVersionCode(r io.ReaderAt) (uint32, error) {
 			var name string
 			if n.NameSize > 0 {
 				// Read the note name, aligned to 4 bytes.
-				buf := make([]byte, Align(int(n.NameSize), 4))
+				buf := make([]byte, Align(n.NameSize, 4))
 				if err := binary.Read(sr, hdr.ByteOrder, &buf); err != nil {
 					return 0, fmt.Errorf("reading note name: %w", err)
 				}
@@ -139,7 +132,7 @@ func vdsoLinuxVersionCode(r io.ReaderAt) (uint32, error) {
 				}
 
 				// Discard the note descriptor if it exists but we're not interested in it.
-				if _, err := io.CopyN(io.Discard, sr, int64(Align(int(n.DescSize), 4))); err != nil {
+				if _, err := io.CopyN(io.Discard, sr, int64(Align(n.DescSize, 4))); err != nil {
 					return 0, err
 				}
 			}

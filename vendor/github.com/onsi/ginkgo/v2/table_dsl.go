@@ -269,11 +269,15 @@ func generateTable(description string, isSubtree bool, args ...interface{}) {
 			internalNodeArgs = append(internalNodeArgs, entry.decorations...)
 
 			hasContext := false
-			if internalBodyType.NumIn() > 0. {
+			if internalBodyType.NumIn() > 0 {
 				if internalBodyType.In(0).Implements(specContextType) {
 					hasContext = true
-				} else if internalBodyType.In(0).Implements(contextType) && (len(entry.parameters) == 0 || !reflect.TypeOf(entry.parameters[0]).Implements(contextType)) {
+				} else if internalBodyType.In(0).Implements(contextType) {
 					hasContext = true
+					if len(entry.parameters) > 0 && reflect.TypeOf(entry.parameters[0]) != nil && reflect.TypeOf(entry.parameters[0]).Implements(contextType) {
+						// we allow you to pass in a non-nil context
+						hasContext = false
+					}
 				}
 			}
 

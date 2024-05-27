@@ -1,0 +1,174 @@
+run:
+  timeout: 8m
+  tests: true
+  build-tags:
+    - admin
+    - functional
+    - integration
+  skip-dirs:
+    # paths are relative to module root
+    - cri-containerd/test-images
+
+linters:
+  enable:
+    # defaults:
+    # - errcheck
+    # - gosimple
+    # - govet
+    # - ineffassign
+    # - staticcheck
+    # - typecheck
+    # - unused
+
+    - errorlint # error wrapping (eg, not using `errors.Is`, using `%s` instead of `%w` in `fmt.Errorf`)
+    - gofmt # whether code was gofmt-ed
+    - govet # enabled by default, but just to be sure
+    - nolintlint # ill-formed or insufficient nolint directives
+    - stylecheck # golint replacement
+    - thelper #  test helpers without t.Helper()
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      # struct order is often for Win32 compat
+      # also, ignore pointer bytes/GC issues for now until performance becomes an issue
+      - fieldalignment
+    check-shadowing: true
+
+  stylecheck:
+    # https://staticcheck.io/docs/checks
+    checks: ["all"]
+
+issues:
+  exclude-rules:
+    # err is very often shadowed in nested scopes
+    - linters:
+        - govet
+      text: '^shadow: declaration of "err" shadows declaration'
+
+    # path is relative to module root, which is ./test/
+    - path: cri-containerd
+      linters:
+        - stylecheck
+      text: "^ST1003: should not use underscores in package names$"
+      source: "^package cri_containerd$"
+
+    # don't bother with propper error wrapping in test code
+    - path: cri-containerd
+      linters:
+        - errorlint
+      text: "non-wrapping format verb for fmt.Errorf"
+
+    # This repo has a LOT of generated schema files, operating system bindings, and other
+    # things that ST1003 from stylecheck won't like (screaming case Windows api constants for example).
+    # There's also some structs that we *could* change the initialisms to be Go friendly
+    # (Id -> ID) but they're exported and it would be a breaking change.
+    # This makes it so that most new code, code that isn't supposed to be a pretty faithful
+    # mapping to an OS call/constants, or non-generated code still checks if we're following idioms,
+    # while ignoring the things that are just noise or would be more of a hassle than it'd be worth to change.
+    - path: layer.go
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: hcsshim.go
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: cmd\\ncproxy\\nodenetsvc\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: cmd\\ncproxy_mock\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\hcs\\schema2\\
+      linters:
+        - stylecheck
+        - gofmt
+
+    - path: internal\\wclayer\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: hcn\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\hcs\\schema1\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\hns\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: ext4\\internal\\compactext4\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: ext4\\internal\\format\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\guestrequest\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\guest\\prot\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\windevice\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\winapi\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\vmcompute\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\regstate\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    - path: internal\\hcserror\\
+      linters:
+        - stylecheck
+      Text: "ST1003:"
+
+    # v0 APIs are deprecated, but still retained for backwards compatability
+    - path: cmd\\ncproxy\\
+      linters:
+        - staticcheck
+      text: "^SA1019: .*(ncproxygrpc|nodenetsvc)[/]?v0"
+
+    - path: internal\\tools\\networkagent
+      linters:
+        - staticcheck
+      text: "^SA1019: .*nodenetsvc[/]?v0"
+
+    - path: internal\\vhdx\\info
+      linters:
+        - stylecheck
+      Text: "ST1003:"

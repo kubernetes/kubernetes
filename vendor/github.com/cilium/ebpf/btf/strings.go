@@ -6,11 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
+	"strings"
 )
 
 type stringTable struct {
 	base    *stringTable
 	offsets []uint32
+	prevIdx int
 	strings []string
 }
 
@@ -57,7 +61,7 @@ func readStringTable(r sizedReader, base *stringTable) (*stringTable, error) {
 		return nil, errors.New("first item in string table is non-empty")
 	}
 
-	return &stringTable{base, offsets, strings}, nil
+	return &stringTable{base, offsets, 0, strings}, nil
 }
 
 func splitNull(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -80,49 +84,115 @@ func (st *stringTable) Lookup(offset uint32) (string, error) {
 }
 
 func (st *stringTable) lookup(offset uint32) (string, error) {
-	i := search(st.offsets, offset)
-	if i == len(st.offsets) || st.offsets[i] != offset {
+	// Fast path: zero offset is the empty string, looked up frequently.
+	if offset == 0 && st.base == nil {
+		return "", nil
+	}
+
+	// Accesses tend to be globally increasing, so check if the next string is
+	// the one we want. This skips the binary search in about 50% of cases.
+	if st.prevIdx+1 < len(st.offsets) && st.offsets[st.prevIdx+1] == offset {
+		st.prevIdx++
+		return st.strings[st.prevIdx], nil
+	}
+
+	i, found := slices.BinarySearch(st.offsets, offset)
+	if !found {
 		return "", fmt.Errorf("offset %d isn't start of a string", offset)
+	}
+
+	// Set the new increment index, but only if its greater than the current.
+	if i > st.prevIdx+1 {
+		st.prevIdx = i
 	}
 
 	return st.strings[i], nil
 }
 
-func (st *stringTable) Length() int {
-	last := len(st.offsets) - 1
-	return int(st.offsets[last]) + len(st.strings[last]) + 1
+// Num returns the number of strings in the table.
+func (st *stringTable) Num() int {
+	return len(st.strings)
 }
 
-func (st *stringTable) Marshal(w io.Writer) error {
-	for _, str := range st.strings {
-		_, err := io.WriteString(w, str)
-		if err != nil {
-			return err
-		}
-		_, err = w.Write([]byte{0})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+// stringTableBuilder builds BTF string tables.
+type stringTableBuilder struct {
+	length  uint32
+	strings map[string]uint32
 }
 
-// search is a copy of sort.Search specialised for uint32.
+// newStringTableBuilder creates a builder with the given capacity.
 //
-// Licensed under https://go.dev/LICENSE
-func search(ints []uint32, needle uint32) int {
-	// Define f(-1) == false and f(n) == true.
-	// Invariant: f(i-1) == false, f(j) == true.
-	i, j := 0, len(ints)
-	for i < j {
-		h := int(uint(i+j) >> 1) // avoid overflow when computing h
-		// i ≤ h < j
-		if !(ints[h] >= needle) {
-			i = h + 1 // preserves f(i-1) == false
-		} else {
-			j = h // preserves f(j) == true
-		}
+// capacity may be zero.
+func newStringTableBuilder(capacity int) *stringTableBuilder {
+	var stb stringTableBuilder
+
+	if capacity == 0 {
+		// Use the runtime's small default size.
+		stb.strings = make(map[string]uint32)
+	} else {
+		stb.strings = make(map[string]uint32, capacity)
 	}
-	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
-	return i
+
+	// Ensure that the empty string is at index 0.
+	stb.append("")
+	return &stb
+}
+
+// Add a string to the table.
+//
+// Adding the same string multiple times will only store it once.
+func (stb *stringTableBuilder) Add(str string) (uint32, error) {
+	if strings.IndexByte(str, 0) != -1 {
+		return 0, fmt.Errorf("string contains null: %q", str)
+	}
+
+	offset, ok := stb.strings[str]
+	if ok {
+		return offset, nil
+	}
+
+	return stb.append(str), nil
+}
+
+func (stb *stringTableBuilder) append(str string) uint32 {
+	offset := stb.length
+	stb.length += uint32(len(str)) + 1
+	stb.strings[str] = offset
+	return offset
+}
+
+// Lookup finds the offset of a string in the table.
+//
+// Returns an error if str hasn't been added yet.
+func (stb *stringTableBuilder) Lookup(str string) (uint32, error) {
+	offset, ok := stb.strings[str]
+	if !ok {
+		return 0, fmt.Errorf("string %q is not in table", str)
+	}
+
+	return offset, nil
+}
+
+// Length returns the length in bytes.
+func (stb *stringTableBuilder) Length() int {
+	return int(stb.length)
+}
+
+// AppendEncoded appends the string table to the end of the provided buffer.
+func (stb *stringTableBuilder) AppendEncoded(buf []byte) []byte {
+	n := len(buf)
+	buf = append(buf, make([]byte, stb.Length())...)
+	strings := buf[n:]
+	for str, offset := range stb.strings {
+		copy(strings[offset:], str)
+	}
+	return buf
+}
+
+// Copy the string table builder.
+func (stb *stringTableBuilder) Copy() *stringTableBuilder {
+	return &stringTableBuilder{
+		stb.length,
+		maps.Clone(stb.strings),
+	}
 }

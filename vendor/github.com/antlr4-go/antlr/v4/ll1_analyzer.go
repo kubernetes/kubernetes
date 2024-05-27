@@ -40,6 +40,7 @@ func (la *LL1Analyzer) getDecisionLookahead(s ATNState) []*IntervalSet {
 	for alt := 0; alt < count; alt++ {
 
 		look[alt] = NewIntervalSet()
+		// TODO: This is one of the reasons that ATNConfigs are allocated and freed all the time - fix this tomorrow jim!
 		lookBusy := NewJStore[*ATNConfig, Comparator[*ATNConfig]](aConfEqInst, ClosureBusyCollection, "LL1Analyzer.getDecisionLookahead for lookBusy")
 		la.look1(s.GetTransitions()[alt].getTarget(), nil, BasePredictionContextEMPTY, look[alt], lookBusy, NewBitSet(), false, false)
 

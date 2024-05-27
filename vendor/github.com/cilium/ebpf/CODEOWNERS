@@ -1,0 +1,9 @@
+* @cilium/ebpf-lib-maintainers
+
+features/ @rgo3
+link/ @mmat11
+
+perf/ @florianl
+ringbuf/ @florianl
+
+btf/ @dylandreimerink

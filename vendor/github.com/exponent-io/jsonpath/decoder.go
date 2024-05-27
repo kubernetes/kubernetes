@@ -39,16 +39,15 @@ func NewDecoder(r io.Reader) *Decoder {
 // Decoder is intended to be used with a stream of tokens. As a result it navigates forward only.
 func (d *Decoder) SeekTo(path ...interface{}) (bool, error) {
 
-	if len(path) == 0 {
-		return len(d.path) == 0, nil
-	}
-	last := len(path) - 1
-	if i, ok := path[last].(int); ok {
-		path[last] = i - 1
+	if len(path) > 0 {
+		last := len(path) - 1
+		if i, ok := path[last].(int); ok {
+			path[last] = i - 1
+		}
 	}
 
 	for {
-		if d.path.Equal(path) {
+		if len(path) == len(d.path) && d.path.Equal(path) {
 			return true, nil
 		}
 		_, err := d.Token()

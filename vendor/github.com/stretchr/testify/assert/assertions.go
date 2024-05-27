@@ -19,7 +19,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pmezard/go-difflib/difflib"
-	yaml "gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3"
 )
 
 //go:generate sh -c "cd ../_codegen && go build && cd - && ../_codegen/_codegen -output-package=assert -template=assertion_format.go.tmpl"
@@ -110,7 +110,12 @@ func copyExportedFields(expected interface{}) interface{} {
 		return result.Interface()
 
 	case reflect.Array, reflect.Slice:
-		result := reflect.MakeSlice(expectedType, expectedValue.Len(), expectedValue.Len())
+		var result reflect.Value
+		if expectedKind == reflect.Array {
+			result = reflect.New(reflect.ArrayOf(expectedValue.Len(), expectedType.Elem())).Elem()
+		} else {
+			result = reflect.MakeSlice(expectedType, expectedValue.Len(), expectedValue.Len())
+		}
 		for i := 0; i < expectedValue.Len(); i++ {
 			index := expectedValue.Index(i)
 			if isNil(index) {
@@ -140,6 +145,8 @@ func copyExportedFields(expected interface{}) interface{} {
 // structures.
 //
 // This function does no assertion of any kind.
+//
+// Deprecated: Use [EqualExportedValues] instead.
 func ObjectsExportedFieldsAreEqual(expected, actual interface{}) bool {
 	expectedCleaned := copyExportedFields(expected)
 	actualCleaned := copyExportedFields(actual)
@@ -153,17 +160,40 @@ func ObjectsAreEqualValues(expected, actual interface{}) bool {
 		return true
 	}
 
-	actualType := reflect.TypeOf(actual)
-	if actualType == nil {
+	expectedValue := reflect.ValueOf(expected)
+	actualValue := reflect.ValueOf(actual)
+	if !expectedValue.IsValid() || !actualValue.IsValid() {
 		return false
 	}
-	expectedValue := reflect.ValueOf(expected)
-	if expectedValue.IsValid() && expectedValue.Type().ConvertibleTo(actualType) {
-		// Attempt comparison after type conversion
-		return reflect.DeepEqual(expectedValue.Convert(actualType).Interface(), actual)
+
+	expectedType := expectedValue.Type()
+	actualType := actualValue.Type()
+	if !expectedType.ConvertibleTo(actualType) {
+		return false
 	}
 
-	return false
+	if !isNumericType(expectedType) || !isNumericType(actualType) {
+		// Attempt comparison after type conversion
+		return reflect.DeepEqual(
+			expectedValue.Convert(actualType).Interface(), actual,
+		)
+	}
+
+	// If BOTH values are numeric, there are chances of false positives due
+	// to overflow or underflow. So, we need to make sure to always convert
+	// the smaller type to a larger type before comparing.
+	if expectedType.Size() >= actualType.Size() {
+		return actualValue.Convert(expectedType).Interface() == expected
+	}
+
+	return expectedValue.Convert(actualType).Interface() == actual
+}
+
+// isNumericType returns true if the type is one of:
+// int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64,
+// float32, float64, complex64, complex128
+func isNumericType(t reflect.Type) bool {
+	return t.Kind() >= reflect.Int && t.Kind() <= reflect.Complex128
 }
 
 /* CallerInfo is necessary because the assert functions use the testing object
@@ -266,7 +296,7 @@ func messageFromMsgAndArgs(msgAndArgs ...interface{}) string {
 
 // Aligns the provided message so that all lines after the first line start at the same location as the first line.
 // Assumes that the first line starts at the correct location (after carriage return, tab, label, spacer and tab).
-// The longestLabelLen parameter specifies the length of the longest label in the output (required becaues this is the
+// The longestLabelLen parameter specifies the length of the longest label in the output (required because this is the
 // basis on which the alignment occurs).
 func indentMessageLines(message string, longestLabelLen int) string {
 	outBuf := new(bytes.Buffer)
@@ -377,6 +407,25 @@ func Implements(t TestingT, interfaceObject interface{}, object interface{}, msg
 	}
 	if !reflect.TypeOf(object).Implements(interfaceType) {
 		return Fail(t, fmt.Sprintf("%T must implement %v", object, interfaceType), msgAndArgs...)
+	}
+
+	return true
+}
+
+// NotImplements asserts that an object does not implement the specified interface.
+//
+//	assert.NotImplements(t, (*MyInterface)(nil), new(MyObject))
+func NotImplements(t TestingT, interfaceObject interface{}, object interface{}, msgAndArgs ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	interfaceType := reflect.TypeOf(interfaceObject).Elem()
+
+	if object == nil {
+		return Fail(t, fmt.Sprintf("Cannot check if nil does not implement %v", interfaceType), msgAndArgs...)
+	}
+	if reflect.TypeOf(object).Implements(interfaceType) {
+		return Fail(t, fmt.Sprintf("%T implements %v", object, interfaceType), msgAndArgs...)
 	}
 
 	return true
@@ -496,7 +545,7 @@ func samePointers(first, second interface{}) bool {
 // representations appropriate to be presented to the user.
 //
 // If the values are not of like type, the returned strings will be prefixed
-// with the type name, and the value will be enclosed in parenthesis similar
+// with the type name, and the value will be enclosed in parentheses similar
 // to a type conversion in the Go grammar.
 func formatUnequalValues(expected, actual interface{}) (e string, a string) {
 	if reflect.TypeOf(expected) != reflect.TypeOf(actual) {
@@ -523,7 +572,7 @@ func truncatingFormat(data interface{}) string {
 	return value
 }
 
-// EqualValues asserts that two objects are equal or convertable to the same types
+// EqualValues asserts that two objects are equal or convertible to the same types
 // and equal.
 //
 //	assert.EqualValues(t, uint32(123), int32(123))
@@ -566,12 +615,19 @@ func EqualExportedValues(t TestingT, expected, actual interface{}, msgAndArgs ..
 		return Fail(t, fmt.Sprintf("Types expected to match exactly\n\t%v != %v", aType, bType), msgAndArgs...)
 	}
 
+	if aType.Kind() == reflect.Ptr {
+		aType = aType.Elem()
+	}
+	if bType.Kind() == reflect.Ptr {
+		bType = bType.Elem()
+	}
+
 	if aType.Kind() != reflect.Struct {
-		return Fail(t, fmt.Sprintf("Types expected to both be struct \n\t%v != %v", aType.Kind(), reflect.Struct), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("Types expected to both be struct or pointer to struct \n\t%v != %v", aType.Kind(), reflect.Struct), msgAndArgs...)
 	}
 
 	if bType.Kind() != reflect.Struct {
-		return Fail(t, fmt.Sprintf("Types expected to both be struct \n\t%v != %v", bType.Kind(), reflect.Struct), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("Types expected to both be struct or pointer to struct \n\t%v != %v", bType.Kind(), reflect.Struct), msgAndArgs...)
 	}
 
 	expected = copyExportedFields(expected)
@@ -620,17 +676,6 @@ func NotNil(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 	return Fail(t, "Expected value not to be nil.", msgAndArgs...)
 }
 
-// containsKind checks if a specified kind in the slice of kinds.
-func containsKind(kinds []reflect.Kind, kind reflect.Kind) bool {
-	for i := 0; i < len(kinds); i++ {
-		if kind == kinds[i] {
-			return true
-		}
-	}
-
-	return false
-}
-
 // isNil checks if a specified object is nil or not, without Failing.
 func isNil(object interface{}) bool {
 	if object == nil {
@@ -638,16 +683,13 @@ func isNil(object interface{}) bool {
 	}
 
 	value := reflect.ValueOf(object)
-	kind := value.Kind()
-	isNilableKind := containsKind(
-		[]reflect.Kind{
-			reflect.Chan, reflect.Func,
-			reflect.Interface, reflect.Map,
-			reflect.Ptr, reflect.Slice, reflect.UnsafePointer},
-		kind)
+	switch value.Kind() {
+	case
+		reflect.Chan, reflect.Func,
+		reflect.Interface, reflect.Map,
+		reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
 
-	if isNilableKind && value.IsNil() {
-		return true
+		return value.IsNil()
 	}
 
 	return false
@@ -731,16 +773,14 @@ func NotEmpty(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 
 }
 
-// getLen try to get length of object.
-// return (false, 0) if impossible.
-func getLen(x interface{}) (ok bool, length int) {
+// getLen tries to get the length of an object.
+// It returns (0, false) if impossible.
+func getLen(x interface{}) (length int, ok bool) {
 	v := reflect.ValueOf(x)
 	defer func() {
-		if e := recover(); e != nil {
-			ok = false
-		}
+		ok = recover() == nil
 	}()
-	return true, v.Len()
+	return v.Len(), true
 }
 
 // Len asserts that the specified object has specific length.
@@ -751,13 +791,13 @@ func Len(t TestingT, object interface{}, length int, msgAndArgs ...interface{}) 
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	ok, l := getLen(object)
+	l, ok := getLen(object)
 	if !ok {
-		return Fail(t, fmt.Sprintf("\"%s\" could not be applied builtin len()", object), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("\"%v\" could not be applied builtin len()", object), msgAndArgs...)
 	}
 
 	if l != length {
-		return Fail(t, fmt.Sprintf("\"%s\" should have %d item(s), but has %d", object, length, l), msgAndArgs...)
+		return Fail(t, fmt.Sprintf("\"%v\" should have %d item(s), but has %d", object, length, l), msgAndArgs...)
 	}
 	return true
 }
@@ -919,10 +959,11 @@ func NotContains(t TestingT, s, contains interface{}, msgAndArgs ...interface{})
 
 }
 
-// Subset asserts that the specified list(array, slice...) contains all
-// elements given in the specified subset(array, slice...).
+// Subset asserts that the specified list(array, slice...) or map contains all
+// elements given in the specified subset list(array, slice...) or map.
 //
-//	assert.Subset(t, [1, 2, 3], [1, 2], "But [1, 2, 3] does contain [1, 2]")
+//	assert.Subset(t, [1, 2, 3], [1, 2])
+//	assert.Subset(t, {"x": 1, "y": 2}, {"x": 1})
 func Subset(t TestingT, list, subset interface{}, msgAndArgs ...interface{}) (ok bool) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -975,10 +1016,12 @@ func Subset(t TestingT, list, subset interface{}, msgAndArgs ...interface{}) (ok
 	return true
 }
 
-// NotSubset asserts that the specified list(array, slice...) contains not all
-// elements given in the specified subset(array, slice...).
+// NotSubset asserts that the specified list(array, slice...) or map does NOT
+// contain all elements given in the specified subset list(array, slice...) or
+// map.
 //
-//	assert.NotSubset(t, [1, 3, 4], [1, 2], "But [1, 3, 4] does not contain [1, 2]")
+//	assert.NotSubset(t, [1, 3, 4], [1, 2])
+//	assert.NotSubset(t, {"x": 1, "y": 2}, {"z": 3})
 func NotSubset(t TestingT, list, subset interface{}, msgAndArgs ...interface{}) (ok bool) {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
@@ -1439,7 +1482,7 @@ func InEpsilon(t TestingT, expected, actual interface{}, epsilon float64, msgAnd
 		h.Helper()
 	}
 	if math.IsNaN(epsilon) {
-		return Fail(t, "epsilon must not be NaN")
+		return Fail(t, "epsilon must not be NaN", msgAndArgs...)
 	}
 	actualEpsilon, err := calcRelativeError(expected, actual)
 	if err != nil {
@@ -1458,19 +1501,26 @@ func InEpsilonSlice(t TestingT, expected, actual interface{}, epsilon float64, m
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	if expected == nil || actual == nil ||
-		reflect.TypeOf(actual).Kind() != reflect.Slice ||
-		reflect.TypeOf(expected).Kind() != reflect.Slice {
+
+	if expected == nil || actual == nil {
 		return Fail(t, "Parameters must be slice", msgAndArgs...)
 	}
 
-	actualSlice := reflect.ValueOf(actual)
 	expectedSlice := reflect.ValueOf(expected)
+	actualSlice := reflect.ValueOf(actual)
 
-	for i := 0; i < actualSlice.Len(); i++ {
-		result := InEpsilon(t, actualSlice.Index(i).Interface(), expectedSlice.Index(i).Interface(), epsilon)
-		if !result {
-			return result
+	if expectedSlice.Type().Kind() != reflect.Slice {
+		return Fail(t, "Expected value must be slice", msgAndArgs...)
+	}
+
+	expectedLen := expectedSlice.Len()
+	if !IsType(t, expected, actual) || !Len(t, actual, expectedLen) {
+		return false
+	}
+
+	for i := 0; i < expectedLen; i++ {
+		if !InEpsilon(t, expectedSlice.Index(i).Interface(), actualSlice.Index(i).Interface(), epsilon, "at index %d", i) {
+			return false
 		}
 	}
 
@@ -1870,23 +1920,18 @@ func (c *CollectT) Errorf(format string, args ...interface{}) {
 }
 
 // FailNow panics.
-func (c *CollectT) FailNow() {
+func (*CollectT) FailNow() {
 	panic("Assertion failed")
 }
 
-// Reset clears the collected errors.
-func (c *CollectT) Reset() {
-	c.errors = nil
+// Deprecated: That was a method for internal usage that should not have been published. Now just panics.
+func (*CollectT) Reset() {
+	panic("Reset() is deprecated")
 }
 
-// Copy copies the collected errors to the supplied t.
-func (c *CollectT) Copy(t TestingT) {
-	if tt, ok := t.(tHelper); ok {
-		tt.Helper()
-	}
-	for _, err := range c.errors {
-		t.Errorf("%v", err)
-	}
+// Deprecated: That was a method for internal usage that should not have been published. Now just panics.
+func (*CollectT) Copy(TestingT) {
+	panic("Copy() is deprecated")
 }
 
 // EventuallyWithT asserts that given condition will be met in waitFor time,
@@ -1912,8 +1957,8 @@ func EventuallyWithT(t TestingT, condition func(collect *CollectT), waitFor time
 		h.Helper()
 	}
 
-	collect := new(CollectT)
-	ch := make(chan bool, 1)
+	var lastFinishedTickErrs []error
+	ch := make(chan []error, 1)
 
 	timer := time.NewTimer(waitFor)
 	defer timer.Stop()
@@ -1924,19 +1969,25 @@ func EventuallyWithT(t TestingT, condition func(collect *CollectT), waitFor time
 	for tick := ticker.C; ; {
 		select {
 		case <-timer.C:
-			collect.Copy(t)
+			for _, err := range lastFinishedTickErrs {
+				t.Errorf("%v", err)
+			}
 			return Fail(t, "Condition never satisfied", msgAndArgs...)
 		case <-tick:
 			tick = nil
-			collect.Reset()
 			go func() {
+				collect := new(CollectT)
+				defer func() {
+					ch <- collect.errors
+				}()
 				condition(collect)
-				ch <- len(collect.errors) == 0
 			}()
-		case v := <-ch:
-			if v {
+		case errs := <-ch:
+			if len(errs) == 0 {
 				return true
 			}
+			// Keep the errors from the last ended condition, so that they can be copied to t if timeout is reached.
+			lastFinishedTickErrs = errs
 			tick = ticker.C
 		}
 	}

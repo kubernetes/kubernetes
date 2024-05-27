@@ -15,6 +15,7 @@
 package expfmt
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/prometheus/common/model"
@@ -63,7 +64,7 @@ const (
 type FormatType int
 
 const (
-	TypeUnknown = iota
+	TypeUnknown FormatType = iota
 	TypeProtoCompact
 	TypeProtoDelim
 	TypeProtoText
@@ -73,7 +74,8 @@ const (
 
 // NewFormat generates a new Format from the type provided. Mostly used for
 // tests, most Formats should be generated as part of content negotiation in
-// encode.go.
+// encode.go. If a type has more than one version, the latest version will be
+// returned.
 func NewFormat(t FormatType) Format {
 	switch t {
 	case TypeProtoCompact:
@@ -91,13 +93,21 @@ func NewFormat(t FormatType) Format {
 	}
 }
 
+// NewOpenMetricsFormat generates a new OpenMetrics format matching the
+// specified version number.
+func NewOpenMetricsFormat(version string) (Format, error) {
+	if version == OpenMetricsVersion_0_0_1 {
+		return fmtOpenMetrics_0_0_1, nil
+	}
+	if version == OpenMetricsVersion_1_0_0 {
+		return fmtOpenMetrics_1_0_0, nil
+	}
+	return fmtUnknown, fmt.Errorf("unknown open metrics version string")
+}
+
 // FormatType deduces an overall FormatType for the given format.
 func (f Format) FormatType() FormatType {
 	toks := strings.Split(string(f), ";")
-	if len(toks) < 2 {
-		return TypeUnknown
-	}
-
 	params := make(map[string]string)
 	for i, t := range toks {
 		if i == 0 {

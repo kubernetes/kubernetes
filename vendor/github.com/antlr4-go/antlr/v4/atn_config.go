@@ -73,9 +73,6 @@ func NewATNConfig1(c *ATNConfig, state ATNState, context *PredictionContext) *AT
 // NewATNConfig creates a new ATNConfig instance given an existing config, a state, a context and a semantic context, other 'constructors'
 // are just wrappers around this one.
 func NewATNConfig(c *ATNConfig, state ATNState, context *PredictionContext, semanticContext SemanticContext) *ATNConfig {
-	if semanticContext == nil {
-		panic("semanticContext cannot be nil") // TODO: Remove this - probably put here for some bug that is now fixed
-	}
 	b := &ATNConfig{}
 	b.InitATNConfig(c, state, c.GetAlt(), context, semanticContext)
 	b.cType = parserConfig

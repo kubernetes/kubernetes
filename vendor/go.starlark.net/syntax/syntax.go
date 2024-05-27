@@ -70,7 +70,8 @@ type File struct {
 	Path  string
 	Stmts []Stmt
 
-	Module interface{} // a *resolve.Module, set by resolver
+	Module  interface{} // a *resolve.Module, set by resolver
+	Options *FileOptions
 }
 
 func (x *File) Span() (start, end Position) {
@@ -99,9 +100,10 @@ func (*LoadStmt) stmt()   {}
 func (*ReturnStmt) stmt() {}
 
 // An AssignStmt represents an assignment:
+//
 //	x = 0
 //	x, y = y, x
-// 	x += 1
+//	x += 1
 type AssignStmt struct {
 	commentsRef
 	OpPos Position
@@ -121,7 +123,9 @@ type DefStmt struct {
 	commentsRef
 	Def    Position
 	Name   *Ident
+	Lparen Position
 	Params []Expr // param = ident | ident=expr | * | *ident | **ident
+	Rparen Position
 	Body   []Stmt
 
 	Function interface{} // a *resolve.Function, set by resolver

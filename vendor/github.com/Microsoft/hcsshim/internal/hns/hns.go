@@ -2,7 +2,7 @@ package hns
 
 import "fmt"
 
-//go:generate go run ../../mksyscall_windows.go -output zsyscall_windows.go hns.go
+//go:generate go run github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go hns.go
 
 //sys _hnsCall(method string, path string, object string, response **uint16) (hr error) = vmcompute.HNSCall?
 

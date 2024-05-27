@@ -6,7 +6,8 @@ package starlark
 
 import (
 	"fmt"
-	_ "unsafe" // for go:linkname hack
+	"hash/maphash"
+	"math/big"
 )
 
 // hashtable is used to represent Starlark dict and set values.
@@ -200,6 +201,57 @@ func (ht *hashtable) lookup(k Value) (v Value, found bool, err error) {
 	return None, false, nil // not found
 }
 
+// count returns the number of distinct elements of iter that are elements of ht.
+func (ht *hashtable) count(iter Iterator) (int, error) {
+	if ht.table == nil {
+		return 0, nil // empty
+	}
+
+	var k Value
+	count := 0
+
+	// Use a bitset per table entry to record seen elements of ht.
+	// Elements are identified by their bucket number and index within the bucket.
+	// Each bitset gets one word initially, but may grow.
+	storage := make([]big.Word, len(ht.table))
+	bitsets := make([]big.Int, len(ht.table))
+	for i := range bitsets {
+		bitsets[i].SetBits(storage[i : i+1 : i+1])
+	}
+	for iter.Next(&k) && count != int(ht.len) {
+		h, err := k.Hash()
+		if err != nil {
+			return 0, err // unhashable
+		}
+		if h == 0 {
+			h = 1 // zero is reserved
+		}
+
+		// Inspect each bucket in the bucket list.
+		bucketId := h & (uint32(len(ht.table) - 1))
+		i := 0
+		for p := &ht.table[bucketId]; p != nil; p = p.next {
+			for j := range p.entries {
+				e := &p.entries[j]
+				if e.hash == h {
+					if eq, err := Equal(k, e.key); err != nil {
+						return 0, err
+					} else if eq {
+						bitIndex := i<<3 + j
+						if bitsets[bucketId].Bit(bitIndex) == 0 {
+							bitsets[bucketId].SetBit(&bitsets[bucketId], bitIndex, 1)
+							count++
+						}
+					}
+				}
+			}
+			i++
+		}
+	}
+
+	return count, nil
+}
+
 // Items returns all the items in the map (as key/value pairs) in insertion order.
 func (ht *hashtable) items() []Tuple {
 	items := make([]Tuple, 0, ht.len)
@@ -364,20 +416,28 @@ func (it *keyIterator) Done() {
 	}
 }
 
-// TODO(adonovan): use go1.19's maphash.String.
+// entries is a go1.23 iterator over the entries of the hash table.
+func (ht *hashtable) entries(yield func(k, v Value) bool) {
+	if !ht.frozen {
+		ht.itercount++
+		defer func() { ht.itercount-- }()
+	}
+	for e := ht.head; e != nil && yield(e.key, e.value); e = e.next {
+	}
+}
+
+var seed = maphash.MakeSeed()
 
 // hashString computes the hash of s.
 func hashString(s string) uint32 {
 	if len(s) >= 12 {
 		// Call the Go runtime's optimized hash implementation,
-		// which uses the AESENC instruction on amd64 machines.
-		return uint32(goStringHash(s, 0))
+		// which uses the AES instructions on amd64 and arm64 machines.
+		h := maphash.String(seed, s)
+		return uint32(h>>32) | uint32(h)
 	}
 	return softHashString(s)
 }
-
-//go:linkname goStringHash runtime.stringHash
-func goStringHash(s string, seed uintptr) uintptr
 
 // softHashString computes the 32-bit FNV-1a hash of s in software.
 func softHashString(s string) uint32 {

@@ -1,3 +1,53 @@
+# Binaries for programs and plugins
 *.exe
-.idea
-.vscode
+*.dll
+*.so
+*.dylib
+
+# Ignore vscode setting files
+.vscode/
+.idea/
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
+.glide/
+
+# Ignore gcs bin directory
+service/bin/
+service/pkg/
+
+*.img
+*.vhd
+*.tar.gz
+*.tar
+
+# Make stuff
+.rootfs-done
+bin/*
+rootfs/*
+rootfs-conv/*
+*.o
+/build/
+
+deps/*
+out/*
+
+# protobuf files
+# only files at root of the repo, otherwise this will cause issues with vendoring
+/protobuf/*
+
+# test results
+test/results
+
+# go workspace files
+go.work
+go.work.sum
+
+# keys and related artifacts
+*.pem
+*.cose

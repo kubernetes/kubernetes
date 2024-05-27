@@ -97,6 +97,9 @@ const doesnt = "this Starlark dialect does not "
 // global options
 // These features are either not standard Starlark (yet), or deprecated
 // features of the BUILD language, so we put them behind flags.
+//
+// Deprecated: use an explicit [syntax.FileOptions] argument instead,
+// as it avoids all the usual problems of global variables.
 var (
 	AllowSet            = false // allow the 'set' built-in
 	AllowGlobalReassign = false // allow reassignment to top-level names; also, allow if/for/while at top-level
@@ -130,7 +133,7 @@ func File(file *syntax.File, isPredeclared, isUniversal func(name string) bool) 
 // REPLChunk is a generalization of the File function that supports a
 // non-empty initial global block, as occurs in a REPL.
 func REPLChunk(file *syntax.File, isGlobal, isPredeclared, isUniversal func(name string) bool) error {
-	r := newResolver(isGlobal, isPredeclared, isUniversal)
+	r := newResolver(file.Options, isGlobal, isPredeclared, isUniversal)
 	r.stmts(file.Stmts)
 
 	r.env.resolveLocalUses()
@@ -151,12 +154,20 @@ func REPLChunk(file *syntax.File, isGlobal, isPredeclared, isUniversal func(name
 	return nil
 }
 
-// Expr resolves the specified expression.
+// Expr calls [ExprOptions] using [syntax.LegacyFileOptions].
+//
+// Deprecated: use [ExprOptions] with [syntax.FileOptions] instead,
+// because this function relies on legacy global variables.
+func Expr(expr syntax.Expr, isPredeclared, isUniversal func(name string) bool) ([]*Binding, error) {
+	return ExprOptions(syntax.LegacyFileOptions(), expr, isPredeclared, isUniversal)
+}
+
+// ExprOptions resolves the specified expression.
 // It returns the local variables bound within the expression.
 //
-// The isPredeclared and isUniversal predicates behave as for the File function.
-func Expr(expr syntax.Expr, isPredeclared, isUniversal func(name string) bool) ([]*Binding, error) {
-	r := newResolver(nil, isPredeclared, isUniversal)
+// The isPredeclared and isUniversal predicates behave as for the File function
+func ExprOptions(opts *syntax.FileOptions, expr syntax.Expr, isPredeclared, isUniversal func(name string) bool) ([]*Binding, error) {
+	r := newResolver(opts, nil, isPredeclared, isUniversal)
 	r.expr(expr)
 	r.env.resolveLocalUses()
 	r.resolveNonLocalUses(r.env) // globals & universals
@@ -179,9 +190,10 @@ type Error struct {
 
 func (e Error) Error() string { return e.Pos.String() + ": " + e.Msg }
 
-func newResolver(isGlobal, isPredeclared, isUniversal func(name string) bool) *resolver {
+func newResolver(options *syntax.FileOptions, isGlobal, isPredeclared, isUniversal func(name string) bool) *resolver {
 	file := new(block)
 	return &resolver{
+		options:       options,
 		file:          file,
 		env:           file,
 		isGlobal:      isGlobal,
@@ -193,6 +205,8 @@ func newResolver(isGlobal, isPredeclared, isUniversal func(name string) bool) *r
 }
 
 type resolver struct {
+	options *syntax.FileOptions
+
 	// env is the current local environment:
 	// a linked list of blocks, innermost first.
 	// The tail of the list is the file block.
@@ -314,7 +328,7 @@ func (r *resolver) bind(id *syntax.Ident) bool {
 				r.moduleGlobals = append(r.moduleGlobals, bind)
 			}
 		}
-		if ok && !AllowGlobalReassign {
+		if ok && !r.options.GlobalReassign {
 			r.errorf(id.NamePos, "cannot reassign %s %s declared at %s",
 				bind.Scope, id.Name, bind.First.NamePos)
 		}
@@ -382,7 +396,7 @@ func (r *resolver) use(id *syntax.Ident) {
 	// We will piggyback support for the legacy semantics on the
 	// AllowGlobalReassign flag, which is loosely related and also
 	// required for Bazel.
-	if AllowGlobalReassign && r.env == r.file {
+	if r.options.GlobalReassign && r.env == r.file {
 		r.useToplevel(use)
 		return
 	}
@@ -420,7 +434,7 @@ func (r *resolver) useToplevel(use use) (bind *Binding) {
 		r.predeclared[id.Name] = bind // save it
 	} else if r.isUniversal(id.Name) {
 		// use of universal name
-		if !AllowSet && id.Name == "set" {
+		if !r.options.Set && id.Name == "set" {
 			r.errorf(id.NamePos, doesnt+"support sets")
 		}
 		bind = &Binding{Scope: Universal}
@@ -493,7 +507,7 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		}
 
 	case *syntax.IfStmt:
-		if !AllowGlobalReassign && r.container().function == nil {
+		if !r.options.TopLevelControl && r.container().function == nil {
 			r.errorf(stmt.If, "if statement not within a function")
 		}
 		r.expr(stmt.Cond)
@@ -519,7 +533,7 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		r.function(fn, stmt.Def)
 
 	case *syntax.ForStmt:
-		if !AllowGlobalReassign && r.container().function == nil {
+		if !r.options.TopLevelControl && r.container().function == nil {
 			r.errorf(stmt.For, "for loop not within a function")
 		}
 		r.expr(stmt.X)
@@ -530,10 +544,10 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		r.loops--
 
 	case *syntax.WhileStmt:
-		if !AllowRecursion {
+		if !r.options.While {
 			r.errorf(stmt.While, doesnt+"support while loops")
 		}
-		if !AllowGlobalReassign && r.container().function == nil {
+		if !r.options.TopLevelControl && r.container().function == nil {
 			r.errorf(stmt.While, "while loop not within a function")
 		}
 		r.expr(stmt.Cond)
@@ -569,9 +583,9 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 			}
 
 			id := stmt.To[i]
-			if LoadBindsGlobally {
+			if r.options.LoadBindsGlobally {
 				r.bind(id)
-			} else if r.bindLocal(id) && !AllowGlobalReassign {
+			} else if r.bindLocal(id) && !r.options.GlobalReassign {
 				// "Global" in AllowGlobalReassign is a misnomer for "toplevel".
 				// Sadly we can't report the previous declaration
 				// as id.Binding may not be set yet.

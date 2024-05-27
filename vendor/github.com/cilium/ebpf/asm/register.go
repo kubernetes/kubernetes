@@ -35,10 +35,11 @@ const (
 
 // Pseudo registers used by 64bit loads and jumps
 const (
-	PseudoMapFD    = R1 // BPF_PSEUDO_MAP_FD
-	PseudoMapValue = R2 // BPF_PSEUDO_MAP_VALUE
-	PseudoCall     = R1 // BPF_PSEUDO_CALL
-	PseudoFunc     = R4 // BPF_PSEUDO_FUNC
+	PseudoMapFD     = R1 // BPF_PSEUDO_MAP_FD
+	PseudoMapValue  = R2 // BPF_PSEUDO_MAP_VALUE
+	PseudoCall      = R1 // BPF_PSEUDO_CALL
+	PseudoFunc      = R4 // BPF_PSEUDO_FUNC
+	PseudoKfuncCall = R2 // BPF_PSEUDO_KFUNC_CALL
 )
 
 func (r Register) String() string {

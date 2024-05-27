@@ -139,7 +139,13 @@ func NegotiateIncludingOpenMetrics(h http.Header) Format {
 // interface is kept for backwards compatibility.
 // In cases where the Format does not allow for UTF-8 names, the global
 // NameEscapingScheme will be applied.
-func NewEncoder(w io.Writer, format Format) Encoder {
+//
+// NewEncoder can be called with additional options to customize the OpenMetrics text output.
+// For example:
+// NewEncoder(w, FmtOpenMetrics_1_0_0, WithCreatedLines())
+//
+// Extra options are ignored for all other formats.
+func NewEncoder(w io.Writer, format Format, options ...EncoderOption) Encoder {
 	escapingScheme := format.ToEscapingScheme()
 
 	switch format.FormatType() {
@@ -178,7 +184,7 @@ func NewEncoder(w io.Writer, format Format) Encoder {
 	case TypeOpenMetrics:
 		return encoderCloser{
 			encode: func(v *dto.MetricFamily) error {
-				_, err := MetricFamilyToOpenMetrics(w, model.EscapeMetricFamily(v, escapingScheme))
+				_, err := MetricFamilyToOpenMetrics(w, model.EscapeMetricFamily(v, escapingScheme), options...)
 				return err
 			},
 			close: func() error {

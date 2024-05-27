@@ -60,6 +60,34 @@ func (ins *Instruction) Unmarshal(r io.Reader, bo binary.ByteOrder) (uint64, err
 	}
 
 	ins.Offset = int16(bo.Uint16(data[2:4]))
+
+	if ins.OpCode.Class().IsALU() {
+		switch ins.OpCode.ALUOp() {
+		case Div:
+			if ins.Offset == 1 {
+				ins.OpCode = ins.OpCode.SetALUOp(SDiv)
+				ins.Offset = 0
+			}
+		case Mod:
+			if ins.Offset == 1 {
+				ins.OpCode = ins.OpCode.SetALUOp(SMod)
+				ins.Offset = 0
+			}
+		case Mov:
+			switch ins.Offset {
+			case 8:
+				ins.OpCode = ins.OpCode.SetALUOp(MovSX8)
+				ins.Offset = 0
+			case 16:
+				ins.OpCode = ins.OpCode.SetALUOp(MovSX16)
+				ins.Offset = 0
+			case 32:
+				ins.OpCode = ins.OpCode.SetALUOp(MovSX32)
+				ins.Offset = 0
+			}
+		}
+	}
+
 	// Convert to int32 before widening to int64
 	// to ensure the signed bit is carried over.
 	ins.Constant = int64(int32(bo.Uint32(data[4:8])))
@@ -106,8 +134,38 @@ func (ins Instruction) Marshal(w io.Writer, bo binary.ByteOrder) (uint64, error)
 		return 0, fmt.Errorf("can't marshal registers: %s", err)
 	}
 
+	if ins.OpCode.Class().IsALU() {
+		newOffset := int16(0)
+		switch ins.OpCode.ALUOp() {
+		case SDiv:
+			ins.OpCode = ins.OpCode.SetALUOp(Div)
+			newOffset = 1
+		case SMod:
+			ins.OpCode = ins.OpCode.SetALUOp(Mod)
+			newOffset = 1
+		case MovSX8:
+			ins.OpCode = ins.OpCode.SetALUOp(Mov)
+			newOffset = 8
+		case MovSX16:
+			ins.OpCode = ins.OpCode.SetALUOp(Mov)
+			newOffset = 16
+		case MovSX32:
+			ins.OpCode = ins.OpCode.SetALUOp(Mov)
+			newOffset = 32
+		}
+		if newOffset != 0 && ins.Offset != 0 {
+			return 0, fmt.Errorf("extended ALU opcodes should have an .Offset of 0: %s", ins)
+		}
+		ins.Offset = newOffset
+	}
+
+	op, err := ins.OpCode.bpfOpCode()
+	if err != nil {
+		return 0, err
+	}
+
 	data := make([]byte, InstructionSize)
-	data[0] = byte(ins.OpCode)
+	data[0] = op
 	data[1] = byte(regs)
 	bo.PutUint16(data[2:4], uint16(ins.Offset))
 	bo.PutUint32(data[4:8], uint32(cons))
@@ -226,6 +284,13 @@ func (ins *Instruction) IsFunctionCall() bool {
 	return ins.OpCode.JumpOp() == Call && ins.Src == PseudoCall
 }
 
+// IsKfuncCall returns true if the instruction calls a kfunc.
+//
+// This is not the same thing as a BPF helper call.
+func (ins *Instruction) IsKfuncCall() bool {
+	return ins.OpCode.JumpOp() == Call && ins.Src == PseudoKfuncCall
+}
+
 // IsLoadOfFunctionPointer returns true if the instruction loads a function pointer.
 func (ins *Instruction) IsLoadOfFunctionPointer() bool {
 	return ins.OpCode.IsDWordLoad() && ins.Src == PseudoFunc
@@ -291,9 +356,9 @@ func (ins Instruction) Format(f fmt.State, c rune) {
 		goto ref
 	}
 
-	fmt.Fprintf(f, "%v ", op)
 	switch cls := op.Class(); {
 	case cls.isLoadOrStore():
+		fmt.Fprintf(f, "%v ", op)
 		switch op.Mode() {
 		case ImmMode:
 			fmt.Fprintf(f, "dst: %s imm: %d", ins.Dst, ins.Constant)
@@ -301,28 +366,48 @@ func (ins Instruction) Format(f fmt.State, c rune) {
 			fmt.Fprintf(f, "imm: %d", ins.Constant)
 		case IndMode:
 			fmt.Fprintf(f, "dst: %s src: %s imm: %d", ins.Dst, ins.Src, ins.Constant)
-		case MemMode:
+		case MemMode, MemSXMode:
 			fmt.Fprintf(f, "dst: %s src: %s off: %d imm: %d", ins.Dst, ins.Src, ins.Offset, ins.Constant)
 		case XAddMode:
 			fmt.Fprintf(f, "dst: %s src: %s", ins.Dst, ins.Src)
 		}
 
 	case cls.IsALU():
-		fmt.Fprintf(f, "dst: %s ", ins.Dst)
-		if op.ALUOp() == Swap || op.Source() == ImmSource {
+		fmt.Fprintf(f, "%v", op)
+		if op == Swap.Op(ImmSource) {
+			fmt.Fprintf(f, "%d", ins.Constant)
+		}
+
+		fmt.Fprintf(f, " dst: %s ", ins.Dst)
+		switch {
+		case op.ALUOp() == Swap:
+			break
+		case op.Source() == ImmSource:
 			fmt.Fprintf(f, "imm: %d", ins.Constant)
-		} else {
+		default:
 			fmt.Fprintf(f, "src: %s", ins.Src)
 		}
 
 	case cls.IsJump():
+		fmt.Fprintf(f, "%v ", op)
 		switch jop := op.JumpOp(); jop {
 		case Call:
-			if ins.Src == PseudoCall {
+			switch ins.Src {
+			case PseudoCall:
 				// bpf-to-bpf call
 				fmt.Fprint(f, ins.Constant)
-			} else {
+			case PseudoKfuncCall:
+				// kfunc call
+				fmt.Fprintf(f, "Kfunc(%d)", ins.Constant)
+			default:
 				fmt.Fprint(f, BuiltinFunc(ins.Constant))
+			}
+
+		case Ja:
+			if ins.OpCode.Class() == Jump32Class {
+				fmt.Fprintf(f, "imm: %d", ins.Constant)
+			} else {
+				fmt.Fprintf(f, "off: %d", ins.Offset)
 			}
 
 		default:
@@ -333,6 +418,8 @@ func (ins Instruction) Format(f fmt.State, c rune) {
 				fmt.Fprintf(f, "src: %s", ins.Src)
 			}
 		}
+	default:
+		fmt.Fprintf(f, "%v ", op)
 	}
 
 ref:
@@ -352,6 +439,13 @@ func (ins Instruction) equal(other Instruction) bool {
 // Size returns the amount of bytes ins would occupy in binary form.
 func (ins Instruction) Size() uint64 {
 	return uint64(InstructionSize * ins.OpCode.rawInstructions())
+}
+
+// WithMetadata sets the given Metadata on the Instruction. e.g. to copy
+// Metadata from another Instruction when replacing it.
+func (ins Instruction) WithMetadata(meta Metadata) Instruction {
+	ins.Metadata = meta
+	return ins
 }
 
 type symbolMeta struct{}
@@ -754,7 +848,8 @@ func (insns Instructions) encodeFunctionReferences() error {
 		}
 
 		switch {
-		case ins.IsFunctionReference() && ins.Constant == -1:
+		case ins.IsFunctionReference() && ins.Constant == -1,
+			ins.OpCode == Ja.opCode(Jump32Class, ImmSource) && ins.Constant == -1:
 			symOffset, ok := symbolOffsets[ins.Reference()]
 			if !ok {
 				return fmt.Errorf("%s at insn %d: symbol %q: %w", ins.OpCode, i, ins.Reference(), ErrUnsatisfiedProgramReference)

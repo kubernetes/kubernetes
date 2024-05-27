@@ -23,9 +23,14 @@ const (
 	NetNsType         = sys.BPF_LINK_TYPE_NETNS
 	XDPType           = sys.BPF_LINK_TYPE_XDP
 	PerfEventType     = sys.BPF_LINK_TYPE_PERF_EVENT
+	KprobeMultiType   = sys.BPF_LINK_TYPE_KPROBE_MULTI
+	TCXType           = sys.BPF_LINK_TYPE_TCX
+	UprobeMultiType   = sys.BPF_LINK_TYPE_UPROBE_MULTI
+	NetfilterType     = sys.BPF_LINK_TYPE_NETFILTER
+	NetkitType        = sys.BPF_LINK_TYPE_NETKIT
 )
 
-var haveProgAttach = internal.FeatureTest("BPF_PROG_ATTACH", "4.10", func() error {
+var haveProgAttach = internal.NewFeatureTest("BPF_PROG_ATTACH", "4.10", func() error {
 	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
 		Type:    ebpf.CGroupSKB,
 		License: "MIT",
@@ -45,7 +50,7 @@ var haveProgAttach = internal.FeatureTest("BPF_PROG_ATTACH", "4.10", func() erro
 	return nil
 })
 
-var haveProgAttachReplace = internal.FeatureTest("BPF_PROG_ATTACH atomic replacement", "5.5", func() error {
+var haveProgAttachReplace = internal.NewFeatureTest("BPF_PROG_ATTACH atomic replacement of MULTI progs", "5.5", func() error {
 	if err := haveProgAttach(); err != nil {
 		return err
 	}
@@ -59,9 +64,11 @@ var haveProgAttachReplace = internal.FeatureTest("BPF_PROG_ATTACH atomic replace
 			asm.Return(),
 		},
 	})
+
 	if err != nil {
 		return internal.ErrNotSupported
 	}
+
 	defer prog.Close()
 
 	// We know that we have BPF_PROG_ATTACH since we can load CGroupSKB programs.
@@ -69,10 +76,10 @@ var haveProgAttachReplace = internal.FeatureTest("BPF_PROG_ATTACH atomic replace
 	// present.
 	attr := sys.ProgAttachAttr{
 		// We rely on this being checked after attachFlags.
-		TargetFd:    ^uint32(0),
-		AttachBpfFd: uint32(prog.FD()),
-		AttachType:  uint32(ebpf.AttachCGroupInetIngress),
-		AttachFlags: uint32(flagReplace),
+		TargetFdOrIfindex: ^uint32(0),
+		AttachBpfFd:       uint32(prog.FD()),
+		AttachType:        uint32(ebpf.AttachCGroupInetIngress),
+		AttachFlags:       uint32(flagReplace),
 	}
 
 	err = sys.ProgAttach(&attr)
@@ -85,7 +92,7 @@ var haveProgAttachReplace = internal.FeatureTest("BPF_PROG_ATTACH atomic replace
 	return err
 })
 
-var haveBPFLink = internal.FeatureTest("bpf_link", "5.7", func() error {
+var haveBPFLink = internal.NewFeatureTest("bpf_link", "5.7", func() error {
 	attr := sys.LinkCreateAttr{
 		// This is a hopefully invalid file descriptor, which triggers EBADF.
 		TargetFd:   ^uint32(0),
@@ -100,4 +107,94 @@ var haveBPFLink = internal.FeatureTest("bpf_link", "5.7", func() error {
 		return nil
 	}
 	return err
+})
+
+var haveProgQuery = internal.NewFeatureTest("BPF_PROG_QUERY", "4.15", func() error {
+	attr := sys.ProgQueryAttr{
+		// We rely on this being checked during the syscall.
+		// With an otherwise correct payload we expect EBADF here
+		// as an indication that the feature is present.
+		TargetFdOrIfindex: ^uint32(0),
+		AttachType:        sys.AttachType(ebpf.AttachCGroupInetIngress),
+	}
+
+	err := sys.ProgQuery(&attr)
+
+	if errors.Is(err, unix.EBADF) {
+		return nil
+	}
+	if err != nil {
+		return ErrNotSupported
+	}
+	return errors.New("syscall succeeded unexpectedly")
+})
+
+var haveTCX = internal.NewFeatureTest("tcx", "6.6", func() error {
+	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
+		Type:    ebpf.SchedCLS,
+		License: "MIT",
+		Instructions: asm.Instructions{
+			asm.Mov.Imm(asm.R0, 0),
+			asm.Return(),
+		},
+	})
+
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+
+	defer prog.Close()
+	attr := sys.LinkCreateTcxAttr{
+		// We rely on this being checked during the syscall.
+		// With an otherwise correct payload we expect ENODEV here
+		// as an indication that the feature is present.
+		TargetIfindex: ^uint32(0),
+		ProgFd:        uint32(prog.FD()),
+		AttachType:    sys.AttachType(ebpf.AttachTCXIngress),
+	}
+
+	_, err = sys.LinkCreateTcx(&attr)
+
+	if errors.Is(err, unix.ENODEV) {
+		return nil
+	}
+	if err != nil {
+		return ErrNotSupported
+	}
+	return errors.New("syscall succeeded unexpectedly")
+})
+
+var haveNetkit = internal.NewFeatureTest("netkit", "6.7", func() error {
+	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
+		Type:    ebpf.SchedCLS,
+		License: "MIT",
+		Instructions: asm.Instructions{
+			asm.Mov.Imm(asm.R0, 0),
+			asm.Return(),
+		},
+	})
+
+	if err != nil {
+		return internal.ErrNotSupported
+	}
+
+	defer prog.Close()
+	attr := sys.LinkCreateNetkitAttr{
+		// We rely on this being checked during the syscall.
+		// With an otherwise correct payload we expect ENODEV here
+		// as an indication that the feature is present.
+		TargetIfindex: ^uint32(0),
+		ProgFd:        uint32(prog.FD()),
+		AttachType:    sys.AttachType(ebpf.AttachNetkitPrimary),
+	}
+
+	_, err = sys.LinkCreateNetkit(&attr)
+
+	if errors.Is(err, unix.ENODEV) {
+		return nil
+	}
+	if err != nil {
+		return ErrNotSupported
+	}
+	return errors.New("syscall succeeded unexpectedly")
 })

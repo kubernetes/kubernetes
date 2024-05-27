@@ -1,9 +1,11 @@
 package netlink
 
 import (
+	"fmt"
+	"net"
+	"strings"
 	"syscall"
 
-	"fmt"
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
 )
@@ -25,6 +27,61 @@ type DevlinkDevice struct {
 	BusName    string
 	DeviceName string
 	Attrs      DevlinkDevAttrs
+}
+
+// DevlinkPortFn represents port function and its attributes
+type DevlinkPortFn struct {
+	HwAddr  net.HardwareAddr
+	State   uint8
+	OpState uint8
+}
+
+// DevlinkPortFnSetAttrs represents attributes to set
+type DevlinkPortFnSetAttrs struct {
+	FnAttrs     DevlinkPortFn
+	HwAddrValid bool
+	StateValid  bool
+}
+
+// DevlinkPort represents port and its attributes
+type DevlinkPort struct {
+	BusName        string
+	DeviceName     string
+	PortIndex      uint32
+	PortType       uint16
+	NetdeviceName  string
+	NetdevIfIndex  uint32
+	RdmaDeviceName string
+	PortFlavour    uint16
+	Fn             *DevlinkPortFn
+}
+
+type DevLinkPortAddAttrs struct {
+	Controller      uint32
+	SfNumber        uint32
+	PortIndex       uint32
+	PfNumber        uint16
+	SfNumberValid   bool
+	PortIndexValid  bool
+	ControllerValid bool
+}
+
+// DevlinkDeviceInfo represents devlink info
+type DevlinkDeviceInfo struct {
+	Driver         string
+	SerialNumber   string
+	BoardID        string
+	FwApp          string
+	FwAppBoundleID string
+	FwAppName      string
+	FwBoundleID    string
+	FwMgmt         string
+	FwMgmtAPI      string
+	FwMgmtBuild    string
+	FwNetlist      string
+	FwNetlistBuild string
+	FwPsidAPI      string
+	FwUndi         string
 }
 
 func parseDevLinkDeviceList(msgs [][]byte) ([]*DevlinkDevice, error) {
@@ -95,9 +152,9 @@ func (d *DevlinkDevice) parseAttributes(attrs []syscall.NetlinkRouteAttr) error 
 	for _, a := range attrs {
 		switch a.Attr.Type {
 		case nl.DEVLINK_ATTR_BUS_NAME:
-			d.BusName = string(a.Value)
+			d.BusName = string(a.Value[:len(a.Value)-1])
 		case nl.DEVLINK_ATTR_DEV_NAME:
-			d.DeviceName = string(a.Value)
+			d.DeviceName = string(a.Value[:len(a.Value)-1])
 		case nl.DEVLINK_ATTR_ESWITCH_MODE:
 			d.Attrs.Eswitch.Mode = parseEswitchMode(native.Uint16(a.Value))
 		case nl.DEVLINK_ATTR_ESWITCH_INLINE_MODE:
@@ -126,12 +183,12 @@ func (h *Handle) getEswitchAttrs(family *GenlFamily, dev *DevlinkDevice) {
 	req := h.newNetlinkRequest(int(family.ID), unix.NLM_F_REQUEST|unix.NLM_F_ACK)
 	req.AddData(msg)
 
-	b := make([]byte, len(dev.BusName))
+	b := make([]byte, len(dev.BusName)+1)
 	copy(b, dev.BusName)
 	data := nl.NewRtAttr(nl.DEVLINK_ATTR_BUS_NAME, b)
 	req.AddData(data)
 
-	b = make([]byte, len(dev.DeviceName))
+	b = make([]byte, len(dev.DeviceName)+1)
 	copy(b, dev.DeviceName)
 	data = nl.NewRtAttr(nl.DEVLINK_ATTR_DEV_NAME, b)
 	req.AddData(data)
@@ -269,4 +326,403 @@ func (h *Handle) DevLinkSetEswitchMode(Dev *DevlinkDevice, NewMode string) error
 // Equivalent to: `devlink dev eswitch set $dev mode legacy`
 func DevLinkSetEswitchMode(Dev *DevlinkDevice, NewMode string) error {
 	return pkgHandle.DevLinkSetEswitchMode(Dev, NewMode)
+}
+
+func (port *DevlinkPort) parseAttributes(attrs []syscall.NetlinkRouteAttr) error {
+	for _, a := range attrs {
+		switch a.Attr.Type {
+		case nl.DEVLINK_ATTR_BUS_NAME:
+			port.BusName = string(a.Value[:len(a.Value)-1])
+		case nl.DEVLINK_ATTR_DEV_NAME:
+			port.DeviceName = string(a.Value[:len(a.Value)-1])
+		case nl.DEVLINK_ATTR_PORT_INDEX:
+			port.PortIndex = native.Uint32(a.Value)
+		case nl.DEVLINK_ATTR_PORT_TYPE:
+			port.PortType = native.Uint16(a.Value)
+		case nl.DEVLINK_ATTR_PORT_NETDEV_NAME:
+			port.NetdeviceName = string(a.Value[:len(a.Value)-1])
+		case nl.DEVLINK_ATTR_PORT_NETDEV_IFINDEX:
+			port.NetdevIfIndex = native.Uint32(a.Value)
+		case nl.DEVLINK_ATTR_PORT_IBDEV_NAME:
+			port.RdmaDeviceName = string(a.Value[:len(a.Value)-1])
+		case nl.DEVLINK_ATTR_PORT_FLAVOUR:
+			port.PortFlavour = native.Uint16(a.Value)
+		case nl.DEVLINK_ATTR_PORT_FUNCTION:
+			port.Fn = &DevlinkPortFn{}
+			for nested := range nl.ParseAttributes(a.Value) {
+				switch nested.Type {
+				case nl.DEVLINK_PORT_FUNCTION_ATTR_HW_ADDR:
+					port.Fn.HwAddr = nested.Value[:]
+				case nl.DEVLINK_PORT_FN_ATTR_STATE:
+					port.Fn.State = uint8(nested.Value[0])
+				case nl.DEVLINK_PORT_FN_ATTR_OPSTATE:
+					port.Fn.OpState = uint8(nested.Value[0])
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func parseDevLinkAllPortList(msgs [][]byte) ([]*DevlinkPort, error) {
+	ports := make([]*DevlinkPort, 0, len(msgs))
+	for _, m := range msgs {
+		attrs, err := nl.ParseRouteAttr(m[nl.SizeofGenlmsg:])
+		if err != nil {
+			return nil, err
+		}
+		port := &DevlinkPort{}
+		if err = port.parseAttributes(attrs); err != nil {
+			return nil, err
+		}
+		ports = append(ports, port)
+	}
+	return ports, nil
+}
+
+// DevLinkGetPortList provides a pointer to devlink ports and nil error,
+// otherwise returns an error code.
+func (h *Handle) DevLinkGetAllPortList() ([]*DevlinkPort, error) {
+	f, err := h.GenlFamilyGet(nl.GENL_DEVLINK_NAME)
+	if err != nil {
+		return nil, err
+	}
+	msg := &nl.Genlmsg{
+		Command: nl.DEVLINK_CMD_PORT_GET,
+		Version: nl.GENL_DEVLINK_VERSION,
+	}
+	req := h.newNetlinkRequest(int(f.ID),
+		unix.NLM_F_REQUEST|unix.NLM_F_ACK|unix.NLM_F_DUMP)
+	req.AddData(msg)
+	msgs, err := req.Execute(unix.NETLINK_GENERIC, 0)
+	if err != nil {
+		return nil, err
+	}
+	ports, err := parseDevLinkAllPortList(msgs)
+	if err != nil {
+		return nil, err
+	}
+	return ports, nil
+}
+
+// DevLinkGetPortList provides a pointer to devlink ports and nil error,
+// otherwise returns an error code.
+func DevLinkGetAllPortList() ([]*DevlinkPort, error) {
+	return pkgHandle.DevLinkGetAllPortList()
+}
+
+func parseDevlinkPortMsg(msgs [][]byte) (*DevlinkPort, error) {
+	m := msgs[0]
+	attrs, err := nl.ParseRouteAttr(m[nl.SizeofGenlmsg:])
+	if err != nil {
+		return nil, err
+	}
+	port := &DevlinkPort{}
+	if err = port.parseAttributes(attrs); err != nil {
+		return nil, err
+	}
+	return port, nil
+}
+
+// DevLinkGetPortByIndexprovides a pointer to devlink device and nil error,
+// otherwise returns an error code.
+func (h *Handle) DevLinkGetPortByIndex(Bus string, Device string, PortIndex uint32) (*DevlinkPort, error) {
+
+	_, req, err := h.createCmdReq(nl.DEVLINK_CMD_PORT_GET, Bus, Device)
+	if err != nil {
+		return nil, err
+	}
+
+	req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_INDEX, nl.Uint32Attr(PortIndex)))
+
+	respmsg, err := req.Execute(unix.NETLINK_GENERIC, 0)
+	if err != nil {
+		return nil, err
+	}
+	port, err := parseDevlinkPortMsg(respmsg)
+	return port, err
+}
+
+// DevLinkGetPortByIndex provides a pointer to devlink portand nil error,
+// otherwise returns an error code.
+func DevLinkGetPortByIndex(Bus string, Device string, PortIndex uint32) (*DevlinkPort, error) {
+	return pkgHandle.DevLinkGetPortByIndex(Bus, Device, PortIndex)
+}
+
+// DevLinkPortAdd adds a devlink port and returns a port on success
+// otherwise returns nil port and an error code.
+func (h *Handle) DevLinkPortAdd(Bus string, Device string, Flavour uint16, Attrs DevLinkPortAddAttrs) (*DevlinkPort, error) {
+	_, req, err := h.createCmdReq(nl.DEVLINK_CMD_PORT_NEW, Bus, Device)
+	if err != nil {
+		return nil, err
+	}
+
+	req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_FLAVOUR, nl.Uint16Attr(Flavour)))
+
+	req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_PCI_PF_NUMBER, nl.Uint16Attr(Attrs.PfNumber)))
+	if Flavour == nl.DEVLINK_PORT_FLAVOUR_PCI_SF && Attrs.SfNumberValid {
+		req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_PCI_SF_NUMBER, nl.Uint32Attr(Attrs.SfNumber)))
+	}
+	if Attrs.PortIndexValid {
+		req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_INDEX, nl.Uint32Attr(Attrs.PortIndex)))
+	}
+	if Attrs.ControllerValid {
+		req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_CONTROLLER_NUMBER, nl.Uint32Attr(Attrs.Controller)))
+	}
+	respmsg, err := req.Execute(unix.NETLINK_GENERIC, 0)
+	if err != nil {
+		return nil, err
+	}
+	port, err := parseDevlinkPortMsg(respmsg)
+	return port, err
+}
+
+// DevLinkPortAdd adds a devlink port and returns a port on success
+// otherwise returns nil port and an error code.
+func DevLinkPortAdd(Bus string, Device string, Flavour uint16, Attrs DevLinkPortAddAttrs) (*DevlinkPort, error) {
+	return pkgHandle.DevLinkPortAdd(Bus, Device, Flavour, Attrs)
+}
+
+// DevLinkPortDel deletes a devlink port and returns success or error code.
+func (h *Handle) DevLinkPortDel(Bus string, Device string, PortIndex uint32) error {
+	_, req, err := h.createCmdReq(nl.DEVLINK_CMD_PORT_DEL, Bus, Device)
+	if err != nil {
+		return err
+	}
+
+	req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_INDEX, nl.Uint32Attr(PortIndex)))
+	_, err = req.Execute(unix.NETLINK_GENERIC, 0)
+	return err
+}
+
+// DevLinkPortDel deletes a devlink port and returns success or error code.
+func DevLinkPortDel(Bus string, Device string, PortIndex uint32) error {
+	return pkgHandle.DevLinkPortDel(Bus, Device, PortIndex)
+}
+
+// DevlinkPortFnSet sets one or more port function attributes specified by the attribute mask.
+// It returns 0 on success or error code.
+func (h *Handle) DevlinkPortFnSet(Bus string, Device string, PortIndex uint32, FnAttrs DevlinkPortFnSetAttrs) error {
+	_, req, err := h.createCmdReq(nl.DEVLINK_CMD_PORT_SET, Bus, Device)
+	if err != nil {
+		return err
+	}
+
+	req.AddData(nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_INDEX, nl.Uint32Attr(PortIndex)))
+
+	fnAttr := nl.NewRtAttr(nl.DEVLINK_ATTR_PORT_FUNCTION|unix.NLA_F_NESTED, nil)
+
+	if FnAttrs.HwAddrValid {
+		fnAttr.AddRtAttr(nl.DEVLINK_PORT_FUNCTION_ATTR_HW_ADDR, []byte(FnAttrs.FnAttrs.HwAddr))
+	}
+
+	if FnAttrs.StateValid {
+		fnAttr.AddRtAttr(nl.DEVLINK_PORT_FN_ATTR_STATE, nl.Uint8Attr(FnAttrs.FnAttrs.State))
+	}
+	req.AddData(fnAttr)
+
+	_, err = req.Execute(unix.NETLINK_GENERIC, 0)
+	return err
+}
+
+// DevlinkPortFnSet sets one or more port function attributes specified by the attribute mask.
+// It returns 0 on success or error code.
+func DevlinkPortFnSet(Bus string, Device string, PortIndex uint32, FnAttrs DevlinkPortFnSetAttrs) error {
+	return pkgHandle.DevlinkPortFnSet(Bus, Device, PortIndex, FnAttrs)
+}
+
+// devlinkInfoGetter is function that is responsible for getting devlink info message
+// this is introduced for test purpose
+type devlinkInfoGetter func(bus, device string) ([]byte, error)
+
+// DevlinkGetDeviceInfoByName returns devlink info for selected device,
+// otherwise returns an error code.
+// Equivalent to: `devlink dev info $dev`
+func (h *Handle) DevlinkGetDeviceInfoByName(Bus string, Device string, getInfoMsg devlinkInfoGetter) (*DevlinkDeviceInfo, error) {
+	info, err := h.DevlinkGetDeviceInfoByNameAsMap(Bus, Device, getInfoMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseInfoData(info), nil
+}
+
+// DevlinkGetDeviceInfoByName returns devlink info for selected device,
+// otherwise returns an error code.
+// Equivalent to: `devlink dev info $dev`
+func DevlinkGetDeviceInfoByName(Bus string, Device string) (*DevlinkDeviceInfo, error) {
+	return pkgHandle.DevlinkGetDeviceInfoByName(Bus, Device, pkgHandle.getDevlinkInfoMsg)
+}
+
+// DevlinkGetDeviceInfoByNameAsMap returns devlink info for selected device as a map,
+// otherwise returns an error code.
+// Equivalent to: `devlink dev info $dev`
+func (h *Handle) DevlinkGetDeviceInfoByNameAsMap(Bus string, Device string, getInfoMsg devlinkInfoGetter) (map[string]string, error) {
+	response, err := getInfoMsg(Bus, Device)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := parseInfoMsg(response)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+// DevlinkGetDeviceInfoByNameAsMap returns devlink info for selected device as a map,
+// otherwise returns an error code.
+// Equivalent to: `devlink dev info $dev`
+func DevlinkGetDeviceInfoByNameAsMap(Bus string, Device string) (map[string]string, error) {
+	return pkgHandle.DevlinkGetDeviceInfoByNameAsMap(Bus, Device, pkgHandle.getDevlinkInfoMsg)
+}
+
+// GetDevlinkInfo returns devlink info for target device,
+// otherwise returns an error code.
+func (d *DevlinkDevice) GetDevlinkInfo() (*DevlinkDeviceInfo, error) {
+	return pkgHandle.DevlinkGetDeviceInfoByName(d.BusName, d.DeviceName, pkgHandle.getDevlinkInfoMsg)
+}
+
+// GetDevlinkInfoAsMap returns devlink info for target device as a map,
+// otherwise returns an error code.
+func (d *DevlinkDevice) GetDevlinkInfoAsMap() (map[string]string, error) {
+	return pkgHandle.DevlinkGetDeviceInfoByNameAsMap(d.BusName, d.DeviceName, pkgHandle.getDevlinkInfoMsg)
+}
+
+func (h *Handle) getDevlinkInfoMsg(bus, device string) ([]byte, error) {
+	_, req, err := h.createCmdReq(nl.DEVLINK_CMD_INFO_GET, bus, device)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := req.Execute(unix.NETLINK_GENERIC, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(response) < 1 {
+		return nil, fmt.Errorf("getDevlinkInfoMsg: message too short")
+	}
+
+	return response[0], nil
+}
+
+func parseInfoMsg(msg []byte) (map[string]string, error) {
+	if len(msg) < nl.SizeofGenlmsg {
+		return nil, fmt.Errorf("parseInfoMsg: message too short")
+	}
+
+	info := make(map[string]string)
+	err := collectInfoData(msg[nl.SizeofGenlmsg:], info)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func collectInfoData(msg []byte, data map[string]string) error {
+	attrs, err := nl.ParseRouteAttr(msg)
+	if err != nil {
+		return err
+	}
+
+	for _, attr := range attrs {
+		switch attr.Attr.Type {
+		case nl.DEVLINK_ATTR_INFO_DRIVER_NAME:
+			data["driver"] = parseInfoValue(attr.Value)
+		case nl.DEVLINK_ATTR_INFO_SERIAL_NUMBER:
+			data["serialNumber"] = parseInfoValue(attr.Value)
+		case nl.DEVLINK_ATTR_INFO_VERSION_RUNNING, nl.DEVLINK_ATTR_INFO_VERSION_FIXED,
+			nl.DEVLINK_ATTR_INFO_VERSION_STORED:
+			key, value, err := getNestedInfoData(attr.Value)
+			if err != nil {
+				return err
+			}
+			data[key] = value
+		}
+	}
+
+	if len(data) == 0 {
+		return fmt.Errorf("collectInfoData: could not read attributes")
+	}
+
+	return nil
+}
+
+func getNestedInfoData(msg []byte) (string, string, error) {
+	nestedAttrs, err := nl.ParseRouteAttr(msg)
+
+	var key, value string
+
+	if err != nil {
+		return "", "", err
+	}
+
+	if len(nestedAttrs) != 2 {
+		return "", "", fmt.Errorf("getNestedInfoData: too few attributes in nested structure")
+	}
+
+	for _, nestedAttr := range nestedAttrs {
+		switch nestedAttr.Attr.Type {
+		case nl.DEVLINK_ATTR_INFO_VERSION_NAME:
+			key = parseInfoValue(nestedAttr.Value)
+		case nl.DEVLINK_ATTR_INFO_VERSION_VALUE:
+			value = parseInfoValue(nestedAttr.Value)
+		}
+	}
+
+	if key == "" {
+		return "", "", fmt.Errorf("getNestedInfoData: key not found")
+	}
+
+	if value == "" {
+		return "", "", fmt.Errorf("getNestedInfoData: value not found")
+	}
+
+	return key, value, nil
+}
+
+func parseInfoData(data map[string]string) *DevlinkDeviceInfo {
+	info := new(DevlinkDeviceInfo)
+	for key, value := range data {
+		switch key {
+		case "driver":
+			info.Driver = value
+		case "serialNumber":
+			info.SerialNumber = value
+		case "board.id":
+			info.BoardID = value
+		case "fw.app":
+			info.FwApp = value
+		case "fw.app.bundle_id":
+			info.FwAppBoundleID = value
+		case "fw.app.name":
+			info.FwAppName = value
+		case "fw.bundle_id":
+			info.FwBoundleID = value
+		case "fw.mgmt":
+			info.FwMgmt = value
+		case "fw.mgmt.api":
+			info.FwMgmtAPI = value
+		case "fw.mgmt.build":
+			info.FwMgmtBuild = value
+		case "fw.netlist":
+			info.FwNetlist = value
+		case "fw.netlist.build":
+			info.FwNetlistBuild = value
+		case "fw.psid.api":
+			info.FwPsidAPI = value
+		case "fw.undi":
+			info.FwUndi = value
+		}
+	}
+	return info
+}
+
+func parseInfoValue(value []byte) string {
+	v := strings.ReplaceAll(string(value), "\x00", "")
+	return strings.TrimSpace(v)
 }

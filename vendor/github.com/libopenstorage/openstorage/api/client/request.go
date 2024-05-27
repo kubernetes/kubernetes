@@ -2,38 +2,48 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
-	"math/rand"
+
+	"github.com/libopenstorage/openstorage/pkg/auth"
+	"github.com/libopenstorage/openstorage/pkg/grpcutil"
+)
+
+const (
+	maxRetryDuration = 5 * time.Minute
 )
 
 // Request is contructed iteratively by the client and finally dispatched.
 // A REST endpoint is accessed with the following convention:
 // base_url/<version>/<resource>/[<instance>]
 type Request struct {
-	client   *http.Client
-	version  string
-	verb     string
-	path     string
-	base     *url.URL
-	params   url.Values
-	headers  http.Header
-	resource string
-	instance string
-	err      error
-	body     []byte
-	req      *http.Request
-	resp     *http.Response
-	timeout  time.Duration
-	authstring string
+	client      *http.Client
+	version     string
+	verb        string
+	path        string
+	base        *url.URL
+	params      url.Values
+	headers     http.Header
+	resource    string
+	instance    string
+	err         error
+	body        []byte
+	req         *http.Request
+	resp        *http.Response
+	timeout     time.Duration
+	authstring  string
 	accesstoken string
+	ctx         context.Context
 }
 
 // Response is a representation of HTTP response received from the server.
@@ -52,13 +62,27 @@ type Status struct {
 
 // NewRequest instance
 func NewRequest(client *http.Client, base *url.URL, verb string, version string, authstring, userAgent string) *Request {
+	return NewRequestWithContext(nil, client, base, verb, version, authstring, userAgent)
+}
+
+// NewRequestWithContext takes in context which may describe a timeout
+func NewRequestWithContext(
+	ctx context.Context,
+	client *http.Client,
+	base *url.URL,
+	verb string,
+	version string,
+	authstring,
+	userAgent string,
+) *Request {
 	r := &Request{
-		client:  client,
-		verb:    verb,
-		base:    base,
-		path:    base.Path,
-		version: version,
+		client:     client,
+		verb:       verb,
+		base:       base,
+		path:       base.Path,
+		version:    version,
 		authstring: authstring,
+		ctx:        ctx,
 	}
 	r.SetHeader("User-Agent", userAgent)
 	return r
@@ -177,7 +201,7 @@ func (r *Request) URL() *url.URL {
 		p = path.Join(p, strings.ToLower(r.version))
 	}
 	if len(r.resource) != 0 {
-		p = path.Join(p, strings.ToLower(r.resource))
+		p = path.Join(p, r.resource)
 		if len(r.instance) != 0 {
 			p = path.Join(p, r.instance)
 		}
@@ -209,31 +233,18 @@ func headerVal(key string, resp *http.Response) (int, bool) {
 }
 
 func parseHTTPStatus(resp *http.Response, body []byte) error {
-
-	var (
-		status *Status
-		err    error
-	)
-
-	httpOK := resp.StatusCode >= http.StatusOK && resp.StatusCode <= http.StatusPartialContent
-	hasStatus := false
-	if body != nil {
-		err = json.Unmarshal(body, status)
-		if err == nil && status.Message != "" {
-			hasStatus = true
-		}
-	}
-	// If the status is NG, return an error regardless of HTTP status.
-	if hasStatus && status.ErrorCode != 0 {
-		return fmt.Errorf("Error %v : %v", status.ErrorCode, status.Message)
-	}
-
-	// Status is good and HTTP status is good, everything is good
-	if httpOK {
+	if resp.StatusCode >= http.StatusOK &&
+		resp.StatusCode <= http.StatusPartialContent {
+		// Status is good and HTTP status is good, everything is good
 		return nil
 	}
 
-	// If HTTP status is NG, return an error.
+	// Get error from body if any
+	if len(string(body)) != 0 {
+		return errors.New(string(body))
+	}
+
+	// If no error was in the body, return a generic one
 	return fmt.Errorf("HTTP error %d", resp.StatusCode)
 }
 
@@ -246,47 +257,98 @@ func (r *Request) Do() *Response {
 		url  string
 		body []byte
 	)
+
 	if r.err != nil {
 		return &Response{err: r.err}
 	}
+
+	// Get a context timeout if non provided
+	if r.ctx == nil {
+		ctx, cancel := grpcutil.WithDefaultTimeout(context.Background())
+		r.ctx = ctx
+		defer cancel()
+	}
+
 	url = r.URL().String()
-	req, err = http.NewRequest(r.verb, url, bytes.NewBuffer(r.body))
-	if err != nil {
-		return &Response{err: err}
-	}
-	if r.headers == nil {
-		r.headers = http.Header{}
+	start := time.Now()
+	attemptNum := 0
+	for {
+		// Re-create Request for every call to make sure body isn't empty.
+		req, err = http.NewRequestWithContext(r.ctx, r.verb, url, bytes.NewBuffer(r.body))
+		if err != nil {
+			return &Response{err: err}
+		}
+
+		if r.headers == nil {
+			r.headers = http.Header{}
+		}
+
+		req.Header = r.headers
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Date", time.Now().String())
+
+		if len(r.authstring) > 0 {
+			if auth.IsJwtToken(r.authstring) {
+				req.Header.Set("Authorization", "bearer "+r.authstring)
+			} else {
+				req.Header.Set("Authorization", "Basic "+r.authstring)
+			}
+		}
+
+		if len(r.accesstoken) > 0 {
+			req.Header.Set("Access-Token", r.accesstoken)
+		}
+
+		if resp, err = r.client.Do(req); err != nil {
+			return &Response{err: err}
+		}
+
+		if time.Since(start) >= maxRetryDuration ||
+			resp.StatusCode != http.StatusServiceUnavailable {
+			break
+		}
+		attemptNum++
+
+		// If we don't receive a retry header we should exit.
+		if !retryHeaderReceived(resp, attemptNum) {
+			break
+		}
 	}
 
-	req.Header = r.headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Date", time.Now().String())
-
-	if len(r.authstring) > 0 {
-		req.Header.Set("Authorization", "Basic "+ r.authstring)
-	}
-
-	if len(r.accesstoken) > 0 {
-		req.Header.Set("Access-Token", r.accesstoken)
-	}
-
-	resp, err = r.client.Do(req)
-	if err != nil {
-		return &Response{err: err}
-	}
 	if resp.Body != nil {
 		defer resp.Body.Close()
-		body, err = ioutil.ReadAll(resp.Body)
+		if body, err = ioutil.ReadAll(resp.Body); err != nil {
+			return &Response{err: err}
+		}
 	}
-	if err != nil {
-		return &Response{err: err}
-	}
+
 	return &Response{
 		status:     resp.Status,
 		statusCode: resp.StatusCode,
 		body:       body,
 		err:        parseHTTPStatus(resp, body),
 	}
+}
+
+func retryHeaderReceived(resp *http.Response, attemptNum int) bool {
+	var duration = time.Duration(1 * time.Second)
+
+	// Close body so go-routines can spin down.
+	defer resp.Body.Close()
+
+	// Look for the retry header, if we find it set the retry sleep duration.
+	if len(resp.Header["Retry-After"]) > 0 {
+		if retryafter, err := strconv.Atoi(resp.Header["Retry-After"][0]); err == nil {
+			duration = time.Duration(retryafter*attemptNum) * time.Second
+
+			// Sleep for the newly calculated back-off and keep retrying.
+			time.Sleep(duration)
+			return true
+		}
+	}
+
+	// We didn't receive a retry header or we couldn't parse one. Exit and stop retry-ing.
+	return false
 }
 
 // Body return http body, valid only if there is no error
@@ -317,7 +379,7 @@ func (r Response) FormatError() error {
 	if len(r.body) == 0 {
 		return fmt.Errorf("Error: %v", r.err)
 	}
-	return fmt.Errorf("HTTP-%d: %s", r.statusCode, string(r.body))
+	return fmt.Errorf("%v", strings.TrimSpace(string(r.body)))
 }
 
 func digest(method string, path string) string {

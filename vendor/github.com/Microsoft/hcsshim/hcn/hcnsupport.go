@@ -1,11 +1,14 @@
+//go:build windows
+
 package hcn
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/Microsoft/hcsshim/internal/log"
 )
 
 var (
@@ -32,6 +35,9 @@ type SupportedFeatures struct {
 	L4Proxy                  bool        `json:"L4Proxy"`    // network policy that applies VFP rules to all endpoints on the network to redirect traffic
 	L4WfpProxy               bool        `json:"L4WfpProxy"` // endpoint policy that applies WFP filters to redirect traffic to/from that endpoint
 	TierAcl                  bool        `json:"TierAcl"`
+	NetworkACL               bool        `json:"NetworkACL"`
+	NestedIpSet              bool        `json:"NestedIpSet"`
+	DisableHostPort          bool        `json:"DisableHostPort"`
 }
 
 // AclFeatures are the supported ACL possibilities.
@@ -107,10 +113,13 @@ func getSupportedFeatures() (SupportedFeatures, error) {
 	features.L4Proxy = isFeatureSupported(globals.Version, L4ProxyPolicyVersion)
 	features.L4WfpProxy = isFeatureSupported(globals.Version, L4WfpProxyPolicyVersion)
 	features.TierAcl = isFeatureSupported(globals.Version, TierAclPolicyVersion)
+	features.NetworkACL = isFeatureSupported(globals.Version, NetworkACLPolicyVersion)
+	features.NestedIpSet = isFeatureSupported(globals.Version, NestedIpSetVersion)
+	features.DisableHostPort = isFeatureSupported(globals.Version, DisableHostPortVersion)
 
-	logrus.WithFields(logrus.Fields{
-		"version":           fmt.Sprintf("%+v", globals.Version),
-		"supportedFeatures": fmt.Sprintf("%+v", features),
+	log.L.WithFields(logrus.Fields{
+		"version":           globals.Version,
+		"supportedFeatures": features,
 	}).Info("HCN feature check")
 
 	return features, nil

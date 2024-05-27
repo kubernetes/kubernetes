@@ -1,6 +1,6 @@
 package asm
 
-//go:generate stringer -output func_string.go -type=BuiltinFunc
+//go:generate go run golang.org/x/tools/cmd/stringer@latest -output func_string.go -type=BuiltinFunc
 
 // BuiltinFunc is a built-in eBPF function.
 type BuiltinFunc int32
@@ -13,15 +13,15 @@ func (_ BuiltinFunc) Max() BuiltinFunc {
 //
 // You can regenerate this list using the following gawk script:
 //
-//    /FN\(.+\),/ {
-//      match($1, /\((.+)\)/, r)
-//      split(r[1], p, "_")
-//      printf "Fn"
-//      for (i in p) {
-//        printf "%s%s", toupper(substr(p[i], 1, 1)), substr(p[i], 2)
-//      }
-//      print ""
-//    }
+//	/FN\(.+\),/ {
+//	  match($1, /\(([a-z_0-9]+),/, r)
+//	  split(r[1], p, "_")
+//	  printf "Fn"
+//	  for (i in p) {
+//	    printf "%s%s", toupper(substr(p[i], 1, 1)), substr(p[i], 2)
+//	  }
+//	  print ""
+//	}
 //
 // The script expects include/uapi/linux/bpf.h as it's input.
 const (
@@ -229,6 +229,14 @@ const (
 	FnDynptrRead
 	FnDynptrWrite
 	FnDynptrData
+	FnTcpRawGenSyncookieIpv4
+	FnTcpRawGenSyncookieIpv6
+	FnTcpRawCheckSyncookieIpv4
+	FnTcpRawCheckSyncookieIpv6
+	FnKtimeGetTaiNs
+	FnUserRingbufDrain
+	FnCgrpStorageGet
+	FnCgrpStorageDelete
 
 	maxBuiltinFunc
 )

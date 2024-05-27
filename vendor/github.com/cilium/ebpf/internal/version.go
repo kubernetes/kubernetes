@@ -15,14 +15,6 @@ const (
 	MagicKernelVersion = 0xFFFFFFFE
 )
 
-var (
-	kernelVersion = struct {
-		once    sync.Once
-		version Version
-		err     error
-	}{}
-)
-
 // A Version in the form Major.Minor.Patch.
 type Version [3]uint16
 
@@ -88,16 +80,9 @@ func (v Version) Kernel() uint32 {
 }
 
 // KernelVersion returns the version of the currently running kernel.
-func KernelVersion() (Version, error) {
-	kernelVersion.once.Do(func() {
-		kernelVersion.version, kernelVersion.err = detectKernelVersion()
-	})
-
-	if kernelVersion.err != nil {
-		return Version{}, kernelVersion.err
-	}
-	return kernelVersion.version, nil
-}
+var KernelVersion = sync.OnceValues(func() (Version, error) {
+	return detectKernelVersion()
+})
 
 // detectKernelVersion returns the version of the running kernel.
 func detectKernelVersion() (Version, error) {

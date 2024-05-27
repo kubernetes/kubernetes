@@ -10,7 +10,7 @@
 package hcsschema
 
 type RegistryKey struct {
-	Hive string `json:"Hive,omitempty"`
+	Hive RegistryHive `json:"Hive,omitempty"`
 
 	Name string `json:"Name,omitempty"`
 

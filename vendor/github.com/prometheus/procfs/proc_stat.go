@@ -110,6 +110,11 @@ type ProcStat struct {
 	Policy uint
 	// Aggregated block I/O delays, measured in clock ticks (centiseconds).
 	DelayAcctBlkIOTicks uint64
+	// Guest time of the process (time spent running a virtual CPU for a guest
+	// operating system), measured in clock ticks.
+	GuestTime int
+	// Guest time of the process's children, measured in clock ticks.
+	CGuestTime int
 
 	proc FS
 }
@@ -189,6 +194,8 @@ func (p Proc) Stat() (ProcStat, error) {
 		&s.RTPriority,
 		&s.Policy,
 		&s.DelayAcctBlkIOTicks,
+		&s.GuestTime,
+		&s.CGuestTime,
 	)
 	if err != nil {
 		return ProcStat{}, err

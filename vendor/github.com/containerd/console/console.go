@@ -22,7 +22,10 @@ import (
 	"os"
 )
 
-var ErrNotAConsole = errors.New("provided file is not a console")
+var (
+	ErrNotAConsole    = errors.New("provided file is not a console")
+	ErrNotImplemented = errors.New("not implemented")
+)
 
 type File interface {
 	io.ReadWriteCloser
@@ -45,7 +48,7 @@ type Console interface {
 	SetRaw() error
 	// DisableEcho disables echo on the console
 	DisableEcho() error
-	// Reset restores the console to its orignal state
+	// Reset restores the console to its original state
 	Reset() error
 	// Size returns the window size of the console
 	Size() (WinSize, error)
@@ -78,7 +81,7 @@ func Current() (c Console) {
 }
 
 // ConsoleFromFile returns a console using the provided file
-// nolint:golint
+// nolint:revive
 func ConsoleFromFile(f File) (Console, error) {
 	if err := checkConsole(f); err != nil {
 		return nil, err

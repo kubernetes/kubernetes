@@ -5,12 +5,17 @@
 package proto
 
 import (
+	"errors"
+	"fmt"
+
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/order"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/runtime/protoiface"
+
+	protoerrors "google.golang.org/protobuf/internal/errors"
 )
 
 // MarshalOptions configures the marshaler.
@@ -70,7 +75,32 @@ type MarshalOptions struct {
 	UseCachedSize bool
 }
 
+// flags turns the specified MarshalOptions (user-facing) into
+// protoiface.MarshalInputFlags (used internally by the marshaler).
+//
+// See impl.marshalOptions.Options for the inverse operation.
+func (o MarshalOptions) flags() protoiface.MarshalInputFlags {
+	var flags protoiface.MarshalInputFlags
+
+	// Note: o.AllowPartial is always forced to true by MarshalOptions.marshal,
+	// which is why it is not a part of MarshalInputFlags.
+
+	if o.Deterministic {
+		flags |= protoiface.MarshalDeterministic
+	}
+
+	if o.UseCachedSize {
+		flags |= protoiface.MarshalUseCachedSize
+	}
+
+	return flags
+}
+
 // Marshal returns the wire-format encoding of m.
+//
+// This is the most common entry point for encoding a Protobuf message.
+//
+// See the [MarshalOptions] type if you need more control.
 func Marshal(m Message) ([]byte, error) {
 	// Treat nil message interface as an empty message; nothing to output.
 	if m == nil {
@@ -116,6 +146,9 @@ func emptyBytesForMessage(m Message) []byte {
 
 // MarshalAppend appends the wire-format encoding of m to b,
 // returning the result.
+//
+// This is a less common entry point than [Marshal], which is only needed if you
+// need to supply your own buffers for performance reasons.
 func (o MarshalOptions) MarshalAppend(b []byte, m Message) ([]byte, error) {
 	// Treat nil message interface as an empty message; nothing to append.
 	if m == nil {
@@ -145,12 +178,7 @@ func (o MarshalOptions) marshal(b []byte, m protoreflect.Message) (out protoifac
 		in := protoiface.MarshalInput{
 			Message: m,
 			Buf:     b,
-		}
-		if o.Deterministic {
-			in.Flags |= protoiface.MarshalDeterministic
-		}
-		if o.UseCachedSize {
-			in.Flags |= protoiface.MarshalUseCachedSize
+			Flags:   o.flags(),
 		}
 		if methods.Size != nil {
 			sout := methods.Size(protoiface.SizeInput{
@@ -168,6 +196,10 @@ func (o MarshalOptions) marshal(b []byte, m protoreflect.Message) (out protoifac
 		out.Buf, err = o.marshalMessageSlow(b, m)
 	}
 	if err != nil {
+		var mismatch *protoerrors.SizeMismatchError
+		if errors.As(err, &mismatch) {
+			return out, fmt.Errorf("marshaling %s: %v", string(m.Descriptor().FullName()), err)
+		}
 		return out, err
 	}
 	if allowPartial {

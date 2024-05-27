@@ -1,5 +1,8 @@
+//go:build windows
+
 package winapi
 
+//sys CopyFileW(existingFileName *uint16, newFileName *uint16, failIfExists int32) (err error) = kernel32.CopyFileW
 //sys NtCreateFile(handle *uintptr, accessMask uint32, oa *ObjectAttributes, iosb *IOStatusBlock, allocationSize *uint64, fileAttributes uint32, shareAccess uint32, createDisposition uint32, createOptions uint32, eaBuffer *byte, eaLength uint32) (status uint32) = ntdll.NtCreateFile
 //sys NtSetInformationFile(handle uintptr, iosb *IOStatusBlock, information uintptr, length uint32, class uint32) (status uint32) = ntdll.NtSetInformationFile
 
@@ -34,34 +37,35 @@ const (
 // Select entries from FILE_INFO_BY_HANDLE_CLASS.
 //
 // C declaration:
-//   typedef enum _FILE_INFO_BY_HANDLE_CLASS {
-//       FileBasicInfo,
-//       FileStandardInfo,
-//       FileNameInfo,
-//       FileRenameInfo,
-//       FileDispositionInfo,
-//       FileAllocationInfo,
-//       FileEndOfFileInfo,
-//       FileStreamInfo,
-//       FileCompressionInfo,
-//       FileAttributeTagInfo,
-//       FileIdBothDirectoryInfo,
-//       FileIdBothDirectoryRestartInfo,
-//       FileIoPriorityHintInfo,
-//       FileRemoteProtocolInfo,
-//       FileFullDirectoryInfo,
-//       FileFullDirectoryRestartInfo,
-//       FileStorageInfo,
-//       FileAlignmentInfo,
-//       FileIdInfo,
-//       FileIdExtdDirectoryInfo,
-//       FileIdExtdDirectoryRestartInfo,
-//       FileDispositionInfoEx,
-//       FileRenameInfoEx,
-//       FileCaseSensitiveInfo,
-//       FileNormalizedNameInfo,
-//       MaximumFileInfoByHandleClass
-//   } FILE_INFO_BY_HANDLE_CLASS, *PFILE_INFO_BY_HANDLE_CLASS;
+//
+//	typedef enum _FILE_INFO_BY_HANDLE_CLASS {
+//	    FileBasicInfo,
+//	    FileStandardInfo,
+//	    FileNameInfo,
+//	    FileRenameInfo,
+//	    FileDispositionInfo,
+//	    FileAllocationInfo,
+//	    FileEndOfFileInfo,
+//	    FileStreamInfo,
+//	    FileCompressionInfo,
+//	    FileAttributeTagInfo,
+//	    FileIdBothDirectoryInfo,
+//	    FileIdBothDirectoryRestartInfo,
+//	    FileIoPriorityHintInfo,
+//	    FileRemoteProtocolInfo,
+//	    FileFullDirectoryInfo,
+//	    FileFullDirectoryRestartInfo,
+//	    FileStorageInfo,
+//	    FileAlignmentInfo,
+//	    FileIdInfo,
+//	    FileIdExtdDirectoryInfo,
+//	    FileIdExtdDirectoryRestartInfo,
+//	    FileDispositionInfoEx,
+//	    FileRenameInfoEx,
+//	    FileCaseSensitiveInfo,
+//	    FileNormalizedNameInfo,
+//	    MaximumFileInfoByHandleClass
+//	} FILE_INFO_BY_HANDLE_CLASS, *PFILE_INFO_BY_HANDLE_CLASS;
 //
 // Documentation: https://docs.microsoft.com/en-us/windows/win32/api/minwinbase/ne-minwinbase-file_info_by_handle_class
 const (
@@ -98,10 +102,11 @@ type FileLinkInformation struct {
 }
 
 // C declaration:
-//   typedef struct _FILE_ID_INFO {
-//       ULONGLONG   VolumeSerialNumber;
-//       FILE_ID_128 FileId;
-//   } FILE_ID_INFO, *PFILE_ID_INFO;
+//
+//	typedef struct _FILE_ID_INFO {
+//		ULONGLONG   VolumeSerialNumber;
+//		FILE_ID_128 FileId;
+//	} FILE_ID_INFO, *PFILE_ID_INFO;
 //
 // Documentation: https://docs.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info
 type FILE_ID_INFO struct {
