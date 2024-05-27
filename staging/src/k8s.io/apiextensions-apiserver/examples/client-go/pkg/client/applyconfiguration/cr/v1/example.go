@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ExampleApplyConfiguration represents an declarative configuration of the Example type for use
+// ExampleApplyConfiguration represents a declarative configuration of the Example type for use
 // with apply.
 type ExampleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -33,7 +33,7 @@ type ExampleApplyConfiguration struct {
 	Status                           *ExampleStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Example constructs an declarative configuration of the Example type for use with
+// Example constructs a declarative configuration of the Example type for use with
 // apply.
 func Example(name, namespace string) *ExampleApplyConfiguration {
 	b := &ExampleApplyConfiguration{}

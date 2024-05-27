@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// StatefulSetSpecApplyConfiguration represents an declarative configuration of the StatefulSetSpec type for use
+// StatefulSetSpecApplyConfiguration represents a declarative configuration of the StatefulSetSpec type for use
 // with apply.
 type StatefulSetSpecApplyConfiguration struct {
 	Replicas                             *int32                                                             `json:"replicas,omitempty"`
@@ -40,7 +40,7 @@ type StatefulSetSpecApplyConfiguration struct {
 	Ordinals                             *StatefulSetOrdinalsApplyConfiguration                             `json:"ordinals,omitempty"`
 }
 
-// StatefulSetSpecApplyConfiguration constructs an declarative configuration of the StatefulSetSpec type for use with
+// StatefulSetSpecApplyConfiguration constructs a declarative configuration of the StatefulSetSpec type for use with
 // apply.
 func StatefulSetSpec() *StatefulSetSpecApplyConfiguration {
 	return &StatefulSetSpecApplyConfiguration{}

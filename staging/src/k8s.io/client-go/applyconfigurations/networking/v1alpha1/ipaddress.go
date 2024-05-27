@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// IPAddressApplyConfiguration represents an declarative configuration of the IPAddress type for use
+// IPAddressApplyConfiguration represents a declarative configuration of the IPAddress type for use
 // with apply.
 type IPAddressApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type IPAddressApplyConfiguration struct {
 	Spec                             *IPAddressSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// IPAddress constructs an declarative configuration of the IPAddress type for use with
+// IPAddress constructs a declarative configuration of the IPAddress type for use with
 // apply.
 func IPAddress(name string) *IPAddressApplyConfiguration {
 	b := &IPAddressApplyConfiguration{}

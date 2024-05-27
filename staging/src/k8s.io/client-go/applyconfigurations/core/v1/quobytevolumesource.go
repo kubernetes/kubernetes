@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// QuobyteVolumeSourceApplyConfiguration represents an declarative configuration of the QuobyteVolumeSource type for use
+// QuobyteVolumeSourceApplyConfiguration represents a declarative configuration of the QuobyteVolumeSource type for use
 // with apply.
 type QuobyteVolumeSourceApplyConfiguration struct {
 	Registry *string `json:"registry,omitempty"`
@@ -29,7 +29,7 @@ type QuobyteVolumeSourceApplyConfiguration struct {
 	Tenant   *string `json:"tenant,omitempty"`
 }
 
-// QuobyteVolumeSourceApplyConfiguration constructs an declarative configuration of the QuobyteVolumeSource type for use with
+// QuobyteVolumeSourceApplyConfiguration constructs a declarative configuration of the QuobyteVolumeSource type for use with
 // apply.
 func QuobyteVolumeSource() *QuobyteVolumeSourceApplyConfiguration {
 	return &QuobyteVolumeSourceApplyConfiguration{}

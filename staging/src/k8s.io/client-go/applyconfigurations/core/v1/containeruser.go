@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// ContainerUserApplyConfiguration represents an declarative configuration of the ContainerUser type for use
+// ContainerUserApplyConfiguration represents a declarative configuration of the ContainerUser type for use
 // with apply.
 type ContainerUserApplyConfiguration struct {
 	Linux *LinuxContainerUserApplyConfiguration `json:"linux,omitempty"`
 }
 
-// ContainerUserApplyConfiguration constructs an declarative configuration of the ContainerUser type for use with
+// ContainerUserApplyConfiguration constructs a declarative configuration of the ContainerUser type for use with
 // apply.
 func ContainerUser() *ContainerUserApplyConfiguration {
 	return &ContainerUserApplyConfiguration{}

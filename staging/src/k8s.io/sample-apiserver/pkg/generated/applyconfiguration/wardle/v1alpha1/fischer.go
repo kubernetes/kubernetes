@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// FischerApplyConfiguration represents an declarative configuration of the Fischer type for use
+// FischerApplyConfiguration represents a declarative configuration of the Fischer type for use
 // with apply.
 type FischerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -32,7 +32,7 @@ type FischerApplyConfiguration struct {
 	DisallowedFlunders               []string `json:"disallowedFlunders,omitempty"`
 }
 
-// Fischer constructs an declarative configuration of the Fischer type for use with
+// Fischer constructs a declarative configuration of the Fischer type for use with
 // apply.
 func Fischer(name string) *FischerApplyConfiguration {
 	b := &FischerApplyConfiguration{}

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ExpressionWarningApplyConfiguration represents an declarative configuration of the ExpressionWarning type for use
+// ExpressionWarningApplyConfiguration represents a declarative configuration of the ExpressionWarning type for use
 // with apply.
 type ExpressionWarningApplyConfiguration struct {
 	FieldRef *string `json:"fieldRef,omitempty"`
 	Warning  *string `json:"warning,omitempty"`
 }
 
-// ExpressionWarningApplyConfiguration constructs an declarative configuration of the ExpressionWarning type for use with
+// ExpressionWarningApplyConfiguration constructs a declarative configuration of the ExpressionWarning type for use with
 // apply.
 func ExpressionWarning() *ExpressionWarningApplyConfiguration {
 	return &ExpressionWarningApplyConfiguration{}

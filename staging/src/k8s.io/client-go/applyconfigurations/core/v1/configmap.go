@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ConfigMapApplyConfiguration represents an declarative configuration of the ConfigMap type for use
+// ConfigMapApplyConfiguration represents a declarative configuration of the ConfigMap type for use
 // with apply.
 type ConfigMapApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type ConfigMapApplyConfiguration struct {
 	BinaryData                       map[string][]byte `json:"binaryData,omitempty"`
 }
 
-// ConfigMap constructs an declarative configuration of the ConfigMap type for use with
+// ConfigMap constructs a declarative configuration of the ConfigMap type for use with
 // apply.
 func ConfigMap(name, namespace string) *ConfigMapApplyConfiguration {
 	b := &ConfigMapApplyConfiguration{}

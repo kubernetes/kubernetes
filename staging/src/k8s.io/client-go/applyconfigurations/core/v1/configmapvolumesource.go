@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// ConfigMapVolumeSourceApplyConfiguration represents an declarative configuration of the ConfigMapVolumeSource type for use
+// ConfigMapVolumeSourceApplyConfiguration represents a declarative configuration of the ConfigMapVolumeSource type for use
 // with apply.
 type ConfigMapVolumeSourceApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
@@ -27,7 +27,7 @@ type ConfigMapVolumeSourceApplyConfiguration struct {
 	Optional                               *bool                         `json:"optional,omitempty"`
 }
 
-// ConfigMapVolumeSourceApplyConfiguration constructs an declarative configuration of the ConfigMapVolumeSource type for use with
+// ConfigMapVolumeSourceApplyConfiguration constructs a declarative configuration of the ConfigMapVolumeSource type for use with
 // apply.
 func ConfigMapVolumeSource() *ConfigMapVolumeSourceApplyConfiguration {
 	return &ConfigMapVolumeSourceApplyConfiguration{}

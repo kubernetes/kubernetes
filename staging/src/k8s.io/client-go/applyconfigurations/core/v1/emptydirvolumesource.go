@@ -23,14 +23,14 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
-// EmptyDirVolumeSourceApplyConfiguration represents an declarative configuration of the EmptyDirVolumeSource type for use
+// EmptyDirVolumeSourceApplyConfiguration represents a declarative configuration of the EmptyDirVolumeSource type for use
 // with apply.
 type EmptyDirVolumeSourceApplyConfiguration struct {
 	Medium    *v1.StorageMedium  `json:"medium,omitempty"`
 	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
 }
 
-// EmptyDirVolumeSourceApplyConfiguration constructs an declarative configuration of the EmptyDirVolumeSource type for use with
+// EmptyDirVolumeSourceApplyConfiguration constructs a declarative configuration of the EmptyDirVolumeSource type for use with
 // apply.
 func EmptyDirVolumeSource() *EmptyDirVolumeSourceApplyConfiguration {
 	return &EmptyDirVolumeSourceApplyConfiguration{}

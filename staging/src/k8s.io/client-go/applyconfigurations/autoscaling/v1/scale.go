@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ScaleApplyConfiguration represents an declarative configuration of the Scale type for use
+// ScaleApplyConfiguration represents a declarative configuration of the Scale type for use
 // with apply.
 type ScaleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -33,7 +33,7 @@ type ScaleApplyConfiguration struct {
 	Status                           *ScaleStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ScaleApplyConfiguration constructs an declarative configuration of the Scale type for use with
+// ScaleApplyConfiguration constructs a declarative configuration of the Scale type for use with
 // apply.
 func Scale() *ScaleApplyConfiguration {
 	b := &ScaleApplyConfiguration{}

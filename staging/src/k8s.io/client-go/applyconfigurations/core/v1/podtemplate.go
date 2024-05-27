@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodTemplateApplyConfiguration represents an declarative configuration of the PodTemplate type for use
+// PodTemplateApplyConfiguration represents a declarative configuration of the PodTemplate type for use
 // with apply.
 type PodTemplateApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type PodTemplateApplyConfiguration struct {
 	Template                         *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
-// PodTemplate constructs an declarative configuration of the PodTemplate type for use with
+// PodTemplate constructs a declarative configuration of the PodTemplate type for use with
 // apply.
 func PodTemplate(name, namespace string) *PodTemplateApplyConfiguration {
 	b := &PodTemplateApplyConfiguration{}

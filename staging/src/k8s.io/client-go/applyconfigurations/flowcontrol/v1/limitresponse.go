@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/flowcontrol/v1"
 )
 
-// LimitResponseApplyConfiguration represents an declarative configuration of the LimitResponse type for use
+// LimitResponseApplyConfiguration represents a declarative configuration of the LimitResponse type for use
 // with apply.
 type LimitResponseApplyConfiguration struct {
 	Type    *v1.LimitResponseType                   `json:"type,omitempty"`
 	Queuing *QueuingConfigurationApplyConfiguration `json:"queuing,omitempty"`
 }
 
-// LimitResponseApplyConfiguration constructs an declarative configuration of the LimitResponse type for use with
+// LimitResponseApplyConfiguration constructs a declarative configuration of the LimitResponse type for use with
 // apply.
 func LimitResponse() *LimitResponseApplyConfiguration {
 	return &LimitResponseApplyConfiguration{}

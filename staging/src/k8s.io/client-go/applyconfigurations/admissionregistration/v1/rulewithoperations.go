@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/admissionregistration/v1"
 )
 
-// RuleWithOperationsApplyConfiguration represents an declarative configuration of the RuleWithOperations type for use
+// RuleWithOperationsApplyConfiguration represents a declarative configuration of the RuleWithOperations type for use
 // with apply.
 type RuleWithOperationsApplyConfiguration struct {
 	Operations             []v1.OperationType `json:"operations,omitempty"`
 	RuleApplyConfiguration `json:",inline"`
 }
 
-// RuleWithOperationsApplyConfiguration constructs an declarative configuration of the RuleWithOperations type for use with
+// RuleWithOperationsApplyConfiguration constructs a declarative configuration of the RuleWithOperations type for use with
 // apply.
 func RuleWithOperations() *RuleWithOperationsApplyConfiguration {
 	return &RuleWithOperationsApplyConfiguration{}

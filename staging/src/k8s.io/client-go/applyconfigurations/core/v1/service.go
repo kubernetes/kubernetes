@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ServiceApplyConfiguration represents an declarative configuration of the Service type for use
+// ServiceApplyConfiguration represents a declarative configuration of the Service type for use
 // with apply.
 type ServiceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ServiceApplyConfiguration struct {
 	Status                           *ServiceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Service constructs an declarative configuration of the Service type for use with
+// Service constructs a declarative configuration of the Service type for use with
 // apply.
 func Service(name, namespace string) *ServiceApplyConfiguration {
 	b := &ServiceApplyConfiguration{}

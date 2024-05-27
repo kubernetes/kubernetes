@@ -18,14 +18,14 @@ limitations under the License.
 
 package v2beta2
 
-// PodsMetricSourceApplyConfiguration represents an declarative configuration of the PodsMetricSource type for use
+// PodsMetricSourceApplyConfiguration represents a declarative configuration of the PodsMetricSource type for use
 // with apply.
 type PodsMetricSourceApplyConfiguration struct {
 	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
 	Target *MetricTargetApplyConfiguration     `json:"target,omitempty"`
 }
 
-// PodsMetricSourceApplyConfiguration constructs an declarative configuration of the PodsMetricSource type for use with
+// PodsMetricSourceApplyConfiguration constructs a declarative configuration of the PodsMetricSource type for use with
 // apply.
 func PodsMetricSource() *PodsMetricSourceApplyConfiguration {
 	return &PodsMetricSourceApplyConfiguration{}

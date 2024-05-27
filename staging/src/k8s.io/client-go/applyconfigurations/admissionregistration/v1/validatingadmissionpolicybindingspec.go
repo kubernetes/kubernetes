@@ -22,7 +22,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
-// ValidatingAdmissionPolicyBindingSpecApplyConfiguration represents an declarative configuration of the ValidatingAdmissionPolicyBindingSpec type for use
+// ValidatingAdmissionPolicyBindingSpecApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyBindingSpec type for use
 // with apply.
 type ValidatingAdmissionPolicyBindingSpecApplyConfiguration struct {
 	PolicyName        *string                                    `json:"policyName,omitempty"`
@@ -31,7 +31,7 @@ type ValidatingAdmissionPolicyBindingSpecApplyConfiguration struct {
 	ValidationActions []admissionregistrationv1.ValidationAction `json:"validationActions,omitempty"`
 }
 
-// ValidatingAdmissionPolicyBindingSpecApplyConfiguration constructs an declarative configuration of the ValidatingAdmissionPolicyBindingSpec type for use with
+// ValidatingAdmissionPolicyBindingSpecApplyConfiguration constructs a declarative configuration of the ValidatingAdmissionPolicyBindingSpec type for use with
 // apply.
 func ValidatingAdmissionPolicyBindingSpec() *ValidatingAdmissionPolicyBindingSpecApplyConfiguration {
 	return &ValidatingAdmissionPolicyBindingSpecApplyConfiguration{}

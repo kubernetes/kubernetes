@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 )
 
-// ObjectMetaApplyConfiguration represents an declarative configuration of the ObjectMeta type for use
+// ObjectMetaApplyConfiguration represents a declarative configuration of the ObjectMeta type for use
 // with apply.
 type ObjectMetaApplyConfiguration struct {
 	Name                       *string                            `json:"name,omitempty"`
@@ -41,7 +41,7 @@ type ObjectMetaApplyConfiguration struct {
 	Finalizers                 []string                           `json:"finalizers,omitempty"`
 }
 
-// ObjectMetaApplyConfiguration constructs an declarative configuration of the ObjectMeta type for use with
+// ObjectMetaApplyConfiguration constructs a declarative configuration of the ObjectMeta type for use with
 // apply.
 func ObjectMeta() *ObjectMetaApplyConfiguration {
 	return &ObjectMetaApplyConfiguration{}

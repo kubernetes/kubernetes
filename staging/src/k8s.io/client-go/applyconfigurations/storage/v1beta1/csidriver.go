@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// CSIDriverApplyConfiguration represents an declarative configuration of the CSIDriver type for use
+// CSIDriverApplyConfiguration represents a declarative configuration of the CSIDriver type for use
 // with apply.
 type CSIDriverApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type CSIDriverApplyConfiguration struct {
 	Spec                             *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// CSIDriver constructs an declarative configuration of the CSIDriver type for use with
+// CSIDriver constructs a declarative configuration of the CSIDriver type for use with
 // apply.
 func CSIDriver(name string) *CSIDriverApplyConfiguration {
 	b := &CSIDriverApplyConfiguration{}

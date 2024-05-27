@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// NodeRuntimeHandlerFeaturesApplyConfiguration represents an declarative configuration of the NodeRuntimeHandlerFeatures type for use
+// NodeRuntimeHandlerFeaturesApplyConfiguration represents a declarative configuration of the NodeRuntimeHandlerFeatures type for use
 // with apply.
 type NodeRuntimeHandlerFeaturesApplyConfiguration struct {
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty"`
 }
 
-// NodeRuntimeHandlerFeaturesApplyConfiguration constructs an declarative configuration of the NodeRuntimeHandlerFeatures type for use with
+// NodeRuntimeHandlerFeaturesApplyConfiguration constructs a declarative configuration of the NodeRuntimeHandlerFeatures type for use with
 // apply.
 func NodeRuntimeHandlerFeatures() *NodeRuntimeHandlerFeaturesApplyConfiguration {
 	return &NodeRuntimeHandlerFeaturesApplyConfiguration{}

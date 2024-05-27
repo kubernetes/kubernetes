@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// StorageVersionMigrationApplyConfiguration represents an declarative configuration of the StorageVersionMigration type for use
+// StorageVersionMigrationApplyConfiguration represents a declarative configuration of the StorageVersionMigration type for use
 // with apply.
 type StorageVersionMigrationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type StorageVersionMigrationApplyConfiguration struct {
 	Status                           *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// StorageVersionMigration constructs an declarative configuration of the StorageVersionMigration type for use with
+// StorageVersionMigration constructs a declarative configuration of the StorageVersionMigration type for use with
 // apply.
 func StorageVersionMigration(name string) *StorageVersionMigrationApplyConfiguration {
 	b := &StorageVersionMigrationApplyConfiguration{}

@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PriorityClassApplyConfiguration represents an declarative configuration of the PriorityClass type for use
+// PriorityClassApplyConfiguration represents a declarative configuration of the PriorityClass type for use
 // with apply.
 type PriorityClassApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -39,7 +39,7 @@ type PriorityClassApplyConfiguration struct {
 	PreemptionPolicy                 *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
-// PriorityClass constructs an declarative configuration of the PriorityClass type for use with
+// PriorityClass constructs a declarative configuration of the PriorityClass type for use with
 // apply.
 func PriorityClass(name string) *PriorityClassApplyConfiguration {
 	b := &PriorityClassApplyConfiguration{}

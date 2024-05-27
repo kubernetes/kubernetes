@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterRoleBindingApplyConfiguration represents an declarative configuration of the ClusterRoleBinding type for use
+// ClusterRoleBindingApplyConfiguration represents a declarative configuration of the ClusterRoleBinding type for use
 // with apply.
 type ClusterRoleBindingApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ClusterRoleBindingApplyConfiguration struct {
 	RoleRef                          *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
 }
 
-// ClusterRoleBinding constructs an declarative configuration of the ClusterRoleBinding type for use with
+// ClusterRoleBinding constructs a declarative configuration of the ClusterRoleBinding type for use with
 // apply.
 func ClusterRoleBinding(name string) *ClusterRoleBindingApplyConfiguration {
 	b := &ClusterRoleBindingApplyConfiguration{}

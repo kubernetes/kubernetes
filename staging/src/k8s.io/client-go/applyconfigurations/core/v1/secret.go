@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// SecretApplyConfiguration represents an declarative configuration of the Secret type for use
+// SecretApplyConfiguration represents a declarative configuration of the Secret type for use
 // with apply.
 type SecretApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -38,7 +38,7 @@ type SecretApplyConfiguration struct {
 	Type                             *corev1.SecretType `json:"type,omitempty"`
 }
 
-// Secret constructs an declarative configuration of the Secret type for use with
+// Secret constructs a declarative configuration of the Secret type for use with
 // apply.
 func Secret(name, namespace string) *SecretApplyConfiguration {
 	b := &SecretApplyConfiguration{}

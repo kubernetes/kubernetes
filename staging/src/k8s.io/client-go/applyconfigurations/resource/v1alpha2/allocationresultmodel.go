@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// AllocationResultModelApplyConfiguration represents an declarative configuration of the AllocationResultModel type for use
+// AllocationResultModelApplyConfiguration represents a declarative configuration of the AllocationResultModel type for use
 // with apply.
 type AllocationResultModelApplyConfiguration struct {
 	NamedResources *NamedResourcesAllocationResultApplyConfiguration `json:"namedResources,omitempty"`
 }
 
-// AllocationResultModelApplyConfiguration constructs an declarative configuration of the AllocationResultModel type for use with
+// AllocationResultModelApplyConfiguration constructs a declarative configuration of the AllocationResultModel type for use with
 // apply.
 func AllocationResultModel() *AllocationResultModelApplyConfiguration {
 	return &AllocationResultModelApplyConfiguration{}

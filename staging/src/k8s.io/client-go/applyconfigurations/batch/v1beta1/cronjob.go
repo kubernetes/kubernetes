@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// CronJobApplyConfiguration represents an declarative configuration of the CronJob type for use
+// CronJobApplyConfiguration represents a declarative configuration of the CronJob type for use
 // with apply.
 type CronJobApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type CronJobApplyConfiguration struct {
 	Status                           *CronJobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// CronJob constructs an declarative configuration of the CronJob type for use with
+// CronJob constructs a declarative configuration of the CronJob type for use with
 // apply.
 func CronJob(name, namespace string) *CronJobApplyConfiguration {
 	b := &CronJobApplyConfiguration{}

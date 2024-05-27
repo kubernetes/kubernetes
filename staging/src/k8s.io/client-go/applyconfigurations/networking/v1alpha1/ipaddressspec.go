@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha1
 
-// IPAddressSpecApplyConfiguration represents an declarative configuration of the IPAddressSpec type for use
+// IPAddressSpecApplyConfiguration represents a declarative configuration of the IPAddressSpec type for use
 // with apply.
 type IPAddressSpecApplyConfiguration struct {
 	ParentRef *ParentReferenceApplyConfiguration `json:"parentRef,omitempty"`
 }
 
-// IPAddressSpecApplyConfiguration constructs an declarative configuration of the IPAddressSpec type for use with
+// IPAddressSpecApplyConfiguration constructs a declarative configuration of the IPAddressSpec type for use with
 // apply.
 func IPAddressSpec() *IPAddressSpecApplyConfiguration {
 	return &IPAddressSpecApplyConfiguration{}

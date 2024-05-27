@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DeleteOptionsApplyConfiguration represents an declarative configuration of the DeleteOptions type for use
+// DeleteOptionsApplyConfiguration represents a declarative configuration of the DeleteOptions type for use
 // with apply.
 type DeleteOptionsApplyConfiguration struct {
 	TypeMetaApplyConfiguration `json:",inline"`
@@ -33,7 +33,7 @@ type DeleteOptionsApplyConfiguration struct {
 	DryRun                     []string                         `json:"dryRun,omitempty"`
 }
 
-// DeleteOptionsApplyConfiguration constructs an declarative configuration of the DeleteOptions type for use with
+// DeleteOptionsApplyConfiguration constructs a declarative configuration of the DeleteOptions type for use with
 // apply.
 func DeleteOptions() *DeleteOptionsApplyConfiguration {
 	b := &DeleteOptionsApplyConfiguration{}

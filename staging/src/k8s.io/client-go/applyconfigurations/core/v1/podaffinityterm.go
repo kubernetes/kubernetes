@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodAffinityTermApplyConfiguration represents an declarative configuration of the PodAffinityTerm type for use
+// PodAffinityTermApplyConfiguration represents a declarative configuration of the PodAffinityTerm type for use
 // with apply.
 type PodAffinityTermApplyConfiguration struct {
 	LabelSelector     *v1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
@@ -33,7 +33,7 @@ type PodAffinityTermApplyConfiguration struct {
 	MismatchLabelKeys []string                            `json:"mismatchLabelKeys,omitempty"`
 }
 
-// PodAffinityTermApplyConfiguration constructs an declarative configuration of the PodAffinityTerm type for use with
+// PodAffinityTermApplyConfiguration constructs a declarative configuration of the PodAffinityTerm type for use with
 // apply.
 func PodAffinityTerm() *PodAffinityTermApplyConfiguration {
 	return &PodAffinityTermApplyConfiguration{}

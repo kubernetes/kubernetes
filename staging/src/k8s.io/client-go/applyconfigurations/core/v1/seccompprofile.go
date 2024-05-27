@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// SeccompProfileApplyConfiguration represents an declarative configuration of the SeccompProfile type for use
+// SeccompProfileApplyConfiguration represents a declarative configuration of the SeccompProfile type for use
 // with apply.
 type SeccompProfileApplyConfiguration struct {
 	Type             *v1.SeccompProfileType `json:"type,omitempty"`
 	LocalhostProfile *string                `json:"localhostProfile,omitempty"`
 }
 
-// SeccompProfileApplyConfiguration constructs an declarative configuration of the SeccompProfile type for use with
+// SeccompProfileApplyConfiguration constructs a declarative configuration of the SeccompProfile type for use with
 // apply.
 func SeccompProfile() *SeccompProfileApplyConfiguration {
 	return &SeccompProfileApplyConfiguration{}

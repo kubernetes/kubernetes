@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// SELinuxOptionsApplyConfiguration represents an declarative configuration of the SELinuxOptions type for use
+// SELinuxOptionsApplyConfiguration represents a declarative configuration of the SELinuxOptions type for use
 // with apply.
 type SELinuxOptionsApplyConfiguration struct {
 	User  *string `json:"user,omitempty"`
@@ -27,7 +27,7 @@ type SELinuxOptionsApplyConfiguration struct {
 	Level *string `json:"level,omitempty"`
 }
 
-// SELinuxOptionsApplyConfiguration constructs an declarative configuration of the SELinuxOptions type for use with
+// SELinuxOptionsApplyConfiguration constructs a declarative configuration of the SELinuxOptions type for use with
 // apply.
 func SELinuxOptions() *SELinuxOptionsApplyConfiguration {
 	return &SELinuxOptionsApplyConfiguration{}

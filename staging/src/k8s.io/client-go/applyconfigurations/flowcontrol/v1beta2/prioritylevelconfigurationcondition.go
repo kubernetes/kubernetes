@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PriorityLevelConfigurationConditionApplyConfiguration represents an declarative configuration of the PriorityLevelConfigurationCondition type for use
+// PriorityLevelConfigurationConditionApplyConfiguration represents a declarative configuration of the PriorityLevelConfigurationCondition type for use
 // with apply.
 type PriorityLevelConfigurationConditionApplyConfiguration struct {
 	Type               *v1beta2.PriorityLevelConfigurationConditionType `json:"type,omitempty"`
@@ -33,7 +33,7 @@ type PriorityLevelConfigurationConditionApplyConfiguration struct {
 	Message            *string                                          `json:"message,omitempty"`
 }
 
-// PriorityLevelConfigurationConditionApplyConfiguration constructs an declarative configuration of the PriorityLevelConfigurationCondition type for use with
+// PriorityLevelConfigurationConditionApplyConfiguration constructs a declarative configuration of the PriorityLevelConfigurationCondition type for use with
 // apply.
 func PriorityLevelConfigurationCondition() *PriorityLevelConfigurationConditionApplyConfiguration {
 	return &PriorityLevelConfigurationConditionApplyConfiguration{}

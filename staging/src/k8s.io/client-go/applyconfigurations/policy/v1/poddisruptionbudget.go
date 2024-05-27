@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodDisruptionBudgetApplyConfiguration represents an declarative configuration of the PodDisruptionBudget type for use
+// PodDisruptionBudgetApplyConfiguration represents a declarative configuration of the PodDisruptionBudget type for use
 // with apply.
 type PodDisruptionBudgetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type PodDisruptionBudgetApplyConfiguration struct {
 	Status                           *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// PodDisruptionBudget constructs an declarative configuration of the PodDisruptionBudget type for use with
+// PodDisruptionBudget constructs a declarative configuration of the PodDisruptionBudget type for use with
 // apply.
 func PodDisruptionBudget(name, namespace string) *PodDisruptionBudgetApplyConfiguration {
 	b := &PodDisruptionBudgetApplyConfiguration{}

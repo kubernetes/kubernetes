@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ResourceMetricStatusApplyConfiguration represents an declarative configuration of the ResourceMetricStatus type for use
+// ResourceMetricStatusApplyConfiguration represents a declarative configuration of the ResourceMetricStatus type for use
 // with apply.
 type ResourceMetricStatusApplyConfiguration struct {
 	Name    *v1.ResourceName                     `json:"name,omitempty"`
 	Current *MetricValueStatusApplyConfiguration `json:"current,omitempty"`
 }
 
-// ResourceMetricStatusApplyConfiguration constructs an declarative configuration of the ResourceMetricStatus type for use with
+// ResourceMetricStatusApplyConfiguration constructs a declarative configuration of the ResourceMetricStatus type for use with
 // apply.
 func ResourceMetricStatus() *ResourceMetricStatusApplyConfiguration {
 	return &ResourceMetricStatusApplyConfiguration{}

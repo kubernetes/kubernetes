@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceClaimParametersReferenceApplyConfiguration represents an declarative configuration of the ResourceClaimParametersReference type for use
+// ResourceClaimParametersReferenceApplyConfiguration represents a declarative configuration of the ResourceClaimParametersReference type for use
 // with apply.
 type ResourceClaimParametersReferenceApplyConfiguration struct {
 	APIGroup *string `json:"apiGroup,omitempty"`
@@ -26,7 +26,7 @@ type ResourceClaimParametersReferenceApplyConfiguration struct {
 	Name     *string `json:"name,omitempty"`
 }
 
-// ResourceClaimParametersReferenceApplyConfiguration constructs an declarative configuration of the ResourceClaimParametersReference type for use with
+// ResourceClaimParametersReferenceApplyConfiguration constructs a declarative configuration of the ResourceClaimParametersReference type for use with
 // apply.
 func ResourceClaimParametersReference() *ResourceClaimParametersReferenceApplyConfiguration {
 	return &ResourceClaimParametersReferenceApplyConfiguration{}

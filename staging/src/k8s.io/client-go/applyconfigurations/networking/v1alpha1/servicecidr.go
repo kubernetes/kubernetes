@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ServiceCIDRApplyConfiguration represents an declarative configuration of the ServiceCIDR type for use
+// ServiceCIDRApplyConfiguration represents a declarative configuration of the ServiceCIDR type for use
 // with apply.
 type ServiceCIDRApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ServiceCIDRApplyConfiguration struct {
 	Status                           *ServiceCIDRStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ServiceCIDR constructs an declarative configuration of the ServiceCIDR type for use with
+// ServiceCIDR constructs a declarative configuration of the ServiceCIDR type for use with
 // apply.
 func ServiceCIDR(name string) *ServiceCIDRApplyConfiguration {
 	b := &ServiceCIDRApplyConfiguration{}

@@ -24,14 +24,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PersistentVolumeClaimTemplateApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimTemplate type for use
+// PersistentVolumeClaimTemplateApplyConfiguration represents a declarative configuration of the PersistentVolumeClaimTemplate type for use
 // with apply.
 type PersistentVolumeClaimTemplateApplyConfiguration struct {
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// PersistentVolumeClaimTemplateApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimTemplate type for use with
+// PersistentVolumeClaimTemplateApplyConfiguration constructs a declarative configuration of the PersistentVolumeClaimTemplate type for use with
 // apply.
 func PersistentVolumeClaimTemplate() *PersistentVolumeClaimTemplateApplyConfiguration {
 	return &PersistentVolumeClaimTemplateApplyConfiguration{}

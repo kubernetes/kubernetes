@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// JobApplyConfiguration represents an declarative configuration of the Job type for use
+// JobApplyConfiguration represents a declarative configuration of the Job type for use
 // with apply.
 type JobApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type JobApplyConfiguration struct {
 	Status                           *JobStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Job constructs an declarative configuration of the Job type for use with
+// Job constructs a declarative configuration of the Job type for use with
 // apply.
 func Job(name, namespace string) *JobApplyConfiguration {
 	b := &JobApplyConfiguration{}

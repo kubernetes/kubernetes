@@ -23,7 +23,7 @@ import (
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// HTTPGetActionApplyConfiguration represents an declarative configuration of the HTTPGetAction type for use
+// HTTPGetActionApplyConfiguration represents a declarative configuration of the HTTPGetAction type for use
 // with apply.
 type HTTPGetActionApplyConfiguration struct {
 	Path        *string                        `json:"path,omitempty"`
@@ -33,7 +33,7 @@ type HTTPGetActionApplyConfiguration struct {
 	HTTPHeaders []HTTPHeaderApplyConfiguration `json:"httpHeaders,omitempty"`
 }
 
-// HTTPGetActionApplyConfiguration constructs an declarative configuration of the HTTPGetAction type for use with
+// HTTPGetActionApplyConfiguration constructs a declarative configuration of the HTTPGetAction type for use with
 // apply.
 func HTTPGetAction() *HTTPGetActionApplyConfiguration {
 	return &HTTPGetActionApplyConfiguration{}

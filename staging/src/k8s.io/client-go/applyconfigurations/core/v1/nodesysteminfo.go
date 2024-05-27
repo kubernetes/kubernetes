@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// NodeSystemInfoApplyConfiguration represents an declarative configuration of the NodeSystemInfo type for use
+// NodeSystemInfoApplyConfiguration represents a declarative configuration of the NodeSystemInfo type for use
 // with apply.
 type NodeSystemInfoApplyConfiguration struct {
 	MachineID               *string `json:"machineID,omitempty"`
@@ -33,7 +33,7 @@ type NodeSystemInfoApplyConfiguration struct {
 	Architecture            *string `json:"architecture,omitempty"`
 }
 
-// NodeSystemInfoApplyConfiguration constructs an declarative configuration of the NodeSystemInfo type for use with
+// NodeSystemInfoApplyConfiguration constructs a declarative configuration of the NodeSystemInfo type for use with
 // apply.
 func NodeSystemInfo() *NodeSystemInfoApplyConfiguration {
 	return &NodeSystemInfoApplyConfiguration{}

@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// ContainerStatusApplyConfiguration represents an declarative configuration of the ContainerStatus type for use
+// ContainerStatusApplyConfiguration represents a declarative configuration of the ContainerStatus type for use
 // with apply.
 type ContainerStatusApplyConfiguration struct {
 	Name                 *string                                 `json:"name,omitempty"`
@@ -40,7 +40,7 @@ type ContainerStatusApplyConfiguration struct {
 	User                 *ContainerUserApplyConfiguration        `json:"user,omitempty"`
 }
 
-// ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with
+// ContainerStatusApplyConfiguration constructs a declarative configuration of the ContainerStatus type for use with
 // apply.
 func ContainerStatus() *ContainerStatusApplyConfiguration {
 	return &ContainerStatusApplyConfiguration{}

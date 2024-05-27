@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta1
 
-// CustomResourceDefinitionVersionApplyConfiguration represents an declarative configuration of the CustomResourceDefinitionVersion type for use
+// CustomResourceDefinitionVersionApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionVersion type for use
 // with apply.
 type CustomResourceDefinitionVersionApplyConfiguration struct {
 	Name                     *string                                            `json:"name,omitempty"`
@@ -32,7 +32,7 @@ type CustomResourceDefinitionVersionApplyConfiguration struct {
 	SelectableFields         []SelectableFieldApplyConfiguration                `json:"selectableFields,omitempty"`
 }
 
-// CustomResourceDefinitionVersionApplyConfiguration constructs an declarative configuration of the CustomResourceDefinitionVersion type for use with
+// CustomResourceDefinitionVersionApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionVersion type for use with
 // apply.
 func CustomResourceDefinitionVersion() *CustomResourceDefinitionVersionApplyConfiguration {
 	return &CustomResourceDefinitionVersionApplyConfiguration{}

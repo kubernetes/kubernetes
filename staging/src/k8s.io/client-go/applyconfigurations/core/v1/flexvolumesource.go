@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// FlexVolumeSourceApplyConfiguration represents an declarative configuration of the FlexVolumeSource type for use
+// FlexVolumeSourceApplyConfiguration represents a declarative configuration of the FlexVolumeSource type for use
 // with apply.
 type FlexVolumeSourceApplyConfiguration struct {
 	Driver    *string                                 `json:"driver,omitempty"`
@@ -28,7 +28,7 @@ type FlexVolumeSourceApplyConfiguration struct {
 	Options   map[string]string                       `json:"options,omitempty"`
 }
 
-// FlexVolumeSourceApplyConfiguration constructs an declarative configuration of the FlexVolumeSource type for use with
+// FlexVolumeSourceApplyConfiguration constructs a declarative configuration of the FlexVolumeSource type for use with
 // apply.
 func FlexVolumeSource() *FlexVolumeSourceApplyConfiguration {
 	return &FlexVolumeSourceApplyConfiguration{}

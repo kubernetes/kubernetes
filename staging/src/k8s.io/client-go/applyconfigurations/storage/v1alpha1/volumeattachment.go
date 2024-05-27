@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// VolumeAttachmentApplyConfiguration represents an declarative configuration of the VolumeAttachment type for use
+// VolumeAttachmentApplyConfiguration represents a declarative configuration of the VolumeAttachment type for use
 // with apply.
 type VolumeAttachmentApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type VolumeAttachmentApplyConfiguration struct {
 	Status                           *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// VolumeAttachment constructs an declarative configuration of the VolumeAttachment type for use with
+// VolumeAttachment constructs a declarative configuration of the VolumeAttachment type for use with
 // apply.
 func VolumeAttachment(name string) *VolumeAttachmentApplyConfiguration {
 	b := &VolumeAttachmentApplyConfiguration{}

@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1beta2
 
-// ReplicaSetStatusApplyConfiguration represents an declarative configuration of the ReplicaSetStatus type for use
+// ReplicaSetStatusApplyConfiguration represents a declarative configuration of the ReplicaSetStatus type for use
 // with apply.
 type ReplicaSetStatusApplyConfiguration struct {
 	Replicas             *int32                                  `json:"replicas,omitempty"`
@@ -29,7 +29,7 @@ type ReplicaSetStatusApplyConfiguration struct {
 	Conditions           []ReplicaSetConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// ReplicaSetStatusApplyConfiguration constructs an declarative configuration of the ReplicaSetStatus type for use with
+// ReplicaSetStatusApplyConfiguration constructs a declarative configuration of the ReplicaSetStatus type for use with
 // apply.
 func ReplicaSetStatus() *ReplicaSetStatusApplyConfiguration {
 	return &ReplicaSetStatusApplyConfiguration{}

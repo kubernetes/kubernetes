@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ReplicationControllerApplyConfiguration represents an declarative configuration of the ReplicationController type for use
+// ReplicationControllerApplyConfiguration represents a declarative configuration of the ReplicationController type for use
 // with apply.
 type ReplicationControllerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ReplicationControllerApplyConfiguration struct {
 	Status                           *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ReplicationController constructs an declarative configuration of the ReplicationController type for use with
+// ReplicationController constructs a declarative configuration of the ReplicationController type for use with
 // apply.
 func ReplicationController(name, namespace string) *ReplicationControllerApplyConfiguration {
 	b := &ReplicationControllerApplyConfiguration{}

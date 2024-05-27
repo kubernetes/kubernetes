@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// FlowSchemaApplyConfiguration represents an declarative configuration of the FlowSchema type for use
+// FlowSchemaApplyConfiguration represents a declarative configuration of the FlowSchema type for use
 // with apply.
 type FlowSchemaApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type FlowSchemaApplyConfiguration struct {
 	Status                           *FlowSchemaStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// FlowSchema constructs an declarative configuration of the FlowSchema type for use with
+// FlowSchema constructs a declarative configuration of the FlowSchema type for use with
 // apply.
 func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 	b := &FlowSchemaApplyConfiguration{}

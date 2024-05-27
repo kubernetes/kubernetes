@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// EvictionApplyConfiguration represents an declarative configuration of the Eviction type for use
+// EvictionApplyConfiguration represents a declarative configuration of the Eviction type for use
 // with apply.
 type EvictionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type EvictionApplyConfiguration struct {
 	DeleteOptions                    *v1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 
-// Eviction constructs an declarative configuration of the Eviction type for use with
+// Eviction constructs a declarative configuration of the Eviction type for use with
 // apply.
 func Eviction(name, namespace string) *EvictionApplyConfiguration {
 	b := &EvictionApplyConfiguration{}

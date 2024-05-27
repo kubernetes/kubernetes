@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ParamRefApplyConfiguration represents an declarative configuration of the ParamRef type for use
+// ParamRefApplyConfiguration represents a declarative configuration of the ParamRef type for use
 // with apply.
 type ParamRefApplyConfiguration struct {
 	Name                    *string                                              `json:"name,omitempty"`
@@ -32,7 +32,7 @@ type ParamRefApplyConfiguration struct {
 	ParameterNotFoundAction *admissionregistrationv1.ParameterNotFoundActionType `json:"parameterNotFoundAction,omitempty"`
 }
 
-// ParamRefApplyConfiguration constructs an declarative configuration of the ParamRef type for use with
+// ParamRefApplyConfiguration constructs a declarative configuration of the ParamRef type for use with
 // apply.
 func ParamRef() *ParamRefApplyConfiguration {
 	return &ParamRefApplyConfiguration{}

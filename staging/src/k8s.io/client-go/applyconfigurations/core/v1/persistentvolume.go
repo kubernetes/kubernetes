@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PersistentVolumeApplyConfiguration represents an declarative configuration of the PersistentVolume type for use
+// PersistentVolumeApplyConfiguration represents a declarative configuration of the PersistentVolume type for use
 // with apply.
 type PersistentVolumeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type PersistentVolumeApplyConfiguration struct {
 	Status                           *PersistentVolumeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// PersistentVolume constructs an declarative configuration of the PersistentVolume type for use with
+// PersistentVolume constructs a declarative configuration of the PersistentVolume type for use with
 // apply.
 func PersistentVolume(name string) *PersistentVolumeApplyConfiguration {
 	b := &PersistentVolumeApplyConfiguration{}

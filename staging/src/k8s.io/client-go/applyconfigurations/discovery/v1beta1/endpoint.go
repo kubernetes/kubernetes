@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// EndpointApplyConfiguration represents an declarative configuration of the Endpoint type for use
+// EndpointApplyConfiguration represents a declarative configuration of the Endpoint type for use
 // with apply.
 type EndpointApplyConfiguration struct {
 	Addresses  []string                              `json:"addresses,omitempty"`
@@ -34,7 +34,7 @@ type EndpointApplyConfiguration struct {
 	Hints      *EndpointHintsApplyConfiguration      `json:"hints,omitempty"`
 }
 
-// EndpointApplyConfiguration constructs an declarative configuration of the Endpoint type for use with
+// EndpointApplyConfiguration constructs a declarative configuration of the Endpoint type for use with
 // apply.
 func Endpoint() *EndpointApplyConfiguration {
 	return &EndpointApplyConfiguration{}
