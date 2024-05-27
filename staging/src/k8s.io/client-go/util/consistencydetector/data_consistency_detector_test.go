@@ -118,11 +118,6 @@ func TestDataConsistencyChecker(t *testing.T) {
 	}
 }
 
-func TestDriveWatchLisConsistencyIfRequired(t *testing.T) {
-	ctx := context.TODO()
-	checkWatchListDataConsistencyIfRequested[runtime.Object, runtime.Object](ctx, "", "", nil, nil)
-}
-
 func TestDataConsistencyCheckerRetry(t *testing.T) {
 	ctx := context.TODO()
 	retrievedItemsFunc := func() []*v1.Pod {

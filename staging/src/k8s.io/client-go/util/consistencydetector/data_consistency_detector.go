@@ -19,9 +19,7 @@ package consistencydetector
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,33 +31,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var dataConsistencyDetectionForWatchListEnabled = false
-
-func init() {
-	dataConsistencyDetectionForWatchListEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"))
-}
-
 type RetrieveItemsFunc[U any] func() []U
 
 type ListFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOptions) (T, error)
-
-// checkWatchListDataConsistencyIfRequested performs a data consistency check only when
-// the KUBE_WATCHLIST_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
-//
-// The consistency check is meant to be enforced only in the CI, not in production.
-// The check ensures that data retrieved by the watch-list api call
-// is exactly the same as data received by the standard list api call against etcd.
-//
-// Note that this function will panic when data inconsistency is detected.
-// This is intentional because we want to catch it in the CI.
-func checkWatchListDataConsistencyIfRequested[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], retrieveItemsFn RetrieveItemsFunc[U]) {
-	if !dataConsistencyDetectionForWatchListEnabled {
-		return
-	}
-	// for informers we pass an empty ListOptions because
-	// listFn might be wrapped for filtering during informer construction.
-	CheckDataConsistency(ctx, identity, lastSyncedResourceVersion, listFn, metav1.ListOptions{}, retrieveItemsFn)
-}
 
 // CheckDataConsistency exists solely for testing purposes.
 // we cannot use checkWatchListDataConsistencyIfRequested because
