@@ -26,8 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/ptr"
 )
 
@@ -35,8 +33,8 @@ func TestDataConsistencyChecker(t *testing.T) {
 	scenarios := []struct {
 		name string
 
-		podList        *v1.PodList
-		storeContent   []*v1.Pod
+		listResponse   *v1.PodList
+		retrievedItems []*v1.Pod
 		requestOptions metav1.ListOptions
 
 		expectedRequestOptions []metav1.ListOptions
@@ -45,12 +43,12 @@ func TestDataConsistencyChecker(t *testing.T) {
 	}{
 		{
 			name: "data consistency check won't panic when data is consistent",
-			podList: &v1.PodList{
+			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
 			},
 			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
-			storeContent:         []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
+			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -63,7 +61,7 @@ func TestDataConsistencyChecker(t *testing.T) {
 
 		{
 			name: "data consistency check won't panic when there is no data",
-			podList: &v1.PodList{
+			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 			},
 			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
@@ -79,12 +77,12 @@ func TestDataConsistencyChecker(t *testing.T) {
 
 		{
 			name: "data consistency panics when data is inconsistent",
-			podList: &v1.PodList{
+			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
 			},
 			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
-			storeContent:         []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
+			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -99,23 +97,22 @@ func TestDataConsistencyChecker(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			listWatcher, store, _, stopCh := testData()
-			ctx := wait.ContextForChannel(stopCh)
-			for _, obj := range scenario.storeContent {
-				require.NoError(t, store.Add(obj))
+			ctx := context.TODO()
+			fakeLister := &listWrapper{response: scenario.listResponse}
+			retrievedItemsFunc := func() []*v1.Pod {
+				return scenario.retrievedItems
 			}
-			listWatcher.customListResponse = scenario.podList
 
 			if scenario.expectPanic {
 				require.Panics(t, func() {
-					checkDataConsistency(ctx, "", scenario.podList.ResourceVersion, wrapListFuncWithContext(listWatcher.List), scenario.requestOptions, store.List)
+					checkDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
 				})
 			} else {
-				checkDataConsistency(ctx, "", scenario.podList.ResourceVersion, wrapListFuncWithContext(listWatcher.List), scenario.requestOptions, store.List)
+				checkDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
 			}
 
-			verifyListCounter(t, listWatcher, scenario.expectedListRequests)
-			verifyRequestOptions(t, listWatcher, scenario.expectedRequestOptions)
+			require.Equal(t, fakeLister.counter, scenario.expectedListRequests)
+			require.Equal(t, fakeLister.requestOptions, scenario.expectedRequestOptions)
 		})
 	}
 }
@@ -126,14 +123,15 @@ func TestDriveWatchLisConsistencyIfRequired(t *testing.T) {
 }
 
 func TestDataConsistencyCheckerRetry(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
 	ctx := context.TODO()
-
+	retrievedItemsFunc := func() []*v1.Pod {
+		return nil
+	}
 	stopListErrorAfter := 5
-	errLister := &errorLister{stopErrorAfter: stopListErrorAfter}
+	fakeErrLister := &errorLister{stopErrorAfter: stopListErrorAfter}
 
-	checkDataConsistency(ctx, "", "", wrapListFuncWithContext(errLister.List), metav1.ListOptions{}, store.List)
-	require.Equal(t, errLister.listCounter, errLister.stopErrorAfter)
+	checkDataConsistency(ctx, "", "", fakeErrLister.List, metav1.ListOptions{}, retrievedItemsFunc)
+	require.Equal(t, fakeErrLister.listCounter, fakeErrLister.stopErrorAfter)
 }
 
 type errorLister struct {
@@ -141,7 +139,7 @@ type errorLister struct {
 	stopErrorAfter int
 }
 
-func (lw *errorLister) List(_ metav1.ListOptions) (runtime.Object, error) {
+func (lw *errorLister) List(_ context.Context, _ metav1.ListOptions) (runtime.Object, error) {
 	lw.listCounter++
 	if lw.listCounter == lw.stopErrorAfter {
 		return &v1.PodList{}, nil
@@ -149,6 +147,14 @@ func (lw *errorLister) List(_ metav1.ListOptions) (runtime.Object, error) {
 	return nil, fmt.Errorf("nasty error")
 }
 
-func (lw *errorLister) Watch(_ metav1.ListOptions) (watch.Interface, error) {
-	panic("not implemented")
+type listWrapper struct {
+	counter        int
+	requestOptions []metav1.ListOptions
+	response       *v1.PodList
+}
+
+func (lw *listWrapper) List(_ context.Context, opts metav1.ListOptions) (*v1.PodList, error) {
+	lw.counter++
+	lw.requestOptions = append(lw.requestOptions, opts)
+	return lw.response, nil
 }
