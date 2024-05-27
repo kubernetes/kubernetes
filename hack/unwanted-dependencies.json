@@ -179,7 +179,6 @@
         "google.golang.org/grpc"
       ],
       "google.golang.org/genproto": [
-        "github.com/container-storage-interface/spec",
         "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
