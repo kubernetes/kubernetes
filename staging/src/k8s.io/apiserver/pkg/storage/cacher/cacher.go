@@ -51,7 +51,8 @@ import (
 )
 
 var (
-	emptyFunc = func(bool) {}
+	emptyFunc             = func(bool) {}
+	coreNamespaceResource = schema.GroupResource{Group: "", Resource: "namespaces"}
 )
 
 const (
@@ -540,6 +541,12 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		scope.name = requestInfo.Name
 	} else if selectorName, ok := pred.Field.RequiresExactMatch("metadata.name"); ok {
 		scope.name = selectorName
+	}
+
+	// for request like '/api/v1/watch/namespaces/*', set scope.namespace to empty.
+	// namespaces don't populate metadata.namespace in ObjFields.
+	if c.groupResource == coreNamespaceResource && len(scope.namespace) > 0 && scope.namespace == scope.name {
+		scope.namespace = ""
 	}
 
 	triggerValue, triggerSupported := "", false
