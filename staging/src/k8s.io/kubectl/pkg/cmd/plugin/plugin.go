@@ -41,7 +41,7 @@ var (
 		Please refer to the documentation and examples for more information about how write your own plugins.
 
 		The easiest way to discover and install plugins is via the kubernetes sub-project krew: [krew.sigs.k8s.io].
-		To install krew, visit https://krew.sigs.k8s.io/docs/user-guide/installing-plugins/`))
+		To install krew, visit https://krew.sigs.k8s.io/docs/user-guide/setup/install`))
 
 	pluginExample = templates.Examples(i18n.T(`
 		# List all available plugins
