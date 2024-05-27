@@ -444,7 +444,8 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 		if fileProjection.FsUser == nil {
 			continue
 		}
-		if err := os.Chown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
+
+		if err := w.chown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
 			klog.Errorf("%s: unable to change file %s with owner %v: %v", w.logContext, fullPath, int(*fileProjection.FsUser), err)
 			return err
 		}
