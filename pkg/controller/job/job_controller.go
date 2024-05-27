@@ -827,10 +827,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	newSucceededPods, newFailedPods := getNewFinishedPods(jobCtx)
 	jobCtx.succeeded = job.Status.Succeeded + int32(len(newSucceededPods)) + int32(len(jobCtx.uncounted.succeeded))
 	jobCtx.failed = job.Status.Failed + int32(nonIgnoredFailedPodsCount(jobCtx, newFailedPods)) + int32(len(jobCtx.uncounted.failed))
-	var ready *int32
-	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
-		ready = ptr.To(countReadyPods(jobCtx.activePods))
-	}
+	ready := ptr.To(countReadyPods(jobCtx.activePods))
 
 	// Job first start. Set StartTime only if the job is not in the suspended state.
 	if job.Status.StartTime == nil && !jobSuspended(&job) {

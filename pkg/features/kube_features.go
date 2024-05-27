@@ -346,13 +346,6 @@ const (
 	// based on the set of succeeded pods.
 	JobSuccessPolicy featuregate.Feature = "JobSuccessPolicy"
 
-	// owner: @alculquicondor
-	// alpha: v1.23
-	// beta: v1.24
-	//
-	// Track the number of pods with Ready condition in the Job status.
-	JobReadyPods featuregate.Feature = "JobReadyPods"
-
 	// owner: @marquiz
 	// kep: http://kep.k8s.io/4033
 	// alpha: v1.28
@@ -1049,8 +1042,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	JobPodReplacementPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	JobSuccessPolicy: {Default: false, PreRelease: featuregate.Alpha},
-
-	JobReadyPods: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	KubeletCgroupDriverFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
