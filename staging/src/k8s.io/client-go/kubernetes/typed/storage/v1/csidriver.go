@@ -31,6 +31,7 @@ import (
 	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // CSIDriversGetter has a method to return a CSIDriverInterface.
@@ -79,6 +80,16 @@ func (c *cSIDrivers) Get(ctx context.Context, name string, options metav1.GetOpt
 
 // List takes label and field selectors, and returns the list of CSIDrivers that match those selectors.
 func (c *cSIDrivers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CSIDriverList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for csidrivers", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of CSIDrivers that match those selectors.
+func (c *cSIDrivers) list(ctx context.Context, opts metav1.ListOptions) (result *v1.CSIDriverList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

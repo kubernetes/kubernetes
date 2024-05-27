@@ -31,6 +31,7 @@ import (
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ReplicaSetsGetter has a method to return a ReplicaSetInterface.
@@ -84,6 +85,16 @@ func (c *replicaSets) Get(ctx context.Context, name string, options v1.GetOption
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
 func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.ReplicaSetList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for replicasets", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
+func (c *replicaSets) list(ctx context.Context, opts v1.ListOptions) (result *v1beta2.ReplicaSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

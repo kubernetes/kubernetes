@@ -31,6 +31,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ExamplesGetter has a method to return a ExampleInterface.
@@ -82,6 +83,16 @@ func (c *examples) Get(ctx context.Context, name string, options metav1.GetOptio
 
 // List takes label and field selectors, and returns the list of Examples that match those selectors.
 func (c *examples) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ExampleList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for examples", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of Examples that match those selectors.
+func (c *examples) list(ctx context.Context, opts metav1.ListOptions) (result *v1.ExampleList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

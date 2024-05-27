@@ -31,6 +31,7 @@ import (
 	autoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // HorizontalPodAutoscalersGetter has a method to return a HorizontalPodAutoscalerInterface.
@@ -84,6 +85,16 @@ func (c *horizontalPodAutoscalers) Get(ctx context.Context, name string, options
 
 // List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
 func (c *horizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOptions) (result *v2.HorizontalPodAutoscalerList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for horizontalpodautoscalers", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
+func (c *horizontalPodAutoscalers) list(ctx context.Context, opts v1.ListOptions) (result *v2.HorizontalPodAutoscalerList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

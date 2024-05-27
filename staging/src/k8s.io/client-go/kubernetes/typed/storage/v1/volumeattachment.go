@@ -31,6 +31,7 @@ import (
 	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // VolumeAttachmentsGetter has a method to return a VolumeAttachmentInterface.
@@ -81,6 +82,16 @@ func (c *volumeAttachments) Get(ctx context.Context, name string, options metav1
 
 // List takes label and field selectors, and returns the list of VolumeAttachments that match those selectors.
 func (c *volumeAttachments) List(ctx context.Context, opts metav1.ListOptions) (result *v1.VolumeAttachmentList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for volumeattachments", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of VolumeAttachments that match those selectors.
+func (c *volumeAttachments) list(ctx context.Context, opts metav1.ListOptions) (result *v1.VolumeAttachmentList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

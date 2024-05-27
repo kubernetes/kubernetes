@@ -31,6 +31,7 @@ import (
 	admissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ValidatingAdmissionPoliciesGetter has a method to return a ValidatingAdmissionPolicyInterface.
@@ -81,6 +82,16 @@ func (c *validatingAdmissionPolicies) Get(ctx context.Context, name string, opti
 
 // List takes label and field selectors, and returns the list of ValidatingAdmissionPolicies that match those selectors.
 func (c *validatingAdmissionPolicies) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ValidatingAdmissionPolicyList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for validatingadmissionpolicies", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ValidatingAdmissionPolicies that match those selectors.
+func (c *validatingAdmissionPolicies) list(ctx context.Context, opts metav1.ListOptions) (result *v1.ValidatingAdmissionPolicyList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

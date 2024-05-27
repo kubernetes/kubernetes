@@ -28,6 +28,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
@@ -84,6 +85,16 @@ func (c *flunders) Get(ctx context.Context, name string, options v1.GetOptions) 
 
 // List takes label and field selectors, and returns the list of Flunders that match those selectors.
 func (c *flunders) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FlunderList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for flunders", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of Flunders that match those selectors.
+func (c *flunders) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FlunderList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

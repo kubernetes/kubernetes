@@ -26,6 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	scheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
 )
@@ -79,6 +80,16 @@ func (c *foos) Get(ctx context.Context, name string, options v1.GetOptions) (res
 
 // List takes label and field selectors, and returns the list of Foos that match those selectors.
 func (c *foos) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FooList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for foos", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of Foos that match those selectors.
+func (c *foos) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FooList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
