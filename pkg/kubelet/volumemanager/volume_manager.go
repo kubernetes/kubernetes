@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -332,7 +332,7 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	}
 
 	result := make([]int64, 0, supplementalGroups.Len())
-	for _, group := range sets.List(supplementalGroups) {
+	for _, group := range supplementalGroups.UnsortedList() {
 		iGroup, extra := getExtraSupplementalGid(group, pod)
 		if !extra {
 			continue
@@ -370,9 +370,7 @@ func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 		}
 	}
 
-	sort.Slice(volumesToReportInUse, func(i, j int) bool {
-		return string(volumesToReportInUse[i]) < string(volumesToReportInUse[j])
-	})
+	slices.Sort(volumesToReportInUse)
 	return volumesToReportInUse
 }
 
@@ -463,12 +461,11 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 		for _, v := range vm.actualStateOfWorld.GetMountedVolumesForPod(uniquePodName) {
 			mountedVolumes = append(mountedVolumes, v.OuterVolumeSpecName)
 		}
-		sort.Strings(mountedVolumes)
-
 		if len(mountedVolumes) == 0 {
 			return nil
 		}
 
+		slices.Sort(mountedVolumes)
 		return fmt.Errorf(
 			"mounted volumes=%v: %w",
 			mountedVolumes,
@@ -480,7 +477,7 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 }
 
 func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, expectedVolumes []string) []string {
-	volumesNotInDSW := sets.New[string](expectedVolumes...)
+	volumesNotInDSW := sets.New(expectedVolumes...)
 
 	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
 		if volumeToMount.PodName == uniquePodName {
@@ -502,7 +499,7 @@ func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName)
 			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
 		}
 	}
-	sort.Strings(unattachedVolumes)
+	slices.Sort(unattachedVolumes)
 
 	return unattachedVolumes
 }
@@ -550,7 +547,7 @@ func filterUnmountedVolumes(mountedVolumes sets.Set[string], expectedVolumes []s
 			unmountedVolumes = append(unmountedVolumes, expectedVolume)
 		}
 	}
-	sort.Strings(unmountedVolumes)
+	slices.Sort(unmountedVolumes)
 
 	return unmountedVolumes
 }
