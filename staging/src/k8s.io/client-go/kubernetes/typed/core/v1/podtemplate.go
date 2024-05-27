@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // PodTemplatesGetter has a method to return a PodTemplateInterface.
@@ -82,6 +83,16 @@ func (c *podTemplates) Get(ctx context.Context, name string, options metav1.GetO
 
 // List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
 func (c *podTemplates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodTemplateList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for podtemplates", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of PodTemplates that match those selectors.
+func (c *podTemplates) list(ctx context.Context, opts metav1.ListOptions) (result *v1.PodTemplateList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

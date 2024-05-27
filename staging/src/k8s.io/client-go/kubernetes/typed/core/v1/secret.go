@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // SecretsGetter has a method to return a SecretInterface.
@@ -82,6 +83,16 @@ func (c *secrets) Get(ctx context.Context, name string, options metav1.GetOption
 
 // List takes label and field selectors, and returns the list of Secrets that match those selectors.
 func (c *secrets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.SecretList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for secrets", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of Secrets that match those selectors.
+func (c *secrets) list(ctx context.Context, opts metav1.ListOptions) (result *v1.SecretList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

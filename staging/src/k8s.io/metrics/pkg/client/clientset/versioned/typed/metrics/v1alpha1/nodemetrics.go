@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 	v1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
@@ -69,6 +70,16 @@ func (c *nodeMetricses) Get(ctx context.Context, name string, options v1.GetOpti
 
 // List takes label and field selectors, and returns the list of NodeMetricses that match those selectors.
 func (c *nodeMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for nodes", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of NodeMetricses that match those selectors.
+func (c *nodeMetricses) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

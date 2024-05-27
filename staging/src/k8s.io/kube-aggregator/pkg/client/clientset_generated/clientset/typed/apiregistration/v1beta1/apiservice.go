@@ -26,6 +26,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
@@ -76,6 +77,16 @@ func (c *aPIServices) Get(ctx context.Context, name string, options v1.GetOption
 
 // List takes label and field selectors, and returns the list of APIServices that match those selectors.
 func (c *aPIServices) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.APIServiceList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for apiservices", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of APIServices that match those selectors.
+func (c *aPIServices) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.APIServiceList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

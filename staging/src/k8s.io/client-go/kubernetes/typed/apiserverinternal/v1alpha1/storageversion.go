@@ -31,6 +31,7 @@ import (
 	apiserverinternalv1alpha1 "k8s.io/client-go/applyconfigurations/apiserverinternal/v1alpha1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // StorageVersionsGetter has a method to return a StorageVersionInterface.
@@ -81,6 +82,16 @@ func (c *storageVersions) Get(ctx context.Context, name string, options v1.GetOp
 
 // List takes label and field selectors, and returns the list of StorageVersions that match those selectors.
 func (c *storageVersions) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.StorageVersionList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for storageversions", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of StorageVersions that match those selectors.
+func (c *storageVersions) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.StorageVersionList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

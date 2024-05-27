@@ -31,6 +31,7 @@ import (
 	nodev1beta1 "k8s.io/client-go/applyconfigurations/node/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // RuntimeClassesGetter has a method to return a RuntimeClassInterface.
@@ -79,6 +80,16 @@ func (c *runtimeClasses) Get(ctx context.Context, name string, options v1.GetOpt
 
 // List takes label and field selectors, and returns the list of RuntimeClasses that match those selectors.
 func (c *runtimeClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RuntimeClassList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for runtimeclasses", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of RuntimeClasses that match those selectors.
+func (c *runtimeClasses) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RuntimeClassList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

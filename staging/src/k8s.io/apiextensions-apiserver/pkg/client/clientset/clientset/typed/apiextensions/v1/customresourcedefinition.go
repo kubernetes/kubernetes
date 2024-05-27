@@ -31,6 +31,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // CustomResourceDefinitionsGetter has a method to return a CustomResourceDefinitionInterface.
@@ -81,6 +82,16 @@ func (c *customResourceDefinitions) Get(ctx context.Context, name string, option
 
 // List takes label and field selectors, and returns the list of CustomResourceDefinitions that match those selectors.
 func (c *customResourceDefinitions) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CustomResourceDefinitionList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for customresourcedefinitions", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of CustomResourceDefinitions that match those selectors.
+func (c *customResourceDefinitions) list(ctx context.Context, opts metav1.ListOptions) (result *v1.CustomResourceDefinitionList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

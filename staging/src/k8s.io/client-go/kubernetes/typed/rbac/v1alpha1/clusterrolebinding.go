@@ -31,6 +31,7 @@ import (
 	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ClusterRoleBindingsGetter has a method to return a ClusterRoleBindingInterface.
@@ -79,6 +80,16 @@ func (c *clusterRoleBindings) Get(ctx context.Context, name string, options v1.G
 
 // List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
 func (c *clusterRoleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleBindingList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for clusterrolebindings", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
+func (c *clusterRoleBindings) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleBindingList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

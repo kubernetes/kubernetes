@@ -31,6 +31,7 @@ import (
 	schedulingv1 "k8s.io/client-go/applyconfigurations/scheduling/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // PriorityClassesGetter has a method to return a PriorityClassInterface.
@@ -79,6 +80,16 @@ func (c *priorityClasses) Get(ctx context.Context, name string, options metav1.G
 
 // List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
 func (c *priorityClasses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PriorityClassList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for priorityclasses", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
+func (c *priorityClasses) list(ctx context.Context, opts metav1.ListOptions) (result *v1.PriorityClassList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
