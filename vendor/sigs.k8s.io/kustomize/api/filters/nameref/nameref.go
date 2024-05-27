@@ -284,9 +284,9 @@ func (f Filter) roleRefFilter() sieveFunc {
 	return previousIdSelectedByGvk(roleRefGvk)
 }
 
-func prefixSuffixEquals(other resource.ResCtx) sieveFunc {
+func prefixSuffixEquals(other resource.ResCtx, allowEmpty bool) sieveFunc {
 	return func(r *resource.Resource) bool {
-		return r.PrefixesSuffixesEquals(other)
+		return r.PrefixesSuffixesEquals(other, allowEmpty)
 	}
 }
 
@@ -325,7 +325,10 @@ func (f Filter) selectReferral(
 	if len(candidates) == 1 {
 		return candidates[0], nil
 	}
-	candidates = doSieve(candidates, prefixSuffixEquals(f.Referrer))
+	candidates = doSieve(candidates, prefixSuffixEquals(f.Referrer, true))
+	if len(candidates) > 1 {
+		candidates = doSieve(candidates, prefixSuffixEquals(f.Referrer, false))
+	}
 	if len(candidates) == 1 {
 		return candidates[0], nil
 	}

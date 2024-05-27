@@ -85,7 +85,7 @@ __%[1]s_handle_go_custom_completion()
     local out requestComp lastParam lastChar comp directive args
 
     # Prepare the command to request completions for the program.
-    # Calling ${words[0]} instead of directly %[1]s allows to handle aliases
+    # Calling ${words[0]} instead of directly %[1]s allows handling aliases
     args=("${words[@]:1}")
     # Disable ActiveHelp which is not supported for bash completion v1
     requestComp="%[8]s=0 ${words[0]} %[2]s ${args[*]}"
