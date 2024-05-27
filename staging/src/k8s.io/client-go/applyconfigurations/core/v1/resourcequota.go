@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ResourceQuotaApplyConfiguration represents an declarative configuration of the ResourceQuota type for use
+// ResourceQuotaApplyConfiguration represents a declarative configuration of the ResourceQuota type for use
 // with apply.
 type ResourceQuotaApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ResourceQuotaApplyConfiguration struct {
 	Status                           *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ResourceQuota constructs an declarative configuration of the ResourceQuota type for use with
+// ResourceQuota constructs a declarative configuration of the ResourceQuota type for use with
 // apply.
 func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 	b := &ResourceQuotaApplyConfiguration{}

@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha1
 
-// ImageReviewContainerSpecApplyConfiguration represents an declarative configuration of the ImageReviewContainerSpec type for use
+// ImageReviewContainerSpecApplyConfiguration represents a declarative configuration of the ImageReviewContainerSpec type for use
 // with apply.
 type ImageReviewContainerSpecApplyConfiguration struct {
 	Image *string `json:"image,omitempty"`
 }
 
-// ImageReviewContainerSpecApplyConfiguration constructs an declarative configuration of the ImageReviewContainerSpec type for use with
+// ImageReviewContainerSpecApplyConfiguration constructs a declarative configuration of the ImageReviewContainerSpec type for use with
 // apply.
 func ImageReviewContainerSpec() *ImageReviewContainerSpecApplyConfiguration {
 	return &ImageReviewContainerSpecApplyConfiguration{}

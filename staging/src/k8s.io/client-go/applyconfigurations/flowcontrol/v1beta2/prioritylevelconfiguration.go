@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PriorityLevelConfigurationApplyConfiguration represents an declarative configuration of the PriorityLevelConfiguration type for use
+// PriorityLevelConfigurationApplyConfiguration represents a declarative configuration of the PriorityLevelConfiguration type for use
 // with apply.
 type PriorityLevelConfigurationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type PriorityLevelConfigurationApplyConfiguration struct {
 	Status                           *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// PriorityLevelConfiguration constructs an declarative configuration of the PriorityLevelConfiguration type for use with
+// PriorityLevelConfiguration constructs a declarative configuration of the PriorityLevelConfiguration type for use with
 // apply.
 func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyConfiguration {
 	b := &PriorityLevelConfigurationApplyConfiguration{}

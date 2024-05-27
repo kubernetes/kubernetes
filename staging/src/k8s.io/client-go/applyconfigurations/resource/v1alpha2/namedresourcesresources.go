@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// NamedResourcesResourcesApplyConfiguration represents an declarative configuration of the NamedResourcesResources type for use
+// NamedResourcesResourcesApplyConfiguration represents a declarative configuration of the NamedResourcesResources type for use
 // with apply.
 type NamedResourcesResourcesApplyConfiguration struct {
 	Instances []NamedResourcesInstanceApplyConfiguration `json:"instances,omitempty"`
 }
 
-// NamedResourcesResourcesApplyConfiguration constructs an declarative configuration of the NamedResourcesResources type for use with
+// NamedResourcesResourcesApplyConfiguration constructs a declarative configuration of the NamedResourcesResources type for use with
 // apply.
 func NamedResourcesResources() *NamedResourcesResourcesApplyConfiguration {
 	return &NamedResourcesResourcesApplyConfiguration{}

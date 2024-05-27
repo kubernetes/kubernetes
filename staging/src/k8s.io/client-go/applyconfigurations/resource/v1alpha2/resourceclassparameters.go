@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ResourceClassParametersApplyConfiguration represents an declarative configuration of the ResourceClassParameters type for use
+// ResourceClassParametersApplyConfiguration represents a declarative configuration of the ResourceClassParameters type for use
 // with apply.
 type ResourceClassParametersApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type ResourceClassParametersApplyConfiguration struct {
 	Filters                          []ResourceFilterApplyConfiguration                  `json:"filters,omitempty"`
 }
 
-// ResourceClassParameters constructs an declarative configuration of the ResourceClassParameters type for use with
+// ResourceClassParameters constructs a declarative configuration of the ResourceClassParameters type for use with
 // apply.
 func ResourceClassParameters(name, namespace string) *ResourceClassParametersApplyConfiguration {
 	b := &ResourceClassParametersApplyConfiguration{}

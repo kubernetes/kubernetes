@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PodConditionApplyConfiguration represents an declarative configuration of the PodCondition type for use
+// PodConditionApplyConfiguration represents a declarative configuration of the PodCondition type for use
 // with apply.
 type PodConditionApplyConfiguration struct {
 	Type               *v1.PodConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type PodConditionApplyConfiguration struct {
 	Message            *string              `json:"message,omitempty"`
 }
 
-// PodConditionApplyConfiguration constructs an declarative configuration of the PodCondition type for use with
+// PodConditionApplyConfiguration constructs a declarative configuration of the PodCondition type for use with
 // apply.
 func PodCondition() *PodConditionApplyConfiguration {
 	return &PodConditionApplyConfiguration{}

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1beta1
 
-// TokenRequestApplyConfiguration represents an declarative configuration of the TokenRequest type for use
+// TokenRequestApplyConfiguration represents a declarative configuration of the TokenRequest type for use
 // with apply.
 type TokenRequestApplyConfiguration struct {
 	Audience          *string `json:"audience,omitempty"`
 	ExpirationSeconds *int64  `json:"expirationSeconds,omitempty"`
 }
 
-// TokenRequestApplyConfiguration constructs an declarative configuration of the TokenRequest type for use with
+// TokenRequestApplyConfiguration constructs a declarative configuration of the TokenRequest type for use with
 // apply.
 func TokenRequest() *TokenRequestApplyConfiguration {
 	return &TokenRequestApplyConfiguration{}

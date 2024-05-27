@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NodeApplyConfiguration represents an declarative configuration of the Node type for use
+// NodeApplyConfiguration represents a declarative configuration of the Node type for use
 // with apply.
 type NodeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type NodeApplyConfiguration struct {
 	Status                           *NodeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Node constructs an declarative configuration of the Node type for use with
+// Node constructs a declarative configuration of the Node type for use with
 // apply.
 func Node(name string) *NodeApplyConfiguration {
 	b := &NodeApplyConfiguration{}

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// ClaimSourceApplyConfiguration represents an declarative configuration of the ClaimSource type for use
+// ClaimSourceApplyConfiguration represents a declarative configuration of the ClaimSource type for use
 // with apply.
 type ClaimSourceApplyConfiguration struct {
 	ResourceClaimName         *string `json:"resourceClaimName,omitempty"`
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
 }
 
-// ClaimSourceApplyConfiguration constructs an declarative configuration of the ClaimSource type for use with
+// ClaimSourceApplyConfiguration constructs a declarative configuration of the ClaimSource type for use with
 // apply.
 func ClaimSource() *ClaimSourceApplyConfiguration {
 	return &ClaimSourceApplyConfiguration{}

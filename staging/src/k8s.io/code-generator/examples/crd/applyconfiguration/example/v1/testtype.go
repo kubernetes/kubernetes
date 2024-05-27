@@ -25,7 +25,7 @@ import (
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 )
 
-// TestTypeApplyConfiguration represents an declarative configuration of the TestType type for use
+// TestTypeApplyConfiguration represents a declarative configuration of the TestType type for use
 // with apply.
 type TestTypeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -33,7 +33,7 @@ type TestTypeApplyConfiguration struct {
 	Status                           *examplev1.TestTypeStatus `json:"status,omitempty"`
 }
 
-// TestType constructs an declarative configuration of the TestType type for use with
+// TestType constructs a declarative configuration of the TestType type for use with
 // apply.
 func TestType(name, namespace string) *TestTypeApplyConfiguration {
 	b := &TestTypeApplyConfiguration{}

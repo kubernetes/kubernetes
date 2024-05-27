@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// PodSpecApplyConfiguration represents an declarative configuration of the PodSpec type for use
+// PodSpecApplyConfiguration represents a declarative configuration of the PodSpec type for use
 // with apply.
 type PodSpecApplyConfiguration struct {
 	Volumes                       []VolumeApplyConfiguration                   `json:"volumes,omitempty"`
@@ -66,7 +66,7 @@ type PodSpecApplyConfiguration struct {
 	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty"`
 }
 
-// PodSpecApplyConfiguration constructs an declarative configuration of the PodSpec type for use with
+// PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
 // apply.
 func PodSpec() *PodSpecApplyConfiguration {
 	return &PodSpecApplyConfiguration{}

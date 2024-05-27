@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// EndpointHintsApplyConfiguration represents an declarative configuration of the EndpointHints type for use
+// EndpointHintsApplyConfiguration represents a declarative configuration of the EndpointHints type for use
 // with apply.
 type EndpointHintsApplyConfiguration struct {
 	ForZones []ForZoneApplyConfiguration `json:"forZones,omitempty"`
 }
 
-// EndpointHintsApplyConfiguration constructs an declarative configuration of the EndpointHints type for use with
+// EndpointHintsApplyConfiguration constructs a declarative configuration of the EndpointHints type for use with
 // apply.
 func EndpointHints() *EndpointHintsApplyConfiguration {
 	return &EndpointHintsApplyConfiguration{}

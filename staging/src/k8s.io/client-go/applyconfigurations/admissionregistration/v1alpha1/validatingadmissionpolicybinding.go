@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ValidatingAdmissionPolicyBindingApplyConfiguration represents an declarative configuration of the ValidatingAdmissionPolicyBinding type for use
+// ValidatingAdmissionPolicyBindingApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyBinding type for use
 // with apply.
 type ValidatingAdmissionPolicyBindingApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type ValidatingAdmissionPolicyBindingApplyConfiguration struct {
 	Spec                             *ValidatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// ValidatingAdmissionPolicyBinding constructs an declarative configuration of the ValidatingAdmissionPolicyBinding type for use with
+// ValidatingAdmissionPolicyBinding constructs a declarative configuration of the ValidatingAdmissionPolicyBinding type for use with
 // apply.
 func ValidatingAdmissionPolicyBinding(name string) *ValidatingAdmissionPolicyBindingApplyConfiguration {
 	b := &ValidatingAdmissionPolicyBindingApplyConfiguration{}

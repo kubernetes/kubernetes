@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1beta2
 
-// ServiceAccountSubjectApplyConfiguration represents an declarative configuration of the ServiceAccountSubject type for use
+// ServiceAccountSubjectApplyConfiguration represents a declarative configuration of the ServiceAccountSubject type for use
 // with apply.
 type ServiceAccountSubjectApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 	Name      *string `json:"name,omitempty"`
 }
 
-// ServiceAccountSubjectApplyConfiguration constructs an declarative configuration of the ServiceAccountSubject type for use with
+// ServiceAccountSubjectApplyConfiguration constructs a declarative configuration of the ServiceAccountSubject type for use with
 // apply.
 func ServiceAccountSubject() *ServiceAccountSubjectApplyConfiguration {
 	return &ServiceAccountSubjectApplyConfiguration{}

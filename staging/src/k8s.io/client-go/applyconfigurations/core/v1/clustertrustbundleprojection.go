@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterTrustBundleProjectionApplyConfiguration represents an declarative configuration of the ClusterTrustBundleProjection type for use
+// ClusterTrustBundleProjectionApplyConfiguration represents a declarative configuration of the ClusterTrustBundleProjection type for use
 // with apply.
 type ClusterTrustBundleProjectionApplyConfiguration struct {
 	Name          *string                             `json:"name,omitempty"`
@@ -32,7 +32,7 @@ type ClusterTrustBundleProjectionApplyConfiguration struct {
 	Path          *string                             `json:"path,omitempty"`
 }
 
-// ClusterTrustBundleProjectionApplyConfiguration constructs an declarative configuration of the ClusterTrustBundleProjection type for use with
+// ClusterTrustBundleProjectionApplyConfiguration constructs a declarative configuration of the ClusterTrustBundleProjection type for use with
 // apply.
 func ClusterTrustBundleProjection() *ClusterTrustBundleProjectionApplyConfiguration {
 	return &ClusterTrustBundleProjectionApplyConfiguration{}

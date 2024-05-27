@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceHandleApplyConfiguration represents an declarative configuration of the ResourceHandle type for use
+// ResourceHandleApplyConfiguration represents a declarative configuration of the ResourceHandle type for use
 // with apply.
 type ResourceHandleApplyConfiguration struct {
 	DriverName     *string                                     `json:"driverName,omitempty"`
@@ -26,7 +26,7 @@ type ResourceHandleApplyConfiguration struct {
 	StructuredData *StructuredResourceHandleApplyConfiguration `json:"structuredData,omitempty"`
 }
 
-// ResourceHandleApplyConfiguration constructs an declarative configuration of the ResourceHandle type for use with
+// ResourceHandleApplyConfiguration constructs a declarative configuration of the ResourceHandle type for use with
 // apply.
 func ResourceHandle() *ResourceHandleApplyConfiguration {
 	return &ResourceHandleApplyConfiguration{}

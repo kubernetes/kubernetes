@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// IngressClassApplyConfiguration represents an declarative configuration of the IngressClass type for use
+// IngressClassApplyConfiguration represents a declarative configuration of the IngressClass type for use
 // with apply.
 type IngressClassApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type IngressClassApplyConfiguration struct {
 	Spec                             *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// IngressClass constructs an declarative configuration of the IngressClass type for use with
+// IngressClass constructs a declarative configuration of the IngressClass type for use with
 // apply.
 func IngressClass(name string) *IngressClassApplyConfiguration {
 	b := &IngressClassApplyConfiguration{}

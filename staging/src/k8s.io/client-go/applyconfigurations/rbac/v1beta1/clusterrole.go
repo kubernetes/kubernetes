@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ClusterRoleApplyConfiguration represents an declarative configuration of the ClusterRole type for use
+// ClusterRoleApplyConfiguration represents a declarative configuration of the ClusterRole type for use
 // with apply.
 type ClusterRoleApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ClusterRoleApplyConfiguration struct {
 	AggregationRule                  *AggregationRuleApplyConfiguration `json:"aggregationRule,omitempty"`
 }
 
-// ClusterRole constructs an declarative configuration of the ClusterRole type for use with
+// ClusterRole constructs a declarative configuration of the ClusterRole type for use with
 // apply.
 func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 	b := &ClusterRoleApplyConfiguration{}

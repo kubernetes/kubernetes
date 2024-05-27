@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ResourceClaimApplyConfiguration represents an declarative configuration of the ResourceClaim type for use
+// ResourceClaimApplyConfiguration represents a declarative configuration of the ResourceClaim type for use
 // with apply.
 type ResourceClaimApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ResourceClaimApplyConfiguration struct {
 	Status                           *ResourceClaimStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ResourceClaim constructs an declarative configuration of the ResourceClaim type for use with
+// ResourceClaim constructs a declarative configuration of the ResourceClaim type for use with
 // apply.
 func ResourceClaim(name, namespace string) *ResourceClaimApplyConfiguration {
 	b := &ResourceClaimApplyConfiguration{}

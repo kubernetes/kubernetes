@@ -25,7 +25,7 @@ import (
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 )
 
-// ClusterTestTypeApplyConfiguration represents an declarative configuration of the ClusterTestType type for use
+// ClusterTestTypeApplyConfiguration represents a declarative configuration of the ClusterTestType type for use
 // with apply.
 type ClusterTestTypeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -33,7 +33,7 @@ type ClusterTestTypeApplyConfiguration struct {
 	Status                           *examplev1.ClusterTestTypeStatus `json:"status,omitempty"`
 }
 
-// ClusterTestType constructs an declarative configuration of the ClusterTestType type for use with
+// ClusterTestType constructs a declarative configuration of the ClusterTestType type for use with
 // apply.
 func ClusterTestType(name string) *ClusterTestTypeApplyConfiguration {
 	b := &ClusterTestTypeApplyConfiguration{}

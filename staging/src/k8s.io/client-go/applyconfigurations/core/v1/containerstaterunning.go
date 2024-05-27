@@ -22,13 +22,13 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ContainerStateRunningApplyConfiguration represents an declarative configuration of the ContainerStateRunning type for use
+// ContainerStateRunningApplyConfiguration represents a declarative configuration of the ContainerStateRunning type for use
 // with apply.
 type ContainerStateRunningApplyConfiguration struct {
 	StartedAt *v1.Time `json:"startedAt,omitempty"`
 }
 
-// ContainerStateRunningApplyConfiguration constructs an declarative configuration of the ContainerStateRunning type for use with
+// ContainerStateRunningApplyConfiguration constructs a declarative configuration of the ContainerStateRunning type for use with
 // apply.
 func ContainerStateRunning() *ContainerStateRunningApplyConfiguration {
 	return &ContainerStateRunningApplyConfiguration{}

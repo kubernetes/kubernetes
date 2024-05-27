@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ImageReviewApplyConfiguration represents an declarative configuration of the ImageReview type for use
+// ImageReviewApplyConfiguration represents a declarative configuration of the ImageReview type for use
 // with apply.
 type ImageReviewApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type ImageReviewApplyConfiguration struct {
 	Status                           *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// ImageReview constructs an declarative configuration of the ImageReview type for use with
+// ImageReview constructs a declarative configuration of the ImageReview type for use with
 // apply.
 func ImageReview(name string) *ImageReviewApplyConfiguration {
 	b := &ImageReviewApplyConfiguration{}

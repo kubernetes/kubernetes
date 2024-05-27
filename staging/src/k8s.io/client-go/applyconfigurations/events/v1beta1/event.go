@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// EventApplyConfiguration represents an declarative configuration of the Event type for use
+// EventApplyConfiguration represents a declarative configuration of the Event type for use
 // with apply.
 type EventApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -49,7 +49,7 @@ type EventApplyConfiguration struct {
 	DeprecatedCount                  *int32                                    `json:"deprecatedCount,omitempty"`
 }
 
-// Event constructs an declarative configuration of the Event type for use with
+// Event constructs a declarative configuration of the Event type for use with
 // apply.
 func Event(name, namespace string) *EventApplyConfiguration {
 	b := &EventApplyConfiguration{}

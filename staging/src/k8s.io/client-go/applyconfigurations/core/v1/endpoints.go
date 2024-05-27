@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// EndpointsApplyConfiguration represents an declarative configuration of the Endpoints type for use
+// EndpointsApplyConfiguration represents a declarative configuration of the Endpoints type for use
 // with apply.
 type EndpointsApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type EndpointsApplyConfiguration struct {
 	Subsets                          []EndpointSubsetApplyConfiguration `json:"subsets,omitempty"`
 }
 
-// Endpoints constructs an declarative configuration of the Endpoints type for use with
+// Endpoints constructs a declarative configuration of the Endpoints type for use with
 // apply.
 func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 	b := &EndpointsApplyConfiguration{}

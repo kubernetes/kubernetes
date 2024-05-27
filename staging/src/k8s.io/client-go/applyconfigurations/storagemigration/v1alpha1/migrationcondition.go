@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// MigrationConditionApplyConfiguration represents an declarative configuration of the MigrationCondition type for use
+// MigrationConditionApplyConfiguration represents a declarative configuration of the MigrationCondition type for use
 // with apply.
 type MigrationConditionApplyConfiguration struct {
 	Type           *v1alpha1.MigrationConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type MigrationConditionApplyConfiguration struct {
 	Message        *string                          `json:"message,omitempty"`
 }
 
-// MigrationConditionApplyConfiguration constructs an declarative configuration of the MigrationCondition type for use with
+// MigrationConditionApplyConfiguration constructs a declarative configuration of the MigrationCondition type for use with
 // apply.
 func MigrationCondition() *MigrationConditionApplyConfiguration {
 	return &MigrationConditionApplyConfiguration{}

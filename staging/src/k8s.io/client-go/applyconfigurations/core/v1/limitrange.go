@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// LimitRangeApplyConfiguration represents an declarative configuration of the LimitRange type for use
+// LimitRangeApplyConfiguration represents a declarative configuration of the LimitRange type for use
 // with apply.
 type LimitRangeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type LimitRangeApplyConfiguration struct {
 	Spec                             *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// LimitRange constructs an declarative configuration of the LimitRange type for use with
+// LimitRange constructs a declarative configuration of the LimitRange type for use with
 // apply.
 func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 	b := &LimitRangeApplyConfiguration{}

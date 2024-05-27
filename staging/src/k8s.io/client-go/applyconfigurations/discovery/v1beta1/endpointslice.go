@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// EndpointSliceApplyConfiguration represents an declarative configuration of the EndpointSlice type for use
+// EndpointSliceApplyConfiguration represents a declarative configuration of the EndpointSlice type for use
 // with apply.
 type EndpointSliceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type EndpointSliceApplyConfiguration struct {
 	Ports                            []EndpointPortApplyConfiguration `json:"ports,omitempty"`
 }
 
-// EndpointSlice constructs an declarative configuration of the EndpointSlice type for use with
+// EndpointSlice constructs a declarative configuration of the EndpointSlice type for use with
 // apply.
 func EndpointSlice(name, namespace string) *EndpointSliceApplyConfiguration {
 	b := &EndpointSliceApplyConfiguration{}

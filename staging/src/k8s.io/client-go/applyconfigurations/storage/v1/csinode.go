@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// CSINodeApplyConfiguration represents an declarative configuration of the CSINode type for use
+// CSINodeApplyConfiguration represents a declarative configuration of the CSINode type for use
 // with apply.
 type CSINodeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type CSINodeApplyConfiguration struct {
 	Spec                             *CSINodeSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// CSINode constructs an declarative configuration of the CSINode type for use with
+// CSINode constructs a declarative configuration of the CSINode type for use with
 // apply.
 func CSINode(name string) *CSINodeApplyConfiguration {
 	b := &CSINodeApplyConfiguration{}

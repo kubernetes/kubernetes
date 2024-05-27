@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StorageVersionConditionApplyConfiguration represents an declarative configuration of the StorageVersionCondition type for use
+// StorageVersionConditionApplyConfiguration represents a declarative configuration of the StorageVersionCondition type for use
 // with apply.
 type StorageVersionConditionApplyConfiguration struct {
 	Type               *v1alpha1.StorageVersionConditionType `json:"type,omitempty"`
@@ -34,7 +34,7 @@ type StorageVersionConditionApplyConfiguration struct {
 	Message            *string                               `json:"message,omitempty"`
 }
 
-// StorageVersionConditionApplyConfiguration constructs an declarative configuration of the StorageVersionCondition type for use with
+// StorageVersionConditionApplyConfiguration constructs a declarative configuration of the StorageVersionCondition type for use with
 // apply.
 func StorageVersionCondition() *StorageVersionConditionApplyConfiguration {
 	return &StorageVersionConditionApplyConfiguration{}

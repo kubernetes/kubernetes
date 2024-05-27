@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// VolumeApplyConfiguration represents an declarative configuration of the Volume type for use
+// VolumeApplyConfiguration represents a declarative configuration of the Volume type for use
 // with apply.
 type VolumeApplyConfiguration struct {
 	Name                           *string `json:"name,omitempty"`
 	VolumeSourceApplyConfiguration `json:",inline"`
 }
 
-// VolumeApplyConfiguration constructs an declarative configuration of the Volume type for use with
+// VolumeApplyConfiguration constructs a declarative configuration of the Volume type for use with
 // apply.
 func Volume() *VolumeApplyConfiguration {
 	return &VolumeApplyConfiguration{}

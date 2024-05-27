@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// StatefulSetApplyConfiguration represents an declarative configuration of the StatefulSet type for use
+// StatefulSetApplyConfiguration represents a declarative configuration of the StatefulSet type for use
 // with apply.
 type StatefulSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type StatefulSetApplyConfiguration struct {
 	Status                           *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// StatefulSet constructs an declarative configuration of the StatefulSet type for use with
+// StatefulSet constructs a declarative configuration of the StatefulSet type for use with
 // apply.
 func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 	b := &StatefulSetApplyConfiguration{}

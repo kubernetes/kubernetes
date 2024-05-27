@@ -22,14 +22,14 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// DriverAllocationResultApplyConfiguration represents an declarative configuration of the DriverAllocationResult type for use
+// DriverAllocationResultApplyConfiguration represents a declarative configuration of the DriverAllocationResult type for use
 // with apply.
 type DriverAllocationResultApplyConfiguration struct {
 	VendorRequestParameters                 *runtime.RawExtension `json:"vendorRequestParameters,omitempty"`
 	AllocationResultModelApplyConfiguration `json:",inline"`
 }
 
-// DriverAllocationResultApplyConfiguration constructs an declarative configuration of the DriverAllocationResult type for use with
+// DriverAllocationResultApplyConfiguration constructs a declarative configuration of the DriverAllocationResult type for use with
 // apply.
 func DriverAllocationResult() *DriverAllocationResultApplyConfiguration {
 	return &DriverAllocationResultApplyConfiguration{}

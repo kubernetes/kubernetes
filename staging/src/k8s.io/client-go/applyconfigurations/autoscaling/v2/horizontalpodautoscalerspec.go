@@ -18,7 +18,7 @@ limitations under the License.
 
 package v2
 
-// HorizontalPodAutoscalerSpecApplyConfiguration represents an declarative configuration of the HorizontalPodAutoscalerSpec type for use
+// HorizontalPodAutoscalerSpecApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerSpec type for use
 // with apply.
 type HorizontalPodAutoscalerSpecApplyConfiguration struct {
 	ScaleTargetRef *CrossVersionObjectReferenceApplyConfiguration     `json:"scaleTargetRef,omitempty"`
@@ -28,7 +28,7 @@ type HorizontalPodAutoscalerSpecApplyConfiguration struct {
 	Behavior       *HorizontalPodAutoscalerBehaviorApplyConfiguration `json:"behavior,omitempty"`
 }
 
-// HorizontalPodAutoscalerSpecApplyConfiguration constructs an declarative configuration of the HorizontalPodAutoscalerSpec type for use with
+// HorizontalPodAutoscalerSpecApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerSpec type for use with
 // apply.
 func HorizontalPodAutoscalerSpec() *HorizontalPodAutoscalerSpecApplyConfiguration {
 	return &HorizontalPodAutoscalerSpecApplyConfiguration{}

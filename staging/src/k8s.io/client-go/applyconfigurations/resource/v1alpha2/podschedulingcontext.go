@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodSchedulingContextApplyConfiguration represents an declarative configuration of the PodSchedulingContext type for use
+// PodSchedulingContextApplyConfiguration represents a declarative configuration of the PodSchedulingContext type for use
 // with apply.
 type PodSchedulingContextApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type PodSchedulingContextApplyConfiguration struct {
 	Status                           *PodSchedulingContextStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// PodSchedulingContext constructs an declarative configuration of the PodSchedulingContext type for use with
+// PodSchedulingContext constructs a declarative configuration of the PodSchedulingContext type for use with
 // apply.
 func PodSchedulingContext(name, namespace string) *PodSchedulingContextApplyConfiguration {
 	b := &PodSchedulingContextApplyConfiguration{}

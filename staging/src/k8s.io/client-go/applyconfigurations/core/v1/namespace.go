@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// NamespaceApplyConfiguration represents an declarative configuration of the Namespace type for use
+// NamespaceApplyConfiguration represents a declarative configuration of the Namespace type for use
 // with apply.
 type NamespaceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type NamespaceApplyConfiguration struct {
 	Status                           *NamespaceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Namespace constructs an declarative configuration of the Namespace type for use with
+// Namespace constructs a declarative configuration of the Namespace type for use with
 // apply.
 func Namespace(name string) *NamespaceApplyConfiguration {
 	b := &NamespaceApplyConfiguration{}

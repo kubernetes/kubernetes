@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CustomResourceDefinitionConditionApplyConfiguration represents an declarative configuration of the CustomResourceDefinitionCondition type for use
+// CustomResourceDefinitionConditionApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionCondition type for use
 // with apply.
 type CustomResourceDefinitionConditionApplyConfiguration struct {
 	Type               *v1.CustomResourceDefinitionConditionType `json:"type,omitempty"`
@@ -33,7 +33,7 @@ type CustomResourceDefinitionConditionApplyConfiguration struct {
 	Message            *string                                   `json:"message,omitempty"`
 }
 
-// CustomResourceDefinitionConditionApplyConfiguration constructs an declarative configuration of the CustomResourceDefinitionCondition type for use with
+// CustomResourceDefinitionConditionApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionCondition type for use with
 // apply.
 func CustomResourceDefinitionCondition() *CustomResourceDefinitionConditionApplyConfiguration {
 	return &CustomResourceDefinitionConditionApplyConfiguration{}

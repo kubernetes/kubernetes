@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ResourceClaimParametersApplyConfiguration represents an declarative configuration of the ResourceClaimParameters type for use
+// ResourceClaimParametersApplyConfiguration represents a declarative configuration of the ResourceClaimParameters type for use
 // with apply.
 type ResourceClaimParametersApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type ResourceClaimParametersApplyConfiguration struct {
 	DriverRequests                   []DriverRequestsApplyConfiguration                  `json:"driverRequests,omitempty"`
 }
 
-// ResourceClaimParameters constructs an declarative configuration of the ResourceClaimParameters type for use with
+// ResourceClaimParameters constructs a declarative configuration of the ResourceClaimParameters type for use with
 // apply.
 func ResourceClaimParameters(name, namespace string) *ResourceClaimParametersApplyConfiguration {
 	b := &ResourceClaimParametersApplyConfiguration{}

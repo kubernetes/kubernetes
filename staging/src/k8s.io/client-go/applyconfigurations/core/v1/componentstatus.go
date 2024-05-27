@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ComponentStatusApplyConfiguration represents an declarative configuration of the ComponentStatus type for use
+// ComponentStatusApplyConfiguration represents a declarative configuration of the ComponentStatus type for use
 // with apply.
 type ComponentStatusApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type ComponentStatusApplyConfiguration struct {
 	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// ComponentStatus constructs an declarative configuration of the ComponentStatus type for use with
+// ComponentStatus constructs a declarative configuration of the ComponentStatus type for use with
 // apply.
 func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 	b := &ComponentStatusApplyConfiguration{}

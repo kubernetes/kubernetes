@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// SuccessPolicyRuleApplyConfiguration represents an declarative configuration of the SuccessPolicyRule type for use
+// SuccessPolicyRuleApplyConfiguration represents a declarative configuration of the SuccessPolicyRule type for use
 // with apply.
 type SuccessPolicyRuleApplyConfiguration struct {
 	SucceededIndexes *string `json:"succeededIndexes,omitempty"`
 	SucceededCount   *int32  `json:"succeededCount,omitempty"`
 }
 
-// SuccessPolicyRuleApplyConfiguration constructs an declarative configuration of the SuccessPolicyRule type for use with
+// SuccessPolicyRuleApplyConfiguration constructs a declarative configuration of the SuccessPolicyRule type for use with
 // apply.
 func SuccessPolicyRule() *SuccessPolicyRuleApplyConfiguration {
 	return &SuccessPolicyRuleApplyConfiguration{}

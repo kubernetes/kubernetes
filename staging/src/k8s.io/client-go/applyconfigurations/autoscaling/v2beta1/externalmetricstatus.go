@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ExternalMetricStatusApplyConfiguration represents an declarative configuration of the ExternalMetricStatus type for use
+// ExternalMetricStatusApplyConfiguration represents a declarative configuration of the ExternalMetricStatus type for use
 // with apply.
 type ExternalMetricStatusApplyConfiguration struct {
 	MetricName          *string                             `json:"metricName,omitempty"`
@@ -32,7 +32,7 @@ type ExternalMetricStatusApplyConfiguration struct {
 	CurrentAverageValue *resource.Quantity                  `json:"currentAverageValue,omitempty"`
 }
 
-// ExternalMetricStatusApplyConfiguration constructs an declarative configuration of the ExternalMetricStatus type for use with
+// ExternalMetricStatusApplyConfiguration constructs a declarative configuration of the ExternalMetricStatus type for use with
 // apply.
 func ExternalMetricStatus() *ExternalMetricStatusApplyConfiguration {
 	return &ExternalMetricStatusApplyConfiguration{}

@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// VolumeAttributesClassApplyConfiguration represents an declarative configuration of the VolumeAttributesClass type for use
+// VolumeAttributesClassApplyConfiguration represents a declarative configuration of the VolumeAttributesClass type for use
 // with apply.
 type VolumeAttributesClassApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type VolumeAttributesClassApplyConfiguration struct {
 	Parameters                       map[string]string `json:"parameters,omitempty"`
 }
 
-// VolumeAttributesClass constructs an declarative configuration of the VolumeAttributesClass type for use with
+// VolumeAttributesClass constructs a declarative configuration of the VolumeAttributesClass type for use with
 // apply.
 func VolumeAttributesClass(name string) *VolumeAttributesClassApplyConfiguration {
 	b := &VolumeAttributesClassApplyConfiguration{}

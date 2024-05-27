@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/batch/v1beta1"
 )
 
-// CronJobSpecApplyConfiguration represents an declarative configuration of the CronJobSpec type for use
+// CronJobSpecApplyConfiguration represents a declarative configuration of the CronJobSpec type for use
 // with apply.
 type CronJobSpecApplyConfiguration struct {
 	Schedule                   *string                            `json:"schedule,omitempty"`
@@ -35,7 +35,7 @@ type CronJobSpecApplyConfiguration struct {
 	FailedJobsHistoryLimit     *int32                             `json:"failedJobsHistoryLimit,omitempty"`
 }
 
-// CronJobSpecApplyConfiguration constructs an declarative configuration of the CronJobSpec type for use with
+// CronJobSpecApplyConfiguration constructs a declarative configuration of the CronJobSpec type for use with
 // apply.
 func CronJobSpec() *CronJobSpecApplyConfiguration {
 	return &CronJobSpecApplyConfiguration{}

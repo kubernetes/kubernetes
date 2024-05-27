@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RoleBindingApplyConfiguration represents an declarative configuration of the RoleBinding type for use
+// RoleBindingApplyConfiguration represents a declarative configuration of the RoleBinding type for use
 // with apply.
 type RoleBindingApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type RoleBindingApplyConfiguration struct {
 	RoleRef                          *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
 }
 
-// RoleBinding constructs an declarative configuration of the RoleBinding type for use with
+// RoleBinding constructs a declarative configuration of the RoleBinding type for use with
 // apply.
 func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 	b := &RoleBindingApplyConfiguration{}

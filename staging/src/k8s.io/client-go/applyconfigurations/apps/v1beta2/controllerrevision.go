@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ControllerRevisionApplyConfiguration represents an declarative configuration of the ControllerRevision type for use
+// ControllerRevisionApplyConfiguration represents a declarative configuration of the ControllerRevision type for use
 // with apply.
 type ControllerRevisionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type ControllerRevisionApplyConfiguration struct {
 	Revision                         *int64                `json:"revision,omitempty"`
 }
 
-// ControllerRevision constructs an declarative configuration of the ControllerRevision type for use with
+// ControllerRevision constructs a declarative configuration of the ControllerRevision type for use with
 // apply.
 func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfiguration {
 	b := &ControllerRevisionApplyConfiguration{}

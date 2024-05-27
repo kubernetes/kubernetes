@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// RBDPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the RBDPersistentVolumeSource type for use
+// RBDPersistentVolumeSourceApplyConfiguration represents a declarative configuration of the RBDPersistentVolumeSource type for use
 // with apply.
 type RBDPersistentVolumeSourceApplyConfiguration struct {
 	CephMonitors []string                           `json:"monitors,omitempty"`
@@ -31,7 +31,7 @@ type RBDPersistentVolumeSourceApplyConfiguration struct {
 	ReadOnly     *bool                              `json:"readOnly,omitempty"`
 }
 
-// RBDPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the RBDPersistentVolumeSource type for use with
+// RBDPersistentVolumeSourceApplyConfiguration constructs a declarative configuration of the RBDPersistentVolumeSource type for use with
 // apply.
 func RBDPersistentVolumeSource() *RBDPersistentVolumeSourceApplyConfiguration {
 	return &RBDPersistentVolumeSourceApplyConfiguration{}

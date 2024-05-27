@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// NodeStatusApplyConfiguration represents an declarative configuration of the NodeStatus type for use
+// NodeStatusApplyConfiguration represents a declarative configuration of the NodeStatus type for use
 // with apply.
 type NodeStatusApplyConfiguration struct {
 	Capacity        *v1.ResourceList                       `json:"capacity,omitempty"`
@@ -39,7 +39,7 @@ type NodeStatusApplyConfiguration struct {
 	RuntimeHandlers []NodeRuntimeHandlerApplyConfiguration `json:"runtimeHandlers,omitempty"`
 }
 
-// NodeStatusApplyConfiguration constructs an declarative configuration of the NodeStatus type for use with
+// NodeStatusApplyConfiguration constructs a declarative configuration of the NodeStatus type for use with
 // apply.
 func NodeStatus() *NodeStatusApplyConfiguration {
 	return &NodeStatusApplyConfiguration{}
