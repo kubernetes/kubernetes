@@ -263,3 +263,9 @@ func (b *RuntimeClassApplyConfiguration) WithScheduling(value *SchedulingApplyCo
 	b.Scheduling = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RuntimeClassApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

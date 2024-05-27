@@ -254,3 +254,9 @@ func (b *StorageVersionMigrationApplyConfiguration) WithStatus(value *StorageVer
 	b.Status = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *StorageVersionMigrationApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

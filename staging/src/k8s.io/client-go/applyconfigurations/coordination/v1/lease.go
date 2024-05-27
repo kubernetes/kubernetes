@@ -247,3 +247,9 @@ func (b *LeaseApplyConfiguration) WithSpec(value *LeaseSpecApplyConfiguration) *
 	b.Spec = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *LeaseApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

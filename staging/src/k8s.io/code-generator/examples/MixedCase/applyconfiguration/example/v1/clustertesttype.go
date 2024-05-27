@@ -208,3 +208,9 @@ func (b *ClusterTestTypeApplyConfiguration) WithStatus(value examplev1.ClusterTe
 	b.Status = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ClusterTestTypeApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

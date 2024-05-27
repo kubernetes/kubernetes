@@ -275,3 +275,9 @@ func (b *ResourceClassParametersApplyConfiguration) WithFilters(values ...*Resou
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ResourceClassParametersApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

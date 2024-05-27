@@ -209,3 +209,9 @@ func (b *TestTypeApplyConfiguration) WithStatus(value example2v1.TestTypeStatus)
 	b.Status = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *TestTypeApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

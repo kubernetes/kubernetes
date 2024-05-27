@@ -256,3 +256,9 @@ func (b *JobApplyConfiguration) WithStatus(value *JobStatusApplyConfiguration) *
 	b.Status = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *JobApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

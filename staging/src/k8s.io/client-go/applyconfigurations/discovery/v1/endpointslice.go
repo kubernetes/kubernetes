@@ -275,3 +275,9 @@ func (b *EndpointSliceApplyConfiguration) WithPorts(values ...*EndpointPortApply
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *EndpointSliceApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

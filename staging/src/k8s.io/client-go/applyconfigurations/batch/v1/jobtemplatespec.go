@@ -186,3 +186,9 @@ func (b *JobTemplateSpecApplyConfiguration) WithSpec(value *JobSpecApplyConfigur
 	b.Spec = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *JobTemplateSpecApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

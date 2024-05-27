@@ -250,3 +250,9 @@ func (b *ComponentStatusApplyConfiguration) WithConditions(values ...*ComponentC
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ComponentStatusApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

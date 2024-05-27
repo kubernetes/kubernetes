@@ -245,3 +245,9 @@ func (b *IPAddressApplyConfiguration) WithSpec(value *IPAddressSpecApplyConfigur
 	b.Spec = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *IPAddressApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

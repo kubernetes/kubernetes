@@ -256,3 +256,9 @@ func (b *PodSchedulingContextApplyConfiguration) WithStatus(value *PodScheduling
 	b.Status = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *PodSchedulingContextApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

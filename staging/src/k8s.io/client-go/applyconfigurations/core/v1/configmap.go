@@ -277,3 +277,9 @@ func (b *ConfigMapApplyConfiguration) WithBinaryData(entries map[string][]byte) 
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ConfigMapApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

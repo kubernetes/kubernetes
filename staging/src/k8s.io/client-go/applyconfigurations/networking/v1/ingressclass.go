@@ -245,3 +245,9 @@ func (b *IngressClassApplyConfiguration) WithSpec(value *IngressClassSpecApplyCo
 	b.Spec = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *IngressClassApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

@@ -261,3 +261,9 @@ func (b *RoleBindingApplyConfiguration) WithRoleRef(value *RoleRefApplyConfigura
 	b.RoleRef = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RoleBindingApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

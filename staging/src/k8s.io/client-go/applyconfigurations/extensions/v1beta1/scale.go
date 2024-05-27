@@ -216,3 +216,9 @@ func (b *ScaleApplyConfiguration) WithStatus(value v1beta1.ScaleStatus) *ScaleAp
 	b.Status = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ScaleApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

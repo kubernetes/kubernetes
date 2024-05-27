@@ -252,3 +252,9 @@ func (b *EndpointsApplyConfiguration) WithSubsets(values ...*EndpointSubsetApply
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *EndpointsApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

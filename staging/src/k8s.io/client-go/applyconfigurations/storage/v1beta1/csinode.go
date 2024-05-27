@@ -245,3 +245,9 @@ func (b *CSINodeApplyConfiguration) WithSpec(value *CSINodeSpecApplyConfiguratio
 	b.Spec = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *CSINodeApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}
