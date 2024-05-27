@@ -2008,13 +2008,13 @@ metadata:
 			// replace multi spaces into single white space
 			eventsStr := strings.Join(strings.Fields(strings.TrimSpace(events)), " ")
 			if !strings.Contains(string(eventsStr), fmt.Sprintf("Normal Scheduled Pod/%s", podName)) {
-				framework.Failf("failed to list expected event")
+				framework.Failf("failed to list expected event with pod name: %s, got: %s", podName, events)
 			}
 
 			ginkgo.By("expect not showing any WARNING message except timeouts")
 			events = e2ekubectl.RunKubectlOrDie(ns, "events", "--types=WARNING", "--for=pod/"+podName)
 			if events != "" && !strings.Contains(events, "timed out") {
-				framework.Failf("unexpected WARNING event fired")
+				framework.Failf("unexpected non-timeout WARNING event fired, got: %s ", events)
 			}
 		})
 	})
