@@ -295,3 +295,16 @@ func (c *testTypes) ApplyStatus(ctx context.Context, testType *examplev1.TestTyp
 		Into(result)
 	return
 }
+
+// GetClusterTestType takes name of the testType, and returns the corresponding testType object, and an error if there is any.
+func (c *testTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
+	result = &v1.TestType{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("testtypes").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do(ctx).
+		Into(result)
+	return
+}
