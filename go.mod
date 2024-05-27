@@ -16,7 +16,7 @@ require (
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/blang/semver/v4 v4.0.0
-	github.com/container-storage-interface/spec v1.8.0
+	github.com/container-storage-interface/spec v1.9.0
 	github.com/containerd/cgroups v1.1.0
 	github.com/coredns/corefile-migration v1.0.21
 	github.com/coreos/go-oidc v2.2.1+incompatible
