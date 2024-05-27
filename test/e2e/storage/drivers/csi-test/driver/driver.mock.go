@@ -319,6 +319,14 @@ func (mr *MockControllerServerMockRecorder) ValidateVolumeCapabilities(arg0, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateVolumeCapabilities", reflect.TypeOf((*MockControllerServer)(nil).ValidateVolumeCapabilities), arg0, arg1)
 }
 
+func (m *MockControllerServer) ControllerModifyVolume(arg0 context.Context, arg1 *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ModifyVolume", arg0, arg1)
+	ret0, _ := ret[0].(*csi.ControllerModifyVolumeResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
 // MockNodeServer is a mock of NodeServer interface.
 type MockNodeServer struct {
 	ctrl     *gomock.Controller
