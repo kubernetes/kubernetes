@@ -364,3 +364,9 @@ func (b *EventApplyConfiguration) WithReportingInstance(value string) *EventAppl
 	b.ReportingInstance = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *EventApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

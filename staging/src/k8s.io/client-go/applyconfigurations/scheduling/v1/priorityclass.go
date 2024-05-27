@@ -273,3 +273,9 @@ func (b *PriorityClassApplyConfiguration) WithPreemptionPolicy(value corev1.Pree
 	b.PreemptionPolicy = &value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *PriorityClassApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

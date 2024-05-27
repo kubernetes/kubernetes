@@ -254,3 +254,9 @@ func (b *FlowSchemaApplyConfiguration) WithStatus(value *FlowSchemaStatusApplyCo
 	b.Status = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *FlowSchemaApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

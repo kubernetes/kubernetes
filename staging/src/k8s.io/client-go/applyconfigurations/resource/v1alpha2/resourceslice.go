@@ -263,3 +263,9 @@ func (b *ResourceSliceApplyConfiguration) WithNamedResources(value *NamedResourc
 	b.NamedResources = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ResourceSliceApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

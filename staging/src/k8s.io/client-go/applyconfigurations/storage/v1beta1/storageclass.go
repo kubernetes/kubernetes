@@ -314,3 +314,9 @@ func (b *StorageClassApplyConfiguration) WithAllowedTopologies(values ...*applyc
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *StorageClassApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

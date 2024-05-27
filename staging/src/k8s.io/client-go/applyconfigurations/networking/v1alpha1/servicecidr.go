@@ -254,3 +254,9 @@ func (b *ServiceCIDRApplyConfiguration) WithStatus(value *ServiceCIDRStatusApply
 	b.Status = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ServiceCIDRApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

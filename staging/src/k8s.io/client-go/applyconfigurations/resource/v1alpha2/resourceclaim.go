@@ -256,3 +256,9 @@ func (b *ResourceClaimApplyConfiguration) WithStatus(value *ResourceClaimStatusA
 	b.Status = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ResourceClaimApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

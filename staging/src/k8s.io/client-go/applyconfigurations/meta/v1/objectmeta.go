@@ -169,3 +169,8 @@ func (b *ObjectMetaApplyConfiguration) WithFinalizers(values ...string) *ObjectM
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ObjectMetaApplyConfiguration) GetName() *string {
+	return b.Name
+}

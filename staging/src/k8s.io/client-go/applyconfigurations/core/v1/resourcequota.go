@@ -256,3 +256,9 @@ func (b *ResourceQuotaApplyConfiguration) WithStatus(value *ResourceQuotaStatusA
 	b.Status = value
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ResourceQuotaApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}

@@ -252,3 +252,9 @@ func (b *RoleApplyConfiguration) WithRules(values ...*PolicyRuleApplyConfigurati
 	}
 	return b
 }
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RoleApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
+}
