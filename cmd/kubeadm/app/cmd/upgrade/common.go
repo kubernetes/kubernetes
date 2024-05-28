@@ -53,9 +53,6 @@ import (
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
 func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, *kubeadmapi.UpgradeConfiguration, error) {
-	// Fetch the configuration from a file or ConfigMap and validate it
-	_, _ = printer.Printf("[upgrade/config] Making sure the configuration is correct:\n")
-
 	externalCfg := &v1beta4.UpgradeConfiguration{}
 	opt := configutil.LoadOrDefaultConfigurationOptions{}
 	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
@@ -63,7 +60,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/upgrade config] FATAL")
 	}
 
-	// `dryRun` should be always `false` for `kubeadm plan`.
+	// `dryRun` should be always be `false` for `kubeadm plan`.
 	isDryRun := ptr.To(false)
 	printConfigCfg := upgradeCfg.Plan.PrintConfig
 	ignoreErrCfg := upgradeCfg.Plan.IgnorePreflightErrors
@@ -99,15 +96,12 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, err
 	}
 
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, true)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, false)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			_, _ = printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			_, _ = printer.Printf("[upgrade/config] Next steps:\n")
-			_, _ = printer.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
-			_, _ = printer.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
-			_, _ = printer.Println()
-			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			_, _ = printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			_, _ = printer.Printf("[upgrade/config] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
+			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
