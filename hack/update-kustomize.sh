@@ -55,6 +55,7 @@ fi
 
 ./hack/update-vendor.sh
 ./hack/update-internal-modules.sh
+./hack/update-go-workspace.sh
 ./hack/lint-dependencies.sh
 
 sed -i'' -e "s/const kustomizeVersion.*$/const kustomizeVersion = \"${LATEST_KUSTOMIZE}\"/" staging/src/k8s.io/kubectl/pkg/cmd/version/version.go
