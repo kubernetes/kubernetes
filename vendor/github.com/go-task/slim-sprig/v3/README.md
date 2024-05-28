@@ -1,4 +1,4 @@
-# Slim-Sprig: Template functions for Go templates [![GoDoc](https://godoc.org/github.com/go-task/slim-sprig?status.svg)](https://godoc.org/github.com/go-task/slim-sprig) [![Go Report Card](https://goreportcard.com/badge/github.com/go-task/slim-sprig)](https://goreportcard.com/report/github.com/go-task/slim-sprig)
+# Slim-Sprig: Template functions for Go templates [![Go Reference](https://pkg.go.dev/badge/github.com/go-task/slim-sprig/v3.svg)](https://pkg.go.dev/github.com/go-task/slim-sprig/v3)
 
 Slim-Sprig is a fork of [Sprig](https://github.com/Masterminds/sprig), but with
 all functions that depend on external (non standard library) or crypto packages
