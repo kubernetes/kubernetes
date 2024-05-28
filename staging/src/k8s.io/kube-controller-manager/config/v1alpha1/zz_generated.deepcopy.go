@@ -416,16 +416,6 @@ func (in *PersistentVolumeBinderControllerConfiguration) DeepCopyInto(out *Persi
 	*out = *in
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
 	in.VolumeConfiguration.DeepCopyInto(&out.VolumeConfiguration)
-	if in.VolumeHostCIDRDenylist != nil {
-		in, out := &in.VolumeHostCIDRDenylist, &out.VolumeHostCIDRDenylist
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.VolumeHostAllowLocalLoopback != nil {
-		in, out := &in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback
-		*out = new(bool)
-		**out = **in
-	}
 	return
 }
 
