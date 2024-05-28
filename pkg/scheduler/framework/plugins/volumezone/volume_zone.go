@@ -165,7 +165,21 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
 			return nil, s
 		}
-		podPVTopologies = append(podPVTopologies, pl.getPVTopologiesFromPV(logger, pv)...)
+
+		for _, key := range topologyLabels {
+			if value, ok := pv.ObjectMeta.Labels[key]; ok {
+				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
+				if err != nil {
+					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+					continue
+				}
+				podPVTopologies = append(podPVTopologies, pvTopology{
+					pvName: pv.Name,
+					key:    key,
+					values: sets.Set[string](volumeVSet),
+				})
+			}
+		}
 	}
 	return podPVTopologies, nil
 }
@@ -212,8 +226,33 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	}
 
 	node := nodeInfo.Node()
-	status, _ := pl.isSchedulableNode(logger, podPVTopologies, node, pod)
-	return status
+	hasAnyNodeConstraint := false
+	for _, topologyLabel := range topologyLabels {
+		if _, ok := node.Labels[topologyLabel]; ok {
+			hasAnyNodeConstraint = true
+			break
+		}
+	}
+
+	if !hasAnyNodeConstraint {
+		// The node has no zone constraints, so we're OK to schedule.
+		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
+		return nil
+	}
+
+	for _, pvTopology := range podPVTopologies {
+		v, ok := node.Labels[pvTopology.key]
+		if !ok {
+			// if we can't match the beta label, try to match pv's beta label with node's ga label
+			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
+		}
+		if !ok || !pvTopology.values.Has(v) {
+			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
+		}
+	}
+
+	return nil
 }
 
 func getStateData(cs *framework.CycleState) (*stateData, error) {
@@ -257,7 +296,7 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 		// A new pvc may make a pod schedulable.
-		// PVC's VolumeName is mutable if old PVC's volumeName is empty.
+		// Also, if pvc's VolumeName is filled, that also could make a pod schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
@@ -276,36 +315,6 @@ func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string 
 		pvcNames = append(pvcNames, pvcName)
 	}
 	return pvcNames
-}
-
-// isSchedulablerNode checks whether the node can schedule the pod.
-func (pl *VolumeZone) isSchedulableNode(logger klog.Logger, podPVTopologies []pvTopology, node *v1.Node, pod *v1.Pod) (*framework.Status, bool) {
-	hasAnyNodeConstraint := false
-	for _, topologyLabel := range topologyLabels {
-		if _, ok := node.Labels[topologyLabel]; ok {
-			hasAnyNodeConstraint = true
-			break
-		}
-	}
-
-	if !hasAnyNodeConstraint {
-		// The node has no zone constraints, so we're OK to schedule.
-		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
-		return nil, true
-	}
-
-	for _, pvTopology := range podPVTopologies {
-		v, ok := node.Labels[pvTopology.key]
-		if !ok {
-			// if we can't match the beta label, try to match pv's beta label with node's ga label
-			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
-		}
-		if !ok || !pvTopology.values.Has(v) {
-			logger.V(10).Info("Cannot schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict), false
-		}
-	}
-	return nil, true
 }
 
 // isSchedulableAfterPersistentVolumeClaimChange is invoked whenever a PersistentVolumeClaim added or updated.
@@ -334,12 +343,12 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.
 
 // checkPVCBindingToPodPV verifies if the PVC is bound to PV of a given Pod.
 func (pl *VolumeZone) checkPVCBindingToPodPV(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
-	if pvc == nil {
+	if (pvc == nil) || (pod.Namespace != pvc.Namespace) {
 		return false
 	}
 	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
 	for _, pvcName := range pvcNames {
-		if (pvc.Name != pvcName) || (pod.Namespace != pvc.Namespace) {
+		if pvc.Name != pvcName {
 			// pod's PVC doesn't match with the given PVC
 			continue
 		}
@@ -361,26 +370,6 @@ func (pl *VolumeZone) checkPVCBindingToPodPV(logger klog.Logger, pvc *v1.Persist
 
 	logger.V(5).Info("PVC doesn't match the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 	return false
-}
-
-// getPVTopologiesFromPV retrieves pvTopology from a given PV and returns the array
-func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
-	podPVTopologies := make([]pvTopology, 0)
-	for _, key := range topologyLabels {
-		if value, ok := pv.ObjectMeta.Labels[key]; ok {
-			volumeVSet, err := volumehelpers.LabelZonesToSet(value)
-			if err != nil {
-				logger.V(5).Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
-				continue
-			}
-			podPVTopologies = append(podPVTopologies, pvTopology{
-				pvName: pv.Name,
-				key:    key,
-				values: sets.Set[string](volumeVSet),
-			})
-		}
-	}
-	return podPVTopologies
 }
 
 // New initializes a new plugin and returns it.
