@@ -77,6 +77,22 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
+			name:                 "data consistency check won't be performed when Continuation was set",
+			requestOptions:       metav1.ListOptions{Continue: "fake continuation token"},
+			expectedListRequests: 0,
+		},
+
+		{
+			name: "data consistency check won't be performed when ResourceVersion was set to 0",
+			listResponse: &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "0"},
+				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
+			},
+			requestOptions:       metav1.ListOptions{},
+			expectedListRequests: 0,
+		},
+
+		{
 			name: "data consistency panics when data is inconsistent",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
@@ -99,6 +115,9 @@ func TestDataConsistencyChecker(t *testing.T) {
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			ctx := context.TODO()
+			if scenario.listResponse == nil {
+				scenario.listResponse = &v1.PodList{}
+			}
 			fakeLister := &listWrapper{response: scenario.listResponse}
 			retrievedItemsFunc := func() []*v1.Pod {
 				return scenario.retrievedItems
