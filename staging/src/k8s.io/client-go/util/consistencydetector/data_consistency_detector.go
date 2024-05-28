@@ -41,6 +41,10 @@ type ListFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOpt
 // we cannot manipulate the environmental variable because
 // it will affect other tests in this package.
 func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn ListFunc[T], listOptions metav1.ListOptions, retrieveItemsFn RetrieveItemsFunc[U]) {
+	if !canFormAdditionalListCall(lastSyncedResourceVersion, listOptions) {
+		klog.V(4).Infof("data consistency check for %s is enabled but the parameters (RV, ListOptions) doesn't allow for creating a valid LIST request. Skipping the data consistency check.", identity)
+		return
+	}
 	klog.Warningf("data consistency check for %s is enabled, this will result in an additional call to the API server.", identity)
 	listOptions.ResourceVersion = lastSyncedResourceVersion
 	listOptions.ResourceVersionMatch = metav1.ResourceVersionMatchExact
@@ -77,6 +81,26 @@ func CheckDataConsistency[T runtime.Object, U any](ctx context.Context, identity
 		msg := fmt.Sprintf("data inconsistency detected for %s, panicking!", identity)
 		panic(msg)
 	}
+}
+
+// canFormAdditionalListCall ensures that we can form a valid LIST requests
+// for checking data consistency.
+func canFormAdditionalListCall(resourceVersion string, options metav1.ListOptions) bool {
+	// since we are setting ResourceVersionMatch to metav1.ResourceVersionMatchExact
+	// we need to make sure that the continuation hasn't been set
+	// https://github.com/kubernetes/kubernetes/blob/be4afb9ef90b19ccb6f7e595cbdb247e088b2347/staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion/validation/validation.go#L38
+	if len(options.Continue) > 0 {
+		return false
+	}
+
+	// since we are setting ResourceVersionMatch to metav1.ResourceVersionMatchExact
+	// we need to make sure that the RV is valid because the validation code forbids RV == "0"
+	// https://github.com/kubernetes/kubernetes/blob/be4afb9ef90b19ccb6f7e595cbdb247e088b2347/staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion/validation/validation.go#L44
+	if resourceVersion == "0" {
+		return false
+	}
+
+	return true
 }
 
 type byUID []metav1.Object
