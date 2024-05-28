@@ -120,22 +120,6 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 	return nil, nil
 }
 
-// isWaitForFirstConsumer confirms whether storageClass's volumeBindingMode is VolumeBindingWaitForFirstConsumer or not.
-func (pl *VolumeZone) isWaitForFirstConsumer(scName string) (bool, *framework.Status) {
-	class, err := pl.scLister.Get(scName)
-	if s := getErrorAsStatus(err); !s.IsSuccess() {
-		return false, s
-	}
-	if class.VolumeBindingMode == nil {
-		return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
-	}
-	if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-		// Return true because volumeBindingMode of storageClass is VolumeBindingWaitForFirstConsumer.
-		return true, nil
-	}
-	return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
-}
-
 // getPVbyPod gets PVTopology from pod
 func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
 	podPVTopologies := make([]pvTopology, 0)
@@ -156,11 +140,20 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 			if len(scName) == 0 {
 				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
-			isWait, status := pl.isWaitForFirstConsumer(scName)
-			if !isWait {
-				return nil, status
+
+			class, err := pl.scLister.Get(scName)
+			if s := getErrorAsStatus(err); !s.IsSuccess() {
+				return nil, s
 			}
-			continue
+			if class.VolumeBindingMode == nil {
+				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+			}
+			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+				// Skip unbound volumes
+				continue
+			}
+
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
@@ -214,8 +207,33 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	}
 
 	node := nodeInfo.Node()
-	status, _ := pl.isSchedulableNode(logger, podPVTopologies, node, pod)
-	return status
+	hasAnyNodeConstraint := false
+	for _, topologyLabel := range topologyLabels {
+		if _, ok := node.Labels[topologyLabel]; ok {
+			hasAnyNodeConstraint = true
+			break
+		}
+	}
+
+	if !hasAnyNodeConstraint {
+		// The node has no zone constraints, so we're OK to schedule.
+		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
+		return nil
+	}
+
+	for _, pvTopology := range podPVTopologies {
+		v, ok := node.Labels[pvTopology.key]
+		if !ok {
+			// if we can't match the beta label, try to match pv's beta label with node's ga label
+			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
+		}
+		if !ok || !pvTopology.values.Has(v) {
+			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
+		}
+	}
+
+	return nil
 }
 
 func getStateData(cs *framework.CycleState) (*stateData, error) {
@@ -278,36 +296,6 @@ func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string 
 		pvcNames = append(pvcNames, pvcName)
 	}
 	return pvcNames
-}
-
-// isSchedulablerNode checks whether the node can schedule the pod.
-func (pl *VolumeZone) isSchedulableNode(logger klog.Logger, podPVTopologies []pvTopology, node *v1.Node, pod *v1.Pod) (*framework.Status, bool) {
-	hasAnyNodeConstraint := false
-	for _, topologyLabel := range topologyLabels {
-		if _, ok := node.Labels[topologyLabel]; ok {
-			hasAnyNodeConstraint = true
-			break
-		}
-	}
-
-	if !hasAnyNodeConstraint {
-		// The node has no zone constraints, so we're OK to schedule.
-		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
-		return nil, true
-	}
-
-	for _, pvTopology := range podPVTopologies {
-		v, ok := node.Labels[pvTopology.key]
-		if !ok {
-			// if we can't match the beta label, try to match pv's beta label with node's ga label
-			v, ok = node.Labels[translateToGALabel(pvTopology.key)]
-		}
-		if !ok || !pvTopology.values.Has(v) {
-			logger.V(10).Info("Cannot schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict), false
-		}
-	}
-	return nil, true
 }
 
 // isSchedulableAfterPersistentVolumeChange is invoked whenever a PersistentVolume added or updated.
