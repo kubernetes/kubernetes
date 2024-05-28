@@ -651,7 +651,9 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 	}
 
 	if len(buf) > 1 {
-		return []error{errors.New("swap is supported for cgroup v2 only; the NodeSwap feature gate of the kubelet is beta but disabled by default")}, nil
+		return []error{errors.New("swap is supported for cgroup v2 only. " +
+			"The kubelet must be properly configured to use swap. Please refer to https://kubernetes.io/docs/concepts/architecture/nodes/#swap-memory, " +
+			"or disable swap on the node")}, nil
 	}
 
 	return nil, nil
