@@ -400,10 +400,10 @@ func TestControllerSyncJob(t *testing.T) {
 			backoffLimit:            6,
 			activePods:              2,
 			failedPods:              0,
-			terminatingPods:         4,
+			terminatingPods:         5,
 			podReplacementPolicy:    podReplacementPolicy(batch.Failed),
 			jobPodReplacementPolicy: true,
-			expectedTerminating:     ptr.To[int32](4),
+			expectedTerminating:     ptr.To[int32](6),
 			expectedReady:           ptr.To[int32](0),
 			expectedActive:          1,
 			expectedDeletions:       1,
@@ -3640,7 +3640,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  1,
 				Succeeded:               1,
-				Terminating:             ptr.To[int32](0),
+				Terminating:             ptr.To[int32](2),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
@@ -3697,7 +3697,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  1,
 				Succeeded:               1,
-				Terminating:             ptr.To[int32](0),
+				Terminating:             ptr.To[int32](1),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
@@ -3746,7 +3746,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  1,
 				Succeeded:               1,
-				Terminating:             ptr.To[int32](0),
+				Terminating:             ptr.To[int32](1),
 				CompletedIndexes:        "1",
 				FailedIndexes:           ptr.To(""),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
@@ -3868,7 +3868,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  1,
 				Succeeded:               1,
-				Terminating:             ptr.To[int32](0),
+				Terminating:             ptr.To[int32](2),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
@@ -3931,7 +3931,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  2,
 				Succeeded:               1,
-				Terminating:             ptr.To[int32](0),
+				Terminating:             ptr.To[int32](1),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
@@ -4761,7 +4761,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			wantStatus: batch.JobStatus{
 				Failed:                  3,
 				Succeeded:               1,
-				Terminating:             ptr.To[int32](0),
+				Terminating:             ptr.To[int32](1),
 				FailedIndexes:           ptr.To("0,2"),
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
