@@ -18,6 +18,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=infrastructures,scope=Cluster
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
 type Infrastructure struct {
 	metav1.TypeMeta `json:",inline"`
 

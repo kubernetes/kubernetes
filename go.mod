@@ -51,10 +51,10 @@ require (
 	github.com/onsi/gomega v1.31.0
 	github.com/opencontainers/runc v1.1.12
 	github.com/opencontainers/selinux v1.11.0
-	github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
-	github.com/openshift/apiserver-library-go v0.0.0-20240522092531-e30326329813
-	github.com/openshift/client-go v0.0.0-20240521210225-1a8f9bfc8107
-	github.com/openshift/library-go v0.0.0-20240522085517-46b9cb74daa4
+	github.com/openshift/api v0.0.0-20240527133614-ba11c1587003
+	github.com/openshift/apiserver-library-go v0.0.0-20240528110119-d099d1006d9d
+	github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
+	github.com/openshift/library-go v0.0.0-20240528102242-9c194599a149
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.16.0
@@ -93,16 +93,16 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.30.0
-	k8s.io/apiextensions-apiserver v0.30.0
-	k8s.io/apimachinery v0.30.0
-	k8s.io/apiserver v0.30.0
+	k8s.io/api v0.30.1
+	k8s.io/apiextensions-apiserver v0.30.1
+	k8s.io/apimachinery v0.30.1
+	k8s.io/apiserver v0.30.1
 	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.30.0
+	k8s.io/client-go v0.30.1
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/cluster-bootstrap v0.0.0
-	k8s.io/code-generator v0.30.0
-	k8s.io/component-base v0.30.0
+	k8s.io/code-generator v0.30.1
+	k8s.io/component-base v0.30.1
 	k8s.io/component-helpers v0.29.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/cri-api v0.0.0
@@ -110,8 +110,8 @@ require (
 	k8s.io/dynamic-resource-allocation v0.0.0
 	k8s.io/endpointslice v0.0.0
 	k8s.io/klog/v2 v2.120.1
-	k8s.io/kms v0.30.0
-	k8s.io/kube-aggregator v0.30.0
+	k8s.io/kms v0.30.1
+	k8s.io/kube-aggregator v0.30.1
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
 	k8s.io/kube-proxy v0.0.0
@@ -245,7 +245,7 @@ require (
 )
 
 replace (
-	github.com/onsi/ginkgo/v2 => github.com/soltysh/ginkgo/v2 v2.1.5-0.20240209144154-7bbda43b8ce6
+	github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240314173009-2cd07f4ca53d
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

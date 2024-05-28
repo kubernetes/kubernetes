@@ -19,6 +19,7 @@ import (
 // +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/470
 // +openshift:file-pattern=cvoRunLevel=0000_03,operatorName=config-operator,operatorOrdering=01
 // +openshift:compatibility-gen:level=1
+// +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
 type ClusterResourceQuota struct {
 	metav1.TypeMeta `json:",inline"`
 

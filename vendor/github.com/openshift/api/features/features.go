@@ -472,7 +472,7 @@ var (
 						reportProblemsToJiraComponent("Storage / Kubernetes External Components").
 						contactPerson("rbednar").
 						productScope(ocpSpecific).
-						enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
+						enableIn(configv1.Default, configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 						mustRegister()
 
 	FeatureGateClusterAPIInstallAWS = newFeatureGate("ClusterAPIInstallAWS").
@@ -535,4 +535,10 @@ var (
 				productScope(ocpSpecific).
 				enableIn(configv1.DevPreviewNoUpgrade, configv1.TechPreviewNoUpgrade).
 				mustRegister()
+
+	FeatureGateMachineAPIMigration = newFeatureGate("MachineAPIMigration").
+					reportProblemsToJiraComponent("OCPCLOUD").
+					contactPerson("jspeed").
+					productScope(ocpSpecific).
+					mustRegister()
 )

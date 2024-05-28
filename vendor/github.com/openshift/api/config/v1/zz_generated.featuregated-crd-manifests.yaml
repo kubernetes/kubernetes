@@ -1,5 +1,6 @@
 apiservers.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: apiservers.config.openshift.io
   Capability: ""
@@ -20,7 +21,8 @@ apiservers.config.openshift.io:
   Version: v1
 
 authentications.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: authentications.config.openshift.io
   Capability: ""
@@ -144,7 +146,8 @@ clusterversions.config.openshift.io:
   Version: v1
 
 consoles.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: consoles.config.openshift.io
   Capability: ""
@@ -165,7 +168,8 @@ consoles.config.openshift.io:
   Version: v1
 
 dnses.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: dnses.config.openshift.io
   Capability: ""
@@ -186,7 +190,8 @@ dnses.config.openshift.io:
   Version: v1
 
 featuregates.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: featuregates.config.openshift.io
   Capability: ""
@@ -207,7 +212,8 @@ featuregates.config.openshift.io:
   Version: v1
 
 images.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: images.config.openshift.io
   Capability: ""
@@ -228,7 +234,8 @@ images.config.openshift.io:
   Version: v1
 
 imagecontentpolicies.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/874
   CRDName: imagecontentpolicies.config.openshift.io
   Capability: ""
@@ -249,7 +256,8 @@ imagecontentpolicies.config.openshift.io:
   Version: v1
 
 imagedigestmirrorsets.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/1126
   CRDName: imagedigestmirrorsets.config.openshift.io
   Capability: ""
@@ -271,7 +279,8 @@ imagedigestmirrorsets.config.openshift.io:
   Version: v1
 
 imagetagmirrorsets.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/1126
   CRDName: imagetagmirrorsets.config.openshift.io
   Capability: ""
@@ -293,7 +302,8 @@ imagetagmirrorsets.config.openshift.io:
   Version: v1
 
 infrastructures.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: infrastructures.config.openshift.io
   Capability: ""
@@ -319,7 +329,8 @@ infrastructures.config.openshift.io:
   Version: v1
 
 ingresses.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: ingresses.config.openshift.io
   Capability: ""
@@ -340,7 +351,8 @@ ingresses.config.openshift.io:
   Version: v1
 
 networks.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: networks.config.openshift.io
   Capability: ""
@@ -363,7 +375,8 @@ networks.config.openshift.io:
   Version: v1
 
 nodes.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/1107
   CRDName: nodes.config.openshift.io
   Capability: ""
@@ -384,7 +397,8 @@ nodes.config.openshift.io:
   Version: v1
 
 oauths.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: oauths.config.openshift.io
   Capability: ""
@@ -426,7 +440,8 @@ operatorhubs.config.openshift.io:
   Version: v1
 
 projects.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: projects.config.openshift.io
   Capability: ""
@@ -447,7 +462,8 @@ projects.config.openshift.io:
   Version: v1
 
 proxies.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: proxies.config.openshift.io
   Capability: ""
@@ -468,7 +484,8 @@ proxies.config.openshift.io:
   Version: v1
 
 schedulers.config.openshift.io:
-  Annotations: {}
+  Annotations:
+    release.openshift.io/bootstrap-required: "true"
   ApprovedPRNumber: https://github.com/openshift/api/pull/470
   CRDName: schedulers.config.openshift.io
   Capability: ""

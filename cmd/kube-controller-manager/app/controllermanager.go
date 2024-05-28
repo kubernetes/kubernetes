@@ -625,7 +625,9 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	// Informer transform to trim ManagedFields for memory efficiency.
 	trim := func(obj interface{}) (interface{}, error) {
 		if accessor, err := meta.Accessor(obj); err == nil {
-			accessor.SetManagedFields(nil)
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
 		}
 		return obj, nil
 	}

@@ -18,6 +18,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=ingresses,scope=Cluster
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
 type Ingress struct {
 	metav1.TypeMeta `json:",inline"`
 

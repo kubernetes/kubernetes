@@ -37,6 +37,7 @@ var AllowAllCapabilities corev1.Capability = "*"
 // +kubebuilder:printcolumn:name="Volumes",type=string,JSONPath=.volumes,description="White list of allowed volume plugins"
 // +kubebuilder:singular=securitycontextconstraint
 // +openshift:compatibility-gen:level=1
+// +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
 type SecurityContextConstraints struct {
 	metav1.TypeMeta `json:",inline"`
 

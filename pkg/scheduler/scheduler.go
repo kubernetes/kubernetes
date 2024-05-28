@@ -549,7 +549,9 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 	// The Extract workflow (i.e. `ExtractPod`) should be unused.
 	trim := func(obj interface{}) (interface{}, error) {
 		if accessor, err := meta.Accessor(obj); err == nil {
-			accessor.SetManagedFields(nil)
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
 		}
 		return obj, nil
 	}

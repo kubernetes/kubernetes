@@ -441,13 +441,16 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 // filter plugins and filter extenders.
 func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*framework.NodeInfo, framework.Diagnosis, error) {
 	logger := klog.FromContext(ctx)
-	diagnosis := framework.Diagnosis{
-		NodeToStatusMap: make(framework.NodeToStatusMap),
-	}
 
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
-		return nil, diagnosis, err
+		return nil, framework.Diagnosis{
+			NodeToStatusMap: make(framework.NodeToStatusMap),
+		}, err
+	}
+
+	diagnosis := framework.Diagnosis{
+		NodeToStatusMap: make(framework.NodeToStatusMap, len(allNodes)),
 	}
 	// Run "prefilter" plugins.
 	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
