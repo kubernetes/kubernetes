@@ -53,6 +53,7 @@ message AppliedClusterResourceQuotaList {
 // +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/470
 // +openshift:file-pattern=cvoRunLevel=0000_03,operatorName=config-operator,operatorOrdering=01
 // +openshift:compatibility-gen:level=1
+// +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
 message ClusterResourceQuota {
   // metadata is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

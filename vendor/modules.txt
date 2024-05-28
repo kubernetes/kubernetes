@@ -522,7 +522,7 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.15.0 => github.com/soltysh/ginkgo/v2 v2.1.5-0.20240209144154-7bbda43b8ce6
+# github.com/onsi/ginkgo/v2 v2.15.0 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240314173009-2cd07f4ca53d
 ## explicit; go 1.20
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -599,7 +599,7 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalkdir
-# github.com/openshift/api v0.0.0-20240521185306-0314f31e7774
+# github.com/openshift/api v0.0.0-20240527133614-ba11c1587003
 ## explicit; go 1.22.0
 github.com/openshift/api/apiserver/v1
 github.com/openshift/api/apps/v1
@@ -625,7 +625,7 @@ github.com/openshift/api/security
 github.com/openshift/api/security/v1
 github.com/openshift/api/template/v1
 github.com/openshift/api/user/v1
-# github.com/openshift/apiserver-library-go v0.0.0-20240522092531-e30326329813
+# github.com/openshift/apiserver-library-go v0.0.0-20240528110119-d099d1006d9d
 ## explicit; go 1.22.0
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/v1
@@ -646,7 +646,7 @@ github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sysctl
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort
-# github.com/openshift/client-go v0.0.0-20240521210225-1a8f9bfc8107
+# github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
 ## explicit; go 1.22.0
 github.com/openshift/client-go/apiserver/applyconfigurations/apiserver/v1
 github.com/openshift/client-go/apiserver/applyconfigurations/internal
@@ -790,7 +790,7 @@ github.com/openshift/client-go/user/informers/externalversions/internalinterface
 github.com/openshift/client-go/user/informers/externalversions/user
 github.com/openshift/client-go/user/informers/externalversions/user/v1
 github.com/openshift/client-go/user/listers/user/v1
-# github.com/openshift/library-go v0.0.0-20240522085517-46b9cb74daa4
+# github.com/openshift/library-go v0.0.0-20240528102242-9c194599a149
 ## explicit; go 1.22.0
 github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
 github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
@@ -1419,25 +1419,25 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.30.0 => ./staging/src/k8s.io/api
+# k8s.io/api v0.30.1 => ./staging/src/k8s.io/api
 ## explicit; go 1.22.0
-# k8s.io/apiextensions-apiserver v0.30.0 => ./staging/src/k8s.io/apiextensions-apiserver
+# k8s.io/apiextensions-apiserver v0.30.1 => ./staging/src/k8s.io/apiextensions-apiserver
 ## explicit; go 1.22.0
-# k8s.io/apimachinery v0.30.0 => ./staging/src/k8s.io/apimachinery
+# k8s.io/apimachinery v0.30.1 => ./staging/src/k8s.io/apimachinery
 ## explicit; go 1.22.0
-# k8s.io/apiserver v0.30.0 => ./staging/src/k8s.io/apiserver
+# k8s.io/apiserver v0.30.1 => ./staging/src/k8s.io/apiserver
 ## explicit; go 1.22.0
 # k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime
 ## explicit; go 1.22.0
-# k8s.io/client-go v0.30.0 => ./staging/src/k8s.io/client-go
+# k8s.io/client-go v0.30.1 => ./staging/src/k8s.io/client-go
 ## explicit; go 1.22.0
 # k8s.io/cloud-provider v0.0.0 => ./staging/src/k8s.io/cloud-provider
 ## explicit; go 1.22.0
 # k8s.io/cluster-bootstrap v0.0.0 => ./staging/src/k8s.io/cluster-bootstrap
 ## explicit; go 1.22.0
-# k8s.io/code-generator v0.30.0 => ./staging/src/k8s.io/code-generator
+# k8s.io/code-generator v0.30.1 => ./staging/src/k8s.io/code-generator
 ## explicit; go 1.22.0
-# k8s.io/component-base v0.30.0 => ./staging/src/k8s.io/component-base
+# k8s.io/component-base v0.30.1 => ./staging/src/k8s.io/component-base
 ## explicit; go 1.22.0
 # k8s.io/component-helpers v0.29.0 => ./staging/src/k8s.io/component-helpers
 ## explicit; go 1.22.0
@@ -1472,9 +1472,9 @@ k8s.io/klog/v2/ktesting
 k8s.io/klog/v2/ktesting/init
 k8s.io/klog/v2/test
 k8s.io/klog/v2/textlogger
-# k8s.io/kms v0.30.0 => ./staging/src/k8s.io/kms
+# k8s.io/kms v0.30.1 => ./staging/src/k8s.io/kms
 ## explicit; go 1.22.0
-# k8s.io/kube-aggregator v0.30.0 => ./staging/src/k8s.io/kube-aggregator
+# k8s.io/kube-aggregator v0.30.1 => ./staging/src/k8s.io/kube-aggregator
 ## explicit; go 1.22.0
 # k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
 ## explicit; go 1.22.0
@@ -1662,4 +1662,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/onsi/ginkgo/v2 => github.com/soltysh/ginkgo/v2 v2.1.5-0.20240209144154-7bbda43b8ce6
+# github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20240314173009-2cd07f4ca53d

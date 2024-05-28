@@ -18,6 +18,7 @@ import (
 // +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=config-operator,operatorOrdering=01
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=networks,scope=Cluster
+// +kubebuilder:metadata:annotations=release.openshift.io/bootstrap-required=true
 type Network struct {
 	metav1.TypeMeta `json:",inline"`
 
