@@ -149,7 +149,7 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 	return a.registeredHandlePaths
 }
 
-// ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
+// ListenAndServeKubeletServer initializes a server to respond to HTTPS network requests on the Kubelet.
 func ListenAndServeKubeletServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
