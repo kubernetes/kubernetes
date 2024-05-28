@@ -204,27 +204,27 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 
 	// We wrap this block in a func so we can defer c.workqueue.Done.
-	err := func(key string) error {
+	err := func() error {
 		// We call Done here so the workqueue knows we have finished
 		// processing this item. We also must remember to call Forget if we
 		// do not want this work item being re-queued. For example, we do
 		// not call Forget if a transient error occurs, instead the item is
 		// put back on the workqueue and attempted again after a back-off
 		// period.
-		defer c.workqueue.Done(key)
+		defer c.workqueue.Done(obj)
 		// Run the syncHandler, passing it the namespace/name string of the
 		// Foo resource to be synced.
-		if err := c.syncHandler(ctx, key); err != nil {
+		if err := c.syncHandler(ctx, obj); err != nil {
 			// Put the item back on the workqueue to handle any transient errors.
-			c.workqueue.AddRateLimited(key)
-			return fmt.Errorf("error syncing '%s': %s, requeuing", key, err.Error())
+			c.workqueue.AddRateLimited(obj)
+			return fmt.Errorf("error syncing '%s': %s, requeuing", obj, err.Error())
 		}
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queued again until another change happens.
 		c.workqueue.Forget(obj)
-		logger.Info("Successfully synced", "resourceName", key)
+		logger.Info("Successfully synced", "resourceName", obj)
 		return nil
-	}(obj)
+	}()
 
 	if err != nil {
 		utilruntime.HandleError(err)
