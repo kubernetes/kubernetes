@@ -264,7 +264,7 @@ func (plugin *localVolumePlugin) ConstructBlockVolumeSpec(podUID types.UID, volu
 }
 
 func (plugin *localVolumePlugin) generateBlockDeviceBaseGlobalPath() string {
-	return filepath.Join(plugin.host.GetPluginDir(localVolumePluginName), util.MountsInGlobalPDPath)
+	return filepath.Join(plugin.host.GetPluginDir(localVolumePluginName), "mounts")
 }
 
 func (plugin *localVolumePlugin) getGlobalLocalPath(spec *volume.Spec) (string, error) {
