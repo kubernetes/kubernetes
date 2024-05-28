@@ -899,6 +899,9 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			jobCtx.finishedCondition = nil
 		}
 		active -= deleted
+		if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+			*jobCtx.terminating += deleted
+		}
 		manageJobErr = err
 	} else {
 		manageJobCalled := false
@@ -1504,6 +1507,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		jm.expectations.ExpectDeletions(logger, jobKey, len(podsToDelete))
 		removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
+		if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+			*jobCtx.terminating += removed
+		}
 		return active, metrics.JobSyncActionPodsDeleted, err
 	}
 
@@ -1553,6 +1559,9 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 		logger.V(4).Info("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", wantActive)
 		removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
+		if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+			*jobCtx.terminating += removed
+		}
 		// While it is possible for a Job to require both pod creations and
 		// deletions at the same time (e.g. indexed Jobs with repeated indexes), we
 		// restrict ourselves to either just pod deletion or pod creation in any
