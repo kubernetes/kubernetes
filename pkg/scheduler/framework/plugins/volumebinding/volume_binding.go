@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -117,10 +119,35 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add | framework.Update}},
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
-		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIDriverChange},
 		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}},
 	}
 	return events
+}
+
+func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, modifiedCSIDriver, err := util.As[*storagev1.CSIDriver](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"CSIDriver", klog.KObj(modifiedCSIDriver),
+	)
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.CSI != nil || vol.CSI.Driver != modifiedCSIDriver.Name {
+			continue
+		}
+		driverSpec := modifiedCSIDriver.Spec
+		if driverSpec.StorageCapacity != nil && *driverSpec.StorageCapacity {
+			return framework.Queue, err
+		}
+	}
+
+	return framework.QueueSkip, nil
 }
 
 // podHasPVCs returns 2 values:
