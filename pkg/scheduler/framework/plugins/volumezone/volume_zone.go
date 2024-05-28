@@ -118,22 +118,6 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 	return nil, nil
 }
 
-// isWaitForFirstConsumer confirms whether storageClass's volumeBindingMode is VolumeBindingWaitForFirstConsumer or not.
-func (pl *VolumeZone) isWaitForFirstConsumer(scName string) (bool, *framework.Status) {
-	class, err := pl.scLister.Get(scName)
-	if s := getErrorAsStatus(err); !s.IsSuccess() {
-		return false, s
-	}
-	if class.VolumeBindingMode == nil {
-		return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
-	}
-	if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-		// Return true because volumeBindingMode of storageClass is VolumeBindingWaitForFirstConsumer.
-		return true, nil
-	}
-	return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
-}
-
 // getPVbyPod gets PVTopology from pod
 func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
 	podPVTopologies := make([]pvTopology, 0)
@@ -154,18 +138,40 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 			if len(scName) == 0 {
 				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
-			isWait, status := pl.isWaitForFirstConsumer(scName)
-			if !isWait {
-				return nil, status
+
+			class, err := pl.scLister.Get(scName)
+			if s := getErrorAsStatus(err); !s.IsSuccess() {
+				return nil, s
 			}
-			continue
+			if class.VolumeBindingMode == nil {
+				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+			}
+			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+				// Skip unbound volumes
+				continue
+			}
+
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
 			return nil, s
 		}
-		podPVTopologies = append(podPVTopologies, pl.getPVTopologiesFromPV(logger, pv)...)
+		for _, key := range topologyLabels {
+			if value, ok := pv.ObjectMeta.Labels[key]; ok {
+				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
+				if err != nil {
+					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+					continue
+				}
+				podPVTopologies = append(podPVTopologies, pvTopology{
+					pvName: pv.Name,
+					key:    key,
+					values: sets.Set[string](volumeVSet),
+				})
+			}
+		}
 	}
 	return podPVTopologies, nil
 }
@@ -336,26 +342,6 @@ func (pl *VolumeZone) isSchedulableNode(logger klog.Logger, podPVTopologies []pv
 		}
 	}
 	return nil, true
-}
-
-// getPVTopologiesFromPV retrieves pvTopology from a given PV and returns the array
-func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
-	podPVTopologies := make([]pvTopology, 0)
-	for _, key := range topologyLabels {
-		if value, ok := pv.ObjectMeta.Labels[key]; ok {
-			volumeVSet, err := volumehelpers.LabelZonesToSet(value)
-			if err != nil {
-				logger.V(5).Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
-				continue
-			}
-			podPVTopologies = append(podPVTopologies, pvTopology{
-				pvName: pv.Name,
-				key:    key,
-				values: sets.Set[string](volumeVSet),
-			})
-		}
-	}
-	return podPVTopologies
 }
 
 // New initializes a new plugin and returns it.
