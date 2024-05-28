@@ -220,7 +220,8 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 	kind := s.Scope.Kind
 	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer)
-	ch := s.Watching.ResultChan()
+	resultCh := s.Watching.ResultChan()
+	defer s.Watching.Stop()
 	done := req.Context().Done()
 
 	for {
@@ -238,7 +239,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-ch:
+		case event, ok := <-resultCh:
 			if !ok {
 				// End of results.
 				return
@@ -252,7 +253,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			if len(ch) == 0 {
+			if len(resultCh) == 0 {
 				flusher.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
@@ -289,7 +290,8 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 
 	kind := s.Scope.Kind
 	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer)
-	ch := s.Watching.ResultChan()
+	resultCh := s.Watching.ResultChan()
+	defer s.Watching.Stop()
 
 	for {
 		select {
@@ -297,7 +299,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-ch:
+		case event, ok := <-resultCh:
 			if !ok {
 				// End of results.
 				return

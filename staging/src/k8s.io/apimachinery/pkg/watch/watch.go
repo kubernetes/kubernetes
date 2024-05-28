@@ -114,6 +114,7 @@ func (f *FakeWatcher) Stop() {
 	defer f.Unlock()
 	if !f.stopped {
 		klog.V(4).Infof("Stopping fake watcher.")
+		// TODO: make the producer close the result channel after confirming that cleanup is complete
 		close(f.result)
 		f.stopped = true
 	}
@@ -321,4 +322,22 @@ func (pw *ProxyWatcher) ResultChan() <-chan Event {
 // StopChan returns stop channel
 func (pw *ProxyWatcher) StopChan() <-chan struct{} {
 	return pw.stopCh
+}
+
+// MockWatcher implements watch.Interface with mockable functions.
+type MockWatcher struct {
+	StopFunc       func()
+	ResultChanFunc func() <-chan Event
+}
+
+var _ Interface = &MockWatcher{}
+
+// Stop calls StopFunc
+func (mw MockWatcher) Stop() {
+	mw.StopFunc()
+}
+
+// ResultChan calls ResultChanFunc
+func (mw MockWatcher) ResultChan() <-chan Event {
+	return mw.ResultChanFunc()
 }

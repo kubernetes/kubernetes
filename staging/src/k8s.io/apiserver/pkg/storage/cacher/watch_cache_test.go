@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,7 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -276,7 +277,8 @@ func TestEvents(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error too old")
 		}
-		if _, ok := err.(*errors.StatusError); !ok {
+		var statusErr *apierrors.StatusError
+		if !errors.As(err, &statusErr) {
 			t.Errorf("expected error to be of type StatusError")
 		}
 	}
@@ -615,7 +617,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 			}()
 
 			_, _, _, err := store.WaitUntilFreshAndList(ctx, 4, nil)
-			if !errors.IsTimeout(err) {
+			if !apierrors.IsTimeout(err) {
 				t.Errorf("expected timeout error but got: %v", err)
 			}
 			if !storage.IsTooLargeResourceVersion(err) {
