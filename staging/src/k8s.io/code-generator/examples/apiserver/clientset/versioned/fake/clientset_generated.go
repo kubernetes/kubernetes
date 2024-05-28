@@ -25,6 +25,8 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
 	clientset "k8s.io/code-generator/examples/apiserver/clientset/versioned"
+	corev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/core/v1"
+	fakecorev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/core/v1/fake"
 	examplev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/example/v1"
 	fakeexamplev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/example/v1/fake"
 	secondexamplev1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/example2/v1"
@@ -86,6 +88,11 @@ var (
 	_ clientset.Interface = &Clientset{}
 	_ testing.FakeClient  = &Clientset{}
 )
+
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() corev1.CoreV1Interface {
+	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
+}
 
 // ExampleV1 retrieves the ExampleV1Client
 func (c *Clientset) ExampleV1() examplev1.ExampleV1Interface {
