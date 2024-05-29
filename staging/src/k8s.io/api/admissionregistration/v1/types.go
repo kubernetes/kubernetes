@@ -137,6 +137,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
+
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 type ValidatingAdmissionPolicy struct {
 	metav1.TypeMeta `json:",inline"`
@@ -195,6 +196,7 @@ type ExpressionWarning struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
+
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
 type ValidatingAdmissionPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -713,6 +715,7 @@ type NamedRuleWithOperations struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
 type ValidatingWebhookConfiguration struct {
@@ -730,6 +733,7 @@ type ValidatingWebhookConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 
 // ValidatingWebhookConfigurationList is a list of ValidatingWebhookConfiguration.
 type ValidatingWebhookConfigurationList struct {
@@ -745,6 +749,7 @@ type ValidatingWebhookConfigurationList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
 type MutatingWebhookConfiguration struct {
@@ -762,6 +767,7 @@ type MutatingWebhookConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
 
 // MutatingWebhookConfigurationList is a list of MutatingWebhookConfiguration.
 type MutatingWebhookConfigurationList struct {

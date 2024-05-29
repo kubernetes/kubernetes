@@ -64,6 +64,7 @@ const (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // Job represents the configuration of a single job.
 type Job struct {
@@ -85,6 +86,7 @@ type Job struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // JobList is a collection of jobs.
 type JobList struct {
@@ -689,6 +691,7 @@ type JobTemplateSpec struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
@@ -710,6 +713,7 @@ type CronJob struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {

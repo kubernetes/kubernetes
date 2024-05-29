@@ -24,6 +24,7 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
 
 // PriorityClass defines mapping from a priority class name to the priority
 // integer value. The value can be any valid integer.
@@ -59,6 +60,7 @@ type PriorityClass struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
 
 // PriorityClassList is a collection of priority classes.
 type PriorityClassList struct {
