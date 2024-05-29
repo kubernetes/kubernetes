@@ -3014,7 +3014,7 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				GracePeriod: 10,
+				GracePeriod: 10, //ns
 			},
 			{ // hard
 				Signal:   evictionapi.SignalMemoryAvailable,
@@ -3029,7 +3029,6 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("600Mi", podStats)}
 	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
 	manager.killPodFunc = podKiller.killPodNowLongShutdown
-	fakeClock.Step(1 * time.Minute)
 
 	// first run doesn't meet the grace period
 	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
@@ -3041,7 +3040,7 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 	}
 
 	// now we meet the grace period of soft eviction
-	fakeClock.Step(1 * time.Minute)
+	fakeClock.Step(1 * time.Second)
 	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 	if err != nil {
 		t.Fatalf("Manager should not report any errors")
@@ -3059,7 +3058,7 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 	}
 
 	// pod is taking too long to shut down, but we are not at the hard eviction threshold level yet
-	fakeClock.Step(1 * time.Minute)
+	fakeClock.Step(1 * time.Second)
 	summaryProvider = &fakeSummaryProvider{result: summaryStatsMaker("550Mi", podStats)}
 	manager.summaryProvider = summaryProvider
 	podKiller.pod = nil
@@ -3072,7 +3071,124 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 	}
 
 	// pod is taking too long to shut down, now we are in the hard eviction threshold
-	fakeClock.Step(1 * time.Minute)
+	fakeClock.Step(1 * time.Second)
+	summaryProvider = &fakeSummaryProvider{result: summaryStatsMaker("400Mi", podStats)}
+	manager.summaryProvider = summaryProvider
+	podKiller.pod = nil
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not have an error %v", err)
+	}
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have chosen to kill a pod, but did not")
+	}
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	}
+	observedGracePeriod = *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(1) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+}
+
+// TestHardEvictPod verifies that the eviction manager will hard kill a pod once the threshold is reached
+func TestHardEvictPod(t *testing.T) {
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "this-one-soft-evicted", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "1Gi"},
+		{name: "this-one-hard-evicted", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "this-one-stays", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "100Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	podToEvict := pods[0]
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{ // soft
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+				GracePeriod: 10, //ns
+			},
+			{ // hard
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("500Mi"),
+				},
+				GracePeriod: 0,
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("600Mi", podStats)}
+	manager := newManagerImpl(fakeClock, podKiller.killPodNow, config, summaryProvider, nodeRef)
+	manager.killPodFunc = podKiller.killPodNowLongShutdown
+
+	// first run doesn't meet the grace period
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not report any errors")
+	}
+	if podKiller.pod != nil {
+		t.Fatalf("Manager should not have chosen to kill a pod, but it did: %v", podKiller.pod.Name)
+	}
+
+	// now we meet the grace period of soft eviction
+	fakeClock.Step(1 * time.Second)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
+	if err != nil {
+		t.Fatalf("Manager should not report any errors")
+	}
+
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have chosen to kill a pod, but did not")
+	}
+	if podKiller.pod != podToEvict {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
+	}
+	observedGracePeriod := *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(5) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 5, observedGracePeriod)
+	}
+
+	podsToMake = []podToMake{
+		{name: "this-one-soft-evicted", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "this-one-hard-evicted", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "1Gi"},
+		{name: "this-one-stays", priority: defaultPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), memoryWorkingSet: "100Mi"},
+	}
+	pods = []*v1.Pod{}
+	podStats = map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	podToEvict = pods[1]
+	activePodsFunc = func() []*v1.Pod {
+		return pods
+	}
+
+	// now we are in the hard eviction threshold, and a different pod is the worst offender, should be hard evicted
+	fakeClock.Step(1 * time.Second)
 	summaryProvider = &fakeSummaryProvider{result: summaryStatsMaker("400Mi", podStats)}
 	manager.summaryProvider = summaryProvider
 	podKiller.pod = nil
