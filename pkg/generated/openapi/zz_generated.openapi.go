@@ -17274,7 +17274,7 @@ func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.Op
 					},
 					"ready": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of pods which have a Ready condition.",
+							Description: "The number of active pods which have a Ready condition and are not terminating (without a deletionTimestamp).",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
