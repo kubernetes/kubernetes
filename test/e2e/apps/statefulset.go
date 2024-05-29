@@ -987,7 +987,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					"replicas": ssPatchReplicas,
 					"template": map[string]interface{}{
 						"spec": map[string]interface{}{
-							"TerminationGracePeriodSeconds": &one,
+							"terminationGracePeriodSeconds": &one,
 							"containers": [1]map[string]interface{}{{
 								"name":  ssName,
 								"image": ssPatchImage,
