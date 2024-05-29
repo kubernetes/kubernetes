@@ -80,6 +80,14 @@ func capabilitiesBaseline_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.Po
 	var badContainers []string
 	nonDefaultCapabilities := sets.NewString()
 	visitContainers(podSpec, func(container *corev1.Container) {
+		// Skip validation of capabilities if the pod is in a user namespace
+		// (and the "UserNamespacesPodSecurityStandards" feature gate is enabled).
+		// The baseline policy does not enforce a seccomp profile, which is the only way
+		// to prevent a pod from using the `unshare` syscall. Thus, a user in a baseline namespace
+		// can already gain access to all capabilities within a user namespaced process with `unshare -U`.
+		if relaxPolicyForUserNamespacePod(podSpec) {
+			return
+		}
 		if container.SecurityContext != nil && container.SecurityContext.Capabilities != nil {
 			valid := true
 			for _, c := range container.SecurityContext.Capabilities.Add {
