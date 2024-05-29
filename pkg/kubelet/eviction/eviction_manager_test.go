@@ -3093,7 +3093,7 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 }
 
 func newManagerImpl(clock clock.WithTicker, killPodFunc KillPodFuncAsync, config Config, summaryProvider stats.SummaryProvider, nodeRef *v1.ObjectReference) *managerImpl {
-	diskGC := &mockDiskGC{err: nil}
+	diskGC := &mockDiskGC{}
 	return &managerImpl{
 		clock:                        clock,
 		killPodFunc:                  killPodFunc,
