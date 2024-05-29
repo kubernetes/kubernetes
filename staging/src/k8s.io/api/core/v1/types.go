@@ -3030,7 +3030,7 @@ type ContainerStatus struct {
 	// +listMapKey=mountPath
 	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,12,rep,name=volumeMounts"`
-	// User represents user identitiy information initially attached to the first process of the container
+	// User represents user identity information initially attached to the first process of the container
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	User *ContainerUser `json:"user,omitempty" protobuf:"bytes,13,opt,name=user,casttype=ContainerUser"`

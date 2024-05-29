@@ -20995,7 +20995,7 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 					},
 					"user": {
 						SchemaProps: spec.SchemaProps{
-							Description: "User represents user identitiy information initially attached to the first process of the container",
+							Description: "User represents user identity information initially attached to the first process of the container",
 							Ref:         ref("k8s.io/api/core/v1.ContainerUser"),
 						},
 					},

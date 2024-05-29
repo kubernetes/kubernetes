@@ -6521,7 +6521,7 @@
         },
         "user": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ContainerUser",
-          "description": "User represents user identitiy information initially attached to the first process of the container"
+          "description": "User represents user identity information initially attached to the first process of the container"
         },
         "volumeMounts": {
           "description": "Status of volume mounts.",

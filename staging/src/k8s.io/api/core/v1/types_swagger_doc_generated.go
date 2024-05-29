@@ -482,7 +482,7 @@ var map_ContainerStatus = map[string]string{
 	"allocatedResources": "AllocatedResources represents the compute resources allocated for this container by the node. Kubelet sets this value to Container.Resources.Requests upon successful pod admission and after successfully admitting desired pod resize.",
 	"resources":          "Resources represents the compute resource requests and limits that have been successfully enacted on the running container after it has been started or has been successfully resized.",
 	"volumeMounts":       "Status of volume mounts.",
-	"user":               "User represents user identitiy information initially attached to the first process of the container",
+	"user":               "User represents user identity information initially attached to the first process of the container",
 }
 
 func (ContainerStatus) SwaggerDoc() map[string]string {

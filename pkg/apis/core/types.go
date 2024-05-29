@@ -2741,7 +2741,7 @@ type ContainerStatus struct {
 	// +optional
 	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus
-	// User represents user identitiy information initially attached to the first process of the container
+	// User represents user identity information initially attached to the first process of the container
 	// +featureGate=SupplementalGroupsPolicy
 	// +optional
 	User *ContainerUser

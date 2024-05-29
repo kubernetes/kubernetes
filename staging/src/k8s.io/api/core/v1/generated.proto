@@ -1110,7 +1110,7 @@ message ContainerStatus {
   // +featureGate=RecursiveReadOnlyMounts
   repeated VolumeMountStatus volumeMounts = 12;
 
-  // User represents user identitiy information initially attached to the first process of the container
+  // User represents user identity information initially attached to the first process of the container
   // +featureGate=SupplementalGroupsPolicy
   // +optional
   optional ContainerUser user = 13;
