@@ -348,7 +348,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	}
 
 	var patchedJS []byte
-	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, o.GetObjectCreater(), o.GetObjectTyper(), false)
+	jsonSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, o.GetObjectCreater(), o.GetObjectTyper(), json.SerializerOptions{})
 	switch result.PatchType {
 	// VerifyAdmissionResponse normalizes to v1 patch types, regardless of the AdmissionReview version used
 	case admissionv1.PatchTypeJSONPatch:

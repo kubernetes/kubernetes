@@ -905,7 +905,7 @@ func TestCacheableObject(t *testing.T) {
 	gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "MockCacheableObject"}
 	creater := &mockCreater{obj: &runtimetesting.MockCacheableObject{}}
 	typer := &mockTyper{gvk: &gvk}
-	serializer := json.NewSerializer(json.DefaultMetaFactory, creater, typer, false)
+	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, creater, typer, json.SerializerOptions{})
 
 	runtimetesting.CacheableObjectTest(t, serializer)
 }
