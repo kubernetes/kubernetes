@@ -395,7 +395,11 @@ func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) watc
 func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface {
 	watcher, err := e.Watch()
 	if err != nil {
+		// This function traditionally returns no error even though it can fail.
+		// Instead, it logs the error and returns an empty watch. The empty
+		// watch ensures that callers don't crash when calling Stop.
 		klog.FromContext(e.cancelationCtx).Error(err, "Unable start event watcher (will not retry!)")
+		return watch.NewEmptyWatch()
 	}
 	go func() {
 		defer utilruntime.HandleCrash()
