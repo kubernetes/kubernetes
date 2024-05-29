@@ -121,5 +121,5 @@ spec:
         - name: nvidia-config
           mountPath: /etc/nvidia
       containers:
-      - image: "gcr.io/google-containers/pause:2.0"
+      - image: "registry.k8s.io/pause:3.9"
         name: pause
