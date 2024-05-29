@@ -602,7 +602,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 	return false
 }
 
-func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition, lock *sync.Mutex) bool {
+func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition, softEvictionLock *sync.Mutex) bool {
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
