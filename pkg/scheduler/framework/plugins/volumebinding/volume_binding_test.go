@@ -890,3 +890,104 @@ func TestVolumeBinding(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
+	trueVar := true
+	falseVar := false
+	table := []struct {
+		name   string
+		pod    *v1.Pod
+		newObj interface{}
+		err    bool
+		expect framework.QueueingHint
+	}{
+		{
+			name: "pod has no CSIDriver",
+			pod:  makePod("pod-a").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &trueVar,
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name:   "type conversion error",
+			pod:    makePod("pod-a").Pod,
+			newObj: new(struct{}),
+			err:    true,
+			expect: framework.Queue,
+		},
+		{
+			name: "driver name in pod and csidriver name are different.",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test2",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &trueVar,
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name: "driverSpec.StorageCapacity is false",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &falseVar,
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name: "driverSpec.StorageCapacity is true",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &trueVar,
+				},
+			},
+			err:    false,
+			expect: framework.Queue,
+		},
+		{
+			name: "driverSpec.StorageCapacity is nil",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test2",
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+	}
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{}
+			logger, _ := ktesting.NewTestContext(t)
+			oldObj := item.newObj
+			qhint, err := pl.isSchedulableAfterCSIDriverChange(logger, item.pod, oldObj, item.newObj)
+			if (err != nil) != item.err {
+				t.Errorf("isSchedulableAfterCSINodeChange failed - got: %q", err)
+			}
+			if qhint != item.expect {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
