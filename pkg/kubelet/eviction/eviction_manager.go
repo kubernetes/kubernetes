@@ -612,7 +612,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	}
 	// record that we are evicting the pod
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
-	// this is a non-blocking call, it will return right away, semaphore (if non-nil) will be released once the pod is actually killed
+	// this is a non-blocking call, it will return right away. lock (if non-nil) will be released once the pod is actually killed.
 	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
 	err := m.killPodFunc(pod, true, &gracePeriodOverride, lock, func(status *v1.PodStatus) {
 		status.Phase = v1.PodFailed
