@@ -3014,7 +3014,7 @@ func TestHardEvictPodThatHasBeenSoftEvictedOnceHardThresholdReached(t *testing.T
 				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				GracePeriod: 10, //ns
+				GracePeriod: 10, // ns
 			},
 			{ // hard
 				Signal:   evictionapi.SignalMemoryAvailable,
@@ -3127,7 +3127,7 @@ func TestHardEvictPod(t *testing.T) {
 				Value: evictionapi.ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				GracePeriod: 10, //ns
+				GracePeriod: 10, // ns
 			},
 			{ // hard
 				Signal:   evictionapi.SignalMemoryAvailable,
