@@ -143,7 +143,7 @@ controller, and serviceaccounts controller.`,
 			}
 			// add feature enablement metrics
 			utilfeature.DefaultMutableFeatureGate.AddMetrics()
-			return Run(context.Background(), c.Complete())
+			return Run(cmd.Context(), c.Complete())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
