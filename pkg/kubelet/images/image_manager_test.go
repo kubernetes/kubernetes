@@ -238,7 +238,7 @@ func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelI
 	fakeClock = testingclock.NewFakeClock(time.Now())
 	backOff.Clock = fakeClock
 
-	fakeRuntime = &ctest.FakeRuntime{T: t}
+	fakeRuntime = &ctest.FakeRuntime{T: t, DelayImagePulls: time.Millisecond}
 	fakeRecorder := &record.FakeRecorder{}
 
 	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
