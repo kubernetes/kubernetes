@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	gpath "path"
 	"strings"
 	"sync"
@@ -278,9 +277,8 @@ type GenericAPIServer struct {
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
 
-	// EventSink creates events.
-	eventSink EventSink
-	eventRef  *corev1.ObjectReference
+	// OpenShift patch
+	OpenShiftGenericAPIServerPatch
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -1040,34 +1038,4 @@ func getResourceNamesForGroup(apiPrefix string, apiGroupInfo *APIGroupInfo, path
 	}
 
 	return resourceNames, nil
-}
-
-// Eventf creates an event with the API server as source, either in default namespace against default namespace, or
-// if POD_NAME/NAMESPACE are set against that pod.
-func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...interface{}) {
-	t := metav1.Time{Time: time.Now()}
-	host, _ := os.Hostname() // expicitly ignore error. Empty host is fine
-
-	ref := *s.eventRef
-	if len(ref.Namespace) == 0 {
-		ref.Namespace = "default" // TODO: event broadcaster sets event ns to default. We have to match. Odd.
-	}
-
-	e := &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
-			Namespace: ref.Namespace,
-		},
-		InvolvedObject: ref,
-		Reason:         reason,
-		Message:        fmt.Sprintf(messageFmt, args...),
-		Type:           eventType,
-		Source:         corev1.EventSource{Component: "apiserver", Host: host},
-	}
-
-	klog.V(2).Infof("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
-
-	if _, err := s.eventSink.Create(e); err != nil {
-		klog.Warningf("failed to create event %s/%s: %v", e.Namespace, e.Name, err)
-	}
 }
