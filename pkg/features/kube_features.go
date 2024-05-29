@@ -933,6 +933,13 @@ const (
 	//
 	// Allows recursive read-only mounts.
 	RecursiveReadOnlyMounts featuregate.Feature = "RecursiveReadOnlyMounts"
+
+	// owner: @everpeace
+	// kep: https://kep.k8s.io/3619
+	// alpha: v1.31
+	//
+	// Enable SupplementalGroupsPolicy feature in PodSecurityContext
+	SupplementalGroupsPolicy featuregate.Feature = "SupplementalGroupsPolicy"
 )
 
 func init() {
@@ -1186,6 +1193,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	UserNamespacesPodSecurityStandards: {Default: false, PreRelease: featuregate.Alpha},
 
 	SELinuxMount: {Default: false, PreRelease: featuregate.Alpha},
+
+	SupplementalGroupsPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

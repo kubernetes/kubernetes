@@ -886,6 +886,7 @@ spec:
           type: typeValue
         supplementalGroups:
         - 4
+        supplementalGroupsPolicy: supplementalGroupsPolicyValue
         sysctls:
         - name: nameValue
           value: valueValue

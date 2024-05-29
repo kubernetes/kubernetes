@@ -321,6 +321,20 @@ message NamespaceOption {
     UserNamespace userns_options = 5;
 }
 
+// SupplementalGroupsPolicy defines how supplemental groups 
+// of the first container processes are calculated.
+enum SupplementalGroupsPolicy {
+    // Merge means that the container's provided SupplementalGroups 
+    // and FsGroup (specified in SecurityContext) will be merged with 
+    // the primary user's groups as defined in the container image
+    // (in /etc/group).
+    Merge = 0;
+    // Strict means that the container's provided SupplementalGroups
+    // and FsGroup (specified in SecurityContext) will be used instead of 
+    // any groups defined in the container image.
+    Strict = 1;
+}
+
 // Int64Value is the wrapper of int64.
 message Int64Value {
     // The value.
@@ -345,13 +359,14 @@ message LinuxSandboxSecurityContext {
     Int64Value run_as_group = 8;
     // If set, the root filesystem of the sandbox is read-only.
     bool readonly_rootfs = 4;
-    // List of groups applied to the first process run in the sandbox, in
-    // addition to the sandbox's primary GID, and group memberships defined
-    // in the container image for the sandbox's primary UID of the container process.
-    // If the list is empty, no additional groups are added to any container.
-    // Note that group memberships defined in the container image for the sandbox's primary UID
-    // of the container process are still effective, even if they are not included in this list.
+    // List of groups applied to the first process run in each container.
+    // supplemental_groups_policy can control how groups will be calculated.
     repeated int64 supplemental_groups = 5;
+    // supplemental_groups_policy defines how supplemental groups of the first 
+    // container processes are calculated.
+    // Valid values are "Merge" and "Strict".
+    // If not specified, "Merge" is used.
+    SupplementalGroupsPolicy supplemental_groups_policy = 11;
     // Indicates whether the sandbox will be asked to run a privileged
     // container. If a privileged container is to be executed within it, this
     // MUST be true.
@@ -905,13 +920,14 @@ message LinuxContainerSecurityContext {
     string run_as_username = 6;
     // If set, the root filesystem of the container is read-only.
     bool readonly_rootfs = 7;
-    // List of groups applied to the first process run in the container, in
-    // addition to the container's primary GID, and group memberships defined
-    // in the container image for the container's primary UID of the container process.
-    // If the list is empty, no additional groups are added to any container.
-    // Note that group memberships defined in the container image for the container's primary UID
-    // of the container process are still effective, even if they are not included in this list.
+    // List of groups applied to the first process run in each container.
+    // supplemental_groups_policy can control how groups will be calculated.
     repeated int64 supplemental_groups = 8;
+    // supplemental_groups_policy defines how supplemental groups of the first 
+    // container processes are calculated.
+    // Valid values are "Merge" and "Strict".
+    // If not specified, "Merge" is used.
+    SupplementalGroupsPolicy supplemental_groups_policy = 17;
     // no_new_privs defines if the flag for no_new_privs should be set on the
     // container.
     bool no_new_privs = 11;
@@ -948,6 +964,15 @@ message LinuxContainerConfig {
     LinuxContainerResources resources = 1;
     // LinuxContainerSecurityContext configuration for the container.
     LinuxContainerSecurityContext security_context = 2;
+}
+
+message LinuxContainerUser {
+    // uid is the primary uid initially attached to the first process in the container
+    int64 uid = 1;
+    // gid is the primary gid initially attached to the first process in the container
+    int64 gid = 2;
+    // supplemental_groups are the supplemental groups initially attached to the first process in the container
+    repeated int64 supplemental_groups = 3;
 }
 
 // WindowsNamespaceOption provides options for Windows namespaces.
@@ -1286,6 +1311,8 @@ message ContainerStatus {
     // misusage, we now introduce the image_id field, which should always refer
     // to a unique image identifier on the node.
     string image_id = 17;
+    // User identities initially attached to the container
+    ContainerUser user = 18;
 }
 
 message ContainerStatusResponse {
@@ -1305,6 +1332,17 @@ message ContainerResources {
     // Resource limits configuration specific to Windows container.
     WindowsContainerResources windows = 2;
 }
+
+message ContainerUser {
+    // User identities initially attached to first process in the Linux container.
+	// Note that the actual running identity can be changed if the process has enough privilege to do so.
+    LinuxContainerUser linux = 1;
+
+    // User identities initially attached to first process in the Windows container
+    // This is just reserved for future use.
+    // WindowsContainerUser windows = 2;
+}
+
 
 message UpdateContainerResourcesRequest {
     // ID of the container to update.
