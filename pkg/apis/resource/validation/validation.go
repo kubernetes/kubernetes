@@ -92,6 +92,7 @@ func ValidateClass(resourceClass *resource.ResourceClass) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&resourceClass.ObjectMeta, false, corevalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceDriverName(resourceClass.DriverName, field.NewPath("driverName"))...)
 	allErrs = append(allErrs, validateClassParameters(resourceClass.ParametersRef, field.NewPath("parametersRef"))...)
+	allErrs = append(allErrs, validateClassParameters(resourceClass.DefaultClaimParametersRef, field.NewPath("defaultClaimParametersRef"))...)
 	if resourceClass.SuitableNodes != nil {
 		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(resourceClass.SuitableNodes, field.NewPath("suitableNodes"))...)
 	}

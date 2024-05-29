@@ -1006,45 +1006,25 @@ func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *res
 	return nil, statusUnschedulable(logger, fmt.Sprintf("generated class parameters for %s.%s %s not found", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.Namespace, class.ParametersRef.Name)))
 }
 
-func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
-	defaultClaimParameters := resourcev1alpha2.ResourceClaimParameters{
-		Shareable: true,
-		DriverRequests: []resourcev1alpha2.DriverRequests{
-			{
-				DriverName: class.DriverName,
-				Requests: []resourcev1alpha2.ResourceRequest{
-					{
-						ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
-							// TODO: This only works because NamedResources is
-							// the only model currently implemented. We need to
-							// match the default to how the resources of this
-							// class are being advertized in a ResourceSlice.
-							NamedResources: &resourcev1alpha2.NamedResourcesRequest{
-								Selector: "true",
-							},
-						},
-					},
-				},
-			},
-		},
+func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass,
+	claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
+	// If both claim's parametersRef and class's defaultClaimParameterRef are not set, claim cannot be allocated
+	if claim.Spec.ParametersRef == nil && class.DefaultClaimParametersRef == nil {
+		return nil, statusUnschedulable(logger, fmt.Sprintf("error allocating claim, either claim's parameter"+
+			" reference or default parameters for resourceclass need to be set"))
 	}
-
-	if claim.Spec.ParametersRef == nil {
-		return &defaultClaimParameters, nil
+	// Get the resource class's default parameter and use it.
+	if claim.Spec.ParametersRef == nil && class.DefaultClaimParametersRef != nil &&
+		class.DefaultClaimParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
+		class.DefaultClaimParametersRef.Kind == "ResourceClaimParameters" {
+		return pl.getParameters(logger, class.DefaultClaimParametersRef.Namespace,
+			class.DefaultClaimParametersRef.Name)
 	}
+	// Since claim's parameterRef is set, use it.
 	if claim.Spec.ParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
 		claim.Spec.ParametersRef.Kind == "ResourceClaimParameters" {
-		// Use the parameters which were referenced directly.
-		parameters, err := pl.claimParametersLister.ResourceClaimParameters(claim.Namespace).Get(claim.Spec.ParametersRef.Name)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil, statusUnschedulable(logger, fmt.Sprintf("claim parameters %s not found", klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name)))
-			}
-			return nil, statusError(logger, fmt.Errorf("get claim parameters %s: %v", klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name), err))
-		}
-		return parameters, nil
+		return pl.getParameters(logger, claim.Namespace, claim.Spec.ParametersRef.Name)
 	}
-
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123731): use an indexer
 	allParameters, err := pl.claimParametersLister.ResourceClaimParameters(claim.Namespace).List(labels.Everything())
 	if err != nil {
@@ -1061,6 +1041,19 @@ func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *res
 		}
 	}
 	return nil, statusUnschedulable(logger, fmt.Sprintf("generated claim parameters for %s.%s %s not found", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name)))
+}
+
+// getParameters gets the parameters with given name and namespace
+func (pl *dynamicResources) getParameters(logger klog.Logger, namespace, name string) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
+	// Use the parameters which were referenced directly.
+	parameters, err := pl.claimParametersLister.ResourceClaimParameters(namespace).Get(name)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, statusUnschedulable(logger, fmt.Sprintf("claim parameters %s not found", klog.KRef(namespace, name)))
+		}
+		return nil, statusError(logger, fmt.Errorf("get claim parameters %s: %w", klog.KRef(namespace, name), err))
+	}
+	return parameters, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.

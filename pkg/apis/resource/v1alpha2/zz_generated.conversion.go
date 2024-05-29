@@ -1302,6 +1302,7 @@ func autoConvert_v1alpha2_ResourceClass_To_resource_ResourceClass(in *v1alpha2.R
 	out.ParametersRef = (*resource.ResourceClassParametersReference)(unsafe.Pointer(in.ParametersRef))
 	out.SuitableNodes = (*core.NodeSelector)(unsafe.Pointer(in.SuitableNodes))
 	out.StructuredParameters = (*bool)(unsafe.Pointer(in.StructuredParameters))
+	out.DefaultClaimParametersRef = (*resource.ResourceClassParametersReference)(unsafe.Pointer(in.DefaultClaimParametersRef))
 	return nil
 }
 
@@ -1316,6 +1317,7 @@ func autoConvert_resource_ResourceClass_To_v1alpha2_ResourceClass(in *resource.R
 	out.ParametersRef = (*v1alpha2.ResourceClassParametersReference)(unsafe.Pointer(in.ParametersRef))
 	out.SuitableNodes = (*v1.NodeSelector)(unsafe.Pointer(in.SuitableNodes))
 	out.StructuredParameters = (*bool)(unsafe.Pointer(in.StructuredParameters))
+	out.DefaultClaimParametersRef = (*v1alpha2.ResourceClassParametersReference)(unsafe.Pointer(in.DefaultClaimParametersRef))
 	return nil
 }
 

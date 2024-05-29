@@ -231,6 +231,22 @@ func TestValidateClass(t *testing.T) {
 				return class
 			}(),
 		},
+		"default-parameters": {
+			class: func() *resource.ResourceClass {
+				class := testClass(goodName, goodName)
+				class.DefaultClaimParametersRef = goodParameters.DeepCopy()
+				return class
+			}(),
+		},
+		"default-parameters-missing-kind": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("defaultClaimParametersRef", "kind"), "")},
+			class: func() *resource.ResourceClass {
+				class := testClass(goodName, goodName)
+				class.DefaultClaimParametersRef = goodParameters.DeepCopy()
+				class.DefaultClaimParametersRef.Kind = ""
+				return class
+			}(),
+		},
 		"invalid-node-selector": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("suitableNodes", "nodeSelectorTerms"), "must have at least one node selector term")},
 			class: func() *resource.ResourceClass {

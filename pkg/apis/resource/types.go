@@ -366,6 +366,15 @@ type ResourceClass struct {
 	// If and only if allocation of claims using this class is handled
 	// via structured parameters, then StructuredParameters must be set to true.
 	StructuredParameters *bool
+
+	// DefaultClaimParametersRef is an optional reference to an object that holds parameters
+	// used by the driver as default when allocating a resource associated with this class.
+	// It is the responsibility of the cluster administrator to create this default resource
+	// claim parameter reference when defining the resource class. This field is utilized
+	// only when the ParametersRef of the resource claim is nil. If both ParametersRef
+	// and DefaultClaimParametersRef are nil, the claim cannot be allocated.
+	// +optional
+	DefaultClaimParametersRef *ResourceClassParametersReference
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
