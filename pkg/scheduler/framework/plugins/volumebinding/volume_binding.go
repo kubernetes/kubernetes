@@ -138,7 +138,7 @@ func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, p
 	)
 
 	for _, vol := range pod.Spec.Volumes {
-		if vol.CSI != nil || vol.CSI.Driver != modifiedCSIDriver.Name {
+		if vol.CSI == nil || vol.CSI.Driver != modifiedCSIDriver.Name {
 			continue
 		}
 		driverSpec := modifiedCSIDriver.Spec
