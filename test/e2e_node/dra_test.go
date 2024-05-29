@@ -26,6 +26,7 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,9 +34,12 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -131,11 +135,54 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				"Pod should be in Pending state as resource preparation time outed")
 		})
 	})
+
+	f.Context("ResourceSlice", f.WithSerial(), f.WithDisruptive(), func() {
+		ginkgo.It("must be removed on kubelet startup", func(ctx context.Context) {
+			ginkgo.By("stop kubelet")
+			startKubelet := stopKubelet()
+			ginkgo.DeferCleanup(func() {
+				if startKubelet != nil {
+					startKubelet()
+				}
+			})
+
+			ginkgo.By("create some ResourceSlices")
+			nodeName := getNodeName(ctx, f)
+			otherNodeName := nodeName + "-other"
+			createTestResourceSlice(ctx, f.ClientSet, nodeName, driverName)
+			createTestResourceSlice(ctx, f.ClientSet, nodeName+"-other", driverName)
+
+			matchByNodeName := func(nodeName string) types.GomegaMatcher {
+				return gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"NodeName": gomega.Equal(nodeName),
+				})
+			}
+			matchAll := gomega.ConsistOf(matchByNodeName(nodeName), matchByNodeName(otherNodeName))
+			matchOtherNode := gomega.ConsistOf(matchByNodeName(otherNodeName))
+
+			list := func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
+				slices, err := f.ClientSet.ResourceV1alpha2().ResourceSlices().List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return nil, err
+				}
+				return slices.Items, nil
+			}
+			gomega.Consistently(ctx, list).WithTimeout(5*time.Second).Should(matchAll, "ResourceSlices without kubelet")
+
+			ginkgo.By("start kubelet")
+			startKubelet()
+			startKubelet = nil
+
+			ginkgo.By("wait for exactly the node's ResourceSlice to get deleted")
+			gomega.Eventually(ctx, list).Should(matchOtherNode, "ResourceSlices with kubelet")
+			gomega.Consistently(ctx, list).WithTimeout(5*time.Second).Should(matchOtherNode, "ResourceSlices with kubelet")
+		})
+	})
 })
 
 // Run Kubelet plugin and wait until it's registered
 func newKubeletPlugin(ctx context.Context, nodeName string) *testdriver.ExamplePlugin {
-	ginkgo.By("start Kubelet plugin")
+	ginkgo.By(fmt.Sprintf("start Kubelet plugin for node %s", nodeName))
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", nodeName)
 	ctx = klog.NewContext(ctx, logger)
 
@@ -253,4 +300,26 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	framework.ExpectNoError(err)
 
 	return pod
+}
+
+func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) {
+	slice := &resourcev1alpha2.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+		},
+		NodeName:   nodeName,
+		DriverName: driverName,
+		ResourceModel: resourcev1alpha2.ResourceModel{
+			NamedResources: &resourcev1alpha2.NamedResourcesResources{},
+		},
+	}
+
+	slice, err := clientSet.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create ResourceSlice")
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		err := clientSet.ResourceV1alpha2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			framework.ExpectNoError(err, "delete ResourceSlice")
+		}
+	})
 }
