@@ -35,6 +35,7 @@ const (
 	UnfinishedWorkKey          = "unfinished_work_seconds"
 	LongestRunningProcessorKey = "longest_running_processor_seconds"
 	RetriesKey                 = "retries_total"
+	WaitingForQueueDepthKey    = "waitingfor_depth"
 )
 
 var (
@@ -93,8 +94,15 @@ var (
 		Help:           "Total number of retries handled by workqueue",
 	}, []string{"name"})
 
+	waitingForQueueDepth = k8smetrics.NewGaugeVec(&k8smetrics.GaugeOpts{
+		Subsystem:      WorkQueueSubsystem,
+		Name:           WaitingForQueueDepthKey,
+		StabilityLevel: k8smetrics.ALPHA,
+		Help:           "Current depth of the waiting-for queue",
+	}, []string{"name"})
+
 	metrics = []k8smetrics.Registerable{
-		depth, adds, latency, workDuration, unfinished, longestRunningProcessor, retries,
+		depth, adds, latency, workDuration, unfinished, longestRunningProcessor, retries, waitingForQueueDepth,
 	}
 )
 
@@ -134,4 +142,8 @@ func (prometheusMetricsProvider) NewLongestRunningProcessorSecondsMetric(name st
 
 func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
 	return retries.WithLabelValues(name)
+}
+
+func (prometheusMetricsProvider) NewWaitingForQueueDepthMetric(name string) workqueue.GaugeMetric {
+	return waitingForQueueDepth.WithLabelValues(name)
 }

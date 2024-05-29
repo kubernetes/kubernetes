@@ -230,7 +230,7 @@ func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-func (_ noopMetricsProvider) NewWaitingForQueueDepthMetric(name string) GaugeMetric {
+func (noopMetricsProvider) NewWaitingForQueueDepthMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
 

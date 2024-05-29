@@ -80,11 +80,23 @@ func (m *testMetric) Inc() {
 	m.notify()
 }
 
+func (m *testMetric) getInc() int64 {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.inc
+}
+
 func (m *testMetric) Dec() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.dec++
 	m.notify()
+}
+
+func (m *testMetric) getDec() int64 {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.dec
 }
 
 func (m *testMetric) Set(f float64) {
