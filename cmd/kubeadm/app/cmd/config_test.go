@@ -31,15 +31,11 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
-
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 const (
@@ -336,46 +332,6 @@ registry.k8s.io/etcd:{{.EtcdVersion}}
 				t.Fatalf("unexpected output:\n|%s|\nexpected:\n|%s|\n", output.String(), tc.expectedOutput)
 			}
 		})
-	}
-}
-
-func TestImagesPull(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-		},
-	}
-
-	fexec := &fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	containerRuntime, err := utilruntime.NewContainerRuntime(fexec, constants.DefaultCRISocket)
-	if err != nil {
-		t.Errorf("unexpected NewContainerRuntime error: %v", err)
-	}
-
-	images := []string{"a", "b", "c", "d", "a"}
-	for _, image := range images {
-		if err := containerRuntime.PullImage(image); err != nil {
-			t.Fatalf("expected nil but found %v", err)
-		}
-		fmt.Printf("[config/images] Pulled %s\n", image)
-	}
-
-	if fcmd.CombinedOutputCalls != len(images) {
-		t.Errorf("expected %d calls, got %d", len(images), fcmd.CombinedOutputCalls)
 	}
 }
 

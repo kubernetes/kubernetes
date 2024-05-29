@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	utilsexec "k8s.io/utils/exec"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -372,8 +371,8 @@ func newCmdConfigImagesPull() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.NodeRegistration.CRISocket)
-			if err != nil {
+			containerRuntime := utilruntime.NewContainerRuntime(internalcfg.NodeRegistration.CRISocket)
+			if err := containerRuntime.Connect(); err != nil {
 				return err
 			}
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
