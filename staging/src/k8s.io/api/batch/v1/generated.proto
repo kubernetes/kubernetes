@@ -467,8 +467,8 @@ message JobStatus {
   // +optional
   optional UncountedTerminatedPods uncountedTerminatedPods = 8;
 
-  // The number of pods which have a Ready condition.
-  // +optional
+  // The number of active pods which have a Ready condition and are not
+  // terminating (without a deletionTimestamp).
   optional int32 ready = 9;
 }
 

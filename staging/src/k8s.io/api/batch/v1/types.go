@@ -597,8 +597,8 @@ type JobStatus struct {
 	// +optional
 	UncountedTerminatedPods *UncountedTerminatedPods `json:"uncountedTerminatedPods,omitempty" protobuf:"bytes,8,opt,name=uncountedTerminatedPods"`
 
-	// The number of pods which have a Ready condition.
-	// +optional
+	// The number of active pods which have a Ready condition and are not
+	// terminating (without a deletionTimestamp).
 	Ready *int32 `json:"ready,omitempty" protobuf:"varint,9,opt,name=ready"`
 }
 
