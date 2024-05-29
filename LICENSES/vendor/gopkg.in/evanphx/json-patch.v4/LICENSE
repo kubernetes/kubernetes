@@ -1,4 +1,4 @@
-= vendor/github.com/evanphx/json-patch licensed under: =
+= vendor/gopkg.in/evanphx/json-patch.v4 licensed under: =
 
 Copyright (c) 2014, Evan Phoenix
 All rights reserved.
@@ -26,4 +26,4 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-= vendor/github.com/evanphx/json-patch/LICENSE 96ae735ca1b4dcdb6b26f4ca4b8ba645
+= vendor/gopkg.in/evanphx/json-patch.v4/LICENSE 96ae735ca1b4dcdb6b26f4ca4b8ba645
