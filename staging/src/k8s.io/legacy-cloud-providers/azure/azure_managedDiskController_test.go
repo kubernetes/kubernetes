@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	cloudprovider "k8s.io/cloud-provider"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -549,5 +550,33 @@ func TestGetLabelsForVolume(t *testing.T) {
 		assert.Equal(t, test.expected, result, "TestCase[%d]: %s, expected: %v, return: %v", i, test.desc, test.expected, result)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s, return error: %v", i, test.desc, err)
 		assert.Equal(t, test.expectedErrMsg, err, "TestCase[%d]: %s, expected: %v, return: %v", i, test.desc, test.expectedErrMsg, err)
+	}
+}
+
+func TestGetAzureDiskLabelsUninitialized(t *testing.T) {
+	// Create an uninitialized Azure cloud provider
+	testCloud, err := NewCloud(nil)
+	if err != nil {
+		t.Fatalf("Failed to create uninitialized cloud: %v", err)
+	}
+
+	pv := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				AzureDisk: &v1.AzureDiskVolumeSource{
+					DiskName:    cloudvolume.ProvisionedVolumeName,
+					DataDiskURI: "/subscriptions/4347f140-6c74-4199-b4fc-1938eb6c16c0/resourceGroups/test/providers/Microsoft.Compute/disks/pvc-ade30d58-5a51-4a62-a83a-142267b74f9e",
+				},
+			},
+		},
+	}
+
+	labeller := testCloud.(cloudprovider.PVLabeler)
+	labels, err := labeller.GetLabelsForVolume(context.Background(), pv)
+	if err != nil {
+		t.Errorf("Unexpected GetLabelsForVolume error: %v", err)
+	}
+	if labels != nil {
+		t.Errorf("The cloud provider should return nil labels for uninitialized cloud, got: %v", labels)
 	}
 }
