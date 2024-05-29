@@ -94,9 +94,9 @@ type Extra struct {
 	ExtendExpiration            bool
 
 	// ServiceAccountIssuerDiscovery
-	ServiceAccountIssuerURL  string
-	ServiceAccountJWKSURI    string
-	ServiceAccountPublicKeys []interface{}
+	ServiceAccountIssuerURL        string
+	ServiceAccountJWKSURI          string
+	ServiceAccountPublicKeysGetter serviceaccount.PublicKeysGetter
 
 	SystemNamespaces []string
 
@@ -363,18 +363,24 @@ func CreateConfig(
 		return nil, nil, fmt.Errorf("failed to apply admission: %w", err)
 	}
 
-	// Load and set the public keys.
-	var pubKeys []interface{}
-	for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
-		keys, err := keyutil.PublicKeysFromFile(f)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse key file %q: %w", f, err)
+	if len(opts.Authentication.ServiceAccounts.KeyFiles) > 0 {
+		// Load and set the public keys.
+		var pubKeys []interface{}
+		for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
+			keys, err := keyutil.PublicKeysFromFile(f)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse key file %q: %w", f, err)
+			}
+			pubKeys = append(pubKeys, keys...)
 		}
-		pubKeys = append(pubKeys, keys...)
+		keysGetter, err := serviceaccount.StaticPublicKeysGetter(pubKeys)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to set up public service account keys: %w", err)
+		}
+		config.ServiceAccountPublicKeysGetter = keysGetter
 	}
 	config.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
 	config.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
-	config.ServiceAccountPublicKeys = pubKeys
 
 	return config, genericInitializers, nil
 }

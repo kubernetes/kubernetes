@@ -24,11 +24,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sync/atomic"
 
 	jose "gopkg.in/square/go-jose.v2"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -44,26 +46,68 @@ const (
 	JWKSPath = "/openid/v1/jwks"
 )
 
-// OpenIDMetadata contains the pre-rendered responses for OIDC discovery endpoints.
-type OpenIDMetadata struct {
-	ConfigJSON       []byte
-	PublicKeysetJSON []byte
+// OpenIDMetadataProvider returns pre-rendered responses for OIDC discovery endpoints.
+type OpenIDMetadataProvider interface {
+	GetConfigJSON() (json []byte, maxAge int)
+	GetKeysetJSON() (json []byte, maxAge int)
 }
 
-// NewOpenIDMetadata returns the pre-rendered JSON responses for the OIDC discovery
+type openidConfigProvider struct {
+	issuerURL, jwksURI string
+	pubKeyGetter       PublicKeysGetter
+	config             atomic.Pointer[openidConfig]
+}
+type openidConfig struct {
+	configJSON []byte
+	keysetJSON []byte
+}
+
+func (p *openidConfigProvider) GetConfigJSON() ([]byte, int) {
+	return p.config.Load().configJSON, p.pubKeyGetter.GetCacheAgeMaxSeconds()
+}
+func (p *openidConfigProvider) GetKeysetJSON() ([]byte, int) {
+	return p.config.Load().keysetJSON, p.pubKeyGetter.GetCacheAgeMaxSeconds()
+}
+func (p *openidConfigProvider) Enqueue() {
+	err := p.Update()
+	if err != nil {
+		klog.ErrorS(err, "failed to update openid config metadata")
+	}
+}
+func (p *openidConfigProvider) Update() error {
+	pubKeys := p.pubKeyGetter.GetPublicKeys("")
+	if len(pubKeys) == 0 {
+		return fmt.Errorf("no keys provided for validating keyset")
+	}
+	configJSON, err := openIDConfigJSON(p.issuerURL, p.jwksURI, pubKeys)
+	if err != nil {
+		return fmt.Errorf("could not marshal issuer discovery JSON, error: %w", err)
+	}
+	keysetJSON, err := openIDKeysetJSON(pubKeys)
+	if err != nil {
+		return fmt.Errorf("could not marshal issuer keys JSON, error: %w", err)
+	}
+	p.config.Store(&openidConfig{
+		configJSON: configJSON,
+		keysetJSON: keysetJSON,
+	})
+	return nil
+}
+
+// NewOpenIDMetadataProvider returns a provider for the OIDC discovery
 // endpoints, or an error if they could not be constructed. Callers should note
 // that this function may perform additional validation on inputs that is not
 // backwards-compatible with all command-line validation. The recommendation is
 // to log the error and skip installing the OIDC discovery endpoints.
-func NewOpenIDMetadata(issuerURL, jwksURI, defaultExternalAddress string, pubKeys []interface{}) (*OpenIDMetadata, error) {
+func NewOpenIDMetadataProvider(issuerURL, jwksURI, defaultExternalAddress string, pubKeyGetter PublicKeysGetter) (OpenIDMetadataProvider, error) {
 	if issuerURL == "" {
 		return nil, fmt.Errorf("empty issuer URL")
 	}
 	if jwksURI == "" && defaultExternalAddress == "" {
 		return nil, fmt.Errorf("either the JWKS URI or the default external address, or both, must be set")
 	}
-	if len(pubKeys) == 0 {
-		return nil, fmt.Errorf("no keys provided for validating keyset")
+	if pubKeyGetter == nil {
+		return nil, fmt.Errorf("no public key getter provided")
 	}
 
 	// Ensure the issuer URL meets the OIDC spec (this is the additional
@@ -126,20 +170,18 @@ func NewOpenIDMetadata(issuerURL, jwksURI, defaultExternalAddress string, pubKey
 		}
 	}
 
-	configJSON, err := openIDConfigJSON(issuerURL, jwksURI, pubKeys)
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal issuer discovery JSON, error: %v", err)
+	provider := &openidConfigProvider{
+		issuerURL:    issuerURL,
+		jwksURI:      jwksURI,
+		pubKeyGetter: pubKeyGetter,
 	}
-
-	keysetJSON, err := openIDKeysetJSON(pubKeys)
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal issuer keys JSON, error: %v", err)
+	// Register to be notified if public keys change
+	pubKeyGetter.AddListener(provider)
+	// Synchronously construct the config / keyset json once at startup to ensure a successful starting point
+	if err := provider.Update(); err != nil {
+		return nil, err
 	}
-
-	return &OpenIDMetadata{
-		ConfigJSON:       configJSON,
-		PublicKeysetJSON: keysetJSON,
-	}, nil
+	return provider, nil
 }
 
 // openIDMetadata provides a minimal subset of OIDC provider metadata:
@@ -159,7 +201,7 @@ type openIDMetadata struct {
 
 // openIDConfigJSON returns the JSON OIDC Discovery Doc for the service
 // account issuer.
-func openIDConfigJSON(iss, jwksURI string, keys []interface{}) ([]byte, error) {
+func openIDConfigJSON(iss, jwksURI string, keys []PublicKey) ([]byte, error) {
 	keyset, errs := publicJWKSFromKeys(keys)
 	if errs != nil {
 		return nil, errs
@@ -183,7 +225,7 @@ func openIDConfigJSON(iss, jwksURI string, keys []interface{}) ([]byte, error) {
 
 // openIDKeysetJSON returns the JSON Web Key Set for the service account
 // issuer's keys.
-func openIDKeysetJSON(keys []interface{}) ([]byte, error) {
+func openIDKeysetJSON(keys []PublicKey) ([]byte, error) {
 	keyset, errs := publicJWKSFromKeys(keys)
 	if errs != nil {
 		return nil, errs
@@ -212,21 +254,12 @@ type publicKeyGetter interface {
 
 // publicJWKSFromKeys constructs a JSONWebKeySet from a list of keys. The key
 // set will only contain the public keys associated with the input keys.
-func publicJWKSFromKeys(in []interface{}) (*jose.JSONWebKeySet, errors.Aggregate) {
+func publicJWKSFromKeys(in []PublicKey) (*jose.JSONWebKeySet, errors.Aggregate) {
 	// Decode keys into a JWKS.
 	var keys jose.JSONWebKeySet
 	var errs []error
 	for i, key := range in {
-		var pubkey *jose.JSONWebKey
-		var err error
-
-		switch k := key.(type) {
-		case publicKeyGetter:
-			// This is a private key. Get its public key
-			pubkey, err = jwkFromPublicKey(k.Public())
-		default:
-			pubkey, err = jwkFromPublicKey(k)
-		}
+		pubkey, err := jwkFromPublicKey(key)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("error constructing JWK for key #%d: %v", i, err))
 			continue
@@ -244,21 +277,16 @@ func publicJWKSFromKeys(in []interface{}) (*jose.JSONWebKeySet, errors.Aggregate
 	return &keys, nil
 }
 
-func jwkFromPublicKey(publicKey crypto.PublicKey) (*jose.JSONWebKey, error) {
-	alg, err := algorithmFromPublicKey(publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	keyID, err := keyIDFromPublicKey(publicKey)
+func jwkFromPublicKey(publicKey PublicKey) (*jose.JSONWebKey, error) {
+	alg, err := algorithmFromPublicKey(publicKey.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
 	jwk := &jose.JSONWebKey{
 		Algorithm: string(alg),
-		Key:       publicKey,
-		KeyID:     keyID,
+		Key:       publicKey.PublicKey,
+		KeyID:     publicKey.KeyID,
 		Use:       "sig",
 	}
 

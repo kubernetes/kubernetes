@@ -225,22 +225,97 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator[PrivateClaims any](issuers []string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator[PrivateClaims]) authenticator.Token {
+func JWTTokenAuthenticator[PrivateClaims any](issuers []string, publicKeysGetter PublicKeysGetter, implicitAuds authenticator.Audiences, validator Validator[PrivateClaims]) authenticator.Token {
 	issuersMap := make(map[string]bool)
 	for _, issuer := range issuers {
 		issuersMap[issuer] = true
 	}
 	return &jwtTokenAuthenticator[PrivateClaims]{
 		issuers:      issuersMap,
-		keys:         keys,
+		keysGetter:   publicKeysGetter,
 		implicitAuds: implicitAuds,
 		validator:    validator,
 	}
 }
 
+// Listener is an interface to use to notify interested parties of a change.
+type Listener interface {
+	// Enqueue should be called when an input may have changed
+	Enqueue()
+}
+
+// PublicKeysGetter returns public keys for a given key id.
+type PublicKeysGetter interface {
+	// AddListener is adds a listener to be notified of potential input changes.
+	// This is a noop on static providers.
+	AddListener(listener Listener)
+
+	// GetCacheAgeMaxSeconds returns the seconds a call to GetPublicKeys() can be cached for.
+	// If the results of GetPublicKeys() can be dynamic, this means a new key must be included in the results
+	// for at least this long before it is used to sign new tokens.
+	GetCacheAgeMaxSeconds() int
+
+	// GetPublicKeys returns public keys to use for verifying a token with the given key id.
+	// keyIDHint may be empty if the token did not have a kid header, or if all public keys are desired.
+	GetPublicKeys(keyIDHint string) []PublicKey
+}
+
+type PublicKey struct {
+	KeyID     string
+	PublicKey interface{}
+}
+
+type staticPublicKeysGetter struct {
+	allPublicKeys  []PublicKey
+	publicKeysByID map[string][]PublicKey
+}
+
+// StaticPublicKeysGetter constructs an implementation of PublicKeysGetter
+// which returns all public keys when key id is unspecified, and returns
+// the public keys matching the keyIDFromPublicKey-derived key id when
+// a key id is specified.
+func StaticPublicKeysGetter(keys []interface{}) (PublicKeysGetter, error) {
+	allPublicKeys := []PublicKey{}
+	publicKeysByID := map[string][]PublicKey{}
+	for _, key := range keys {
+		if privateKey, isPrivateKey := key.(publicKeyGetter); isPrivateKey {
+			// This is a private key. Extract its public key.
+			key = privateKey.Public()
+		}
+
+		keyID, err := keyIDFromPublicKey(key)
+		if err != nil {
+			return nil, err
+		}
+		pk := PublicKey{PublicKey: key, KeyID: keyID}
+		publicKeysByID[keyID] = append(publicKeysByID[keyID], pk)
+		allPublicKeys = append(allPublicKeys, pk)
+	}
+	return &staticPublicKeysGetter{
+		allPublicKeys:  allPublicKeys,
+		publicKeysByID: publicKeysByID,
+	}, nil
+}
+
+func (s staticPublicKeysGetter) AddListener(listener Listener) {
+	// no-op, static key content never changes
+}
+
+func (s staticPublicKeysGetter) GetCacheAgeMaxSeconds() int {
+	// hard-coded to match cache max-age set in OIDC discovery
+	return 3600
+}
+
+func (s staticPublicKeysGetter) GetPublicKeys(keyID string) []PublicKey {
+	if len(keyID) == 0 {
+		return s.allPublicKeys
+	}
+	return s.publicKeysByID[keyID]
+}
+
 type jwtTokenAuthenticator[PrivateClaims any] struct {
 	issuers      map[string]bool
-	keys         []interface{}
+	keysGetter   PublicKeysGetter
 	validator    Validator[PrivateClaims]
 	implicitAuds authenticator.Audiences
 }
@@ -269,13 +344,25 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Con
 	public := &jwt.Claims{}
 	private := new(PrivateClaims)
 
-	// TODO: Pick the key that has the same key ID as `tok`, if one exists.
+	// Pick the key that has the same key ID as `tok`, if one exists.
+	var kid string
+	for _, header := range tok.Headers {
+		if header.KeyID != "" {
+			kid = header.KeyID
+			break
+		}
+	}
+
 	var (
 		found   bool
 		errlist []error
 	)
-	for _, key := range j.keys {
-		if err := tok.Claims(key, public, private); err != nil {
+	keys := j.keysGetter.GetPublicKeys(kid)
+	if len(keys) == 0 {
+		return nil, false, fmt.Errorf("invalid signature, no keys found")
+	}
+	for _, key := range keys {
+		if err := tok.Claims(key.PublicKey, public, private); err != nil {
 			errlist = append(errlist, err)
 			continue
 		}
