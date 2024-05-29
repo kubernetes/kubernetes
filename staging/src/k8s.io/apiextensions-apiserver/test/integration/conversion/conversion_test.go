@@ -715,7 +715,10 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 				if err == nil {
 					t.Errorf("expected error with message %s, but got no error", message)
 				} else if !strings.Contains(err.Error(), message) {
-					t.Errorf("expected error with message %s, but got %v", message, err)
+					statusCause, hasCause := errors.StatusCause(err, metav1.CauseTypeUnexpectedServerResponse)
+					if !hasCause || !strings.Contains(statusCause.Message, message) {
+						t.Errorf("expected error with message %s, but got %v", message, err)
+					}
 				}
 			})
 		}

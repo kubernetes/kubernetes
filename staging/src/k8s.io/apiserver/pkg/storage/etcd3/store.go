@@ -179,7 +179,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(preparedKey))
 	if err != nil {
-		return apierrors.NewStorageReadError(s.groupResource, key, map[string]error{preparedKey: err})
+		return storage.NewCorruptedDataError(map[string]error{preparedKey: err})
 	}
 
 	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
@@ -793,7 +793,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			getResp.Kvs[i] = nil
 		}
 		if len(failedKeys) > 0 {
-			return apierrors.NewStorageReadError(s.groupResource, key, failedKeys)
+			return storage.NewCorruptedDataError(failedKeys)
 		}
 
 		// no more results remain or we didn't request paging
@@ -917,7 +917,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 	} else {
 		data, stale, err := s.transformer.TransformFromStorage(ctx, getResp.Kvs[0].Value, authenticatedDataString(key))
 		if err != nil {
-			return nil, apierrors.NewStorageReadError(s.groupResource, key, map[string]error{key: err})
+			return nil, storage.NewCorruptedDataError(map[string]error{key: err})
 		}
 		state.rev = getResp.Kvs[0].ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
