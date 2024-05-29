@@ -4761,6 +4761,181 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	}
 }
 
+func Test_determinePodResizeStatus(t *testing.T) {
+	tests := []struct {
+		name                   string
+		pod                    *v1.Pod
+		statusManagerPodStatus v1.PodStatus
+		podStatus              *v1.PodStatus
+		expected               v1.PodResizeStatus
+	}{
+		{
+			name: "pod spec and pod status are matched",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200M"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200M"),
+								},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("300M"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("300M"),
+								},
+							},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					Resize: v1.PodResizeStatusInProgress,
+				},
+			},
+			statusManagerPodStatus: v1.PodStatus{
+				Resize: v1.PodResizeStatusInProgress,
+			},
+			podStatus: &v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "containerA",
+						Resources: &v1.ResourceRequirements{
+							Requests: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("200M"),
+							},
+							Limits: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("200M"),
+							},
+						},
+					},
+					{
+						Name: "containerB",
+						Resources: &v1.ResourceRequirements{
+							Requests: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("300M"),
+							},
+							Limits: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("300M"),
+							},
+						},
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "pod spec and pod status are not matched",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "abc123",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200M"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200M"),
+								},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("300M"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("300M"),
+								},
+							},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyAlways,
+				},
+				Status: v1.PodStatus{
+					Resize: v1.PodResizeStatusInProgress,
+				},
+			},
+			statusManagerPodStatus: v1.PodStatus{
+				Resize: v1.PodResizeStatusInProgress,
+			},
+			podStatus: &v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "containerA",
+						Resources: &v1.ResourceRequirements{
+							Requests: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("200M"),
+							},
+							Limits: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("200M"),
+							},
+						},
+					},
+					{
+						Name: "containerB",
+						Resources: &v1.ResourceRequirements{
+							Requests: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("400M"),
+							},
+							Limits: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU:    resource.MustParse("100m"),
+								v1.ResourceMemory: resource.MustParse("400M"),
+							},
+						},
+					},
+				},
+			},
+			expected: v1.PodResizeStatusInProgress,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			kl.statusManager = status.NewFakeManager()
+			kl.statusManager.SetPodStatus(test.pod, test.statusManagerPodStatus)
+			actual := kl.determinePodResizeStatus(test.pod, test.podStatus)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
+}
+
 func TestKubelet_HandlePodCleanups(t *testing.T) {
 	one := int64(1)
 	two := int64(2)
