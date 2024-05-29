@@ -146,6 +146,9 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-34577
 			`\[sig-storage\] Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-34594
+			`\[sig-node\] \[Feature:PodLifecycleSleepAction\] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action`,
 		},
 		// tests that need to be temporarily disabled while the rebase is in progress.
 		"[Disabled:RebaseInProgress]": {

@@ -1869,7 +1869,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action reduce GracePeriodSeconds during runtime": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action": " [Disabled:Broken] [Suite:k8s]",
 
 	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted by liveness probe because startup probe delays it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
