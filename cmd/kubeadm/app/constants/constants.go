@@ -577,16 +577,6 @@ func GetAdminKubeConfigPath() string {
 	return filepath.Join(KubernetesDir, AdminKubeConfigFileName)
 }
 
-// GetSuperAdminKubeConfigPath returns the location on the disk where admin kubeconfig is located by default
-func GetSuperAdminKubeConfigPath() string {
-	return filepath.Join(KubernetesDir, SuperAdminKubeConfigFileName)
-}
-
-// GetBootstrapKubeletKubeConfigPath returns the location on the disk where bootstrap kubelet kubeconfig is located by default
-func GetBootstrapKubeletKubeConfigPath() string {
-	return filepath.Join(KubernetesDir, KubeletBootstrapKubeConfigFileName)
-}
-
 // GetKubeletKubeConfigPath returns the location on the disk where kubelet kubeconfig is located by default
 func GetKubeletKubeConfigPath() string {
 	return filepath.Join(KubernetesDir, KubeletKubeConfigFileName)
