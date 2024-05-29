@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"k8s.io/utils/pointer"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
@@ -251,7 +251,7 @@ func getJobFromTemplate2(cj *batchv1.CronJob, scheduledTime time.Time) (*batchv1
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CronJobsScheduledAnnotation) {
 
-		timeZoneLocation, err := time.LoadLocation(pointer.StringDeref(cj.Spec.TimeZone, ""))
+		timeZoneLocation, err := time.LoadLocation(ptr.Deref(cj.Spec.TimeZone, ""))
 		if err != nil {
 			return nil, err
 		}
