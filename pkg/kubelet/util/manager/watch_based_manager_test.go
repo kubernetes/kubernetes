@@ -89,6 +89,7 @@ func TestSecretCache(t *testing.T) {
 	}
 	fakeClient.AddReactor("list", "secrets", listReactor)
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -159,6 +160,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	}
 	fakeClient.AddReactor("list", "secrets", listReactor)
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -265,6 +267,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			}
 			fakeClient.AddReactor("list", "secrets", listReactor)
 			fakeWatch := watch.NewFake()
+			defer fakeWatch.Close()
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
@@ -353,6 +356,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 
 	fakeClient.AddReactor("list", "secrets", listReactor)
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
@@ -436,6 +440,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 
 	fakeClient.AddReactor("list", "secrets", listReactor)
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
@@ -591,6 +596,7 @@ func TestRefMapHandlesReferencesCorrectly(t *testing.T) {
 			}
 			fakeClient.AddReactor("list", "secrets", listReactor)
 			fakeWatch := watch.NewFake()
+			defer fakeWatch.Close()
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			store := newSecretCache(fakeClient, fakeClock, time.Minute)

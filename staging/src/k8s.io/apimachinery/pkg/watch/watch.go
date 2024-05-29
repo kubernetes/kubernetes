@@ -91,76 +91,108 @@ func (w emptyWatch) ResultChan() <-chan Event {
 
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type FakeWatcher struct {
-	result  chan Event
-	stopped bool
-	sync.Mutex
+	resultCh   chan Event
+	closed     bool
+	resultLock sync.RWMutex
+
+	stopCh   chan struct{}
+	stopped  bool
+	stopLock sync.RWMutex
 }
 
 func NewFake() *FakeWatcher {
 	return &FakeWatcher{
-		result: make(chan Event),
+		resultCh: make(chan Event),
+		stopCh:   make(chan struct{}),
 	}
 }
 
-func NewFakeWithChanSize(size int, blocking bool) *FakeWatcher {
-	return &FakeWatcher{
-		result: make(chan Event, size),
-	}
+// StopChan returns a channel than will be closed when the consumer calls Stop().
+// This allows the producer to wait until Stop() is called, then perform cleanup,
+// then call Close() to close the result channel.
+func (f *FakeWatcher) StopChan() <-chan struct{} {
+	f.stopLock.RLock()
+	defer f.stopLock.RUnlock()
+	return f.stopCh
 }
 
 // Stop implements Interface.Stop().
 func (f *FakeWatcher) Stop() {
-	f.Lock()
-	defer f.Unlock()
+	f.stopLock.Lock()
+	defer f.stopLock.Unlock()
 	if !f.stopped {
-		klog.V(4).Infof("Stopping fake watcher.")
-		// TODO: make the producer close the result channel after confirming that cleanup is complete
-		close(f.result)
+		klog.V(4).Info("FakeWatcher.Stop(): consumer done reading events.")
+		close(f.stopCh)
 		f.stopped = true
 	}
 }
 
+// IsStopped returns true if Stop() has been called
 func (f *FakeWatcher) IsStopped() bool {
-	f.Lock()
-	defer f.Unlock()
+	f.stopLock.RLock()
+	defer f.stopLock.RUnlock()
 	return f.stopped
 }
 
-// Reset prepares the watcher to be reused.
-func (f *FakeWatcher) Reset() {
-	f.Lock()
-	defer f.Unlock()
-	f.stopped = false
-	f.result = make(chan Event)
+// Stop implements Interface.ResultChan().
+func (f *FakeWatcher) ResultChan() <-chan Event {
+	f.resultLock.RLock()
+	defer f.resultLock.RUnlock()
+	return f.resultCh
 }
 
-func (f *FakeWatcher) ResultChan() <-chan Event {
-	return f.result
+// Close allows the vent producer to close the result channel, to tell the
+// consumer that it is done writing events.
+func (f *FakeWatcher) Close() {
+	f.resultLock.Lock()
+	defer f.resultLock.Unlock()
+	if !f.closed {
+		klog.V(4).Info("FakeWatcher.Close(): producer done writing events.")
+		close(f.resultCh)
+		f.closed = true
+	}
+}
+
+// IsClosed returns true if Close() has been called
+func (f *FakeWatcher) IsClosed() bool {
+	f.resultLock.RLock()
+	defer f.resultLock.RUnlock()
+	return f.closed
 }
 
 // Add sends an add event.
 func (f *FakeWatcher) Add(obj runtime.Object) {
-	f.result <- Event{Added, obj}
+	f.resultLock.RLock()
+	defer f.resultLock.RUnlock()
+	f.resultCh <- Event{Added, obj}
 }
 
 // Modify sends a modify event.
 func (f *FakeWatcher) Modify(obj runtime.Object) {
-	f.result <- Event{Modified, obj}
+	f.resultLock.RLock()
+	defer f.resultLock.RUnlock()
+	f.resultCh <- Event{Modified, obj}
 }
 
 // Delete sends a delete event.
 func (f *FakeWatcher) Delete(lastValue runtime.Object) {
-	f.result <- Event{Deleted, lastValue}
+	f.resultLock.RLock()
+	defer f.resultLock.RUnlock()
+	f.resultCh <- Event{Deleted, lastValue}
 }
 
 // Error sends an Error event.
 func (f *FakeWatcher) Error(errValue runtime.Object) {
-	f.result <- Event{Error, errValue}
+	f.resultLock.RLock()
+	defer f.resultLock.RUnlock()
+	f.resultCh <- Event{Error, errValue}
 }
 
 // Action sends an event of the requested type, for table-based testing.
 func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
-	f.result <- Event{action, obj}
+	f.resultLock.RLock()
+	defer f.resultLock.RUnlock()
+	f.resultCh <- Event{action, obj}
 }
 
 // RaceFreeFakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.

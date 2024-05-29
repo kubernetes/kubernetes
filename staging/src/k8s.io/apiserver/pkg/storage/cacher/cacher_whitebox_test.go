@@ -675,19 +675,24 @@ func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 			var err error
 			switch watchCalls {
 			case 0:
-				w = watch.NewFakeWithChanSize(10, false)
-				for i := 2; i < 8; i++ {
-					w.Add(makePod(i))
-				}
-				// Emit an error to force relisting.
-				w.Error(nil)
-				w.Stop()
+				w = watch.NewFake()
+				go func() {
+					defer w.Close()
+					for i := 2; i < 8; i++ {
+						w.Add(makePod(i))
+					}
+					// Emit an error to force relisting.
+					w.Error(nil)
+				}()
 			case 1:
-				w = watch.NewFakeWithChanSize(10, false)
-				for i := 12; i < 18; i++ {
-					w.Add(makePod(i))
-				}
-				w.Stop()
+				w = watch.NewFake()
+				go func() {
+					defer w.Close()
+					for i := 12; i < 18; i++ {
+						w.Add(makePod(i))
+					}
+					<-w.StopChan()
+				}()
 			default:
 				err = fmt.Errorf("unexpected watch call")
 			}

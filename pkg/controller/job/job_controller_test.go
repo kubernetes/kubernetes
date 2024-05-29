@@ -5522,6 +5522,7 @@ func TestWatchJobs(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	clientset := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	clientset.PrependWatchReactor("jobs", core.DefaultWatchReactor(fakeWatch, nil))
 	manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
@@ -5568,6 +5569,7 @@ func TestWatchPods(t *testing.T) {
 	testJob := newJob(2, 2, 6, batch.NonIndexedCompletion)
 	clientset := fake.NewSimpleClientset(testJob)
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
 	manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady

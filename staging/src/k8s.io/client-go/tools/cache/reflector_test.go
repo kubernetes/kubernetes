@@ -74,6 +74,7 @@ func TestCloseWatchChannelOnError(t *testing.T) {
 	}
 	go r.ListAndWatch(wait.NeverStop)
 	fw.Error(pod)
+	fw.Close()
 	select {
 	case _, ok := <-fw.ResultChan():
 		if ok {
@@ -106,7 +107,10 @@ func TestRunUntil(t *testing.T) {
 	// Synchronously add a dummy pod into the watch channel so we
 	// know the RunUntil go routine is in the watch handler.
 	fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}})
-
+	go func() {
+		<-fw.StopChan()
+		fw.Close()
+	}()
 	close(stopCh)
 	resultCh := fw.ResultChan()
 	for {
@@ -441,8 +445,10 @@ func TestReflectorListAndWatch(t *testing.T) {
 		sendingRV := strconv.FormatUint(uint64(i+2), 10)
 		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: id, ResourceVersion: sendingRV}})
 		if sendingRV == "3" {
-			// Inject a failure.
-			fw.Stop()
+			// Simulate error that interrupts retries
+			status := apierrors.NewTooManyRequests("too many requests", 1).Status()
+			fw.Error(&status)
+			fw.Close()
 			fw = nil
 		}
 	}
@@ -654,7 +660,7 @@ func (f *fakeBackoff) Backoff() clock.Timer {
 }
 
 func TestBackoffOnTooManyRequests(t *testing.T) {
-	err := apierrors.NewTooManyRequests("too many requests", 1)
+	watchErr := apierrors.NewTooManyRequests("too many requests", 1)
 	clock := &clock.RealClock{}
 	bm := &fakeBackoff{clock: clock}
 
@@ -665,14 +671,21 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			switch bm.calls {
 			case 0:
-				return nil, err
+				return nil, watchErr
 			case 1:
-				w := watch.NewFakeWithChanSize(1, false)
-				status := err.Status()
-				w.Error(&status)
+				w := watch.NewFake()
+				go func() {
+					defer w.Close()
+					status := watchErr.Status()
+					w.Error(&status)
+				}()
 				return w, nil
 			default:
 				w := watch.NewFake()
+				defer w.Close()
+				// Stop the test on the third watch call.
+				// Normally the caller of ListAndWatch would close the stop channel,
+				// but this is faster for testing backoff, which is invisible to the caller.
 				w.Stop()
 				return w, nil
 			}
@@ -688,9 +701,10 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 		watchErrorHandler: WatchErrorHandler(DefaultWatchErrorHandler),
 	}
 
-	stopCh := make(chan struct{})
-	r.ListAndWatch(stopCh)
-	close(stopCh)
+	err := r.ListAndWatch(wait.NeverStop)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	if bm.calls != 2 {
 		t.Errorf("unexpected watch backoff calls: %d", bm.calls)
 	}
@@ -741,9 +755,12 @@ func TestRetryInternalError(t *testing.T) {
 				}
 
 				fakeClock.Step(time.Second)
-				w := watch.NewFakeWithChanSize(1, false)
-				status := err.Status()
-				w.Error(&status)
+				w := watch.NewFake()
+				go func() {
+					defer w.Close()
+					status := err.Status()
+					w.Error(&status)
+				}()
 				return w, nil
 			},
 		}

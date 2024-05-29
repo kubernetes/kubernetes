@@ -36,16 +36,19 @@ func TestDecoratedWatcher(t *testing.T) {
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	dw := newDecoratedWatcher(ctx, w, decorator)
 	defer dw.Stop()
 
 	go func() {
+		defer w.Close()
 		w.Error(&metav1.Status{Status: "Failure"})
 		w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 		w.Error(&metav1.Status{Status: "Failure"})
 		w.Modify(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 		w.Error(&metav1.Status{Status: "Failure"})
 		w.Delete(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		<-w.StopChan()
 	}()
 
 	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
@@ -68,9 +71,16 @@ func TestDecoratedWatcher(t *testing.T) {
 		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
 	}
 
-	// expect the underlying watcher to have been stopped as a result of the context cancellation
-	if !w.IsStopped() {
-		t.Errorf("expected underlying watcher to be stopped")
+	// Validate the DecoratedWatcher stopped the watcher when the context was cancelled
+	select {
+	case _, ok := <-w.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected watcher to be stopped")
 	}
 }
 

@@ -48,7 +48,7 @@ func (n *clientNegotiator) Encoder(contentType string, params map[string]string)
 	info, ok := SerializerInfoForMediaType(mediaTypes, contentType)
 	if !ok {
 		if len(contentType) != 0 || len(mediaTypes) == 0 {
-			return nil, NegotiateError{ContentType: contentType}
+			return nil, fmt.Errorf("encoding: %w", NegotiateError{ContentType: contentType})
 		}
 		info = mediaTypes[0]
 	}
@@ -60,7 +60,7 @@ func (n *clientNegotiator) Decoder(contentType string, params map[string]string)
 	info, ok := SerializerInfoForMediaType(mediaTypes, contentType)
 	if !ok {
 		if len(contentType) != 0 || len(mediaTypes) == 0 {
-			return nil, NegotiateError{ContentType: contentType}
+			return nil, fmt.Errorf("decoding: %w", NegotiateError{ContentType: contentType})
 		}
 		info = mediaTypes[0]
 	}
@@ -72,12 +72,12 @@ func (n *clientNegotiator) StreamDecoder(contentType string, params map[string]s
 	info, ok := SerializerInfoForMediaType(mediaTypes, contentType)
 	if !ok {
 		if len(contentType) != 0 || len(mediaTypes) == 0 {
-			return nil, nil, nil, NegotiateError{ContentType: contentType, Stream: true}
+			return nil, nil, nil, fmt.Errorf("stream decoding: %w", NegotiateError{ContentType: contentType, Stream: true})
 		}
 		info = mediaTypes[0]
 	}
 	if info.StreamSerializer == nil {
-		return nil, nil, nil, NegotiateError{ContentType: info.MediaType, Stream: true}
+		return nil, nil, nil, fmt.Errorf("stream decoding: %w", NegotiateError{ContentType: info.MediaType, Stream: true})
 	}
 	return n.serializer.DecoderToVersion(info.Serializer, n.decode), info.StreamSerializer.Serializer, info.StreamSerializer.Framer, nil
 }

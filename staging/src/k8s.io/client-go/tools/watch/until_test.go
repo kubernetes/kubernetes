@@ -47,6 +47,8 @@ func TestUntil(t *testing.T) {
 		var obj *fakePod
 		fw.Add(obj)
 		fw.Modify(obj)
+		<-fw.StopChan()
+		fw.Close()
 	}()
 	conditions := []ConditionFunc{
 		func(event watch.Event) (bool, error) { return event.Type == watch.Added, nil },
@@ -69,6 +71,18 @@ func TestUntil(t *testing.T) {
 	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
+
+	// Validate the UntilWithoutRetry stopped the watcher on condition or error
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
+	}
 }
 
 func TestUntilMultipleConditions(t *testing.T) {
@@ -76,6 +90,8 @@ func TestUntilMultipleConditions(t *testing.T) {
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
+		<-fw.StopChan()
+		fw.Close()
 	}()
 	conditions := []ConditionFunc{
 		func(event watch.Event) (bool, error) { return event.Type == watch.Added, nil },
@@ -98,6 +114,18 @@ func TestUntilMultipleConditions(t *testing.T) {
 	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
+
+	// Validate the UntilWithoutRetry stopped the watcher on condition or error
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
+	}
 }
 
 func TestUntilMultipleConditionsFail(t *testing.T) {
@@ -105,6 +133,8 @@ func TestUntilMultipleConditionsFail(t *testing.T) {
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
+		<-fw.StopChan()
+		fw.Close()
 	}()
 	conditions := []ConditionFunc{
 		func(event watch.Event) (bool, error) { return event.Type == watch.Added, nil },
@@ -128,6 +158,18 @@ func TestUntilMultipleConditionsFail(t *testing.T) {
 	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
+
+	// Validate the UntilWithoutRetry stopped the watcher on condition or error
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
+	}
 }
 
 func TestUntilTimeout(t *testing.T) {
@@ -136,6 +178,8 @@ func TestUntilTimeout(t *testing.T) {
 		var obj *fakePod
 		fw.Add(obj)
 		fw.Modify(obj)
+		<-fw.StopChan()
+		fw.Close()
 	}()
 	conditions := []ConditionFunc{
 		func(event watch.Event) (bool, error) {
@@ -159,6 +203,18 @@ func TestUntilTimeout(t *testing.T) {
 	if got, isPod := lastEvent.Object.(*fakePod); !isPod {
 		t.Fatalf("expected a pod event, got %#v", got)
 	}
+
+	// Validate the UntilWithoutRetry stopped the watcher on condition or error
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
+	}
 }
 
 func TestUntilErrorCondition(t *testing.T) {
@@ -166,6 +222,8 @@ func TestUntilErrorCondition(t *testing.T) {
 	go func() {
 		var obj *fakePod
 		fw.Add(obj)
+		<-fw.StopChan()
+		fw.Close()
 	}()
 	expected := "something bad"
 	conditions := []ConditionFunc{
@@ -182,6 +240,18 @@ func TestUntilErrorCondition(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), expected) {
 		t.Fatalf("expected %q in error string, got %q", expected, err.Error())
+	}
+
+	// Validate the UntilWithoutRetry stopped the watcher on condition or error
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
 	}
 }
 

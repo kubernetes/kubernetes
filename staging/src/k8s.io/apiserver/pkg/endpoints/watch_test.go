@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,9 +34,11 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -96,7 +99,7 @@ func podWatchTestTable() []struct {
 	}
 }
 
-func TestWatchWebsocket(t *testing.T) {
+func TestWatchWebsocketServerClose(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
@@ -112,10 +115,20 @@ func TestWatchWebsocket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer func(t *testing.T) {
+		require.NoError(t, ws.Close())
+	}(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
+	storageWatcher, err := simpleStorage.WaitForWatcher(ctx)
+	if err != nil {
+		t.Fatalf("waiting for watcher: %v", err)
+	}
 
 	try := func(action watch.EventType, object runtime.Object) {
 		// Send
-		simpleStorage.fakeWatch.Action(action, object)
+		storageWatcher.Action(action, object)
 		// Test receive
 		var got watchJSON
 		err := websocket.JSON.Receive(ws, &got)
@@ -137,12 +150,14 @@ func TestWatchWebsocket(t *testing.T) {
 	for _, item := range watchTestTable {
 		try(item.t, item.obj)
 	}
-	simpleStorage.fakeWatch.Stop()
+
+	// Storage closes the watcher before the client is done reading.
+	storageWatcher.Close()
 
 	var got watchJSON
 	err = websocket.JSON.Receive(ws, &got)
-	if err == nil {
-		t.Errorf("Unexpected non-error")
+	if !errors.Is(err, io.EOF) {
+		t.Errorf("Expected EOF error, but got: %v", err)
 	}
 }
 
@@ -162,10 +177,20 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer func(t *testing.T) {
+		require.NoError(t, ws.Close())
+	}(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
+	storageWatcher, err := simpleStorage.WaitForWatcher(ctx)
+	if err != nil {
+		t.Fatalf("waiting for watcher: %v", err)
+	}
 
 	try := func(action watch.EventType, object runtime.Object) {
 		// Send
-		simpleStorage.fakeWatch.Action(action, object)
+		storageWatcher.Action(action, object)
 		// Test receive
 		var got watchJSON
 		err := websocket.JSON.Receive(ws, &got)
@@ -197,22 +222,28 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		try(item.t, item.obj)
 	}
 
+	// Storage waits for the server to stop reading, then closes the watcher.
+	go func() {
+		<-storageWatcher.StopChan()
+		storageWatcher.Close()
+	}()
+
 	// Client requests a close
 	ws.Close()
 
 	select {
-	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
+	case data, ok := <-storageWatcher.ResultChan():
 		if ok {
 			t.Errorf("expected a closed result channel, but got watch result %#v", data)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("watcher did not close when client closed")
 	}
 
 	var got watchJSON
 	err = websocket.JSON.Receive(ws, &got)
-	if err == nil {
-		t.Errorf("Unexpected non-error")
+	if err == nil || !strings.Contains(err.Error(), "use of closed network connection") {
+		t.Errorf("Expected closed connection error, but got: %v", err)
 	}
 }
 
@@ -237,11 +268,27 @@ func TestWatchClientClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer func(t *testing.T) {
+		require.NoError(t, response.Body.Close())
+	}(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
+	storageWatcher, err := simpleStorage.WaitForWatcher(ctx)
+	if err != nil {
+		t.Fatalf("waiting for watcher: %v", err)
+	}
 
 	if response.StatusCode != http.StatusOK {
 		b, _ := ioutil.ReadAll(response.Body)
 		t.Fatalf("Unexpected response: %#v\n%s", response, string(b))
 	}
+
+	// Storage waits for the server to stop reading, then closes the watcher.
+	go func() {
+		<-storageWatcher.StopChan()
+		storageWatcher.Close()
+	}()
 
 	// Close response to cause a cancel on the server
 	if err := response.Body.Close(); err != nil {
@@ -249,11 +296,11 @@ func TestWatchClientClose(t *testing.T) {
 	}
 
 	select {
-	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
+	case data, ok := <-storageWatcher.ResultChan():
 		if ok {
 			t.Errorf("expected a closed result channel, but got watch result %#v", data)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("watcher did not close when client closed")
 	}
 }
@@ -357,7 +404,9 @@ func TestWatchRead(t *testing.T) {
 				streamSerializer := info.StreamSerializer
 
 				r, contentType := protocol.fn(test.Accept)
-				defer r.Close()
+				defer func(t *testing.T) {
+					require.NoError(t, r.Close())
+				}(t)
 
 				if contentType != "__default__" && contentType != test.ExpectedContentType {
 					t.Errorf("Unexpected content type: %#v", contentType)
@@ -370,10 +419,11 @@ func TestWatchRead(t *testing.T) {
 				}
 				d := streaming.NewDecoder(fr, streamSerializer.Serializer)
 
-				var w *watch.FakeWatcher
-				for w == nil {
-					w = simpleStorage.Watcher()
-					time.Sleep(time.Millisecond)
+				ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+				defer cancel()
+				storageWatcher, err := simpleStorage.WaitForWatcher(ctx)
+				if err != nil {
+					t.Fatalf("waiting for watcher: %v", err)
 				}
 
 				for i, item := range podWatchTestTable() {
@@ -381,7 +431,7 @@ func TestWatchRead(t *testing.T) {
 					name := fmt.Sprintf("%s-%s-%d", protocol.name, test.MediaType, i)
 
 					// Send
-					w.Action(action, object)
+					storageWatcher.Action(action, object)
 					// Test receive
 					var got metav1.WatchEvent
 					_, _, err := d.Decode(nil, &got)
@@ -400,12 +450,27 @@ func TestWatchRead(t *testing.T) {
 						t.Errorf("%s: different: %s", name, cmp.Diff(e, a))
 					}
 				}
-				w.Stop()
+
+				// Storage waits for the server to stop reading, then closes the watcher.
+				go func() {
+					<-storageWatcher.StopChan()
+					storageWatcher.Close()
+				}()
+
+				// Client closes the decoder
+				assert.NoError(t, d.Close())
 
 				var got metav1.WatchEvent
-				_, _, err := d.Decode(nil, &got)
-				if err == nil {
-					t.Errorf("Unexpected non-error")
+				_, _, err = d.Decode(nil, &got)
+				// TODO: Why is there a race condition that makes the error non-deterministic?
+				switch {
+				case err == nil:
+					t.Errorf("Expected closed connection error, but got: %v", err)
+				case strings.Contains(err.Error(), "use of closed network connection"):
+				case strings.Contains(err.Error(), "http: read on closed response body"):
+				default:
+					t.Errorf("Expected closed connection error, but got: %v", err)
+
 				}
 			}()
 		}
@@ -615,9 +680,12 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 // Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
 func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preServeErr error) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		defer watcher.Stop()
-
 		if preServeErr != nil {
+			// Cleanup the Watcher
+			defer watcher.Stop()
+			// Cleanup the TimeoutFactory
+			_, cleanup := watchServer.TimeoutFactory.TimeoutCh()
+			defer cleanup()
 			responsewriters.ErrorNegotiated(preServeErr, watchServer.Scope.Serializer, watchServer.Scope.Kind.GroupVersion(), w, req)
 			return
 		}
@@ -628,8 +696,9 @@ func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preS
 
 func TestWatchHTTPErrors(t *testing.T) {
 	watcher := watch.NewFake()
+	defer watcher.Close()
 	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
+	doneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -647,7 +716,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, doneCh},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
@@ -664,9 +733,10 @@ func TestWatchHTTPErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
+	errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
 	watcher.Error(&errStatus)
-	watcher.Stop()
+	// Storage closes watcher immediately after error event
+	watcher.Close()
 
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)
@@ -685,12 +755,37 @@ func TestWatchHTTPErrors(t *testing.T) {
 	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
 		t.Fatalf("error: %#v", status)
 	}
+
+	// Validate the handler stopped the watcher
+	select {
+	case _, ok := <-watcher.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected watcher to be stopped")
+	}
+
+	// Validate the handler cleaned up the TimeoutFactory
+	select {
+	case _, ok := <-doneCh:
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected done channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected timeout factory to be done")
+	}
 }
 
 func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	watcher := watch.NewFake()
+	defer watcher.Close()
 	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
+	doneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -711,10 +806,10 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, doneCh},
 	}
 
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error"))
+	errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error"))
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, errStatus))
 	defer s.Close()
@@ -724,7 +819,10 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
-	req, _ := http.NewRequest("GET", dest.String(), nil)
+	req, err := http.NewRequest("GET", dest.String(), nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -742,16 +840,43 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		t.Fatalf("error: %#v", status)
 	}
 
-	// check for leaks
-	if !watcher.IsStopped() {
-		t.Errorf("Leaked watcher goruntine after request done")
+	// Storage waits for the server to stop reading, then closes the watcher.
+	go func() {
+		<-watcher.StopChan()
+		watcher.Close()
+	}()
+
+	// Validate the handler stopped the watcher
+	select {
+	case _, ok := <-watcher.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected watcher to be stopped")
+	}
+
+	// Validate the handler cleaned up the TimeoutFactory
+	select {
+	case _, ok := <-doneCh:
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected done channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected timeout factory to be done")
 	}
 }
 
 func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 	watcher := watch.NewFake()
+	defer watcher.Close()
 	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
+	defer close(timeoutCh)
+	doneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -769,7 +894,7 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, doneCh},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
@@ -783,17 +908,62 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 
 	_, err := client.Watch(context.TODO(), metav1.ListOptions{})
 	if err == nil {
-		t.Fatal(err)
+		t.Fatal("expected error, got nil")
 	}
-	if err.Error() != "no stream serializers registered for testcase/json" {
+	var nErr runtime.NegotiateError
+	if !errors.As(err, &nErr) {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !nErr.Stream {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if nErr.ContentType != "testcase/json" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Storage waits for the server to stop reading, then closes the watcher.
+	go func() {
+		<-watcher.StopChan()
+		watcher.Close()
+	}()
+
+	// client.Watch errored client-side while trying to create a stream decoder,
+	// and the storage watcher never received any events. So the server remains
+	// blocked until either the connection closes, the server times out, or the
+	// request times out. So shut down the connection to terminate the request
+	// and wait until the handler stops the watcher.
+	s.CloseClientConnections()
+
+	// Validate the handler stopped the watcher
+	select {
+	case _, ok := <-watcher.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected watcher to be stopped")
+	}
+
+	// Validate the handler cleaned up the TimeoutFactory
+	select {
+	case _, ok := <-doneCh:
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected done channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected timeout factory to be done")
 	}
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {
 	watcher := watch.NewFake()
+	defer watcher.Close()
 	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
+	doneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -811,7 +981,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, doneCh},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
@@ -830,6 +1000,12 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	}
 	watcher.Add(&apitesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: newGroupVersion.String()}})
 
+	// Storage waits for the server to stop reading, then closes the watcher.
+	go func() {
+		<-watcher.StopChan()
+		watcher.Close()
+	}()
+
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)
 	var got watchJSON
@@ -837,22 +1013,30 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer func(t *testing.T) {
+		require.NoError(t, resp.Body.Close())
+	}(t)
 
-	// Timeout and check for leaks
+	// Timeout should cause the server to close the watch connection,
+	// which should stop the storage watcher, which should close the result channel.
 	close(timeoutCh)
+	// Check for leaks
 	select {
-	case <-done:
+	case <-doneCh:
 		eventCh := watcher.ResultChan()
-		select {
-		case _, opened := <-eventCh:
-			if opened {
-				t.Errorf("Watcher received unexpected event")
+	loop:
+		for {
+			select {
+			case e, opened := <-eventCh:
+				if !opened {
+					// result channel closed, as expected
+					break loop
+				}
+				t.Errorf("Watcher received unexpected event: %v", e)
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Leaked watch on timeout")
+				break loop
 			}
-			if !watcher.IsStopped() {
-				t.Errorf("Watcher is not stopped")
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Leaked watch on timeout")
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Failed to stop watcher after %s of timeout signal", wait.ForeverTestTimeout.String())
@@ -862,6 +1046,18 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	err = decoder.Decode(&got)
 	if err != io.EOF {
 		t.Errorf("Unexpected non-error")
+	}
+
+	// Validate the handler cleaned up the TimeoutFactory
+	select {
+	case _, ok := <-doneCh:
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Error("Unexpected done channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Expected timeout factory to be done")
 	}
 }
 
@@ -921,14 +1117,26 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 	if err != nil {
 		b.Fatalf("unexpected error: %v", err)
 	}
+	defer func(b *testing.B) {
+		require.NoError(b, response.Body.Close())
+	}(b)
 	if response.StatusCode != http.StatusOK {
 		b.Fatalf("Unexpected response %#v", response)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
+	storageWatcher, err := simpleStorage.WaitForWatcher(ctx)
+	if err != nil {
+		b.Fatalf("waiting for watcher: %v", err)
 	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		defer response.Body.Close()
+		defer func(b *testing.B) {
+			require.NoError(b, response.Body.Close())
+		}(b)
 		if _, err := io.Copy(ioutil.Discard, response.Body); err != nil {
 			b.Error(err)
 		}
@@ -939,9 +1147,10 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		simpleStorage.fakeWatch.Action(actions[i%len(actions)], items[i%len(items)])
+		storageWatcher.Action(actions[i%len(actions)], items[i%len(items)])
 	}
-	simpleStorage.fakeWatch.Stop()
+	// Storage closes the watcher when done sending events
+	storageWatcher.Close()
 	wg.Wait()
 	b.StopTimer()
 }
@@ -965,6 +1174,13 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 		b.Fatalf("unexpected error: %v", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+	defer cancel()
+	storageWatcher, err := simpleStorage.WaitForWatcher(ctx)
+	if err != nil {
+		b.Fatalf("waiting for watcher: %v", err)
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -979,9 +1195,10 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		simpleStorage.fakeWatch.Action(actions[i%len(actions)], &items[i%len(items)])
+		storageWatcher.Action(actions[i%len(actions)], &items[i%len(items)])
 	}
-	simpleStorage.fakeWatch.Stop()
+	// Storage closes the watcher when done sending events
+	storageWatcher.Close()
 	wg.Wait()
 	b.StopTimer()
 }

@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
@@ -654,6 +653,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	ctx := context.Background()
 	store := newTestWatchCache(5, &cache.Indexers{})
 	defer store.Stop()
+	stopCh := make(chan struct{})
 
 	{
 		_, version, _, err := store.WaitUntilFreshAndList(ctx, 0, nil)
@@ -668,7 +668,13 @@ func TestReflectorForWatchCache(t *testing.T) {
 	lw := &testLW{
 		WatchFunc: func(_ metav1.ListOptions) (watch.Interface, error) {
 			fw := watch.NewFake()
-			go fw.Stop()
+			// Wait for the watcher to be stopped, then close the result channel.
+			go func() {
+				<-fw.StopChan()
+				fw.Close()
+			}()
+			// Simulate the client stopping the ListAndWatch after watch starts.
+			go close(stopCh)
 			return fw, nil
 		},
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -676,7 +682,10 @@ func TestReflectorForWatchCache(t *testing.T) {
 		},
 	}
 	r := cache.NewReflector(lw, &v1.Pod{}, store, 0)
-	r.ListAndWatch(wait.NeverStop)
+	err := r.ListAndWatch(stopCh)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	{
 		_, version, _, err := store.WaitUntilFreshAndList(ctx, 10, nil)

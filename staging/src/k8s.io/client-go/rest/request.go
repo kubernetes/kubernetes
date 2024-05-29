@@ -865,11 +865,13 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 	var lastKey string
 	var items []runtime.Object
 
+	doneCh := ctx.Done()
+	resultCh := w.ResultChan()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-doneCh:
 			return WatchListResult{err: ctx.Err()}
-		case event, ok := <-w.ResultChan():
+		case event, ok := <-resultCh:
 			if !ok {
 				return WatchListResult{err: fmt.Errorf("unexpected watch close")}
 			}

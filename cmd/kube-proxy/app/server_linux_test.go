@@ -569,6 +569,7 @@ func Test_waitForPodCIDR(t *testing.T) {
 		fakeWatch.Delete(oldNode)
 		// set the PodCIDRs on the new node
 		fakeWatch.Modify(updatedNode)
+		fakeWatch.Close()
 	}()
 	got, err := waitForPodCIDR(ctx, client, node.Name)
 	if err != nil {

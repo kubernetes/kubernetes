@@ -26,6 +26,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
@@ -89,41 +90,48 @@ func TestGetPodList(t *testing.T) {
 		},
 	}
 
-	for i := range tests {
-		test := tests[i]
-		fake := fakeexternal.NewSimpleClientset(test.podList)
-		if len(test.watching) > 0 {
-			watcher := watch.NewFake()
-			for _, event := range test.watching {
-				switch event.Type {
-				case watch.Added:
-					go watcher.Add(event.Object)
-				case watch.Modified:
-					go watcher.Modify(event.Object)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := fakeexternal.NewSimpleClientset(tc.podList)
+			var watcher *watch.ProxyWatcher
+			if len(tc.watching) > 0 {
+				resultCh := make(chan watch.Event)
+				watcher = watch.NewProxyWatcher(resultCh)
+				go sendWatchEvents(resultCh, watcher.StopChan(), tc.watching)
+				fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
+			}
+			selector := labels.Set(labelSet).AsSelector()
+			podList, err := GetPodList(fake.CoreV1(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, tc.sortBy)
+
+			if !tc.expectedErr && err != nil {
+				t.Fatalf("%s: unexpected error: %v", tc.name, err)
+			}
+			if tc.expectedErr && err == nil {
+				t.Fatalf("%s: expected an error", tc.name)
+			}
+			if tc.expectedNum != len(podList.Items) {
+				t.Fatalf("%s: expected %d pods, got %d", tc.name, tc.expectedNum, len(podList.Items))
+			}
+			if !apiequality.Semantic.DeepEqual(tc.expected, podList) {
+				t.Fatalf("%s:\nexpected podList:\n%#v\ngot:\n%#v\n\n", tc.name, tc.expected, podList)
+			}
+			if watcher != nil {
+				// Validate the GetPodList stopped the watcher when done
+				select {
+				case _, ok := <-watcher.StopChan():
+					if !ok {
+						// closed as expected
+						break
+					}
+					t.Fatalf("Unexpected stop channel event")
+				case <-time.After(wait.ForeverTestTimeout):
+					t.Fatalf("Expected watcher to be stopped")
 				}
 			}
-			fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
-		}
-		selector := labels.Set(labelSet).AsSelector()
-		podList, err := GetPodList(fake.CoreV1(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, test.sortBy)
-
-		if !test.expectedErr && err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-			continue
-		}
-		if test.expectedErr && err == nil {
-			t.Errorf("%s: expected an error", test.name)
-			continue
-		}
-		if test.expectedNum != len(podList.Items) {
-			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, len(podList.Items))
-			continue
-		}
-		if !apiequality.Semantic.DeepEqual(test.expected, podList) {
-			t.Errorf("%s:\nexpected podList:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, podList)
-		}
+		})
 	}
 }
+
 func TestGetFirstPod(t *testing.T) {
 	labelSet := map[string]string{"test": "selector"}
 	tests := []struct {
@@ -205,8 +213,8 @@ func TestGetFirstPod(t *testing.T) {
 			expectedNum: 2,
 		},
 		{
-			name:    "kubectl attach - wait for ready pod",
-			podList: newPodList(1, 1, -1, labelSet),
+			name:    "kubectl attach - wait for pod",
+			podList: newPodList(0, -1, -1, labelSet),
 			watching: []watch.Event{
 				{
 					Type: watch.Modified,
@@ -216,14 +224,6 @@ func TestGetFirstPod(t *testing.T) {
 							Namespace:         metav1.NamespaceDefault,
 							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 							Labels:            map[string]string{"test": "selector"},
-						},
-						Status: corev1.PodStatus{
-							Conditions: []corev1.PodCondition{
-								{
-									Status: corev1.ConditionTrue,
-									Type:   corev1.PodReady,
-								},
-							},
 						},
 					},
 				},
@@ -236,53 +236,51 @@ func TestGetFirstPod(t *testing.T) {
 					CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{"test": "selector"},
 				},
-				Status: corev1.PodStatus{
-					Conditions: []corev1.PodCondition{
-						{
-							Status: corev1.ConditionTrue,
-							Type:   corev1.PodReady,
-						},
-					},
-				},
 			},
 			expectedNum: 1,
 		},
 	}
 
-	for i := range tests {
-		test := tests[i]
-		fake := fakeexternal.NewSimpleClientset(test.podList)
-		if len(test.watching) > 0 {
-			watcher := watch.NewFake()
-			for _, event := range test.watching {
-				switch event.Type {
-				case watch.Added:
-					go watcher.Add(event.Object)
-				case watch.Modified:
-					go watcher.Modify(event.Object)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := fakeexternal.NewSimpleClientset(tc.podList)
+			var watcher *watch.ProxyWatcher
+			if len(tc.watching) > 0 {
+				resultCh := make(chan watch.Event)
+				watcher = watch.NewProxyWatcher(resultCh)
+				go sendWatchEvents(resultCh, watcher.StopChan(), tc.watching)
+				fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
+			}
+			selector := labels.Set(labelSet).AsSelector()
+
+			pod, numPods, err := GetFirstPod(fake.CoreV1(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, tc.sortBy)
+			pod.Spec.SecurityContext = nil
+			if !tc.expectedErr && err != nil {
+				t.Fatalf("%s: unexpected error: %v", tc.name, err)
+			}
+			if tc.expectedErr && err == nil {
+				t.Fatalf("%s: expected an error", tc.name)
+			}
+			if tc.expectedNum != numPods {
+				t.Fatalf("%s: expected %d pods, got %d", tc.name, tc.expectedNum, numPods)
+			}
+			if !apiequality.Semantic.DeepEqual(tc.expected, pod) {
+				t.Fatalf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", tc.name, tc.expected, pod)
+			}
+			if watcher != nil {
+				// Validate the GetPodList stopped the watcher when done
+				select {
+				case _, ok := <-watcher.StopChan():
+					if !ok {
+						// closed as expected
+						break
+					}
+					t.Fatalf("Unexpected stop channel event")
+				case <-time.After(wait.ForeverTestTimeout):
+					t.Fatalf("Expected watcher to be stopped")
 				}
 			}
-			fake.PrependWatchReactor("pods", testcore.DefaultWatchReactor(watcher, nil))
-		}
-		selector := labels.Set(labelSet).AsSelector()
-
-		pod, numPods, err := GetFirstPod(fake.CoreV1(), metav1.NamespaceDefault, selector.String(), 1*time.Minute, test.sortBy)
-		pod.Spec.SecurityContext = nil
-		if !test.expectedErr && err != nil {
-			t.Errorf("%s: unexpected error: %v", test.name, err)
-			continue
-		}
-		if test.expectedErr && err == nil {
-			t.Errorf("%s: expected an error", test.name)
-			continue
-		}
-		if test.expectedNum != numPods {
-			t.Errorf("%s: expected %d pods, got %d", test.name, test.expectedNum, numPods)
-			continue
-		}
-		if !apiequality.Semantic.DeepEqual(test.expected, pod) {
-			t.Errorf("%s:\nexpected pod:\n%#v\ngot:\n%#v\n\n", test.name, test.expected, pod)
-		}
+		})
 	}
 }
 
@@ -315,5 +313,16 @@ func newPodList(count, isUnready, isUnhealthy int, labels map[string]string) *co
 	}
 	return &corev1.PodList{
 		Items: pods,
+	}
+}
+
+func sendWatchEvents(resultCh chan watch.Event, stopCh <-chan struct{}, events []watch.Event) {
+	defer close(resultCh)
+	for _, event := range events {
+		select {
+		case resultCh <- event:
+		case <-stopCh:
+			return
+		}
 	}
 }

@@ -500,6 +500,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 	})
 
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeMetricsClient := &metricsfake.Clientset{}

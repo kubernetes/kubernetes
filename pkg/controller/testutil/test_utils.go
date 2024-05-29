@@ -281,6 +281,7 @@ func (m *FakeNodeHandler) PatchStatus(ctx context.Context, nodeName string, data
 
 // Watch watches Nodes in a fake store.
 func (m *FakeNodeHandler) Watch(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	// TODO: fakeWatch.Close()
 	return watch.NewFake(), nil
 }
 
