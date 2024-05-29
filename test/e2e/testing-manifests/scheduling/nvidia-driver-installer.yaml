@@ -1,5 +1,5 @@
 # This DaemonSet was originally referenced from
-# https://github.com/GoogleCloudPlatform/container-engine-accelerators/edit/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
+# https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
 
 # The Dockerfile and other source for this daemonset are in
 # https://github.com/GoogleCloudPlatform/cos-gpu-installer
