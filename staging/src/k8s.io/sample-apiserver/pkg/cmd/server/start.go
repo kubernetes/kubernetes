@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -36,6 +35,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -61,7 +61,7 @@ type WardleServerOptions struct {
 
 func mapWardleEffectiveVersionToKubeEffectiveVersion(registry utilversion.ComponentGlobalsRegistry) error {
 	wardleVer := registry.EffectiveVersionFor(apiserver.WardleComponentName)
-	kubeVer := registry.EffectiveVersionFor(utilversion.ComponentGenericAPIServer).(utilversion.MutableEffectiveVersion)
+	kubeVer := registry.EffectiveVersionFor(utilversion.DefaultKubeComponent).(utilversion.MutableEffectiveVersion)
 	// map from wardle emulation version to kube emulation version.
 	emulationVersionMap := map[string]string{
 		"1.2": kubeVer.BinaryVersion().AddMinor(1).String(),
@@ -99,6 +99,13 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 	cmd := &cobra.Command{
 		Short: "Launch a wardle API server",
 		Long:  "Launch a wardle API server",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+				return err
+			}
+			// convert wardle effective version to kube effective version to be used in generic api server, and set the generic api server feature gate.
+			return mapWardleEffectiveVersionToKubeEffectiveVersion(utilversion.DefaultComponentGlobalsRegistry)
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
 				return err
@@ -118,12 +125,19 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 	o.RecommendedOptions.AddFlags(flags)
 
 	wardleEffectiveVersion := utilversion.NewEffectiveVersion("1.2")
-	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(apiserver.WardleComponentName, wardleEffectiveVersion, nil, false))
-	_, featureGate := utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+	wardleFeatureGate := featuregate.NewVersionedFeatureGate(version.MustParse("1.2"))
+	utilruntime.Must(wardleFeatureGate.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+		"BanFlunder": {
+			{Version: version.MustParse("1.2"), Default: true, PreRelease: featuregate.GA},
+			{Version: version.MustParse("1.1"), Default: false, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.Alpha},
+		},
+	}))
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(apiserver.WardleComponentName, wardleEffectiveVersion, wardleFeatureGate, false))
+	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		utilversion.DefaultKubeComponent, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 
-	wardleEffectiveVersion.AddFlags(flags, "wardle-")
-	featureGate.AddFlag(flags, "")
+	utilversion.DefaultComponentGlobalsRegistry.AddFlags(flags)
 
 	return cmd
 }
@@ -132,29 +146,19 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 func (o WardleServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
-	errors = append(errors, utilversion.DefaultComponentGlobalsRegistry.ValidateAllComponents()...)
+	errors = append(errors, utilversion.DefaultComponentGlobalsRegistry.Validate()...)
 	return utilerrors.NewAggregate(errors)
 }
 
 // Complete fills in fields required to have valid data
 func (o *WardleServerOptions) Complete() error {
-	// register admission plugins
-	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
+	if utilversion.DefaultComponentGlobalsRegistry.FeatureGateFor(apiserver.WardleComponentName).Enabled("BanFlunder") {
+		// register admission plugins
+		banflunder.Register(o.RecommendedOptions.Admission.Plugins)
 
-	// add admission plugins to the RecommendedPluginOrder
-	o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
-
-	// convert wardle effective version to kube effective version to be used in generic api server, and set the generic api server feature gate.
-	if err := mapWardleEffectiveVersionToKubeEffectiveVersion(utilversion.DefaultComponentGlobalsRegistry); err != nil {
-		return err
+		// add admission plugins to the RecommendedPluginOrder
+		o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
 	}
-	if err := utilversion.DefaultComponentGlobalsRegistry.SetAllComponents(); err != nil {
-		return err
-	}
-	if errs := utilversion.DefaultComponentGlobalsRegistry.ValidateAllComponents(); len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-
 	return nil
 }
 
@@ -185,8 +189,8 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	serverConfig.OpenAPIV3Config.Info.Title = "Wardle"
 	serverConfig.OpenAPIV3Config.Info.Version = "0.1"
 
-	serverConfig.FeatureGate = utilversion.DefaultComponentGlobalsRegistry.FeatureGateFor(utilversion.ComponentGenericAPIServer)
-	serverConfig.EffectiveVersion = utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.ComponentGenericAPIServer)
+	serverConfig.FeatureGate = utilversion.DefaultComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)
+	serverConfig.EffectiveVersion = utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err

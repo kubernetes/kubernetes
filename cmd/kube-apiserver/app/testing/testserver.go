@@ -187,15 +187,14 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		binaryVersion = instanceOptions.BinaryVersion
 	}
 	effectiveVersion := utilversion.NewEffectiveVersion(binaryVersion)
-	_ = utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.ComponentGenericAPIServer, effectiveVersion, featureGate, true)
+	_ = utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate, true)
 
 	s := options.NewServerRunOptions(featureGate, effectiveVersion)
 
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
-	featureGate.AddFlag(fs, "")
-	effectiveVersion.AddFlags(fs, "")
+	utilversion.DefaultComponentGlobalsRegistry.AddFlags(fs)
 
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {
@@ -336,7 +335,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, err
 	}
 
-	if err := utilversion.DefaultComponentGlobalsRegistry.SetAllComponents(); err != nil {
+	if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
 		return result, err
 	}
 

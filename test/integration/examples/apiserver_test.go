@@ -292,7 +292,8 @@ func TestAggregatedAPIServer(t *testing.T) {
 			"--etcd-servers", framework.GetEtcdURL(),
 			"--cert-dir", wardleCertDir,
 			"--kubeconfig", wardleToKASKubeConfigFile,
-			"--wardle-emulated-version", "1.1",
+			"--emulated-version", "wardle=1.1",
+			"--feature-gates", "wardle:BanFlunder=true",
 		})
 		if err := wardleCmd.Execute(); err != nil {
 			t.Error(err)
@@ -387,6 +388,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "panda",
 		},
+		DisallowedFlunders: []string{"badname"},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -404,9 +406,20 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	_, err = wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
 		ObjectMeta: metav1.ObjectMeta{
+			Name: "badname",
+		},
+	}, metav1.CreateOptions{})
+	if err == nil {
+		t.Fatal("expect flunder:badname not admitted")
+	}
+	_, err = wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "panda",
 		},
 	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	flunderList, err := wardleClient.Flunders(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)

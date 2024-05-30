@@ -115,7 +115,6 @@ type FeatureGate interface {
 	// config against potential feature gate changes before committing those changes.
 	DeepCopy() MutableVersionedFeatureGate
 	// Validate checks if the flag gates are valid at the emulated version.
-	// Should always be called after Set when DeferErrorsToValidation is set to true.
 	Validate() []error
 }
 
@@ -125,7 +124,9 @@ type MutableFeatureGate interface {
 	FeatureGate
 
 	// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
-	AddFlag(fs *pflag.FlagSet, prefix string)
+	AddFlag(fs *pflag.FlagSet)
+	// Close sets closed to true, and prevents subsequent calls to Add
+	Close()
 	// Set parses and stores flag gates for known features
 	// from a string like feature1=true,feature2=false,...
 	Set(value string) error
@@ -163,10 +164,6 @@ type MutableVersionedFeatureGate interface {
 	// Otherwise, the emulationVersion will be the same as the binary version.
 	// If set, the feature defaults and availability will be as if the binary is at the emulated version.
 	SetEmulationVersion(emulationVersion *version.Version) error
-	// DeferErrorsToValidation defers the errors of Set function to the Validate() function if true.
-	// This is used when the user wants to set the feature gate flag before the emulationVersion is finalized.
-	// Validate() should aways be called later to check for flag errors if deferErrorsToValidation is true.
-	DeferErrorsToValidation(val bool)
 	// GetAll returns a copy of the map of known feature names to versioned feature specs.
 	GetAllVersioned() map[Feature]VersionedSpecs
 	// AddVersioned adds versioned feature specs to the featureGate.
@@ -199,12 +196,8 @@ type featureGate struct {
 	// while enabled keeps the values of all resolved features.
 	enabledRaw atomic.Value
 	// closed is set to true when AddFlag is called, and prevents subsequent calls to Add
-	closed bool
-	// deferErrorsToValidation could be set to true to defer checking flag setting error,
-	// because the emulationVersion may not be the final emulationVersion when the flag is set.
-	// Validate() should aways be called later to check for flag errors if deferErrorsToValidation is true.
-	deferErrorsToValidation bool
-	emulationVersion        atomic.Pointer[version.Version]
+	closed           bool
+	emulationVersion atomic.Pointer[version.Version]
 }
 
 func setUnsetAlphaGates(known map[Feature]VersionedSpecs, enabled map[Feature]bool, val bool, cVer *version.Version) {
@@ -288,17 +281,10 @@ func (f *featureGate) Set(value string) error {
 		}
 		m[k] = boolValue
 	}
-	err := f.SetFromMap(m)
-	// ignores SetFromMap error, because the emulationVersion may not be the final emulationVersion when the flag is set.
-	// Validate() should aways be called later to check for flag errors if deferErrorsToValidation is true.
-	if f.deferErrorsToValidation {
-		return nil
-	}
-	return err
+	return f.SetFromMap(m)
 }
 
 // Validate checks if the flag gates are valid at the emulated version.
-// Should always be called after Set when DeferErrorsToValidation is set to true.
 func (f *featureGate) Validate() []error {
 	m, ok := f.enabledRaw.Load().(map[string]bool)
 	if !ok {
@@ -502,15 +488,6 @@ func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 	return retval
 }
 
-// DeferErrorsToValidation could be used to defer checking flag setting error,
-// because the emulationVersion may not be the final emulationVersion when the flag is set.
-// Validate() should aways be called later to check for flag errors if deferErrorsToValidation is true.
-func (f *featureGate) DeferErrorsToValidation(val bool) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.deferErrorsToValidation = val
-}
-
 func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -577,21 +554,23 @@ func getCurrentVersion(v VersionedSpecs, emulationVersion *version.Version) *Fea
 	}
 }
 
-// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
-func (f *featureGate) AddFlag(fs *pflag.FlagSet, prefix string) {
+// Close sets closed to true, and prevents subsequent calls to Add
+func (f *featureGate) Close() {
 	f.lock.Lock()
+	f.closed = true
+	f.lock.Unlock()
+}
+
+// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
+func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 	// TODO(mtaufen): Shouldn't we just close it on the first Set/SetFromMap instead?
 	// Not all components expose a feature gates flag using this AddFlag method, and
 	// in the future, all components will completely stop exposing a feature gates flag,
 	// in favor of componentconfig.
-	f.closed = true
-	f.lock.Unlock()
+	f.Close()
 
 	known := f.KnownFeatures()
-	if len(prefix) > 0 && !strings.HasSuffix(prefix, "-") {
-		prefix += "-"
-	}
-	fs.Var(f, prefix+flagName, ""+
+	fs.Var(f, flagName, ""+
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(known, "\n"))
 }

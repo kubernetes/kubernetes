@@ -88,7 +88,7 @@ func NewCommand() *cobra.Command {
 	fs = sharedFlagSets.FlagSet("other")
 	featureGate := featuregate.NewFeatureGate()
 	utilruntime.Must(logsapi.AddFeatureGates(featureGate))
-	featureGate.AddFlag(fs, "")
+	featureGate.AddFlag(fs)
 
 	fs = cmd.PersistentFlags()
 	for _, f := range sharedFlagSets.FlagSets {

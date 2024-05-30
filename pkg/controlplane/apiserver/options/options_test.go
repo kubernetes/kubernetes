@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -46,14 +47,15 @@ func TestAddFlags(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
 	featureGate := featuregate.NewFeatureGate()
 	effectiveVersion := utilversion.NewEffectiveVersion("1.32")
+	componentRegistry := utilversion.NewComponentGlobalsRegistry()
+	_ = componentRegistry.Register("test", effectiveVersion, featureGate, true)
 	s := NewOptions(featureGate, effectiveVersion)
 	var fss cliflag.NamedFlagSets
 	s.AddFlags(&fss)
 	for _, f := range fss.FlagSets {
 		fs.AddFlagSet(f)
 	}
-	featureGate.AddFlag(fs, "")
-	effectiveVersion.AddFlags(fs, "")
+	componentRegistry.AddFlags(fs)
 
 	args := []string{
 		"--enable-admission-plugins=AlwaysDeny",
@@ -114,9 +116,10 @@ func TestAddFlags(t *testing.T) {
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
 		"--lease-reuse-duration-seconds=100",
-		"--emulated-version=1.31",
+		"--emulated-version=test=1.31",
 	}
 	fs.Parse(args)
+	utilruntime.Must(componentRegistry.Set())
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &Options{
