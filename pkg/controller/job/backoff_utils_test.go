@@ -23,7 +23,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -200,6 +203,7 @@ func TestNewBackoffRecord(t *testing.T) {
 }
 
 func TestGetFinishedTime(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	defaultTestTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
 	defaultTestTimeMinus30s := defaultTestTime.Add(-30 * time.Second)
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
