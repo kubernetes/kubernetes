@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -124,7 +125,7 @@ func HasLBFinalizer(service *v1.Service) bool {
 
 // LoadBalancerStatusEqual checks if load balancer status are equal
 func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
-	return ingressSliceEqual(l.Ingress, r.Ingress)
+	return apiequality.Semantic.DeepEqual(l.Ingress, r.Ingress)
 }
 
 // PatchService patches the given service's Status or ObjectMeta based on the original and
@@ -159,29 +160,4 @@ func getPatchBytes(oldSvc, newSvc *v1.Service) ([]byte, error) {
 	}
 	return patchBytes, nil
 
-}
-
-func ingressSliceEqual(lhs, rhs []v1.LoadBalancerIngress) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	for i := range lhs {
-		if !ingressEqual(&lhs[i], &rhs[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
-	if lhs.IP != rhs.IP {
-		return false
-	}
-	if lhs.Hostname != rhs.Hostname {
-		return false
-	}
-	if lhs.IPMode != rhs.IPMode {
-		return false
-	}
-	return true
 }
