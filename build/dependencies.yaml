@@ -87,7 +87,7 @@ dependencies:
     - path: cluster/images/etcd/migrate/options.go
 
   - name: "node-problem-detector"
-    version: 0.8.16
+    version: 0.8.19
     refPaths:
     - path: test/e2e_node/image_list.go
       match: const defaultImage
