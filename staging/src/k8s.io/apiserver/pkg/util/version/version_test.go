@@ -131,29 +131,29 @@ func TestValidate(t *testing.T) {
 func TestEffectiveVersionsFlag(t *testing.T) {
 	tests := []struct {
 		name                     string
-		emulationVerson          string
+		emulationVersion         string
 		expectedEmulationVersion *version.Version
 		parseError               string
 	}{
 		{
 			name:                     "major.minor ok",
-			emulationVerson:          "1.30",
+			emulationVersion:         "1.30",
 			expectedEmulationVersion: version.MajorMinor(1, 30),
 		},
 		{
 			name:                     "v prefix ok",
-			emulationVerson:          "v1.30",
+			emulationVersion:         "v1.30",
 			expectedEmulationVersion: version.MajorMinor(1, 30),
 		},
 		{
-			name:            "semantic version not ok",
-			emulationVerson: "1.30.1",
-			parseError:      "version 1.30.1 is not in the format of major.minor",
+			name:             "semantic version not ok",
+			emulationVersion: "1.30.1",
+			parseError:       "version 1.30.1 is not in the format of major.minor",
 		},
 		{
-			name:            "invalid version",
-			emulationVerson: "1.foo",
-			parseError:      "illegal version string",
+			name:             "invalid version",
+			emulationVersion: "1.foo",
+			parseError:       "illegal version string",
 		},
 	}
 	for i, test := range tests {
@@ -162,7 +162,7 @@ func TestEffectiveVersionsFlag(t *testing.T) {
 			effective := NewEffectiveVersion("1.30")
 			effective.AddFlags(fs, "test")
 
-			err := fs.Parse([]string{fmt.Sprintf("--test-emulated-version=%s", test.emulationVerson)})
+			err := fs.Parse([]string{fmt.Sprintf("--test-emulated-version=%s", test.emulationVersion)})
 			if test.parseError != "" {
 				if !strings.Contains(err.Error(), test.parseError) {
 					t.Fatalf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)

@@ -41,7 +41,7 @@ var (
 	// Codecs provides methods for retrieving codecs and serializers for specific
 	// versions and content types.
 	Codecs              = serializer.NewCodecFactory(Scheme)
-	WardleComponentName = "wardle-server"
+	WardleComponentName = "wardle"
 )
 
 func init() {

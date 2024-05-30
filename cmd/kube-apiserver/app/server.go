@@ -65,7 +65,7 @@ func init() {
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
 	effectiveVersion, featureGate := utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+		utilversion.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	s := options.NewServerRunOptions(featureGate, effectiveVersion)
 
 	cmd := &cobra.Command{
@@ -78,6 +78,9 @@ cluster's shared state through which all other components interact.`,
 		// stop printing usage when the command errors
 		SilenceUsage: true,
 		PersistentPreRunE: func(*cobra.Command, []string) error {
+			if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+				return err
+			}
 			// silence client-go warnings.
 			// kube-apiserver loopback clients should not log self-issued warnings.
 			rest.SetDefaultWarningHandler(rest.NoWarnings{})
@@ -86,11 +89,6 @@ cluster's shared state through which all other components interact.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			fs := cmd.Flags()
-
-			if err := utilversion.DefaultComponentGlobalsRegistry.SetAllComponents(); err != nil {
-				return err
-			}
-
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
 			if err := logsapi.ValidateAndApply(s.Logs, featureGate); err != nil {
@@ -126,8 +124,7 @@ cluster's shared state through which all other components interact.`,
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
-	featureGate.AddFlag(namedFlagSets.FlagSet("global"), "")
-	effectiveVersion.AddFlags(namedFlagSets.FlagSet("global"), "")
+	utilversion.DefaultComponentGlobalsRegistry.AddFlags(namedFlagSets.FlagSet("global"))
 
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))

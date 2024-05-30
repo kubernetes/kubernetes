@@ -50,7 +50,7 @@ func TestMapBinaryEffectiveVersionToKubeEffectiveVersion(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			registry := utilversion.NewComponentGlobalsRegistry()
 			_ = registry.Register(apiserver.WardleComponentName, wardleEffectiveVersion, nil, true)
-			_ = registry.Register(utilversion.ComponentGenericAPIServer, defaultKubeEffectiveVersion, nil, true)
+			_ = registry.Register(utilversion.DefaultKubeComponent, defaultKubeEffectiveVersion, nil, true)
 
 			wardleEffectiveVersion.SetEmulationVersion(tc.wardleEmulationVer)
 			err := mapWardleEffectiveVersionToKubeEffectiveVersion(registry)
@@ -59,7 +59,7 @@ func TestMapBinaryEffectiveVersionToKubeEffectiveVersion(t *testing.T) {
 					t.Fatal("expected error, no error found")
 				}
 			} else {
-				assert.True(t, registry.EffectiveVersionFor(utilversion.ComponentGenericAPIServer).EmulationVersion().EqualTo(tc.expectedKubeEmulationVer))
+				assert.True(t, registry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().EqualTo(tc.expectedKubeEmulationVer))
 			}
 		})
 	}

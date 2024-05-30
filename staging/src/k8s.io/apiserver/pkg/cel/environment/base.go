@@ -46,7 +46,7 @@ import (
 // A default version number equal to the current Kubernetes major.minor version
 // indicates fast forward CEL features that can be used when rollback is no longer needed.
 func DefaultCompatibilityVersion() *version.Version {
-	effectiveVer := utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.ComponentGenericAPIServer)
+	effectiveVer := utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
 	if effectiveVer == nil {
 		effectiveVer = utilversion.DefaultKubeEffectiveVersion()
 	}

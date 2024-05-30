@@ -124,11 +124,10 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	featureGate := utilfeature.DefaultMutableFeatureGate
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-	_ = utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.ComponentGenericAPIServer, effectiveVersion, featureGate, true)
+	_ = utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate, true)
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr, featureGate, effectiveVersion)
 
-	featureGate.AddFlag(fs, "")
-	effectiveVersion.AddFlags(fs, "")
+	utilversion.DefaultComponentGlobalsRegistry.AddFlags(fs)
 	s.AddFlags(fs)
 
 	s.RecommendedOptions.SecureServing.Listener, s.RecommendedOptions.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
@@ -151,7 +150,7 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	fs.Parse(customFlags)
 
-	if err := utilversion.DefaultComponentGlobalsRegistry.SetAllComponents(); err != nil {
+	if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
 		return result, err
 	}
 

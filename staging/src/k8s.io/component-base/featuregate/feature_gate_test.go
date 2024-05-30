@@ -264,7 +264,7 @@ func TestFeatureGateFlag(t *testing.T) {
 				testLockedFalseGate: {Default: false, PreRelease: GA, LockToDefault: true},
 			})
 			require.NoError(t, err)
-			f.AddFlag(fs, "")
+			f.AddFlag(fs)
 			err = fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
 			if test.parseError != "" {
 				if !strings.Contains(err.Error(), test.parseError) {
@@ -679,7 +679,7 @@ func TestFeatureGateOverrideDefault(t *testing.T) {
 	t.Run("returns error if already added to flag set", func(t *testing.T) {
 		f := NewFeatureGate()
 		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-		f.AddFlag(fs, "")
+		f.AddFlag(fs)
 
 		if err := f.OverrideDefault("TestFeature", true); err == nil {
 			t.Error("expected a non-nil error to be returned")
@@ -986,7 +986,9 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 		t.Run(test.arg, func(t *testing.T) {
 			fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
 			f := NewVersionedFeatureGate(version.MustParse("1.29"))
-			f.DeferErrorsToValidation(true)
+			if err := f.SetEmulationVersion(version.MustParse("1.28")); err != nil {
+				t.Fatalf("failed to SetEmulationVersion: %v", err)
+			}
 			err := f.AddVersioned(map[Feature]VersionedSpecs{
 				testGAGate: {
 					{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
@@ -1011,14 +1013,12 @@ func TestVersionedFeatureGateFlag(t *testing.T) {
 				testBetaGateNoVersion:  {Default: false, PreRelease: Beta},
 			})
 			require.NoError(t, err)
-			f.AddFlag(fs, "")
+			f.AddFlag(fs)
 
 			var errs []error
 			err = fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
 			if err != nil {
 				errs = append(errs, err)
-			} else {
-				errs = append(errs, f.SetEmulationVersion(version.MustParse("1.28")))
 			}
 			err = utilerrors.NewAggregate(errs)
 			if test.parseError != "" {
@@ -1425,7 +1425,7 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		f := NewVersionedFeatureGate(version.MustParse("1.29"))
 		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
 		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-		f.AddFlag(fs, "")
+		f.AddFlag(fs)
 
 		if err := f.OverrideDefault("TestFeature", true); err == nil {
 			t.Error("expected a non-nil error to be returned")

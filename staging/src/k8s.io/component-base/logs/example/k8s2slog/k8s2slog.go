@@ -83,7 +83,7 @@ func NewLoggerCommand() *cobra.Command {
 		// Shouldn't happen.
 		panic(err)
 	}
-	featureGate.AddFlag(cmd.Flags(), "")
+	featureGate.AddFlag(cmd.Flags())
 	logsapi.AddFlags(c, cmd.Flags())
 	return cmd
 }

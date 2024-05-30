@@ -33,17 +33,16 @@ func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command
 	// You can also have the flag setting the effectiveVersion of the apiextensions apiserver, and
 	// having a mapping from the apiextensions apiserver version to generic apiserver version.
 	effectiveVersion, featureGate := utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.ComponentGenericAPIServer, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+		utilversion.DefaultKubeComponent, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	o := options.NewCustomResourceDefinitionsServerOptions(out, errOut, featureGate, effectiveVersion)
 
 	cmd := &cobra.Command{
 		Short: "Launch an API extensions API server",
 		Long:  "Launch an API extensions API server",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return utilversion.DefaultComponentGlobalsRegistry.Set()
+		},
 		RunE: func(c *cobra.Command, args []string) error {
-			if err := utilversion.DefaultComponentGlobalsRegistry.SetAllComponents(); err != nil {
-				return err
-			}
-
 			if err := o.Complete(); err != nil {
 				return err
 			}
@@ -59,8 +58,7 @@ func NewServerCommand(ctx context.Context, out, errOut io.Writer) *cobra.Command
 	cmd.SetContext(ctx)
 
 	fs := cmd.Flags()
-	featureGate.AddFlag(fs, "")
-	effectiveVersion.AddFlags(fs, "")
+	utilversion.DefaultComponentGlobalsRegistry.AddFlags(fs)
 	o.AddFlags(fs)
 	return cmd
 }
