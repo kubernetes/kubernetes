@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"sync"
 	"time"
 
@@ -515,6 +516,16 @@ func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string,
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
+
+	//TODO something like this when https://github.com/kubernetes/kubernetes/pull/124285/files comes along
+	if runtime.GOOS == "windows" {
+		klog.Info("Updating CPU affinity")
+		//	return m.containerRuntime.UpdateContainerResources(ctx, containerID, &runtimeapi.ContainerResources{
+		//		Windows: &runtimeapi.WindowsContainerResources{
+		//			affinity_cpus: cpus.String(),
+		//		}
+		//	}
+	}
 	return m.containerRuntime.UpdateContainerResources(
 		ctx,
 		containerID,
