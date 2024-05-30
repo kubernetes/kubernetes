@@ -19,7 +19,6 @@ package main
 import (
 	"path/filepath"
 	"reflect"
-	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -121,10 +120,6 @@ func TestHasTestFiles(t *testing.T) {
 }
 
 func TestPackageDir(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	cases := []struct {
 		input  *packages.Package
 		expect string
@@ -134,13 +129,13 @@ func TestPackageDir(t *testing.T) {
 			GoFiles:      []string{"/src/prj/file.go"},
 			IgnoredFiles: []string{"/otherdir/file.go"},
 		},
-		expect: "/src/prj",
+		expect: filepath.Clean("/src/prj"),
 	}, {
 		input: &packages.Package{
 			PkgPath:      "example.com/foo/bar/qux",
 			IgnoredFiles: []string{"/src/prj/file.go"},
 		},
-		expect: "/src/prj",
+		expect: filepath.Clean("/src/prj"),
 	}, {
 		input: &packages.Package{
 			PkgPath: "example.com/foo/bar/qux",
@@ -157,10 +152,6 @@ func TestPackageDir(t *testing.T) {
 }
 
 func TestHasPathPrefix(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	cases := []struct {
 		base   string
 		pfx    string
@@ -228,10 +219,6 @@ func checkAllErrorStrings(t *testing.T, errs []error, expect []string) {
 }
 
 func TestSimpleForward(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	pkgs, err := loadPkgs("./testdata/simple-fwd/aaa")
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
