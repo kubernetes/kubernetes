@@ -305,8 +305,10 @@
 
 - baseImportPath: "./staging/src/k8s.io/cri-client"
   allowedImports:
+  - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/apiserver
+  - k8s.io/client-go
   - k8s.io/component-base
   - k8s.io/cri-api
   - k8s.io/cri-client

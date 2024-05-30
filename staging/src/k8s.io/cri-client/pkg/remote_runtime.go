@@ -31,14 +31,16 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+
 	"k8s.io/component-base/logs/logreduction"
 	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
-
 	utilexec "k8s.io/utils/exec"
+
+	"k8s.io/cri-client/pkg/internal"
+	"k8s.io/cri-client/pkg/util"
 )
 
 // remoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
@@ -79,7 +81,7 @@ const (
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
 func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider, logger *klog.Logger) (internalapi.RuntimeService, error) {
-	log(logger, 3, "Connecting to runtime service", "endpoint", endpoint)
+	internal.Log(logger, 3, "Connecting to runtime service", "endpoint", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, err
@@ -118,7 +120,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 
 	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
-		logErr(logger, err, "Connect remote runtime failed", "address", addr)
+		internal.LogErr(logger, err, "Connect remote runtime failed", "address", addr)
 		return nil, err
 	}
 
@@ -136,11 +138,11 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 }
 
 func (r *remoteRuntimeService) log(level int, msg string, keyAndValues ...any) {
-	log(r.logger, level, msg, keyAndValues...)
+	internal.Log(r.logger, level, msg, keyAndValues...)
 }
 
 func (r *remoteRuntimeService) logErr(err error, msg string, keyAndValues ...any) {
-	logErr(r.logger, err, msg, keyAndValues...)
+	internal.LogErr(r.logger, err, msg, keyAndValues...)
 }
 
 // validateServiceConnection tries to connect to the remote runtime service by
