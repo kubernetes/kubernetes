@@ -62,7 +62,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.12
+    version: 3.5.14
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -80,7 +80,7 @@ dependencies:
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.12
+    version: 3.5.14
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
