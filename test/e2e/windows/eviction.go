@@ -172,7 +172,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for pods to start running")
-		err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 2, 0, 3*time.Minute)
+		err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 2, 3*time.Minute)
 		framework.ExpectNoError(err)
 
 		framework.Logf("Waiting for pod2 to get evicted")

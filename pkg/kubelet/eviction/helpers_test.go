@@ -1289,7 +1289,7 @@ func TestMakeSignalObservations(t *testing.T) {
 				},
 				// Used for memory signal observations on windows
 				{
-					Name: statsapi.SystemContainerPhysicalMemory,
+					Name: statsapi.SystemContainerWindowsGlobalCommitMemory,
 					Memory: &statsapi.MemoryStats{
 						AvailableBytes: &nodeAvailableBytes,
 						UsageBytes:     &nodeWorkingSetBytes,

@@ -19,7 +19,6 @@ package eviction
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -846,33 +845,12 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
 	result := signalObservations{}
-	if runtime.GOOS == "windows" {
 
-		klog.Info("Eviction manager: building memory signal obsvervations for windows")
-		sysContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPhysicalMemory)
-		if err != nil {
-			klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalMemoryAvailable)
-		}
-		if memory := sysContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.UsageBytes != nil {
-			klog.InfoS(
-				"Eviction manager: memory signal observations for windows",
-				"Available", *memory.AvailableBytes,
-				"Usage", *memory.UsageBytes)
-			result[evictionapi.SignalMemoryAvailable] = signalObservation{
-				available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
-				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.UsageBytes), resource.BinarySI),
-				time:      memory.Time,
-			}
-		}
-	} else {
-		if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
-			result[evictionapi.SignalMemoryAvailable] = signalObservation{
-				available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
-				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
-				time:      memory.Time,
-			}
-		}
+	memoryAvailableSignal := makeMemoryAvailableSignalObservation(summary)
+	if memoryAvailableSignal != nil {
+		result[evictionapi.SignalMemoryAvailable] = *memoryAvailableSignal
 	}
+
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
 		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)
 	} else {

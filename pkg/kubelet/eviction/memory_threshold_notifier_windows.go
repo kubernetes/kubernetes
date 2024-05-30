@@ -53,16 +53,20 @@ func (m *windowsMemoryThresholdNotifier) Start() {
 		for true {
 			time.Sleep(notifierRefreshInterval)
 
-			// Get global memory usage on Windows
-			availablePhysMem, totalPhysMem, err := winstats.GetAvailableAndTotalPhysicalMemory()
+			// Get global commit limit
+			perfInfo, err := winstats.GetPerformanceInfo()
 			if err != nil {
 				klog.ErrorS(err, "Eviction manager: error getting global memory status for node")
 			}
 
-			capacity := resource.NewQuantity(int64(totalPhysMem), resource.BinarySI)
+			commmiLimitBytes := perfInfo.CommitLimitPages * perfInfo.PageSize
+			capacity := resource.NewQuantity(int64(commmiLimitBytes), resource.BinarySI)
 			evictionThresholdQuantity := evictionapi.GetThresholdQuantity(m.threshold.Value, capacity)
 
-			if availablePhysMem <= uint64(evictionThresholdQuantity.Value()) {
+			commitTotalBytes := perfInfo.CommitTotalPages * perfInfo.PageSize
+			commitAvailableBytes := commmiLimitBytes - commitTotalBytes
+
+			if commitAvailableBytes <= uint64(evictionThresholdQuantity.Value()) {
 				m.events <- struct{}{}
 			}
 		}
@@ -74,10 +78,9 @@ func (m *windowsMemoryThresholdNotifier) Start() {
 }
 
 func (m *windowsMemoryThresholdNotifier) UpdateThreshold(summary *statsapi.Summary) error {
-	// TODO: This is where we will handle allocatable memory threshold checks because
-	// we don't have an easy way to get the allocated memory for all the pods on the node.
-	// see https://github.com/kubernetes/kubernetes/blob/e5b64bdef7e64b0a4ef20e055afbf60674625f42/pkg/kubelet/eviction/helpers.go#L859-L864
-	// for how to determine when to notify on allocatable memory thresholds.
+	// Windows doesn't use cgroup notifiers to trigger eviction, so this function is a no-op.
+	// Instead the go-routine set up in Start() will poll the system for memory usage and
+	// trigger eviction when the threshold is crossed.
 	return nil
 }
 

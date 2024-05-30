@@ -17,10 +17,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package winstats
+package eviction
 
-import "errors"
+import (
+	"k8s.io/apimachinery/pkg/api/resource"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+)
 
-func GetAvailableAndTotalPhysicalMemory() (uint64, uint64, error) {
-	return 0, 0, errors.New("GetAvailableAndTotalPhysicalMemory is not implemented on non-Windows platforms")
+func makeMemoryAvailableSignalObservation(summary *statsapi.Summary) *signalObservation {
+	if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
+		return &signalObservation{
+			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
+			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+			time:      memory.Time,
+		}
+	} else {
+		return nil
+	}
 }

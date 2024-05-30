@@ -31,13 +31,13 @@ import (
 
 func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
-	stats = append(stats, sp.getSystemPhysicalMemoryStats())
+	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
 	return stats
 }
 
 func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
-	stats = append(stats, sp.getSystemPhysicalMemoryStats())
+	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
 	return stats
 }
 
@@ -101,24 +101,26 @@ func (sp *summaryProviderImpl) getSystemPodsCPUAndMemoryStats(nodeConfig cm.Node
 	return podsSummary
 }
 
-func (sp *summaryProviderImpl) getSystemPhysicalMemoryStats() statsapi.ContainerStats {
+func (sp *summaryProviderImpl) getSystemWindowsGlobalmemoryStats() statsapi.ContainerStats {
 	now := metav1.NewTime(time.Now())
-	physicalMemorySummary := statsapi.ContainerStats{
+	globalMemorySummary := statsapi.ContainerStats{
 		StartTime: now,
 		Memory:    &statsapi.MemoryStats{},
-		Name:      statsapi.SystemContainerPhysicalMemory,
+		Name:      statsapi.SystemContainerWindowsGlobalCommitMemory,
 	}
 
-	availablePhysMem, totalPhysMem, err := winstats.GetAvailableAndTotalPhysicalMemory()
+	perfInfo, err := winstats.GetPerformanceInfo()
 	if err != nil {
-		klog.Errorf("Failed to get physical memory stats: %v", err)
-		return physicalMemorySummary
+		klog.Errorf("Failed to get Windows performance info: %v", err)
+		return globalMemorySummary
 	}
 
-	usagePhysMem := totalPhysMem - availablePhysMem
-	physicalMemorySummary.Memory.Time = now
-	physicalMemorySummary.Memory.AvailableBytes = &availablePhysMem
-	physicalMemorySummary.Memory.UsageBytes = &usagePhysMem
+	commitLimitBytes := perfInfo.CommitLimitPages * perfInfo.PageSize
+	commitTotalBytes := perfInfo.CommitTotalPages * perfInfo.PageSize
+	commitAvailableBytes := commitLimitBytes - commitTotalBytes
+	globalMemorySummary.Memory.Time = now
+	globalMemorySummary.Memory.AvailableBytes = &commitAvailableBytes
+	globalMemorySummary.Memory.UsageBytes = &commitTotalBytes
 
-	return physicalMemorySummary
+	return globalMemorySummary
 }
