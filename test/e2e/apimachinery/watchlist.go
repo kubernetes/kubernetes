@@ -30,8 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -39,13 +42,7 @@ import (
 var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), feature.WatchList, func() {
 	f := framework.NewDefaultFramework("watchlist")
 	ginkgo.It("should be requested when WatchListClient is enabled", func(ctx context.Context) {
-		// TODO(p0lyn0mial): use https://github.com/kubernetes/kubernetes/pull/123974
-		//  instead of using directly clientfeatures.ReplaceFeatureGates
-		prevClientFeatureGates := clientfeatures.FeatureGates()
-		defer func() {
-			clientfeatures.ReplaceFeatureGates(prevClientFeatureGates)
-		}()
-		clientfeatures.ReplaceFeatureGates(newEnabledWatchListClientFeatureGateRegistry(prevClientFeatureGates))
+		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 		stopCh := make(chan struct{})
 		defer close(stopCh)
 		secretInformer := cache.NewSharedIndexInformer(
@@ -120,19 +117,4 @@ func newSecret(name string) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
-}
-
-type enabledWatchListClientFeatureGateRegistry struct {
-	originalGates clientfeatures.Gates
-}
-
-func newEnabledWatchListClientFeatureGateRegistry(originalGates clientfeatures.Gates) *enabledWatchListClientFeatureGateRegistry {
-	return &enabledWatchListClientFeatureGateRegistry{originalGates: originalGates}
-}
-
-func (r *enabledWatchListClientFeatureGateRegistry) Enabled(feature clientfeatures.Feature) bool {
-	if feature == clientfeatures.WatchListClient {
-		return true
-	}
-	return r.originalGates.Enabled(feature)
 }
