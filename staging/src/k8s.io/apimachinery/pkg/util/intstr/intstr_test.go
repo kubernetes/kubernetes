@@ -18,10 +18,16 @@ package intstr
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"sigs.k8s.io/yaml"
+
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 )
 
 func TestFromInt(t *testing.T) {
@@ -321,6 +327,242 @@ func TestParse(t *testing.T) {
 		}
 		if value.Type == String && test.output.StrVal != value.StrVal {
 			t.Errorf("expected string value %q (%v), but got %q (%v)", test.output.StrVal, test.output, value.StrVal, value)
+		}
+	}
+}
+
+func TestMarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		in            IntOrString
+		want          []byte
+		assertOnError func(*testing.T, error)
+	}{
+		{
+			in: IntOrString{Type: 42},
+			assertOnError: func(t *testing.T, err error) {
+				if err == nil {
+					t.Fatal("expected non-nil error")
+				}
+				const want = "impossible IntOrString.Type"
+				if got := err.Error(); got != want {
+					t.Fatalf("want error message %q, got %q", want, got)
+				}
+			},
+		},
+		{
+			in:   FromString(""),
+			want: []byte{0x40},
+		},
+		{
+			in:   FromString("abc"),
+			want: []byte{0x43, 'a', 'b', 'c'},
+		},
+		{
+			in:   FromInt32(0), // min positive integer representable in one byte
+			want: []byte{0x00},
+		},
+		{
+			in:   FromInt32(23), // max positive integer representable in one byte
+			want: []byte{0x17},
+		},
+		{
+			in:   FromInt32(24), // min positive integer representable in two bytes
+			want: []byte{0x18, 0x18},
+		},
+		{
+			in:   FromInt32(math.MaxUint8), // max positive integer representable in two bytes
+			want: []byte{0x18, 0xff},
+		},
+		{
+			in:   FromInt32(math.MaxUint8 + 1), // min positive integer representable in three bytes
+			want: []byte{0x19, 0x01, 0x00},
+		},
+		{
+			in:   FromInt32(math.MaxUint16), // max positive integer representable in three bytes
+			want: []byte{0x19, 0xff, 0xff},
+		},
+		{
+			in:   FromInt32(math.MaxUint16 + 1), // min positive integer representable in five bytes
+			want: []byte{0x1a, 0x00, 0x01, 0x00, 0x00},
+		},
+		{
+			in:   FromInt32(math.MaxInt32), // max positive integer representable by Go int32
+			want: []byte{0x1a, 0x7f, 0xff, 0xff, 0xff},
+		},
+		{
+			in:   FromInt32(-1), // max negative integer representable in one byte
+			want: []byte{0x20},
+		},
+		{
+			in:   FromInt32(-24), // min negative integer representable in one byte
+			want: []byte{0x37},
+		},
+		{
+			in:   FromInt32(-1 - 24), // max negative integer representable in two bytes
+			want: []byte{0x38, 0x18},
+		},
+		{
+			in:   FromInt32(-1 - math.MaxUint8), // min negative integer representable in two bytes
+			want: []byte{0x38, 0xff},
+		},
+		{
+			in:   FromInt32(-2 - math.MaxUint8), // max negative integer representable in three bytes
+			want: []byte{0x39, 0x01, 0x00},
+		},
+		{
+			in:   FromInt32(-1 - math.MaxUint16), // min negative integer representable in three bytes
+			want: []byte{0x39, 0xff, 0xff},
+		},
+		{
+			in:   FromInt32(-2 - math.MaxUint16), // max negative integer representable in five bytes
+			want: []byte{0x3a, 0x00, 0x01, 0x00, 0x00},
+		},
+		{
+			in:   FromInt32(math.MinInt32), // min negative integer representable by Go int32
+			want: []byte{0x3a, 0x7f, 0xff, 0xff, 0xff},
+		},
+	} {
+		t.Run(fmt.Sprintf("{Type:%d,IntVal:%d,StrVal:%q}", tc.in.Type, tc.in.IntVal, tc.in.StrVal), func(t *testing.T) {
+			got, err := tc.in.MarshalCBOR()
+			if tc.assertOnError != nil {
+				tc.assertOnError(t, err)
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected difference between expected and actual output:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUnmarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		in            []byte
+		want          IntOrString
+		assertOnError func(*testing.T, error)
+	}{
+		{
+			in: []byte{0xa0}, // {}
+			assertOnError: func(t *testing.T, err error) {
+				if err == nil {
+					t.Fatal("expected non-nil error")
+				}
+				const want = "cbor: cannot unmarshal map into Go value of type int32"
+				if got := err.Error(); got != want {
+					t.Fatalf("want error message %q, got %q", want, got)
+				}
+
+			},
+		},
+		{
+			in:   []byte{0x40},
+			want: FromString(""),
+		},
+		{
+			in:   []byte{0x43, 'a', 'b', 'c'},
+			want: FromString("abc"),
+		},
+		{
+			in:   []byte{0x00},
+			want: FromInt32(0), // min positive integer representable in one byte
+		},
+		{
+			in:   []byte{0x17},
+			want: FromInt32(23), // max positive integer representable in one byte
+		},
+		{
+			in:   []byte{0x18, 0x18},
+			want: FromInt32(24), // min positive integer representable in two bytes
+		},
+		{
+			in:   []byte{0x18, 0xff},
+			want: FromInt32(math.MaxUint8), // max positive integer representable in two bytes
+		},
+		{
+			in:   []byte{0x19, 0x01, 0x00},
+			want: FromInt32(math.MaxUint8 + 1), // min positive integer representable in three bytes
+		},
+		{
+			in:   []byte{0x19, 0xff, 0xff},
+			want: FromInt32(math.MaxUint16), // max positive integer representable in three bytes
+		},
+		{
+			in:   []byte{0x1a, 0x00, 0x01, 0x00, 0x00},
+			want: FromInt32(math.MaxUint16 + 1), // min positive integer representable in five bytes
+		},
+		{
+			in:   []byte{0x1a, 0x7f, 0xff, 0xff, 0xff},
+			want: FromInt32(math.MaxInt32), // max positive integer representable by Go int32
+		},
+		{
+			in:   []byte{0x20},
+			want: FromInt32(-1), // max negative integer representable in one byte
+		},
+		{
+			in:   []byte{0x37},
+			want: FromInt32(-24), // min negative integer representable in one byte
+		},
+		{
+			in:   []byte{0x38, 0x18},
+			want: FromInt32(-1 - 24), // max negative integer representable in two bytes
+		},
+		{
+			in:   []byte{0x38, 0xff},
+			want: FromInt32(-1 - math.MaxUint8), // min negative integer representable in two bytes
+		},
+		{
+			in:   []byte{0x39, 0x01, 0x00},
+			want: FromInt32(-2 - math.MaxUint8), // max negative integer representable in three bytes
+		},
+		{
+			in:   []byte{0x39, 0xff, 0xff},
+			want: FromInt32(-1 - math.MaxUint16), // min negative integer representable in three bytes
+		},
+		{
+			in:   []byte{0x3a, 0x00, 0x01, 0x00, 0x00},
+			want: FromInt32(-2 - math.MaxUint16), // max negative integer representable in five bytes
+		},
+		{
+			in:   []byte{0x3a, 0x7f, 0xff, 0xff, 0xff},
+			want: FromInt32(math.MinInt32), // min negative integer representable by Go int32
+		},
+	} {
+		t.Run(fmt.Sprintf("{Type:%d,IntVal:%d,StrVal:%q}", tc.want.Type, tc.want.IntVal, tc.want.StrVal), func(t *testing.T) {
+			var got IntOrString
+			err := got.UnmarshalCBOR(tc.in)
+			if tc.assertOnError != nil {
+				tc.assertOnError(t, err)
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(got, tc.want); diff != "" {
+				t.Errorf("unexpected difference between expected and actual output:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIntOrStringRoundtripCBOR(t *testing.T) {
+	fuzzer := fuzz.New()
+	for i := 0; i < 500; i++ {
+		var initial, final IntOrString
+		fuzzer.Fuzz(&initial)
+		b, err := cbor.Marshal(initial)
+		if err != nil {
+			t.Errorf("error encoding %v: %v", initial, err)
+			continue
+		}
+		err = cbor.Unmarshal(b, &final)
+		if err != nil {
+			t.Errorf("%v: error decoding %v: %v", initial, string(b), err)
+		}
+		if diff := cmp.Diff(initial, final); diff != "" {
+			diag, err := cbor.Diagnose(b)
+			if err != nil {
+				t.Logf("failed to produce diagnostic encoding of 0x%x: %v", b, err)
+			}
+			t.Errorf("unexpected diff:\n%s\ncbor: %s", diff, diag)
 		}
 	}
 }
