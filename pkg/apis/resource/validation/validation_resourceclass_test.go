@@ -47,6 +47,8 @@ func TestValidateClass(t *testing.T) {
 	}
 	badName := "!@#$%^"
 	badValue := "spaces not allowed"
+	badAPIGroup := "example.com/v1"
+	goodAPIGroup := "example.com"
 
 	scenarios := map[string]struct {
 		class        *resource.ResourceClass
@@ -201,6 +203,23 @@ func TestValidateClass(t *testing.T) {
 			class: func() *resource.ResourceClass {
 				class := testClass(goodName, goodName)
 				class.ParametersRef = goodParameters.DeepCopy()
+				return class
+			}(),
+		},
+		"good-parameters-apigroup": {
+			class: func() *resource.ResourceClass {
+				class := testClass(goodName, goodName)
+				class.ParametersRef = goodParameters.DeepCopy()
+				class.ParametersRef.APIGroup = goodAPIGroup
+				return class
+			}(),
+		},
+		"bad-parameters-apigroup": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("parametersRef", "apiGroup"), badAPIGroup, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			class: func() *resource.ResourceClass {
+				class := testClass(goodName, goodName)
+				class.ParametersRef = goodParameters.DeepCopy()
+				class.ParametersRef.APIGroup = badAPIGroup
 				return class
 			}(),
 		},
