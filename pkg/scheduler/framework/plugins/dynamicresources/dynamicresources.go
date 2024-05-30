@@ -1055,6 +1055,13 @@ func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *res
 		}
 		return parameters, nil
 	default:
+		sort.Slice(objs, func(i, j int) bool {
+			obj1, obj2 := objs[i].(*resourcev1alpha2.ResourceClassParameters), objs[j].(*resourcev1alpha2.ResourceClassParameters)
+			if obj1 == nil || obj2 == nil {
+				return false
+			}
+			return obj1.Name < obj2.Name
+		})
 		return nil, statusError(logger, fmt.Errorf("multiple generated class parameters for %s.%s %s found: %s", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.Namespace, class.ParametersRef.Name), klog.KObjSlice(objs)))
 	}
 }
@@ -1112,6 +1119,13 @@ func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *res
 		}
 		return parameters, nil
 	default:
+		sort.Slice(objs, func(i, j int) bool {
+			obj1, obj2 := objs[i].(*resourcev1alpha2.ResourceClaimParameters), objs[j].(*resourcev1alpha2.ResourceClaimParameters)
+			if obj1 == nil || obj2 == nil {
+				return false
+			}
+			return obj1.Name < obj2.Name
+		})
 		return nil, statusError(logger, fmt.Errorf("multiple generated claim parameters for %s.%s %s found: %s", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name), klog.KObjSlice(objs)))
 	}
 }
