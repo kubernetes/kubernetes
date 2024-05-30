@@ -95,6 +95,7 @@ func TestIsRunning(t *testing.T) {
 				mock.StatusReturns(&v1.StatusResponse{Status: &v1.RuntimeStatus{
 					Conditions: []*v1.RuntimeCondition{
 						{
+							Type:   v1.RuntimeReady,
 							Status: false,
 						},
 					},
@@ -102,6 +103,21 @@ func TestIsRunning(t *testing.T) {
 				}, nil)
 			},
 			shouldError: true,
+		},
+		{
+			name: "valid: runtime condition type does not match",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(&v1.StatusResponse{Status: &v1.RuntimeStatus{
+					Conditions: []*v1.RuntimeCondition{
+						{
+							Type:   v1.NetworkReady,
+							Status: false,
+						},
+					},
+				},
+				}, nil)
+			},
+			shouldError: false,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
