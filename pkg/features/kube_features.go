@@ -170,6 +170,7 @@ const (
 	// kep: http://kep.k8s.io/4009
 	// alpha: v1.28
 	// beta: v1.29
+	// GA: v1.30
 	//
 	// Add support for CDI Device IDs in the Device Plugin API.
 	DevicePluginCDIDevices featuregate.Feature = "DevicePluginCDIDevices"
@@ -1004,7 +1005,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DisableNodeKubeProxyVersion: {Default: true, PreRelease: featuregate.Beta},
 
-	DevicePluginCDIDevices: {Default: true, PreRelease: featuregate.Beta},
+	DevicePluginCDIDevices: {Default: true, PreRelease: featuregate.GA},
 
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 
