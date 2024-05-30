@@ -91,8 +91,8 @@ var (
 
 		Prints a table of the most important information about the specified resources.
 		You can filter the list using a label selector and the --selector flag. If the
-		desired resource type is namespaced you will only see results in other namespaces
-		by passing --namespace(for specific namespace) or --all-namespaces.
+		desired resource type is namespaced you will only see results in the current
+		namespace if you don't specify any namespace.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`))
