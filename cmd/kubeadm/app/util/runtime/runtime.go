@@ -104,7 +104,8 @@ func (runtime *CRIRuntime) IsRunning() error {
 	}
 
 	for _, condition := range res.GetStatus().GetConditions() {
-		if !condition.GetStatus() {
+		if condition.GetType() == runtimeapi.RuntimeReady && // NetworkReady will not be tested on purpose
+			!condition.GetStatus() {
 			return errors.Errorf(
 				"container runtime condition %q is not true. reason: %s, message: %s",
 				condition.GetType(), condition.GetReason(), condition.GetMessage(),
