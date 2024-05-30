@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/hostpath"
 	"k8s.io/kubernetes/pkg/volume/iscsi"
-	"k8s.io/kubernetes/pkg/volume/local"
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 
@@ -120,9 +119,6 @@ func ProbeControllerVolumePlugins(logger klog.Logger, config persistentvolumecon
 	if err != nil {
 		return allPlugins, err
 	}
-
-	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 
 	return allPlugins, nil
 }
