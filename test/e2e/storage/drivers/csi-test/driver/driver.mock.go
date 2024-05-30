@@ -169,6 +169,21 @@ func (mr *MockControllerServerMockRecorder) ControllerGetVolume(arg0, arg1 any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ControllerGetVolume", reflect.TypeOf((*MockControllerServer)(nil).ControllerGetVolume), arg0, arg1)
 }
 
+// ControllerModifyVolume mocks base method.
+func (m *MockControllerServer) ControllerModifyVolume(arg0 context.Context, arg1 *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ControllerModifyVolume", arg0, arg1)
+	ret0, _ := ret[0].(*csi.ControllerModifyVolumeResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ControllerModifyVolume indicates an expected call of ControllerModifyVolume.
+func (mr *MockControllerServerMockRecorder) ControllerModifyVolume(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ControllerModifyVolume", reflect.TypeOf((*MockControllerServer)(nil).ControllerModifyVolume), arg0, arg1)
+}
+
 // ControllerPublishVolume mocks base method.
 func (m *MockControllerServer) ControllerPublishVolume(arg0 context.Context, arg1 *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	m.ctrl.T.Helper()
