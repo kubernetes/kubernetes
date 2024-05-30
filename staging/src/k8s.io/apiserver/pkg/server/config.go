@@ -73,6 +73,7 @@ import (
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/flagz"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -809,7 +810,6 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		healthzRegistry:  healthCheckRegistry{path: "/healthz", checks: c.HealthzChecks},
 		livezRegistry:    healthCheckRegistry{path: "/livez", checks: c.LivezChecks, clock: clock.RealClock{}},
 		readyzRegistry:   healthCheckRegistry{path: "/readyz", checks: c.ReadyzChecks},
-		flagzRegistry:    flagzRegistry{flags: c.Flags},
 		livezGracePeriod: c.LivezGracePeriod,
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
@@ -956,9 +956,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		s.AddHealthChecks(delegateCheck)
 	}
 
-	for _, delegateFlagSet := range delegationTarget.Flags() {
+	// TODO: We may need to append flags from all delegates.
+	/* for _, delegateFlagSet := range delegationTarget.Flags() {
 		s.AddFlags(delegateFlagSet)
-	}
+	} */
 
 	s.RegisterDestroyFunc(func() {
 		if err := c.Config.TracerProvider.Shutdown(context.Background()); err != nil {
@@ -1076,6 +1077,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		}
 		// so far, only logging related endpoints are considered valid to add for these debug flags.
 		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
+		flagz.Flagz{}.Install(s.Handler.NonGoRestfulMux, c.Flags)
 	}
 	if s.UnprotectedDebugSocket != nil {
 		s.UnprotectedDebugSocket.InstallProfiling()

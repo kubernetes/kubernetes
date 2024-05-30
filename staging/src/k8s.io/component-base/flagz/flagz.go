@@ -20,18 +20,41 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
-// InstallHandler registers handlers for displaying flags on the path
-// "/flagz" to mux. *All handlers* for mux must be specified in
-// exactly one call to InstallHandler. Calling InstallHandler more
-// than once for the same mux will result in a panic.
-func InstallHandler(mux mux, flags ...cliflag.NamedFlagSets) {
-	mux.Handle("/flagz",
+type Registry struct {
+	path           string
+	lock           sync.Mutex
+	flags          []cliflag.NamedFlagSets
+	flagsInstalled bool
+}
+
+// Flagz installs the flagz handler
+type Flagz struct{}
+
+type mux interface {
+	Handle(path string, handler http.Handler)
+}
+
+// Install adds the DefaultFlagz handler
+func (f Flagz) Install(m mux, flags []cliflag.NamedFlagSets) {
+	flagzRegistry := Registry{
+		flags: flags,
+	}
+	flagzRegistry.installHandler(m)
+}
+
+func (reg *Registry) installHandler(m mux) {
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+	reg.flagsInstalled = true
+	m.Handle("/flagz",
 		metrics.InstrumentHandlerFunc("GET",
 			/* group = */ "",
 			/* version = */ "",
@@ -41,12 +64,17 @@ func InstallHandler(mux mux, flags ...cliflag.NamedFlagSets) {
 			/* component = */ "",
 			/* deprecated */ false,
 			/* removedRelease */ "",
-			handleFlags(flags)))
+			handleFlags(reg.flags)))
 }
 
-// mux is an interface describing the methods InstallHandler requires.
-type mux interface {
-	Handle(pattern string, handler http.Handler)
+func (reg *Registry) AddFlags(flags cliflag.NamedFlagSets) error {
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+	if reg.flagsInstalled {
+		return fmt.Errorf("unable to add because the %s endpoint has already been created", reg.path)
+	}
+	reg.flags = append(reg.flags, flags)
+	return nil
 }
 
 // handleFlags returns an http.HandlerFunc that serves the provided flags.
