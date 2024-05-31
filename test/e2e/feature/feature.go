@@ -29,9 +29,6 @@ var (
 	APIServerIdentity = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	AppArmor = framework.WithFeature(framework.ValidFeatures.Add("AppArmor"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	BootstrapTokens = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)

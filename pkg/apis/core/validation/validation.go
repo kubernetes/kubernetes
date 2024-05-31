@@ -4781,9 +4781,6 @@ func ValidateAppArmorProfileFormat(profile string) error {
 
 // validateAppArmorAnnotationsAndFieldsMatchOnCreate validates that AppArmor fields and annotations are consistent.
 func validateAppArmorAnnotationsAndFieldsMatchOnCreate(objectMeta metav1.ObjectMeta, podSpec *core.PodSpec, specPath *field.Path) field.ErrorList {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields) {
-		return nil
-	}
 	if podSpec.OS != nil && podSpec.OS.Name == core.Windows {
 		// Skip consistency check for windows pods.
 		return nil

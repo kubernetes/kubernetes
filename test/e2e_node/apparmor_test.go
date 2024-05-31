@@ -38,10 +38,8 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -49,7 +47,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 )
 
-var _ = SIGDescribe("AppArmor", feature.AppArmor, nodefeature.AppArmor, func() {
+var _ = SIGDescribe("AppArmor", framework.WithNodeConformance(), func() {
 	if isAppArmorEnabled() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Loading AppArmor profiles for testing")

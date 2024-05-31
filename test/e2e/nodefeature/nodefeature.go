@@ -26,9 +26,6 @@ var (
 	// Please keep the list in alphabetical order.
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	AppArmor = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("AppArmor"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	CheckpointContainer = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CheckpointContainer"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
