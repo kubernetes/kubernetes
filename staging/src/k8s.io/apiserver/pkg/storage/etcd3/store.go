@@ -620,7 +620,7 @@ func (s *store) resolveGetListRev(continueKey string, continueRV int64, opts sto
 
 // GetList implements storage.Interface.
 func (s *store) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	preparedKey, err := s.prepareKey(key)
+	keyPrefix, err := s.prepareKey(key)
 	if err != nil {
 		return err
 	}
@@ -645,27 +645,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
 	// with prefix "/a" will return all three, while with prefix "/a/" will return only
 	// "/a/b" which is the correct answer.
-	if opts.Recursive && !strings.HasSuffix(preparedKey, "/") {
-		preparedKey += "/"
+	if opts.Recursive && !strings.HasSuffix(keyPrefix, "/") {
+		keyPrefix += "/"
 	}
-	keyPrefix := preparedKey
 
 	// set the appropriate clientv3 options to filter the returned data set
-	var limitOption *clientv3.OpOption
 	limit := opts.Predicate.Limit
-	var paging bool
-	options := make([]clientv3.OpOption, 0, 4)
-	if opts.Predicate.Limit > 0 {
-		paging = true
-		options = append(options, clientv3.WithLimit(limit))
-		limitOption = &options[len(options)-1]
-	}
-
-	if opts.Recursive {
-		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
-		options = append(options, clientv3.WithRange(rangeEnd))
-	}
-
+	paging := opts.Predicate.Limit > 0
 	newItemFunc := getNewItemFunc(listObj, v)
 
 	var continueRV, withRev int64
@@ -675,20 +661,16 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
-		preparedKey = continueKey
+		continueKey = strings.TrimPrefix(continueKey, keyPrefix)
 	}
 	if withRev, err = s.resolveGetListRev(continueKey, continueRV, opts); err != nil {
 		return err
 	}
 
-	if withRev != 0 {
-		options = append(options, clientv3.WithRev(withRev))
-	}
-
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
-	var getResp *clientv3.GetResponse
+	var getResp clientv3.KubernetesListResponse
 	var numFetched int
 	var numEvald int
 	// Because these metrics are for understanding the costs of handling LIST requests,
@@ -705,36 +687,39 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 	for {
 		startTime := time.Now()
-		getResp, err = s.client.KV.Get(ctx, preparedKey, options...)
+		getResp, err = s.getList(ctx, keyPrefix, opts.Recursive, clientv3.ListOptions{
+			Revision: withRev,
+			Limit:    limit,
+			Continue: continueKey,
+		})
 		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
 		if err != nil {
-			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
+			return interpretListError(err, len(opts.Predicate.Continue) > 0, keyPrefix+continueKey, keyPrefix)
 		}
-		numFetched += len(getResp.Kvs)
-		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
+		numFetched += len(getResp.KVs)
+		if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 			return err
 		}
-		hasMore = getResp.More
+		hasMore = int64(len(getResp.KVs)) < getResp.Count
 
-		if len(getResp.Kvs) == 0 && getResp.More {
+		if len(getResp.KVs) == 0 && hasMore {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 		// indicate to the client which resource version was returned, and use the same resource version for subsequent requests.
 		if withRev == 0 {
-			withRev = getResp.Header.Revision
-			options = append(options, clientv3.WithRev(withRev))
+			withRev = getResp.Revision
 		}
 
 		// avoid small allocations for the result slice, since this can be called in many
 		// different contexts and we don't know how significantly the result will be filtered
 		if opts.Predicate.Empty() {
-			growSlice(v, len(getResp.Kvs))
+			growSlice(v, len(getResp.KVs))
 		} else {
-			growSlice(v, 2048, len(getResp.Kvs))
+			growSlice(v, 2048, len(getResp.KVs))
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
-		for i, kv := range getResp.Kvs {
+		for i, kv := range getResp.KVs {
 			if paging && int64(v.Len()) >= opts.Predicate.Limit {
 				hasMore = true
 				break
@@ -768,8 +753,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			numEvald++
 
 			// free kv early. Long lists can take O(seconds) to decode.
-			getResp.Kvs[i] = nil
+			getResp.KVs[i] = nil
 		}
+		continueKey = strings.TrimPrefix(string(lastKey)+"\x00", keyPrefix)
 
 		// no more results remain or we didn't request paging
 		if !hasMore || !paging {
@@ -787,9 +773,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			if limit > maxLimit {
 				limit = maxLimit
 			}
-			*limitOption = clientv3.WithLimit(limit)
 		}
-		preparedKey = string(lastKey) + "\x00"
 	}
 
 	if v.IsNil() {
@@ -802,6 +786,26 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		return err
 	}
 	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
+}
+
+func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options clientv3.ListOptions) (clientv3.KubernetesListResponse, error) {
+	if recursive {
+		return s.client.Kubernetes.List(ctx, keyPrefix, options)
+	}
+	getResp, err := s.client.Kubernetes.Get(ctx, keyPrefix, clientv3.GetOptions{
+		Revision: options.Revision,
+	})
+	var resp clientv3.KubernetesListResponse
+	if getResp.KV != nil {
+		resp.KVs = []*mvccpb.KeyValue{getResp.KV}
+		resp.Count = 1
+		resp.Revision = getResp.Revision
+	} else {
+		resp.KVs = []*mvccpb.KeyValue{}
+		resp.Count = 0
+		resp.Revision = getResp.Revision
+	}
+	return resp, err
 }
 
 // growSlice takes a slice value and grows its capacity up
