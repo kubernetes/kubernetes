@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -103,10 +102,9 @@ func boundObjectKindToAPIVersions() map[string]string {
 	kinds := map[string]string{
 		"Pod":    "v1",
 		"Secret": "v1",
+		"Node":   "v1",
 	}
-	if os.Getenv("KUBECTL_NODE_BOUND_TOKENS") == "true" {
-		kinds["Node"] = "v1"
-	}
+
 	return kinds
 }
 
