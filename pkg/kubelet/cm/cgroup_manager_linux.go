@@ -286,7 +286,11 @@ func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 
 // Exists checks if all subsystem cgroups already exist
 func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
-	return m.Validate(name) == nil
+	if err := m.Validate(name); err != nil {
+		klog.V(6).InfoS("Validate cgroup error", "err", err)
+		return false
+	}
+	return true
 }
 
 // Destroy destroys the specified cgroup
