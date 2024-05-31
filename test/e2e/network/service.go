@@ -333,7 +333,7 @@ func StopServeHostnameService(ctx context.Context, clientset clientset.Interface
 // given expectedPods list after a sort | uniq.
 func verifyServeHostnameServiceUp(ctx context.Context, c clientset.Interface, ns string, expectedPods []string, serviceIP string, servicePort int) error {
 	// to verify from host network
-	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-up-host-exec-pod")
+	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-up-host-exec-pod", nil)
 
 	// to verify from container's network
 	execPod := e2epod.CreateExecPodOrFail(ctx, c, ns, "verify-service-up-exec-pod-", nil)
@@ -403,7 +403,7 @@ func verifyServeHostnameServiceUp(ctx context.Context, c clientset.Interface, ns
 // verifyServeHostnameServiceDown verifies that the given service isn't served.
 func verifyServeHostnameServiceDown(ctx context.Context, c clientset.Interface, ns string, serviceIP string, servicePort int) error {
 	// verify from host network
-	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-down-host-exec-pod")
+	hostExecPod := launchHostExecPod(ctx, c, ns, "verify-service-down-host-exec-pod", nil)
 	defer func() {
 		e2epod.DeletePodOrFail(ctx, c, ns, hostExecPod.Name)
 	}()
@@ -1706,7 +1706,7 @@ var _ = common.SIGDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
-		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "hostexec")
+		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "hostexec", nil)
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
@@ -2705,50 +2705,30 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
 		ginkgo.By("creating the service")
-		svc, err := jig.CreateOnlyLocalNodePortService(ctx, false)
+		svc, err := jig.CreateOnlyLocalNodePortService(ctx, true)
 		framework.ExpectNoError(err, "creating the service")
 		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
 		nodePortStr := fmt.Sprintf("%d", tcpNodePort)
 		framework.Logf("NodePort is %s", nodePortStr)
 
-		ginkgo.By("creating a HostNetwork exec pod")
-		execPod := launchHostExecPod(ctx, cs, namespace, "hostexec")
-		execPod, err = cs.CoreV1().Pods(namespace).Get(ctx, execPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "getting podIP of execPod")
-		framework.Logf("execPod IP is %q", execPod.Status.PodIP)
-
-		ginkgo.By("creating an endpoint for the service on a different node from the execPod")
-		_, err = jig.Run(ctx, func(rc *v1.ReplicationController) {
-			rc.Spec.Template.Spec.Affinity = &v1.Affinity{
-				// We need to ensure the endpoint is on a different node
-				// from the exec pod, to ensure that the source IP of the
-				// traffic is the node's "public" IP. For
-				// node-to-pod-on-same-node traffic, it might end up using
-				// the "docker0" IP or something like that.
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{{
-							MatchFields: []v1.NodeSelectorRequirement{{
-								Key:      "metadata.name",
-								Operator: "NotIn",
-								Values:   []string{execPod.Spec.NodeName},
-							}},
-						}},
-					},
-				},
-			}
-		})
-		framework.ExpectNoError(err, "creating the endpoint pod")
-
-		// Extract the single endpoint node IP from a map of endpoint node IPs
-		var endpointNodeIP string
+		// Get the (single) endpoint's node name and IP
+		var endpointNodeName, endpointNodeIP string
 		endpointsNodeMap, err := getEndpointNodesWithInternalIP(ctx, jig)
 		framework.ExpectNoError(err, "fetching endpoint node IPs")
 		for node, nodeIP := range endpointsNodeMap {
 			framework.Logf("endpoint is on node %s (%s)", node, nodeIP)
+			endpointNodeName = node
 			endpointNodeIP = nodeIP
 			break
 		}
+
+		// We need to ensure the endpoint is on a different node from the exec
+		// pod, to ensure that the source IP of the traffic is the node's "public"
+		// IP. For node-to-pod-on-same-node traffic, it might end up using the
+		// "docker0" IP or something like that.
+		ginkgo.By("creating a HostNetwork exec pod on a different node")
+		execPod := launchHostExecPod(ctx, cs, namespace, "hostexec", &endpointNodeName)
+		framework.Logf("execPod IP is %q", execPod.Status.PodIP)
 
 		ginkgo.By("connecting from the execpod to the NodePort on the endpoint's node")
 		cmd := fmt.Sprintf("curl -g -q -s --connect-timeout 3 http://%s/clientip", net.JoinHostPort(endpointNodeIP, nodePortStr))
@@ -4184,14 +4164,33 @@ func createPodOrFail(ctx context.Context, f *framework.Framework, ns, name strin
 }
 
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
-// until it's Running
-func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name string) *v1.Pod {
+// until it's Running. If avoidNode is non-nil, it will ensure that the pod doesn't
+// land on that node.
+func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name string, avoidNode *string) *v1.Pod {
 	framework.Logf("Creating new host exec pod")
 	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
-	pod, err := client.CoreV1().Pods(ns).Create(ctx, hostExecPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	if avoidNode != nil {
+		hostExecPod.Spec.Affinity = &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: "NotIn",
+							Values:   []string{*avoidNode},
+						}},
+					}},
+				},
+			},
+		}
+	}
+	_, err := client.CoreV1().Pods(ns).Create(ctx, hostExecPod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "creating host exec pod")
 	err = e2epod.WaitTimeoutForPodReadyInNamespace(ctx, client, name, ns, framework.PodStartTimeout)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "waiting for host exec pod")
+	// re-fetch to get PodIP, etc
+	pod, err := client.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "getting podIP of host exec pod")
 	return pod
 }
 
