@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -53,8 +52,6 @@ func TestCreateToken(t *testing.T) {
 		boundObjectUID  string
 		audiences       []string
 		duration        time.Duration
-
-		enableNodeBindingFeature bool
 
 		serverResponseToken string
 		serverResponseError string
@@ -118,14 +115,13 @@ status:
 			test:            "bad bound object kind",
 			name:            "mysa",
 			boundObjectKind: "Foo",
-			expectStderr:    `error: supported --bound-object-kind values are Pod, Secret`,
+			expectStderr:    `error: supported --bound-object-kind values are Node, Pod, Secret`,
 		},
 		{
-			test:                     "bad bound object kind (node feature enabled)",
-			name:                     "mysa",
-			enableNodeBindingFeature: true,
-			boundObjectKind:          "Foo",
-			expectStderr:             `error: supported --bound-object-kind values are Node, Pod, Secret`,
+			test:            "bad bound object kind (node feature enabled)",
+			name:            "mysa",
+			boundObjectKind: "Foo",
+			expectStderr:    `error: supported --bound-object-kind values are Node, Pod, Secret`,
 		},
 		{
 			test:            "missing bound object name",
@@ -172,10 +168,9 @@ status:
 			test: "valid bound object (Node)",
 			name: "mysa",
 
-			enableNodeBindingFeature: true,
-			boundObjectKind:          "Node",
-			boundObjectName:          "mynode",
-			boundObjectUID:           "myuid",
+			boundObjectKind: "Node",
+			boundObjectName: "mynode",
+			boundObjectUID:  "myuid",
 
 			expectRequestPath: "/api/v1/namespaces/test/serviceaccounts/mysa/token",
 			expectTokenRequest: &authenticationv1.TokenRequest{
@@ -366,10 +361,6 @@ status:
 			}
 			if test.duration != 0 {
 				cmd.Flags().Set("duration", test.duration.String())
-			}
-			if test.enableNodeBindingFeature {
-				os.Setenv("KUBECTL_NODE_BOUND_TOKENS", "true")
-				defer os.Unsetenv("KUBECTL_NODE_BOUND_TOKENS")
 			}
 			cmd.Run(cmd, []string{test.name})
 
