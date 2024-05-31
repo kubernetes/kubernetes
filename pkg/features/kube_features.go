@@ -170,7 +170,7 @@ const (
 	// kep: http://kep.k8s.io/4009
 	// alpha: v1.28
 	// beta: v1.29
-	// GA: v1.30
+	// GA: v1.31
 	//
 	// Add support for CDI Device IDs in the Device Plugin API.
 	DevicePluginCDIDevices featuregate.Feature = "DevicePluginCDIDevices"
