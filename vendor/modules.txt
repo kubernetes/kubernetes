@@ -644,7 +644,7 @@ go.etcd.io/etcd/client/pkg/v3/types
 # go.etcd.io/etcd/client/v2 v2.305.13
 ## explicit; go 1.21
 go.etcd.io/etcd/client/v2
-# go.etcd.io/etcd/client/v3 v3.5.13
+# go.etcd.io/etcd/client/v3 v3.5.13 => github.com/serathius/etcd/client/v3 v3.0.0-20240620130152-542535146900
 ## explicit; go 1.21
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/concurrency
@@ -1324,3 +1324,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# go.etcd.io/etcd/client/v3 => github.com/serathius/etcd/client/v3 v3.0.0-20240620130152-542535146900
