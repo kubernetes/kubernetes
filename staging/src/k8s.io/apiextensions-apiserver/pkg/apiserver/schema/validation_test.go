@@ -18,6 +18,7 @@ package schema
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -148,12 +149,89 @@ func TestValidateStructuralMetadataInvariants(t *testing.T) {
 }
 
 func TestValidateStructuralCompleteness(t *testing.T) {
-	sch := Structural{
-		AdditionalProperties: &StructuralOrBool{
-			Structural: &Structural{
-				Generic: Generic{
-					Type: "object",
+
+	type tct struct {
+		name    string
+		schema  Structural
+		options ValidationOptions
+		error   string
+	}
+
+	testCases := []tct{
+		{
+			name: "allowed properties valuevalidation, additional properties structure",
+			schema: Structural{
+				AdditionalProperties: &StructuralOrBool{
+					Structural: &Structural{
+						Generic: Generic{
+							Type: "object",
+						},
+						Properties: map[string]Structural{
+							"bar": {
+								Generic: Generic{
+									Type: "string",
+								},
+							},
+						},
+					},
 				},
+				ValueValidation: &ValueValidation{
+					AllOf: []NestedValueValidation{
+						{
+							Properties: map[string]NestedValueValidation{
+								"foo": {
+									ValueValidation: ValueValidation{
+										MinLength: ptr.To[int64](2),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			options: ValidationOptions{
+				AllowValidationPropertiesWithAdditionalProperties: true,
+			},
+		},
+		{
+			name: "disallowed properties valuevalidation, additional properties structure",
+			schema: Structural{
+				AdditionalProperties: &StructuralOrBool{
+					Structural: &Structural{
+						Generic: Generic{
+							Type: "object",
+						},
+						Properties: map[string]Structural{
+							"bar": {
+								Generic: Generic{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+				ValueValidation: &ValueValidation{
+					AllOf: []NestedValueValidation{
+						{
+							Properties: map[string]NestedValueValidation{
+								"foo": {
+									ValueValidation: ValueValidation{
+										MinLength: ptr.To[int64](2),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			error: `properties[foo]: Required value: because it is defined in allOf[0].properties[foo]`,
+			options: ValidationOptions{
+				AllowValidationPropertiesWithAdditionalProperties: false,
+			},
+		},
+		{
+			name: "disallowed additionalproperties valuevalidation, properties structure",
+			schema: Structural{
 				Properties: map[string]Structural{
 					"bar": {
 						Generic: Generic{
@@ -161,33 +239,145 @@ func TestValidateStructuralCompleteness(t *testing.T) {
 						},
 					},
 				},
+				ValueValidation: &ValueValidation{
+					AllOf: []NestedValueValidation{
+						{
+							AdditionalProperties: &NestedValueValidation{
+								ValueValidation: ValueValidation{
+									MinLength: ptr.To[int64](2),
+								},
+							},
+						},
+					},
+				},
+			},
+			error: `additionalProperties: Required value: because it is defined in allOf[0].additionalProperties`,
+			options: ValidationOptions{
+				AllowNestedAdditionalProperties: true,
 			},
 		},
-		ValueValidation: &ValueValidation{
-			AllOf: []NestedValueValidation{
-				{
-					Properties: map[string]NestedValueValidation{
-						"foo": {
-							ValueValidation: ValueValidation{
-								MinLength: ptr.To[int64](2),
+		{
+			name: "allowed property in valuevalidation, and in structure",
+			schema: Structural{
+				Properties: map[string]Structural{
+					"foo": {
+						Generic: Generic{
+							Type: "string",
+						},
+					},
+				},
+				ValueValidation: &ValueValidation{
+					AllOf: []NestedValueValidation{
+						{
+							Properties: map[string]NestedValueValidation{
+								"foo": {
+									ValueValidation: ValueValidation{
+										MinLength: ptr.To[int64](2),
+									},
+								},
 							},
 						},
 					},
 				},
 			},
 		},
+		{
+			name: "disallowed property in valuevalidation, and in structure",
+			schema: Structural{
+				Properties: map[string]Structural{
+					"foo": {
+						Generic: Generic{
+							Type: "string",
+						},
+					},
+				},
+				ValueValidation: &ValueValidation{
+					AllOf: []NestedValueValidation{
+						{
+							Properties: map[string]NestedValueValidation{
+								"notfoo": {
+									ValueValidation: ValueValidation{
+										MinLength: ptr.To[int64](2),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			error: `properties[notfoo]: Required value: because it is defined in allOf[0].properties[notfoo]`,
+		},
+		{
+			name: "allowed items in valuevalidation, and in structure",
+			schema: Structural{
+				Generic: Generic{
+					Type: "array",
+				},
+				Items: &Structural{
+					Generic: Generic{
+						Type: "string",
+					},
+				},
+				ValueValidation: &ValueValidation{
+					AllOf: []NestedValueValidation{
+						{
+							Items: &NestedValueValidation{
+								ValueValidation: ValueValidation{
+									MinLength: ptr.To[int64](2),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "disallowed items in valuevalidation, and not in structure",
+			schema: Structural{
+				Generic: Generic{
+					Type: "object",
+				},
+				Properties: map[string]Structural{
+					"foo": {
+						Generic: Generic{
+							Type: "string",
+						},
+					},
+				},
+				ValueValidation: &ValueValidation{
+					AllOf: []NestedValueValidation{
+						{
+							Items: &NestedValueValidation{
+								ValueValidation: ValueValidation{
+									MinLength: ptr.To[int64](2),
+								},
+							},
+						},
+					},
+				},
+			},
+			error: `items: Required value: because it is defined in allOf[0].items`,
+		},
 	}
 
-	for _, allowedPropertiesForAdditionalProperties := range []bool{false, true} {
-		errs := validateStructuralCompleteness(&sch, nil, ValidationOptions{
-			AllowValidationPropertiesWithAdditionalProperties: allowedPropertiesForAdditionalProperties,
-		})
-		if allowedPropertiesForAdditionalProperties {
-			if len(errs) != 0 {
-				t.Errorf("unexpected validation errors for: %#v", sch)
+	for _, tc := range testCases {
+		errs := validateStructuralCompleteness(&tc.schema, nil, tc.options)
+		if len(tc.error) == 0 && len(errs) != 0 {
+			t.Errorf("unexpected errors: %v", errs)
+		}
+		if len(tc.error) != 0 {
+			contains := false
+
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tc.error) {
+					contains = true
+					break
+				}
 			}
-		} else if len(errs) == 0 {
-			t.Errorf("expected validation errors for: %#v", sch)
+
+			if !contains {
+				t.Errorf("expected error: %s, got %v", tc.error, errs)
+			}
 		}
 	}
 
