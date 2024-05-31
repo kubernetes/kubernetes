@@ -520,9 +520,12 @@ func (a *Authenticator) refreshCredsLocked() error {
 // It must be called while holding the Authenticator's mutex.
 func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 	switch err.(type) {
-	case *exec.Error: // Binary does not exist (see exec.Error).
+	case *exec.Error: // Failed to execute binary (see exec.Error).
 		builder := strings.Builder{}
-		fmt.Fprintf(&builder, "exec: executable %s not found", a.cmd)
+		// The most common reason for failing to execute a binary is that it wasn't found.
+		// There are more failure modes too though, and we need to preserve the original
+		// error message to avoid swallowing important clues.
+		fmt.Fprintf(&builder, "exec: %v", err)
 
 		a.sometimes.Do(func() {
 			fmt.Fprint(&builder, installHintVerboseHelp)
@@ -533,7 +536,7 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 
 		return errors.New(builder.String())
 
-	case *exec.ExitError: // Binary execution failed (see exec.Cmd.Run()).
+	case *exec.ExitError: // Binary exited with non-zero code (see exec.Cmd.Run()).
 		e := err.(*exec.ExitError)
 		return fmt.Errorf(
 			"exec: executable %s failed with exit code %d",
