@@ -160,29 +160,28 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 		return err
 	}
 	startTime := time.Now()
-	getResp, err := s.client.KV.Get(ctx, preparedKey)
+	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, clientv3.GetOptions{})
 	metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
 	if err != nil {
 		return err
 	}
-	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Header.Revision)); err != nil {
+	if err = s.validateMinimumResourceVersion(opts.ResourceVersion, uint64(getResp.Revision)); err != nil {
 		return err
 	}
 
-	if len(getResp.Kvs) == 0 {
+	if getResp.KV == nil {
 		if opts.IgnoreNotFound {
 			return runtime.SetZeroValue(out)
 		}
 		return storage.NewKeyNotFoundError(preparedKey, 0)
 	}
-	kv := getResp.Kvs[0]
 
-	data, _, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(preparedKey))
+	data, _, err := s.transformer.TransformFromStorage(ctx, getResp.KV.Value, authenticatedDataString(preparedKey))
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
 
-	err = decode(s.codec, s.versioner, data, out, kv.ModRevision)
+	err = decode(s.codec, s.versioner, data, out, getResp.KV.ModRevision)
 	if err != nil {
 		recordDecodeError(s.groupResourceString, preparedKey)
 		return err
