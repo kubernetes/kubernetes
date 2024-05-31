@@ -19,13 +19,13 @@ package etcd3
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"reflect"
 	"strings"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -344,21 +344,17 @@ func (s *store) conditionalDelete(
 		}
 
 		startTime := time.Now()
-		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
-		).Then(
-			clientv3.OpDelete(key),
-		).Else(
-			clientv3.OpGet(key),
-		).Commit()
+		txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, clientv3.DeleteOptions{
+			ExpectedRevision: origState.rev,
+			GetOnFailure: true,
+		})
 		metrics.RecordEtcdRequest("delete", s.groupResourceString, err, startTime)
 		if err != nil {
 			return err
 		}
 		if !txnResp.Succeeded {
-			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(ctx, getResp, key, v, false)
+			origState, err = s.getState(ctx, txnResp.KV, key, v, false)
 			if err != nil {
 				return err
 			}
@@ -366,14 +362,7 @@ func (s *store) conditionalDelete(
 			continue
 		}
 
-		if len(txnResp.Responses) == 0 || txnResp.Responses[0].GetResponseDeleteRange() == nil {
-			return errors.New(fmt.Sprintf("invalid DeleteRange response: %v", txnResp.Responses))
-		}
-		deleteResp := txnResp.Responses[0].GetResponseDeleteRange()
-		if deleteResp.Header == nil {
-			return errors.New("invalid DeleteRange response - nil header")
-		}
-		err = decode(s.codec, s.versioner, origState.data, out, deleteResp.Header.Revision)
+		err = decode(s.codec, s.versioner, origState.data, out, txnResp.Revision)
 		if err != nil {
 			recordDecodeError(s.groupResourceString, key)
 			return err
@@ -504,20 +493,22 @@ func (s *store) GuaranteedUpdate(
 		}
 		span.AddEvent("TransformToStorage succeeded")
 
-		opts, err := s.ttlOpts(ctx, int64(ttl))
-		if err != nil {
-			return err
+		var lease clientv3.LeaseID
+		if ttl != 0 {
+			lease, err = s.leaseManager.GetLease(ctx, int64(ttl))
+			if err != nil {
+				return err
+			}
 		}
 		span.AddEvent("Transaction prepared")
 
 		startTime := time.Now()
-		txnResp, err := s.client.KV.Txn(ctx).If(
-			clientv3.Compare(clientv3.ModRevision(preparedKey), "=", origState.rev),
-		).Then(
-			clientv3.OpPut(preparedKey, string(newData), opts...),
-		).Else(
-			clientv3.OpGet(preparedKey),
-		).Commit()
+
+		txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, clientv3.PutOptions{
+			ExpectedRevision: origState.rev,
+			GetOnFailure: true,
+			LeaseID: lease,
+		})
 		metrics.RecordEtcdRequest("update", s.groupResourceString, err, startTime)
 		if err != nil {
 			span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
@@ -526,9 +517,8 @@ func (s *store) GuaranteedUpdate(
 		span.AddEvent("Txn call completed")
 		span.AddEvent("Transaction committed")
 		if !txnResp.Succeeded {
-			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
-			origState, err = s.getState(ctx, getResp, preparedKey, v, ignoreNotFound)
+			origState, err = s.getState(ctx, txnResp.KV, preparedKey, v, ignoreNotFound)
 			if err != nil {
 				return err
 			}
@@ -536,9 +526,8 @@ func (s *store) GuaranteedUpdate(
 			origStateIsCurrent = true
 			continue
 		}
-		putResp := txnResp.Responses[0].GetResponsePut()
 
-		err = decode(s.codec, s.versioner, data, destination, putResp.Header.Revision)
+		err = decode(s.codec, s.versioner, data, destination, txnResp.Revision)
 		if err != nil {
 			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			recordDecodeError(s.groupResourceString, preparedKey)
@@ -873,16 +862,16 @@ func (s *store) watchContext(ctx context.Context) context.Context {
 func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value, ignoreNotFound bool) func() (*objState, error) {
 	return func() (*objState, error) {
 		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key)
+		getResp, err := s.client.Kubernetes.Get(ctx, key, clientv3.GetOptions{})
 		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
 		if err != nil {
 			return nil, err
 		}
-		return s.getState(ctx, getResp, key, v, ignoreNotFound)
+		return s.getState(ctx, getResp.KV, key, v, ignoreNotFound)
 	}
 }
 
-func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
+func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
 	state := &objState{
 		meta: &storage.ResponseMeta{},
 	}
@@ -893,7 +882,7 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 		state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
 	}
 
-	if len(getResp.Kvs) == 0 {
+	if kv == nil {
 		if !ignoreNotFound {
 			return nil, storage.NewKeyNotFoundError(key, 0)
 		}
@@ -901,11 +890,11 @@ func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key
 			return nil, err
 		}
 	} else {
-		data, stale, err := s.transformer.TransformFromStorage(ctx, getResp.Kvs[0].Value, authenticatedDataString(key))
+		data, stale, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(key))
 		if err != nil {
 			return nil, storage.NewInternalError(err.Error())
 		}
-		state.rev = getResp.Kvs[0].ModRevision
+		state.rev = kv.ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
 		state.data = data
 		state.stale = stale
@@ -959,19 +948,6 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtim
 		ttl = *ttlPtr
 	}
 	return ret, ttl, nil
-}
-
-// ttlOpts returns client options based on given ttl.
-// ttl: if ttl is non-zero, it will attach the key to a lease with ttl of roughly the same length
-func (s *store) ttlOpts(ctx context.Context, ttl int64) ([]clientv3.OpOption, error) {
-	if ttl == 0 {
-		return nil, nil
-	}
-	id, err := s.leaseManager.GetLease(ctx, ttl)
-	if err != nil {
-		return nil, err
-	}
-	return []clientv3.OpOption{clientv3.WithLease(id)}, nil
 }
 
 // validateMinimumResourceVersion returns a 'too large resource' version error when the provided minimumResourceVersion is
