@@ -5171,6 +5171,7 @@ func Convert_core_NodeRuntimeHandler_To_v1_NodeRuntimeHandler(in *core.NodeRunti
 
 func autoConvert_v1_NodeRuntimeHandlerFeatures_To_core_NodeRuntimeHandlerFeatures(in *v1.NodeRuntimeHandlerFeatures, out *core.NodeRuntimeHandlerFeatures, s conversion.Scope) error {
 	out.RecursiveReadOnlyMounts = (*bool)(unsafe.Pointer(in.RecursiveReadOnlyMounts))
+	out.UserNamespaces = (*bool)(unsafe.Pointer(in.UserNamespaces))
 	return nil
 }
 
@@ -5181,6 +5182,7 @@ func Convert_v1_NodeRuntimeHandlerFeatures_To_core_NodeRuntimeHandlerFeatures(in
 
 func autoConvert_core_NodeRuntimeHandlerFeatures_To_v1_NodeRuntimeHandlerFeatures(in *core.NodeRuntimeHandlerFeatures, out *v1.NodeRuntimeHandlerFeatures, s conversion.Scope) error {
 	out.RecursiveReadOnlyMounts = (*bool)(unsafe.Pointer(in.RecursiveReadOnlyMounts))
+	out.UserNamespaces = (*bool)(unsafe.Pointer(in.UserNamespaces))
 	return nil
 }
 

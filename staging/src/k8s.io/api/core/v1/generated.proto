@@ -2634,6 +2634,11 @@ message NodeRuntimeHandlerFeatures {
   // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional bool recursiveReadOnlyMounts = 1;
+
+  // UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+  // +featureGate=UserNamespacesSupport
+  // +optional
+  optional bool userNamespaces = 2;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -2794,6 +2799,7 @@ message NodeStatus {
 
   // The available runtime handlers.
   // +featureGate=RecursiveReadOnlyMounts
+  // +featureGate=UserNamespacesSupport
   // +optional
   // +listType=atomic
   repeated NodeRuntimeHandler runtimeHandlers = 12;
