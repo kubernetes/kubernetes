@@ -1238,6 +1238,7 @@ func (NodeRuntimeHandler) SwaggerDoc() map[string]string {
 var map_NodeRuntimeHandlerFeatures = map[string]string{
 	"":                        "NodeRuntimeHandlerFeatures is a set of runtime features.",
 	"recursiveReadOnlyMounts": "RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
+	"userNamespaces":          "UserNamespaces is set to true if the runtime handler supports UserNamespaces. More specifically, the underlying runtime is expected to support idmapped mounting.",
 }
 
 func (NodeRuntimeHandlerFeatures) SwaggerDoc() map[string]string {

@@ -13477,6 +13477,16 @@ func (m *NodeRuntimeHandlerFeatures) MarshalToSizedBuffer(dAtA []byte) (int, err
 	_ = i
 	var l int
 	_ = l
+	if m.UserNamespaces != nil {
+		i--
+		if *m.UserNamespaces {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x10
+	}
 	if m.RecursiveReadOnlyMounts != nil {
 		i--
 		if *m.RecursiveReadOnlyMounts {
@@ -23507,6 +23517,9 @@ func (m *NodeRuntimeHandlerFeatures) Size() (n int) {
 	if m.RecursiveReadOnlyMounts != nil {
 		n += 2
 	}
+	if m.UserNamespaces != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -28045,6 +28058,7 @@ func (this *NodeRuntimeHandlerFeatures) String() string {
 	}
 	s := strings.Join([]string{`&NodeRuntimeHandlerFeatures{`,
 		`RecursiveReadOnlyMounts:` + valueToStringGenerated(this.RecursiveReadOnlyMounts) + `,`,
+		`UserNamespaces:` + valueToStringGenerated(this.UserNamespaces) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -48680,6 +48694,27 @@ func (m *NodeRuntimeHandlerFeatures) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.RecursiveReadOnlyMounts = &b
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UserNamespaces", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.UserNamespaces = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
