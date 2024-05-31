@@ -99,7 +99,7 @@ func validateNestedValueValidationCompleteness(v *NestedValueValidation, s *Stru
 	}
 
 	if v.AdditionalProperties != nil && opts.AllowNestedAdditionalProperties {
-		allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.AdditionalProperties, s.AdditionalProperties.Structural, sPath.Child("additionalProperties"), vPath.Child("additionalProperties"), opts)...)
+		allErrs = append(allErrs, validateNestedValueValidationCompleteness(v.AdditionalProperties, sAdditionalPropertiesSchema, sPath.Child("additionalProperties"), vPath.Child("additionalProperties"), opts)...)
 	}
 
 	return allErrs
