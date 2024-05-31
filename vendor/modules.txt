@@ -645,6 +645,7 @@ go.etcd.io/etcd/client/v3/concurrency
 go.etcd.io/etcd/client/v3/credentials
 go.etcd.io/etcd/client/v3/internal/endpoint
 go.etcd.io/etcd/client/v3/internal/resolver
+go.etcd.io/etcd/client/v3/kubernetes
 # go.etcd.io/etcd/pkg/v3 v3.5.16
 ## explicit; go 1.22
 go.etcd.io/etcd/pkg/v3/adt
