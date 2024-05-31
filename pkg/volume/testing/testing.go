@@ -231,7 +231,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
 	}
-	volume.VolumesAttached = make(map[string]sets.String)
+	volume.VolumesAttached = make(map[string]sets.Set[string])
 	volume.DeviceMountState = make(map[string]string)
 	volume.VolumeMountState = make(map[string]string)
 	if list != nil {
@@ -667,7 +667,7 @@ type FakeVolume struct {
 	VolName string
 	Plugin  *FakeVolumePlugin
 	volume.MetricsNil
-	VolumesAttached  map[string]sets.String
+	VolumesAttached  map[string]sets.Set[string]
 	DeviceMountState map[string]string
 	VolumeMountState map[string]string
 
@@ -1009,7 +1009,7 @@ func (fv *FakeVolume) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		return "", fmt.Errorf("volume %q trying to attach to node %q is already attached to node %q", volumeName, nodeName, volumeNodes)
 	}
 
-	fv.VolumesAttached[volumeName] = sets.NewString(string(nodeName))
+	fv.VolumesAttached[volumeName] = sets.New[string](string(nodeName))
 	if nodeName == UncertainAttachNode || nodeName == TimeoutAttachNode {
 		return "", fmt.Errorf("timed out to attach volume %q to node %q", volumeName, nodeName)
 	}

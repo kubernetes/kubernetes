@@ -158,7 +158,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 	}
 	oldTsPath := filepath.Join(w.targetDir, oldTsDir)
 
-	var pathsToRemove sets.String
+	var pathsToRemove sets.Set[string]
 	shouldWrite := true
 	// if there was no old version, there's nothing to remove
 	if len(oldTsDir) != 0 {
@@ -355,10 +355,10 @@ func shouldWriteFile(path string, content []byte) (bool, error) {
 // pathsToRemove walks the current version of the data directory and
 // determines which paths should be removed (if any) after the payload is
 // written to the target directory.
-func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir string) (sets.String, error) {
-	paths := sets.NewString()
+func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTSDir string) (sets.Set[string], error) {
+	paths := sets.New[string]()
 	visitor := func(path string, info os.FileInfo, err error) error {
-		relativePath := strings.TrimPrefix(path, oldTsDir)
+		relativePath := strings.TrimPrefix(path, oldTSDir)
 		relativePath = strings.TrimPrefix(relativePath, string(os.PathSeparator))
 		if relativePath == "" {
 			return nil
@@ -368,15 +368,15 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 		return nil
 	}
 
-	err := filepath.Walk(oldTsDir, visitor)
+	err := filepath.Walk(oldTSDir, visitor)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
-	klog.V(5).Infof("%s: current paths:   %+v", w.targetDir, paths.List())
+	klog.V(5).Infof("%s: current paths:   %+v", w.targetDir, sets.List(paths))
 
-	newPaths := sets.NewString()
+	newPaths := sets.New[string]()
 	for file := range payload {
 		// add all subpaths for the payload to the set of new paths
 		// to avoid attempting to remove non-empty dirs
@@ -386,7 +386,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 			subPath = strings.TrimSuffix(subPath, string(os.PathSeparator))
 		}
 	}
-	klog.V(5).Infof("%s: new paths:       %+v", w.targetDir, newPaths.List())
+	klog.V(5).Infof("%s: new paths:       %+v", w.targetDir, sets.List(newPaths))
 
 	result := paths.Difference(newPaths)
 	klog.V(5).Infof("%s: paths to remove: %+v", w.targetDir, result)
@@ -488,7 +488,7 @@ func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection)
 
 // removeUserVisiblePaths removes the set of paths from the user-visible
 // portion of the writer's target directory.
-func (w *AtomicWriter) removeUserVisiblePaths(paths sets.String) error {
+func (w *AtomicWriter) removeUserVisiblePaths(paths sets.Set[string]) error {
 	ps := string(os.PathSeparator)
 	var lasterr error
 	for p := range paths {

@@ -243,7 +243,7 @@ func MountOptionFromSpec(spec *volume.Spec, options ...string) []string {
 
 // JoinMountOptions joins mount options eliminating duplicates
 func JoinMountOptions(userOptions []string, systemOptions []string) []string {
-	allMountOptions := sets.NewString()
+	allMountOptions := sets.New[string]()
 
 	for _, mountOption := range userOptions {
 		if len(mountOption) > 0 {
@@ -254,7 +254,7 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 	for _, mountOption := range systemOptions {
 		allMountOptions.Insert(mountOption)
 	}
-	return allMountOptions.List()
+	return sets.List(allMountOptions)
 }
 
 // ContainsAccessMode returns whether the requested mode is contained by modes
@@ -596,9 +596,9 @@ func GetLocalPersistentVolumeNodeNames(pv *v1.PersistentVolume) []string {
 // GetPodVolumeNames returns names of volumes that are used in a pod,
 // either as filesystem mount or raw block device, together with list
 // of all SELinux contexts of all containers that use the volumes.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String, seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
-	mounts = sets.NewString()
-	devices = sets.NewString()
+func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
+	mounts = sets.New[string]()
+	devices = sets.New[string]()
 	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
