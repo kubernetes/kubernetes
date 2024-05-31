@@ -5856,7 +5856,11 @@ type NodeRuntimeHandlerFeatures struct {
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty" protobuf:"varint,1,opt,name=recursiveReadOnlyMounts"`
-	// Reserved: UserNamespaces *bool (varint 2, for consistency with CRI API)
+	// UserNamespaces is set to true if the runtime handler supports UserNamespaces.
+	// More specifically, the underlying runtime is expected to support idmapped mounting.
+	// +featureGate=UserNamespaces
+	// +optional
+	UserNamespaces *bool `json:"userNamespaces,omitempty" protobuf:"varint,2,opt,name=userNamespaces"`
 }
 
 // NodeRuntimeHandler is a set of runtime handler information.

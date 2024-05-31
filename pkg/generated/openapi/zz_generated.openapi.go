@@ -24551,6 +24551,13 @@ func schema_k8sio_api_core_v1_NodeRuntimeHandlerFeatures(ref common.ReferenceCal
 							Format:      "",
 						},
 					},
+					"userNamespaces": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UserNamespaces is set to true if the runtime handler supports UserNamespaces. More specifically, the underlying runtime is expected to support idmapped mounting.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

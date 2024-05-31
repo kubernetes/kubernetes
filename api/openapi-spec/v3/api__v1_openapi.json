@@ -3815,6 +3815,10 @@
           "recursiveReadOnlyMounts": {
             "description": "RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
             "type": "boolean"
+          },
+          "userNamespaces": {
+            "description": "UserNamespaces is set to true if the runtime handler supports UserNamespaces. More specifically, the underlying runtime is expected to support idmapped mounting.",
+            "type": "boolean"
           }
         },
         "type": "object"

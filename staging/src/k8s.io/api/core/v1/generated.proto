@@ -2651,6 +2651,12 @@ message NodeRuntimeHandlerFeatures {
   // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional bool recursiveReadOnlyMounts = 1;
+
+  // UserNamespaces is set to true if the runtime handler supports UserNamespaces.
+  // More specifically, the underlying runtime is expected to support idmapped mounting.
+  // +featureGate=UserNamespaces
+  // +optional
+  optional bool userNamespaces = 2;
 }
 
 // A node selector represents the union of the results of one or more label queries
