@@ -222,23 +222,23 @@ dependencies:
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/benchmark-controller.json
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-default.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-default.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-node-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-node-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-pod-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-pod-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-pod-anti-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-pod-anti-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-preferred-pod-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-anti-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-preferred-pod-anti-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-preferred-topology-spreading.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-preferred-topology-spreading.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-secret-volume.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-secret-volume.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-topology-spreading.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-topology-spreading.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
