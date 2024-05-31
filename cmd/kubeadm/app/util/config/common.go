@@ -83,11 +83,13 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated, allowExpe
 		"kubeadm.k8s.io/v1beta2":  "v1.22",
 	}
 
-	// Experimental API versions are present here until released.
+	// Experimental API versions are present here until released. Can be used only if allowed.
 	experimentalAPIVersions := map[string]string{}
 
-	// Deprecated API versions are supported by us, but can only be used for migration.
-	deprecatedAPIVersions := map[string]struct{}{}
+	// Deprecated API versions are supported until removed. They throw a warning.
+	deprecatedAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1beta3": {},
+	}
 
 	gvString := gv.String()
 
