@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -51,13 +52,21 @@ func getAvoidTimestampEqualities() conversion.Equalities {
 		}
 
 		var eqs = equality.Semantic.Copy()
-		err := eqs.AddFunc(
+		err := eqs.AddFuncs(
 			func(a, b metav1.ManagedFieldsEntry) bool {
 				// Two objects' managed fields are equivalent if, ignoring timestamp,
 				//	the objects are deeply equal.
 				a.Time = nil
 				b.Time = nil
 				return reflect.DeepEqual(a, b)
+			},
+			func(a, b unstructured.Unstructured) bool {
+				// Check if the managed fields are equal by converting to structured types and leveraging the above
+				// function, then, ignoring the managed fields, equality check the rest of the unstructured data.
+				if !avoidTimestampEqualities.DeepEqual(a.GetManagedFields(), b.GetManagedFields()) {
+					return false
+				}
+				return equalIgnoringValueAtPath(a.Object, b.Object, []string{"metadata", "managedFields"})
 			},
 		)
 
@@ -68,6 +77,35 @@ func getAvoidTimestampEqualities() conversion.Equalities {
 		avoidTimestampEqualities = eqs
 	})
 	return avoidTimestampEqualities
+}
+
+func equalIgnoringValueAtPath(a, b any, path []string) bool {
+	if len(path) == 0 { // found the value to ignore
+		return true
+	}
+	aMap, aOk := a.(map[string]any)
+	bMap, bOk := b.(map[string]any)
+	if !aOk || !bOk {
+		return !avoidTimestampEqualities.DeepEqual(a, b)
+	}
+	if len(aMap) != len(bMap) {
+		return false
+	}
+	pathHead := path[0]
+	for k, aVal := range aMap {
+		bVal, ok := bMap[k]
+		if !ok {
+			return false
+		}
+		if k == pathHead {
+			if !equalIgnoringValueAtPath(aVal, bVal, path[1:]) {
+				return false
+			}
+		} else if !avoidTimestampEqualities.DeepEqual(aVal, bVal) {
+			return false
+		}
+	}
+	return true
 }
 
 // IgnoreManagedFieldsTimestampsTransformer reverts timestamp updates
