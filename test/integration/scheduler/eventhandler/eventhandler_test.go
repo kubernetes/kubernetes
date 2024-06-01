@@ -114,7 +114,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 		t.Fatalf("Creating pod error: %v", err)
 	}
 
-	if err := testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 		t.Fatalf("Pod %v got scheduled: %v", pod.Name, err)
 	}
 	node, err = testCtx.ClientSet.CoreV1().Nodes().Get(testCtx.Ctx, node.Name, metav1.GetOptions{})

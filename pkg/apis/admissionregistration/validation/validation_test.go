@@ -29,6 +29,8 @@ import (
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -3412,8 +3414,9 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 		},
 		// TODO: CustomAuditAnnotations: string valueExpression with {oldObject} is allowed
 	}
+	strictCost := utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP)
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost)
 	extended, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MustParseGeneric("1.999"),
 		EnvOptions:        []cel.EnvOption{library.Test()},
@@ -3421,10 +3424,17 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	statelessCELCompiler = plugincel.NewCompiler(extended)
-	defer func() {
-		statelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
-	}()
+	if strictCost {
+		strictStatelessCELCompiler = plugincel.NewCompiler(extended)
+		defer func() {
+			strictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
+		}()
+	} else {
+		nonStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
+		defer func() {
+			nonStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
+		}()
+	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

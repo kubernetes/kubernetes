@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
@@ -311,24 +312,25 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		RecordTime:      w.clock.Now(),
 	}
 
+	// We can call w.store.Get() outside of a critical section,
+	// because the w.store itself is thread-safe and the only
+	// place where w.store is modified is below (via updateFunc)
+	// and these calls are serialized because reflector is processing
+	// events one-by-one.
+	previous, exists, err := w.store.Get(elem)
+	if err != nil {
+		return err
+	}
+	if exists {
+		previousElem := previous.(*storeElement)
+		wcEvent.PrevObject = previousElem.Object
+		wcEvent.PrevObjLabels = previousElem.Labels
+		wcEvent.PrevObjFields = previousElem.Fields
+	}
+
 	if err := func() error {
-		// TODO: We should consider moving this lock below after the watchCacheEvent
-		// is created. In such situation, the only problematic scenario is Replace()
-		// happening after getting object from store and before acquiring a lock.
-		// Maybe introduce another lock for this purpose.
 		w.Lock()
 		defer w.Unlock()
-
-		previous, exists, err := w.store.Get(elem)
-		if err != nil {
-			return err
-		}
-		if exists {
-			previousElem := previous.(*storeElement)
-			wcEvent.PrevObject = previousElem.Object
-			wcEvent.PrevObjLabels = previousElem.Labels
-			wcEvent.PrevObjFields = previousElem.Fields
-		}
 
 		w.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
@@ -498,7 +500,8 @@ func (s sortableStoreElements) Swap(i, j int) {
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) (result []interface{}, rv uint64, index string, err error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
+	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported && w.notFresh(resourceVersion) {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 		w.waitingUntilFresh.Remove()
@@ -639,6 +642,12 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 func (w *watchCache) Resync() error {
 	// Nothing to do
 	return nil
+}
+
+func (w *watchCache) getResourceVersion() uint64 {
+	w.RLock()
+	defer w.RUnlock()
+	return w.resourceVersion
 }
 
 func (w *watchCache) currentCapacity() int {

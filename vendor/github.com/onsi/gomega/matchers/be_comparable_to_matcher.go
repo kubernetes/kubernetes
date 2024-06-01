@@ -41,9 +41,9 @@ func (matcher *BeComparableToMatcher) Match(actual interface{}) (success bool, m
 }
 
 func (matcher *BeComparableToMatcher) FailureMessage(actual interface{}) (message string) {
-	return cmp.Diff(matcher.Expected, actual, matcher.Options)
+	return fmt.Sprint("Expected object to be comparable, diff: ", cmp.Diff(actual, matcher.Expected, matcher.Options...))
 }
 
 func (matcher *BeComparableToMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "not to equal", matcher.Expected)
+	return format.Message(actual, "not to be comparable to", matcher.Expected)
 }

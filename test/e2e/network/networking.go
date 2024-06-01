@@ -17,7 +17,6 @@ limitations under the License.
 package network
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"strconv"
@@ -328,37 +327,6 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		ginkgo.It("should update endpoints: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(ctx, f)
-
-			// start of intermittent code snippet to understand the reason for flaky behaviour
-			// TODO @aroradaman @aojea remove this once issue #123760 is resolved
-			// streaming logs for netserver-0 which will be deleted during the test
-			// (ref: https://github.com/kubernetes/kubernetes/issues/123760)
-			pod0name := config.EndpointPods[0].Name
-			go func() {
-				defer ginkgo.GinkgoRecover()
-				readCloser, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pod0name, &v1.PodLogOptions{
-					Follow: true,
-				}).Stream(ctx)
-
-				// silently ignoring error, we don't want to disturb the original test
-				if err != nil {
-					return
-				}
-				defer func() {
-					_ = readCloser.Close()
-				}()
-
-				scanner := bufio.NewScanner(readCloser)
-				var lines []string
-				for scanner.Scan() {
-					lines = append(lines, "\t\t"+scanner.Text())
-				}
-				framework.Logf("================ start of pod log for %s ================", pod0name)
-				framework.Logf("\n%s", strings.Join(lines, "\n"))
-				framework.Logf("================ end of pod log for %s ================", pod0name)
-			}()
-			// end of intermittent code snippet
-
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer(ctx, "http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {

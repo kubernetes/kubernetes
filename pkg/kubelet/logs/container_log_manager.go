@@ -146,7 +146,7 @@ type containerLogManager struct {
 	policy           LogRotatePolicy
 	clock            clock.Clock
 	mutex            sync.Mutex
-	queue            workqueue.RateLimitingInterface
+	queue            workqueue.TypedRateLimitingInterface[string]
 	maxWorkers       int
 	monitoringPeriod metav1.Duration
 }
@@ -172,10 +172,13 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 			MaxSize:  parsedMaxSize,
 			MaxFiles: maxFiles,
 		},
-		clock:            clock.RealClock{},
-		mutex:            sync.Mutex{},
-		maxWorkers:       maxWorkers,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kubelet_log_rotate_manager"),
+		clock:      clock.RealClock{},
+		mutex:      sync.Mutex{},
+		maxWorkers: maxWorkers,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubelet_log_rotate_manager"},
+		),
 		monitoringPeriod: monitorInterval,
 	}, nil
 }
@@ -264,7 +267,7 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 	}()
 	// Always default the return to true to keep the processing of Queue ongoing
 	ok = true
-	id := key.(string)
+	id := key
 
 	resp, err := c.runtimeService.ContainerStatus(ctx, id, false)
 	if err != nil {

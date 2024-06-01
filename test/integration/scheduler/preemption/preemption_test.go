@@ -679,7 +679,7 @@ func TestDisablePreemption(t *testing.T) {
 				t.Errorf("Error while creating high priority pod: %v", err)
 			}
 			// Ensure preemptor should keep unschedulable.
-			if err := waitForPodUnschedulable(cs, preemptor); err != nil {
+			if err := waitForPodUnschedulable(testCtx.Ctx, cs, preemptor); err != nil {
 				t.Errorf("Preemptor %v should not become scheduled", preemptor.Name)
 			}
 

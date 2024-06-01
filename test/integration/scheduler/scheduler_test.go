@@ -106,7 +106,7 @@ func TestUnschedulableNodes(t *testing.T) {
 				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=true: %v", err)
 				}
-				err = testutils.WaitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
+				err = testutils.WaitForReflection(testCtx.Ctx, t, nodeLister, nodeKey, func(node interface{}) bool {
 					// An unschedulable node should still be present in the store
 					// Nodes that are unschedulable or that are not ready or
 					// have their disk full (Node.Spec.Conditions) are excluded
@@ -122,7 +122,7 @@ func TestUnschedulableNodes(t *testing.T) {
 				if _, err := c.CoreV1().Nodes().Update(context.TODO(), n, metav1.UpdateOptions{}); err != nil {
 					t.Fatalf("Failed to update node with unschedulable=false: %v", err)
 				}
-				err = testutils.WaitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
+				err = testutils.WaitForReflection(testCtx.Ctx, t, nodeLister, nodeKey, func(node interface{}) bool {
 					return node != nil && node.(*v1.Node).Spec.Unschedulable == false
 				})
 				if err != nil {
@@ -480,6 +480,33 @@ func TestSchedulerInformers(t *testing.T) {
 			}),
 			preemptedPodIndexes: map[int]struct{}{2: {}},
 		},
+		{
+			name:         "The pod cannot be scheduled when nodeAffinity specifies a non-existent node.",
+			nodes:        []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
+			existingPods: []*v1.Pod{},
+			pod: testutils.InitPausePod(&testutils.PausePodConfig{
+				Name:      "unschedulable-pod",
+				Namespace: testCtx.NS.Name,
+				Affinity: &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchFields: []v1.NodeSelectorRequirement{
+										{
+											Key:      "metadata.name",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"invalid-node"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Resources: defaultPodRes,
+			}),
+		},
 	}
 
 	for _, test := range tests {
@@ -491,7 +518,7 @@ func TestSchedulerInformers(t *testing.T) {
 				}
 			}
 			// Ensure nodes are present in scheduler cache.
-			if err := testutils.WaitForNodesInCache(testCtx.Scheduler, len(test.nodes)); err != nil {
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(test.nodes)); err != nil {
 				t.Fatal(err)
 			}
 
@@ -508,7 +535,7 @@ func TestSchedulerInformers(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error while creating new pod: %v", err)
 			}
-			if err := testutils.WaitForPodUnschedulable(cs, unschedulable); err != nil {
+			if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, unschedulable); err != nil {
 				t.Errorf("Pod %v got scheduled: %v", unschedulable.Name, err)
 			}
 
@@ -570,7 +597,7 @@ func TestNodeEvents(t *testing.T) {
 		t.Fatalf("Failed to create pod %v: %v", pod2.Name, err)
 	}
 
-	if err := testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod2); err != nil {
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod2); err != nil {
 		t.Errorf("Pod %v got scheduled: %v", pod2.Name, err)
 	}
 
@@ -603,7 +630,7 @@ func TestNodeEvents(t *testing.T) {
 	}
 
 	// 3.2 pod2 still unschedulable
-	if err := testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod2); err != nil {
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod2); err != nil {
 		t.Errorf("Pod %v got scheduled: %v", pod2.Name, err)
 	}
 

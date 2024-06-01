@@ -34,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -112,6 +113,7 @@ func NewImageOptions(streams genericiooptions.IOStreams) *SetImageOptions {
 // NewCmdImage returns an initialized Command instance for the 'set image' sub command
 func NewCmdImage(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewImageOptions(streams)
+	validArgs := []string{"daemonsets", "deployments", "pods", "cronjobs", "replicasets", "replicationcontrollers", "statefulsets"}
 
 	cmd := &cobra.Command{
 		Use:                   "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
@@ -119,6 +121,7 @@ func NewCmdImage(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.C
 		Short:                 i18n.T("Update the image of a pod template"),
 		Long:                  imageLong,
 		Example:               imageExample,
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

@@ -437,3 +437,20 @@ func calcSwapForBurstablePods(containerMemoryRequest, nodeTotalMemory, totalPods
 
 	return int64(swapAllocation), nil
 }
+
+func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
+	if statusUser == nil {
+		return nil
+	}
+
+	user := &kubecontainer.ContainerUser{}
+	if statusUser.GetLinux() != nil {
+		user.Linux = &kubecontainer.LinuxContainerUser{
+			UID:                statusUser.GetLinux().GetUid(),
+			GID:                statusUser.GetLinux().GetGid(),
+			SupplementalGroups: statusUser.GetLinux().GetSupplementalGroups(),
+		}
+	}
+
+	return user
+}

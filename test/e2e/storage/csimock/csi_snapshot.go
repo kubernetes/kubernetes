@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
@@ -430,7 +432,7 @@ func deleteSnapshot(cs clientset.Interface, config *storageframework.PerTestConf
 
 	// check if the snapshot is deleted
 	_, err = dc.Resource(utils.SnapshotGVR).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
-	framework.ExpectError(err)
+	gomega.Expect(err).To(gomega.MatchError(apierrors.IsNotFound, "the snapshot is not deleted"))
 }
 
 type snapshotMetricsTestConfig struct {

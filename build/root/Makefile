@@ -33,10 +33,12 @@ endif
 SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
 BASH_ENV := ./hack/lib/logging.sh
 
-# Define variables so `make --warn-undefined-variables` works.
+# Define optional user-input variables so `make --warn-undefined-variables` works.
+# Usage is described below with each target that respects these
 PRINT_HELP ?=
 WHAT ?=
 TESTS ?=
+BRANCH ?=
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
@@ -387,6 +389,7 @@ define RELEASE_IMAGES_HELP_INFO
 # Args:
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
 #   DBG: If set to "1", build with optimizations disabled for easier debugging. Any other value is ignored.
+#   KUBE_BUILD_WINDOWS: Whether to build images for Windows as well. Set to 'y' to enable.
 #
 # Example:
 #   make release-images
@@ -436,6 +439,7 @@ define QUICK_RELEASE_IMAGES_HELP_INFO
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'y' to do so.
 #   DBG: If set to "1", build with optimizations disabled for easier debugging. Any other value is ignored.
+#   KUBE_BUILD_WINDOWS: Whether to build images for Windows as well. Set to 'y' to enable.
 #
 # Example:
 #   make quick-release-images

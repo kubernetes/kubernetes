@@ -261,22 +261,6 @@
   - k8s.io/kubelet
   - k8s.io/utils
 
-- baseImportPath: "./staging/src/k8s.io/legacy-cloud-providers"
-  allowedImports:
-  - k8s.io/api
-  - k8s.io/apimachinery
-  - k8s.io/client-go
-  - k8s.io/cloud-provider
-  - k8s.io/csi-translation-lib
-  - k8s.io/klog
-  - k8s.io/legacy-cloud-providers
-  - k8s.io/mount-utils
-  - k8s.io/utils
-  - k8s.io/apiserver/pkg/util/feature
-  - k8s.io/component-base/featuregate
-  - k8s.io/component-base/metrics
-  - k8s.io/component-base/metrics/legacyregistry
-
 - baseImportPath: "./staging/src/k8s.io/csi-translation-lib"
   allowedImports:
   - k8s.io/api
@@ -319,6 +303,14 @@
   - k8s.io/klog
   - k8s.io/utils
 
-# TODO: enable when source code got transferred
-# - baseImportPath: "./staging/src/k8s.io/cri-client"
-#   allowedImports: []
+- baseImportPath: "./staging/src/k8s.io/cri-client"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/apiserver
+  - k8s.io/client-go
+  - k8s.io/component-base
+  - k8s.io/cri-api
+  - k8s.io/cri-client
+  - k8s.io/klog/v2
+  - k8s.io/utils

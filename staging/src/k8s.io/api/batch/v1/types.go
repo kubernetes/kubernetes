@@ -64,6 +64,7 @@ const (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // Job represents the configuration of a single job.
 type Job struct {
@@ -85,6 +86,7 @@ type Job struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // JobList is a collection of jobs.
 type JobList struct {
@@ -477,7 +479,8 @@ type JobSpec struct {
 	// The value must be a valid domain-prefixed path (e.g. acme.io/foo) -
 	// all characters before the first "/" must be a valid subdomain as defined
 	// by RFC 1123. All characters trailing the first "/" must be valid HTTP Path
-	// characters as defined by RFC 3986. The value cannot exceed 64 characters.
+	// characters as defined by RFC 3986. The value cannot exceed 63 characters.
+	// This field is immutable.
 	//
 	// This field is alpha-level. The job controller accepts setting the field
 	// when the feature gate JobManagedBy is enabled (disabled by default).
@@ -688,6 +691,7 @@ type JobTemplateSpec struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
@@ -709,6 +713,7 @@ type CronJob struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {

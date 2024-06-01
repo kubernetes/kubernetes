@@ -51,3 +51,9 @@ const TCPReceiveMemoryNamespacedKernelVersion = "4.15"
 // TCPTransmitMemoryNamespacedKernelVersion is the kernel version in which net.ipv4.tcp_wmem was namespaced(netns).
 // (ref: https://github.com/torvalds/linux/commit/356d1833b638bd465672aefeb71def3ab93fc17d)
 const TCPTransmitMemoryNamespacedKernelVersion = "4.15"
+
+// UserNamespacesSupportKernelVersion is the kernel version where idmap for tmpfs support was added
+// (ref: https://github.com/torvalds/linux/commit/05e6295f7b5e05f09e369a3eb2882ec5b40fff20)
+const UserNamespacesSupportKernelVersion = "6.3"
+
+const TmpfsNoswapSupportKernelVersion = "6.4"

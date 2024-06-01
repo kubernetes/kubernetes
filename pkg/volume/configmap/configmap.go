@@ -86,10 +86,6 @@ func (plugin *configMapPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *configMapPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *configMapPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

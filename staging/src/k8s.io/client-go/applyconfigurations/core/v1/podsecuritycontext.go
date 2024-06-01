@@ -25,17 +25,18 @@ import (
 // PodSecurityContextApplyConfiguration represents an declarative configuration of the PodSecurityContext type for use
 // with apply.
 type PodSecurityContextApplyConfiguration struct {
-	SELinuxOptions      *SELinuxOptionsApplyConfiguration                `json:"seLinuxOptions,omitempty"`
-	WindowsOptions      *WindowsSecurityContextOptionsApplyConfiguration `json:"windowsOptions,omitempty"`
-	RunAsUser           *int64                                           `json:"runAsUser,omitempty"`
-	RunAsGroup          *int64                                           `json:"runAsGroup,omitempty"`
-	RunAsNonRoot        *bool                                            `json:"runAsNonRoot,omitempty"`
-	SupplementalGroups  []int64                                          `json:"supplementalGroups,omitempty"`
-	FSGroup             *int64                                           `json:"fsGroup,omitempty"`
-	Sysctls             []SysctlApplyConfiguration                       `json:"sysctls,omitempty"`
-	FSGroupChangePolicy *corev1.PodFSGroupChangePolicy                   `json:"fsGroupChangePolicy,omitempty"`
-	SeccompProfile      *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty"`
-	AppArmorProfile     *AppArmorProfileApplyConfiguration               `json:"appArmorProfile,omitempty"`
+	SELinuxOptions           *SELinuxOptionsApplyConfiguration                `json:"seLinuxOptions,omitempty"`
+	WindowsOptions           *WindowsSecurityContextOptionsApplyConfiguration `json:"windowsOptions,omitempty"`
+	RunAsUser                *int64                                           `json:"runAsUser,omitempty"`
+	RunAsGroup               *int64                                           `json:"runAsGroup,omitempty"`
+	RunAsNonRoot             *bool                                            `json:"runAsNonRoot,omitempty"`
+	SupplementalGroups       []int64                                          `json:"supplementalGroups,omitempty"`
+	SupplementalGroupsPolicy *corev1.SupplementalGroupsPolicy                 `json:"supplementalGroupsPolicy,omitempty"`
+	FSGroup                  *int64                                           `json:"fsGroup,omitempty"`
+	Sysctls                  []SysctlApplyConfiguration                       `json:"sysctls,omitempty"`
+	FSGroupChangePolicy      *corev1.PodFSGroupChangePolicy                   `json:"fsGroupChangePolicy,omitempty"`
+	SeccompProfile           *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty"`
+	AppArmorProfile          *AppArmorProfileApplyConfiguration               `json:"appArmorProfile,omitempty"`
 }
 
 // PodSecurityContextApplyConfiguration constructs an declarative configuration of the PodSecurityContext type for use with
@@ -91,6 +92,14 @@ func (b *PodSecurityContextApplyConfiguration) WithSupplementalGroups(values ...
 	for i := range values {
 		b.SupplementalGroups = append(b.SupplementalGroups, values[i])
 	}
+	return b
+}
+
+// WithSupplementalGroupsPolicy sets the SupplementalGroupsPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SupplementalGroupsPolicy field is set to the value of the last call.
+func (b *PodSecurityContextApplyConfiguration) WithSupplementalGroupsPolicy(value corev1.SupplementalGroupsPolicy) *PodSecurityContextApplyConfiguration {
+	b.SupplementalGroupsPolicy = &value
 	return b
 }
 

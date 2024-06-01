@@ -90,10 +90,6 @@ func (plugin *iscsiPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *iscsiPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *iscsiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return true, nil
 }

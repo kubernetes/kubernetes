@@ -250,9 +250,6 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		csitranslationplugins.PortworxVolumePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
 		},
-		csitranslationplugins.RBDVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
-		},
 	}
 
 	// Initializing the label management channels
@@ -530,10 +527,6 @@ func (p *csiPlugin) SupportsMountOption() bool {
 	// make plugins register their support for mount options or lack thereof
 	// directly with kubernetes.
 	return true
-}
-
-func (p *csiPlugin) SupportsBulkVolumeVerification() bool {
-	return false
 }
 
 func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {

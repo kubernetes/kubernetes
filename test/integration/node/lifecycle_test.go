@@ -436,7 +436,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 				}
 			}
 
-			if err := testutils.WaitForNodeTaints(cs, nodes[nodeIndex], test.nodeTaints); err != nil {
+			if err := testutils.WaitForNodeTaints(testCtx.Ctx, cs, nodes[nodeIndex], test.nodeTaints); err != nil {
 				t.Errorf("Failed to taint node %q, err: %v", klog.KObj(nodes[nodeIndex]), err)
 			}
 

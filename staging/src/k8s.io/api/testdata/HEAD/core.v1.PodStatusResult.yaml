@@ -85,6 +85,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
     volumeMounts:
     - mountPath: mountPathValue
       name: nameValue
@@ -135,6 +141,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
     volumeMounts:
     - mountPath: mountPathValue
       name: nameValue
@@ -188,6 +200,12 @@ status:
       waiting:
         message: messageValue
         reason: reasonValue
+    user:
+      linux:
+        gid: 2
+        supplementalGroups:
+        - 3
+        uid: 1
     volumeMounts:
     - mountPath: mountPathValue
       name: nameValue

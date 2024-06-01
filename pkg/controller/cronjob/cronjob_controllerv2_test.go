@@ -1375,12 +1375,12 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 }
 
 type fakeQueue struct {
-	workqueue.RateLimitingInterface
+	workqueue.TypedRateLimitingInterface[string]
 	delay time.Duration
 	key   interface{}
 }
 
-func (f *fakeQueue) AddAfter(key interface{}, delay time.Duration) {
+func (f *fakeQueue) AddAfter(key string, delay time.Duration) {
 	f.delay = delay
 	f.key = key
 }
@@ -1593,7 +1593,12 @@ func TestControllerV2UpdateCronJob(t *testing.T) {
 				return
 			}
 			jm.now = justASecondBeforeTheHour
-			queue := &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")}
+			queue := &fakeQueue{TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[string](),
+				workqueue.TypedRateLimitingQueueConfig[string]{
+					Name: "test-update-cronjob",
+				},
+			)}
 			jm.queue = queue
 			jm.jobControl = &fakeJobControl{}
 			jm.cronJobControl = &fakeCJControl{}

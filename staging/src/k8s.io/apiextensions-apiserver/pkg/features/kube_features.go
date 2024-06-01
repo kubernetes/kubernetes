@@ -52,5 +52,5 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CRDValidationRatcheting:      {Default: true, PreRelease: featuregate.Beta},
-	CustomResourceFieldSelectors: {Default: false, PreRelease: featuregate.Alpha},
+	CustomResourceFieldSelectors: {Default: true, PreRelease: featuregate.Beta},
 }

@@ -101,10 +101,6 @@ func (plugin *nfsPlugin) SupportsMountOption() bool {
 	return true
 }
 
-func (plugin *nfsPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *nfsPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

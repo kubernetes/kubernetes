@@ -1902,16 +1902,13 @@ func BenchmarkCacher_GetList(b *testing.B) {
 	}
 }
 
-// TestDoNotPopExpiredWatchersWhenNoEventsSeen makes sure that
-// a bookmark event will be delivered after the cacher has seen an event.
-// Previously the watchers have been removed from the "want bookmark" queue.
-func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
+// TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived makes sure that
+// a bookmark event will be delivered even if the cacher has not received an event.
+func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
+	require.NoError(t, err, "failed to create cacher")
 	defer cacher.Stop()
 
 	// wait until cacher is initialized.
@@ -1929,29 +1926,10 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 	require.NoError(t, err, "failed to create watch: %v")
 	defer w.Stop()
 
-	// Ensure that popExpiredWatchers is called to ensure that our watch isn't removed from bookmarkWatchers.
-	// We do that every ~1s, so waiting 2 seconds seems enough.
-	time.Sleep(2 * time.Second)
-
-	// Send an event to ensure that lastProcessedResourceVersion in Cacher will change to non-zero value.
-	makePod := func(rv uint64) *example.Pod {
-		return &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            fmt.Sprintf("pod-%d", rv),
-				Namespace:       "ns",
-				ResourceVersion: fmt.Sprintf("%d", rv),
-				Annotations:     map[string]string{},
-			},
-		}
-	}
-	err = cacher.watchCache.Add(makePod(102))
-	require.NoError(t, err)
-
 	verifyEvents(t, w, []watch.Event{
-		{Type: watch.Added, Object: makePod(102)},
 		{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "102",
+				ResourceVersion: "100",
 				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 			},
 		}},

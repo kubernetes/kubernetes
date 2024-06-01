@@ -23,8 +23,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"testing"
+	"time"
 
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
@@ -43,7 +43,7 @@ func TestPKICertificateReadWriter(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// creates a certificate
-	cert := writeTestCertificate(t, dir, "test", testCACert, testCAKey, testCertOrganization)
+	cert := writeTestCertificate(t, dir, "test", testCACert, testCAKey, testCertOrganization, time.Time{}, time.Time{})
 
 	// Creates a pkiCertificateReadWriter
 	pkiReadWriter := newPKICertificateReadWriter(dir, "test")
@@ -101,7 +101,7 @@ func TestKubeconfigReadWriter(t *testing.T) {
 	}
 
 	// creates a certificate and then embeds it into a kubeconfig file
-	cert := writeTestKubeconfig(t, dirKubernetes, "test", testCACert, testCAKey)
+	cert := writeTestKubeconfig(t, dirKubernetes, "test", testCACert, testCAKey, time.Time{}, time.Time{})
 
 	// Creates a KubeconfigReadWriter
 	kubeconfigReadWriter := newKubeconfigReadWriter(dirKubernetes, "test", dirPKI, caName)
@@ -147,8 +147,8 @@ func TestKubeconfigReadWriter(t *testing.T) {
 }
 
 // writeTestCertificate is a utility for creating a test certificate
-func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer, organization []string) *x509.Certificate {
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, makeTestCertConfig(organization))
+func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer, organization []string, notBefore, notAfter time.Time) *x509.Certificate {
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, makeTestCertConfig(organization, notBefore, notAfter))
 	if err != nil {
 		t.Fatalf("couldn't generate certificate: %v", err)
 	}
@@ -161,7 +161,7 @@ func writeTestCertificate(t *testing.T, dir, name string, caCert *x509.Certifica
 }
 
 // writeTestKubeconfig is a utility for creating a test kubeconfig with an embedded certificate
-func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer) *x509.Certificate {
+func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificate, caKey crypto.Signer, notBefore, notAfter time.Time) *x509.Certificate {
 
 	cfg := &pkiutil.CertConfig{
 		Config: certutil.Config{
@@ -172,7 +172,9 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 				IPs:      []net.IP{netutils.ParseIPSloppy("10.100.0.1")},
 				DNSNames: []string{"test-domain.space"},
 			},
+			NotBefore: notBefore,
 		},
+		NotAfter: notAfter,
 	}
 	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, cfg)
 	if err != nil {
@@ -203,10 +205,6 @@ func writeTestKubeconfig(t *testing.T, dir, name string, caCert *x509.Certificat
 }
 
 func TestFileExists(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
@@ -221,6 +219,10 @@ func TestFileExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpfile: %v", err)
 	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Couldn't close tmpfile: %v", err)
+	}
+
 	tests := []struct {
 		name     string
 		filename string
@@ -308,10 +310,6 @@ func TestPKICertificateReadWriterExists(t *testing.T) {
 }
 
 func TestKubeConfigReadWriterExists(t *testing.T) {
-	if goruntime.GOOS == "windows" {
-		// TODO: remove skip once the failing test has been fixed.
-		t.Skip("Skip failing test on Windows.")
-	}
 	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
@@ -326,6 +324,10 @@ func TestKubeConfigReadWriterExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Couldn't create tmpfile: %v", err)
 	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("Couldn't close tmpfile: %v", err)
+	}
+
 	tests := []struct {
 		name               string
 		kubeConfigFilePath string

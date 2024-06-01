@@ -681,6 +681,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ContainerStateWaitingApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerStatus"):
 		return &applyconfigurationscorev1.ContainerStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ContainerUser"):
+		return &applyconfigurationscorev1.ContainerUserApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CSIPersistentVolumeSource"):
 		return &applyconfigurationscorev1.CSIPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CSIVolumeSource"):
@@ -767,6 +769,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.LimitRangeItemApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRangeSpec"):
 		return &applyconfigurationscorev1.LimitRangeSpecApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("LinuxContainerUser"):
+		return &applyconfigurationscorev1.LinuxContainerUserApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LoadBalancerIngress"):
 		return &applyconfigurationscorev1.LoadBalancerIngressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LoadBalancerStatus"):

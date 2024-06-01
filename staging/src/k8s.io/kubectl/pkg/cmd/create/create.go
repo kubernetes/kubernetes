@@ -109,12 +109,6 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 		Long:                  createLong,
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
-				ioStreams.ErrOut.Write([]byte("Error: must specify one of -f and -k\n\n"))
-				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
-				defaultRunFunc(cmd, args)
-				return
-			}
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunCreate(f, cmd))
@@ -159,8 +153,12 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 	return cmd
 }
 
-// Validate makes sure there is no discrepency in command options
+// Validate makes sure there is no discrepancy in command options
 func (o *CreateOptions) Validate() error {
+	if err := o.FilenameOptions.RequireFilenameOrKustomize(); err != nil {
+		return err
+	}
+
 	if len(o.Raw) > 0 {
 		if o.EditBeforeCreate {
 			return fmt.Errorf("--raw and --edit are mutually exclusive")

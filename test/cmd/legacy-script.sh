@@ -526,6 +526,14 @@ runTests() {
     record_command run_ambiguous_shortname_tests
   fi
 
+  ################
+  # Explain crd  #
+  ################
+
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+    record_command run_explain_crd_with_additional_properties_tests
+  fi
+
   #########################
   # Assert categories     #
   #########################

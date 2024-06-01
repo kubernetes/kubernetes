@@ -119,7 +119,6 @@ func NewReconciler(
 		timeOfLastSync:                  time.Time{},
 		volumesFailedReconstruction:     make([]podVolume, 0),
 		volumesNeedUpdateFromNodeStatus: make([]v1.UniqueVolumeName, 0),
-		volumesNeedReportedInUse:        make([]v1.UniqueVolumeName, 0),
 	}
 }
 
@@ -143,7 +142,6 @@ type reconciler struct {
 	timeOfLastSync                  time.Time
 	volumesFailedReconstruction     []podVolume
 	volumesNeedUpdateFromNodeStatus []v1.UniqueVolumeName
-	volumesNeedReportedInUse        []v1.UniqueVolumeName
 }
 
 func (rc *reconciler) unmountVolumes() {

@@ -176,7 +176,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("discovery.k8s.io", "v1", "endpointslices"): {
 			Stub:             `{"metadata": {"name": "slicev1"}, "addressType": "IPv4", "protocol": "TCP", "ports": [], "endpoints": []}`,
 			ExpectedEtcdPath: "/registry/endpointslices/" + namespace + "/slicev1",
-			ExpectedGVK:      gvkP("discovery.k8s.io", "v1beta1", "EndpointSlice"),
 		},
 		// --
 

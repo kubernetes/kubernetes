@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -2157,7 +2158,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+			if err := waitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 				t.Errorf("Pod %v got scheduled: %v", pod.Name, err)
 			}
 			if err := tt.update(testCtx.ClientSet, testCtx.NS.Name); err != nil {
@@ -2173,4 +2174,143 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPodAffinityMatchLabelKeyEnablement tests the Pod is correctly mutated by MatchLabelKeysInPodAffinity feature,
+// even if turing the feature gate enabled or disabled.
+func TestPodAffinityMatchLabelKeyEnablement(t *testing.T) {
+	// enable the feature gate
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, true)
+	testCtx := initTest(t, "matchlabelkey")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test",
+			Namespace:    testCtx.NS.Name,
+			Labels:       map[string]string{"foo": "", "bar": "a"},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "container",
+					Image: imageutils.GetPauseImageName(),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("1G"),
+						},
+					},
+				},
+			},
+			Affinity: &v1.Affinity{
+				PodAffinity: &v1.PodAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+						{
+							TopologyKey: "node",
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpExists,
+									},
+								},
+							},
+							MatchLabelKeys: []string{"bar"},
+						},
+					},
+				},
+			},
+		},
+	}
+	expectedLabelSelector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "foo",
+				Operator: metav1.LabelSelectorOpExists,
+			},
+			{
+				Key:      "bar",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"a"},
+			},
+		},
+	}
+
+	p1, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be changed from the original one because the feature gate is enabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
+	}
+
+	// disable the feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+
+	p2, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be the same as the original one because the feature gate is disabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
+	}
+
+	// check the pod, which was created when the feature gate is enabled, still has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p1.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be changed from the original one because the feature gate is enabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
+	}
+
+	// Again, enable the feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, true)
+
+	p3, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error while creating pod during test: %v", err)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p3.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector should be changed from the original one because the feature gate is enabled.
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, expectedLabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p1.Name, d)
+	}
+
+	// check the pod has the expected label selector.
+	gotpod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, p2.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error while getting pod during test: %v", err)
+	}
+
+	// the label selector shouldn't get changed because the feature gate was disabled at its creation.
+	// Even if the feature gate is enabled now, matchLabelKeys don't get applied to the pod.
+	// (it's only handled when the pod is created)
+	if d := cmp.Diff(gotpod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector, pod.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector); d != "" {
+		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
+	}
+
 }

@@ -23,7 +23,7 @@ import (
 const (
 	// When these values are updated, also update test/utils/image/manifest.go
 	defaultPodSandboxImageName    = "registry.k8s.io/pause"
-	defaultPodSandboxImageVersion = "3.9"
+	defaultPodSandboxImageVersion = "3.10"
 )
 
 var (

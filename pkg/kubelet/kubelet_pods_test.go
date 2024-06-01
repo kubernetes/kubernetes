@@ -4761,6 +4761,124 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	}
 }
 
+func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
+	nowTime := time.Now()
+	testContainerName := "ctr0"
+	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
+	testContainer := v1.Container{
+		Name:  testContainerName,
+		Image: "img",
+	}
+	testContainerStatus := v1.ContainerStatus{
+		Name: testContainerName,
+	}
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "123456",
+			Name:      "foo",
+			Namespace: "bar",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{testContainer},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{testContainerStatus},
+		},
+	}
+	testPodStaus := func(user *kubecontainer.ContainerUser) *kubecontainer.PodStatus {
+		testKubeContainerStatus := kubecontainer.Status{
+			Name:      testContainerName,
+			ID:        testContainerID,
+			Image:     "img",
+			State:     kubecontainer.ContainerStateRunning,
+			StartedAt: nowTime,
+			User:      user,
+		}
+		return &kubecontainer.PodStatus{
+			ID:                testPod.UID,
+			Name:              testPod.Name,
+			Namespace:         testPod.Namespace,
+			ContainerStatuses: []*kubecontainer.Status{&testKubeContainerStatus},
+		}
+	}
+	expectedContainerStatuses := func(user *v1.ContainerUser) []v1.ContainerStatus {
+		return []v1.ContainerStatus{
+			{
+				Name:        testContainerName,
+				ContainerID: testContainerID.String(),
+				Image:       "img",
+				State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+				User:        user,
+			},
+		}
+	}
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.statusManager = status.NewFakeManager()
+
+	for tdesc, tc := range map[string]struct {
+		testPodStatus           *kubecontainer.PodStatus
+		featureEnabled          bool
+		expectedContainerStatus []v1.ContainerStatus
+	}{
+		"nil user, SupplementalGroupsPolicy is disabled": {
+			testPodStaus(nil),
+			false,
+			expectedContainerStatuses(nil),
+		},
+		"empty user, SupplementalGroupsPolicy is disabled": {
+			testPodStaus(&kubecontainer.ContainerUser{}),
+			false,
+			expectedContainerStatuses(nil),
+		},
+		"linux user, SupplementalGroupsPolicy is disabled": {
+			testPodStaus(&kubecontainer.ContainerUser{
+				Linux: &kubecontainer.LinuxContainerUser{
+					UID:                0,
+					GID:                0,
+					SupplementalGroups: []int64{10},
+				},
+			}),
+			false,
+			expectedContainerStatuses(nil),
+		},
+		"nil user, SupplementalGroupsPolicy is enabled": {
+			testPodStaus(nil),
+			true,
+			expectedContainerStatuses(nil),
+		},
+		"empty user, SupplementalGroupsPolicy is enabled": {
+			testPodStaus(&kubecontainer.ContainerUser{}),
+			true,
+			expectedContainerStatuses(&v1.ContainerUser{}),
+		},
+		"linux user, SupplementalGroupsPolicy is enabled": {
+			testPodStaus(&kubecontainer.ContainerUser{
+				Linux: &kubecontainer.LinuxContainerUser{
+					UID:                0,
+					GID:                0,
+					SupplementalGroups: []int64{10},
+				},
+			}),
+			true,
+			expectedContainerStatuses(&v1.ContainerUser{
+				Linux: &v1.LinuxContainerUser{
+					UID:                0,
+					GID:                0,
+					SupplementalGroups: []int64{10},
+				},
+			}),
+		},
+	} {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, tc.featureEnabled)
+		tPod := testPod.DeepCopy()
+		t.Logf("TestCase: %q", tdesc)
+		cStatuses := kubelet.convertToAPIContainerStatuses(tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, false, false)
+		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
+	}
+}
+
 func TestKubelet_HandlePodCleanups(t *testing.T) {
 	one := int64(1)
 	two := int64(2)

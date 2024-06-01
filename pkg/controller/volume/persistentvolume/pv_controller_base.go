@@ -64,7 +64,6 @@ type ControllerParameters struct {
 	KubeClient                clientset.Interface
 	SyncPeriod                time.Duration
 	VolumePlugins             []vol.VolumePlugin
-	ClusterName               string
 	VolumeInformer            coreinformers.PersistentVolumeInformer
 	ClaimInformer             coreinformers.PersistentVolumeClaimInformer
 	ClassInformer             storageinformers.StorageClassInformer
@@ -86,11 +85,10 @@ func NewController(ctx context.Context, p ControllerParameters) (*PersistentVolu
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
 		enableDynamicProvisioning:     p.EnableDynamicProvisioning,
-		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		claimQueue:                    workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "claims"}),
-		volumeQueue:                   workqueue.NewTypedWithConfig[any](workqueue.TypedQueueConfig[any]{Name: "volumes"}),
+		claimQueue:                    workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "claims"}),
+		volumeQueue:                   workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "volumes"}),
 		resyncPeriod:                  p.SyncPeriod,
 		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}
@@ -171,7 +169,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(logger klog.Logger, vol
 }
 
 // enqueueWork adds volume or claim to given work queue.
-func (ctrl *PersistentVolumeController) enqueueWork(ctx context.Context, queue workqueue.Interface, obj interface{}) {
+func (ctrl *PersistentVolumeController) enqueueWork(ctx context.Context, queue workqueue.TypedInterface[string], obj interface{}) {
 	// Beware of "xxx deleted" events
 	logger := klog.FromContext(ctx)
 	if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok && unknown.Obj != nil {
@@ -489,12 +487,11 @@ func updateMigrationAnnotations(logger klog.Logger, cmpm CSIMigratedPluginManage
 func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	workFunc := func(ctx context.Context) bool {
-		keyObj, quit := ctrl.volumeQueue.Get()
+		key, quit := ctrl.volumeQueue.Get()
 		if quit {
 			return true
 		}
-		defer ctrl.volumeQueue.Done(keyObj)
-		key := keyObj.(string)
+		defer ctrl.volumeQueue.Done(key)
 		logger.V(5).Info("volumeWorker", "volumeKey", key)
 
 		_, name, err := cache.SplitMetaNamespaceKey(key)
@@ -548,12 +545,11 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	workFunc := func() bool {
-		keyObj, quit := ctrl.claimQueue.Get()
+		key, quit := ctrl.claimQueue.Get()
 		if quit {
 			return true
 		}
-		defer ctrl.claimQueue.Done(keyObj)
-		key := keyObj.(string)
+		defer ctrl.claimQueue.Done(key)
 		logger.V(5).Info("claimWorker", "claimKey", key)
 
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)

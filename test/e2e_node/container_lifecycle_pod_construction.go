@@ -122,23 +122,30 @@ func (o containerOutputList) String() string {
 // RunTogether returns an error the lhs and rhs run together
 func (o containerOutputList) RunTogether(lhs, rhs string) error {
 	lhsStart := o.findIndex(lhs, "Started", 0)
-	rhsStart := o.findIndex(rhs, "Started", 0)
-
-	lhsFinish := o.findIndex(lhs, "Exiting", 0)
-	rhsFinish := o.findIndex(rhs, "Exiting", 0)
-
 	if lhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got\n%v", lhs, o)
 	}
+
+	rhsStart := o.findIndex(rhs, "Started", lhsStart+1)
 	if rhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got\n%v", rhs, o)
 	}
 
-	if lhsFinish != -1 && rhsStart > lhsFinish {
+	lhsExit := o.findIndex(lhs, "Exiting", lhsStart+1)
+	if lhsExit == -1 {
+		return fmt.Errorf("couldn't find that %s ever exited, got\n%v", lhs, o)
+	}
+
+	if rhsStart > lhsExit {
 		return fmt.Errorf("expected %s to start before exiting %s, got\n%v", rhs, lhs, o)
 	}
 
-	if rhsFinish != -1 && lhsStart > rhsFinish {
+	rhsExit := o.findIndex(rhs, "Exiting", rhsStart+1)
+	if rhsExit == -1 {
+		return fmt.Errorf("couldn't find that %s ever exited, got\n%v", rhs, o)
+	}
+
+	if lhsStart > rhsExit {
 		return fmt.Errorf("expected %s to start before exiting %s, got\n%v", lhs, rhs, o)
 	}
 
@@ -361,7 +368,7 @@ func preparePod(pod *v1.Pod) {
 			v1.ResourceMemory: resource.MustParse("15Mi"),
 		},
 		Limits: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("15Mi"),
+			v1.ResourceMemory: resource.MustParse("35Mi"),
 		},
 	}
 

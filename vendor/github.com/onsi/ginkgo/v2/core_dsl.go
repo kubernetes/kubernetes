@@ -292,7 +292,7 @@ func RunSpecs(t GinkgoTestingT, description string, args ...interface{}) bool {
 
 	err = global.Suite.BuildTree()
 	exitIfErr(err)
-	suitePath, err := os.Getwd()
+	suitePath, err := getwd()
 	exitIfErr(err)
 	suitePath, err = filepath.Abs(suitePath)
 	exitIfErr(err)
@@ -345,6 +345,15 @@ func extractSuiteConfiguration(args []interface{}) Labels {
 	return suiteLabels
 }
 
+func getwd() (string, error) {
+	if !strings.EqualFold(os.Getenv("GINKGO_PRESERVE_CACHE"), "true") {
+		// Getwd calls os.Getenv("PWD"), which breaks test caching if the cache
+		// is shared between two different directories with the same test code.
+		return os.Getwd()
+	}
+	return "", nil
+}
+
 /*
 PreviewSpecs walks the testing tree and produces a report without actually invoking the specs.
 See http://onsi.github.io/ginkgo/#previewing-specs for more information.
@@ -369,7 +378,7 @@ func PreviewSpecs(description string, args ...any) Report {
 
 	err = global.Suite.BuildTree()
 	exitIfErr(err)
-	suitePath, err := os.Getwd()
+	suitePath, err := getwd()
 	exitIfErr(err)
 	suitePath, err = filepath.Abs(suitePath)
 	exitIfErr(err)
@@ -783,8 +792,8 @@ DeferCleanup can be passed:
 For example:
 
 	BeforeEach(func() {
-	    DeferCleanup(os.SetEnv, "FOO", os.GetEnv("FOO"))
-	    os.SetEnv("FOO", "BAR")
+	    DeferCleanup(os.Setenv, "FOO", os.GetEnv("FOO"))
+	    os.Setenv("FOO", "BAR")
 	})
 
 will register a cleanup handler that will set the environment variable "FOO" to its current value (obtained by os.GetEnv("FOO")) after the spec runs and then sets the environment variable "FOO" to "BAR" for the current spec.

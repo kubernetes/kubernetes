@@ -21,8 +21,10 @@ package emptydir
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -1057,6 +1059,60 @@ func TestCalculateEmptyDirMemorySize(t *testing.T) {
 			result := calculateEmptyDirMemorySize(&testCase.nodeAllocatableMemory, spec, testCase.pod)
 			if result.Cmp(testCase.expectedResult) != 0 {
 				t.Errorf("%s: Unexpected result.  Expected %v, got %v", testCaseName, testCase.expectedResult.String(), result.String())
+			}
+		})
+	}
+}
+
+func TestTmpfsMountOptions(t *testing.T) {
+	subQuantity := resource.MustParse("123Ki")
+
+	doesStringArrayContainSubstring := func(strSlice []string, substr string) bool {
+		for _, s := range strSlice {
+			if strings.Contains(s, substr) {
+				return true
+			}
+		}
+		return false
+	}
+
+	testCases := map[string]struct {
+		tmpfsNoswapSupported bool
+		sizeLimit            resource.Quantity
+	}{
+		"default bahavior": {},
+		"tmpfs noswap is supported": {
+			tmpfsNoswapSupported: true,
+		},
+		"size limit is non-zero": {
+			sizeLimit: subQuantity,
+		},
+		"tmpfs noswap is supported and size limit is non-zero": {
+			tmpfsNoswapSupported: true,
+			sizeLimit:            subQuantity,
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			emptyDirObj := emptyDir{
+				sizeLimit: &testCase.sizeLimit,
+			}
+
+			options := emptyDirObj.generateTmpfsMountOptions(testCase.tmpfsNoswapSupported)
+
+			if testCase.tmpfsNoswapSupported && !doesStringArrayContainSubstring(options, swap.TmpfsNoswapOption) {
+				t.Errorf("tmpfs noswap option is expected when supported. options: %v", options)
+			}
+			if !testCase.tmpfsNoswapSupported && doesStringArrayContainSubstring(options, swap.TmpfsNoswapOption) {
+				t.Errorf("tmpfs noswap option is not expected when unsupported. options: %v", options)
+			}
+
+			if testCase.sizeLimit.IsZero() && doesStringArrayContainSubstring(options, "size=") {
+				t.Errorf("size is not expected when is zero. options: %v", options)
+			}
+			if expectedOption := fmt.Sprintf("size=%d", testCase.sizeLimit.Value()); !testCase.sizeLimit.IsZero() && !doesStringArrayContainSubstring(options, expectedOption) {
+				t.Errorf("size option is not expected when is zero. options: %v", options)
 			}
 		})
 	}

@@ -139,7 +139,16 @@
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue"
           }
-        ]
+        ],
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
+        }
       }
     ],
     "containerStatuses": [
@@ -210,7 +219,16 @@
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue"
           }
-        ]
+        ],
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
+        }
       }
     ],
     "qosClass": "qosClassValue",
@@ -282,7 +300,16 @@
             "readOnly": true,
             "recursiveReadOnly": "recursiveReadOnlyValue"
           }
-        ]
+        ],
+        "user": {
+          "linux": {
+            "uid": 1,
+            "gid": 2,
+            "supplementalGroups": [
+              3
+            ]
+          }
+        }
       }
     ],
     "resize": "resizeValue",

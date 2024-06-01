@@ -100,10 +100,13 @@ var (
 		# Check to see if I can access the URL /logs/
 		kubectl auth can-i get /logs/
 
+		# Check to see if I can approve certificates.k8s.io
+		kubectl auth can-i approve certificates.k8s.io
+
 		# List all allowed actions in namespace "foo"
 		kubectl auth can-i --list --namespace=foo`)
 
-	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*")
+	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*", "approve")
 	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
 	// holds all the server-supported resources that cannot be discovered by clients. i.e. users and groups for the impersonate verb
 	nonStandardResourceNames = sets.NewString("users", "groups")
@@ -183,7 +186,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		default:
 			errString := "you must specify two arguments: verb resource or verb resource/resourceName."
 			usageString := "See 'kubectl auth can-i -h' for help and examples."
-			return errors.New(fmt.Sprintf("%s\n%s", errString, usageString))
+			return fmt.Errorf("%s\n%s", errString, usageString)
 		}
 	}
 

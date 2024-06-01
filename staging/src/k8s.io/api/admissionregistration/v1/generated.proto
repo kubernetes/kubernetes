@@ -570,11 +570,6 @@ message TypeChecking {
   repeated ExpressionWarning expressionWarnings = 1;
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.30
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 message ValidatingAdmissionPolicy {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -688,8 +683,6 @@ message ValidatingAdmissionPolicyBindingSpec {
   repeated string validationActions = 4;
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.30
 // ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.
 message ValidatingAdmissionPolicyList {
   // Standard list metadata.

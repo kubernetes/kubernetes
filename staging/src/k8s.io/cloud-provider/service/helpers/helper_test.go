@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 /*
@@ -346,4 +347,153 @@ func Test_getPatchBytes(t *testing.T) {
 
 func addAnnotations(svc *v1.Service) {
 	svc.Annotations["foo"] = "bar"
+}
+
+func TestLoadBalancerStatusEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		l    *v1.LoadBalancerStatus
+		r    *v1.LoadBalancerStatus
+		want bool
+	}{
+		{
+			name: "empty",
+			l:    &v1.LoadBalancerStatus{},
+			r:    &v1.LoadBalancerStatus{},
+			want: true,
+		},
+		{
+			name: "same ip",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1"},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1"},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "different ip",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.2"},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1"},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "same ipmode",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", IPMode: ptr.To(v1.LoadBalancerIPModeVIP)},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", IPMode: ptr.To(v1.LoadBalancerIPModeVIP)},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "only one ipmode set",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1"},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", IPMode: ptr.To(v1.LoadBalancerIPModeVIP)},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "different ipmode",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", IPMode: ptr.To(v1.LoadBalancerIPModeProxy)},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", IPMode: ptr.To(v1.LoadBalancerIPModeVIP)},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "same ports",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}}},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}}},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "same ports different protocol",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}}},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolUDP}}},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "only one port",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}}},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{}},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "only one port",
+			l: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}}},
+				},
+			},
+			r: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "192.168.0.1", Ports: []v1.PortStatus{}},
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LoadBalancerStatusEqual(tt.l, tt.r); got != tt.want {
+				t.Errorf("LoadBalancerStatusEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
