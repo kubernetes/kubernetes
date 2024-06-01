@@ -96,6 +96,28 @@ func TestSysctls(t *testing.T) {
 			expectReason: `forbidden sysctls`,
 			expectDetail: `net.ipv4.tcp_keepalive_probes`,
 		},
+		{
+			name: "new supported sysctls not supported: net.ipv4.tcp_rmem",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_rmem", Value: "4096 87380 16777216"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `net.ipv4.tcp_rmem`,
+		},
+		{
+			name: "new supported sysctls not supported: net.ipv4.tcp_wmem",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_wmem", Value: "4096 87380 16777216"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `net.ipv4.tcp_wmem`,
+		},
 	}
 
 	for _, tc := range tests {
@@ -228,6 +250,65 @@ func TestSysctls_1_29(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := sysctlsV1Dot29(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			if !tc.allowed {
+				if result.Allowed {
+					t.Fatal("expected disallowed")
+				}
+				if e, a := tc.expectReason, result.ForbiddenReason; e != a {
+					t.Errorf("expected\n%s\ngot\n%s", e, a)
+				}
+				if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
+					t.Errorf("expected\n%s\ngot\n%s", e, a)
+				}
+			} else if !result.Allowed {
+				t.Fatal("expected allowed")
+			}
+		})
+	}
+}
+
+func TestSysctls_1_30(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *corev1.Pod
+		allowed      bool
+		expectReason string
+		expectDetail string
+	}{
+		{
+			name: "forbidden sysctls",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "a"}, {Name: "b"}},
+				},
+			}},
+			allowed:      false,
+			expectReason: `forbidden sysctls`,
+			expectDetail: `a, b`,
+		},
+		{
+			name: "new supported sysctls: net.ipv4.tcp_rmem",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_rmem", Value: "4096 87380 16777216"}},
+				},
+			}},
+			allowed: true,
+		},
+		{
+			name: "new supported sysctls: net.ipv4.tcp_wmem",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				SecurityContext: &corev1.PodSecurityContext{
+					Sysctls: []corev1.Sysctl{{Name: "net.ipv4.tcp_wmem", Value: "4096 65536 16777216"}},
+				},
+			}},
+			allowed: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := sysctlsV1Dot30(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if !tc.allowed {
 				if result.Allowed {
 					t.Fatal("expected disallowed")

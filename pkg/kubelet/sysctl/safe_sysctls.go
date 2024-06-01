@@ -61,10 +61,12 @@ var safeSysctls = []sysctl{
 		kernel: utilkernel.TCPKeepAliveProbesNamespacedKernelVersion,
 	},
 	{
-		name: "net.ipv4.tcp_rmem",
+		name:   "net.ipv4.tcp_rmem",
+		kernel: utilkernel.TCPReceiveMemoryNamespacedKernelVersion,
 	},
 	{
-		name: "net.ipv4.tcp_wmem",
+		name:   "net.ipv4.tcp_wmem",
+		kernel: utilkernel.TCPTransmitMemoryNamespacedKernelVersion,
 	},
 }
 
