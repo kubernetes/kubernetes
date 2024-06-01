@@ -107,23 +107,21 @@ readonly KUBE_APISERVER_BASE_IMAGE="${KUBE_APISERVER_BASE_IMAGE:-$KUBE_GORUNNER_
 readonly KUBE_CONTROLLER_MANAGER_BASE_IMAGE="${KUBE_CONTROLLER_MANAGER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 readonly KUBE_SCHEDULER_BASE_IMAGE="${KUBE_SCHEDULER_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 readonly KUBE_PROXY_BASE_IMAGE="${KUBE_PROXY_BASE_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/distroless-iptables:$__default_distroless_iptables_version}"
-readonly KUBE_PROXY_WINDOWS_BASE_IMAGE="${KUBE_PROXY_WINDOWS_BASE_IMAGE:-mcr.microsoft.com/oss/kubernetes/windows-host-process-containers-base-image:v1.0.0}"
 readonly KUBECTL_BASE_IMAGE="${KUBECTL_BASE_IMAGE:-$KUBE_GORUNNER_IMAGE}"
 
 # This is the image used in a multi-stage build to apply capabilities to Docker-wrapped binaries.
 readonly KUBE_BUILD_SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/setcap:$__default_setcap_version}"
 
-# Get the set of master binaries that run in Docker (on Linux), or as Host Process Containers (on Windows).
+# Get the set of master binaries that run in Docker (on Linux)
 # Entry format is "<binary-name>,<base-image>".
-# Binaries are placed in /usr/local/bin inside the image (Linux), or C:\hpc (Windows).
+# Binaries are placed in /usr/local/bin inside the image.
 # `make` users can override any or all of the base images using the associated
 # environment variables.
 #
-# $1 - OS name - the targets returned will be based on the OS name given.
+# $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
-  local os_name="${1:-}"
   local targets=(
     "kube-apiserver,${KUBE_APISERVER_BASE_IMAGE}"
     "kube-controller-manager,${KUBE_CONTROLLER_MANAGER_BASE_IMAGE}"
@@ -131,11 +129,6 @@ kube::build::get_docker_wrapped_binaries() {
     "kube-proxy,${KUBE_PROXY_BASE_IMAGE}"
     "kubectl,${KUBECTL_BASE_IMAGE}"
   )
-  if [[ "${os_name}" = "windows" ]]; then
-    targets=(
-      "kube-proxy.exe,${KUBE_PROXY_WINDOWS_BASE_IMAGE}"
-    )
-  fi
 
   echo "${targets[@]}"
 }
