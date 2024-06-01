@@ -53,7 +53,7 @@ func TestAddFlags(t *testing.T) {
 	featureGate := featuregate.NewFeatureGate()
 	componentRegistry := utilversion.NewComponentGlobalsRegistry()
 	effectiveVersion := utilversion.NewEffectiveVersion("1.32")
-	_ = componentRegistry.Register("test", effectiveVersion, featureGate, true)
+	utilruntime.Must(componentRegistry.Register("test", effectiveVersion, featureGate))
 	s := NewServerRunOptions(featureGate, effectiveVersion)
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)

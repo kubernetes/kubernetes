@@ -31,6 +31,7 @@ import (
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -124,7 +125,8 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	featureGate := utilfeature.DefaultMutableFeatureGate
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-	_ = utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate, true)
+	utilversion.DefaultComponentGlobalsRegistry.Reset()
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr, featureGate, effectiveVersion)
 
 	utilversion.DefaultComponentGlobalsRegistry.AddFlags(fs)

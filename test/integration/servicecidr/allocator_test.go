@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -123,7 +122,6 @@ func TestServiceAllocIPAddress(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceClusterIPRanges = serviceCIDR
 			opts.GenericServerRunOptions.AdvertiseAddress = netutils.ParseIPSloppy("2001:db8::10")
-			opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("1.31")
 			opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true")
 		},
 	})

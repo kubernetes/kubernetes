@@ -39,7 +39,7 @@ import (
 func TestCrossGroupStorage(t *testing.T) {
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 		// force enable all resources so we can check storage.
-		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("1.30")
+		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("0.0")
 	})
 	defer apiServer.Cleanup()
 

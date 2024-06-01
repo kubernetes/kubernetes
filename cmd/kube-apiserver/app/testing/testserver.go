@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -182,12 +183,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	featureGate := utilfeature.DefaultMutableFeatureGate
-	binaryVersion := utilversion.DefaultKubeEffectiveVersion().BinaryVersion().String()
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	if instanceOptions.BinaryVersion != "" {
-		binaryVersion = instanceOptions.BinaryVersion
+		effectiveVersion = utilversion.NewEffectiveVersion(instanceOptions.BinaryVersion)
 	}
-	effectiveVersion := utilversion.NewEffectiveVersion(binaryVersion)
-	_ = utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate, true)
+	utilversion.DefaultComponentGlobalsRegistry.Reset()
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	s := options.NewServerRunOptions(featureGate, effectiveVersion)
 

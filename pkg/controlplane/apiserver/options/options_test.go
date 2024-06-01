@@ -48,7 +48,7 @@ func TestAddFlags(t *testing.T) {
 	featureGate := featuregate.NewFeatureGate()
 	effectiveVersion := utilversion.NewEffectiveVersion("1.32")
 	componentRegistry := utilversion.NewComponentGlobalsRegistry()
-	_ = componentRegistry.Register("test", effectiveVersion, featureGate, true)
+	utilruntime.Must(componentRegistry.Register("test", effectiveVersion, featureGate))
 	s := NewOptions(featureGate, effectiveVersion)
 	var fss cliflag.NamedFlagSets
 	s.AddFlags(&fss)

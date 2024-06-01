@@ -23,6 +23,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 // Version is an opaque representation of a version number
@@ -31,6 +33,7 @@ type Version struct {
 	semver        bool
 	preRelease    string
 	buildMetadata string
+	info          apimachineryversion.Info
 }
 
 var (
@@ -252,19 +255,30 @@ func (v *Version) WithMinor(minor uint) *Version {
 	return &result
 }
 
-// SubtractMinor returns the version diff minor versions back, with the same major and no patch.
-// If diff >= current minor, the minor would be 0.
-func (v *Version) SubtractMinor(diff uint) *Version {
+// SubtractMinor returns the version with offset from the original minor, with the same major and no patch.
+// If -offset >= current minor, the minor would be 0.
+func (v *Version) OffsetMinor(offset int) *Version {
 	var minor uint
-	if diff < v.Minor() {
-		minor = v.Minor() - diff
+	if offset >= 0 {
+		minor = v.Minor() + uint(offset)
+	} else {
+		diff := uint(-offset)
+		if diff < v.Minor() {
+			minor = v.Minor() - diff
+		}
 	}
 	return MajorMinor(v.Major(), minor)
 }
 
+// SubtractMinor returns the version diff minor versions back, with the same major and no patch.
+// If diff >= current minor, the minor would be 0.
+func (v *Version) SubtractMinor(diff uint) *Version {
+	return v.OffsetMinor(-int(diff))
+}
+
 // AddMinor returns the version diff minor versions forward, with the same major and no patch.
 func (v *Version) AddMinor(diff uint) *Version {
-	return MajorMinor(v.Major(), v.Minor()+diff)
+	return v.OffsetMinor(int(diff))
 }
 
 // WithPatch returns copy of the version object with requested patch number
@@ -440,4 +454,31 @@ func (v *Version) Compare(other string) (int, error) {
 		return 0, err
 	}
 	return v.compareInternal(ov), nil
+}
+
+// WithInfo returns copy of the version object with requested info
+func (v *Version) WithInfo(info apimachineryversion.Info) *Version {
+	result := *v
+	result.info = info
+	return &result
+}
+
+func (v *Version) Info() *apimachineryversion.Info {
+	if v == nil {
+		return nil
+	}
+	// in case info is empty, or the major and minor in info is different from the actual major and minor
+	v.info.Major = itoa(v.Major())
+	v.info.Minor = itoa(v.Minor())
+	if v.info.GitVersion == "" {
+		v.info.GitVersion = v.String()
+	}
+	return &v.info
+}
+
+func itoa(i uint) string {
+	if i == 0 {
+		return ""
+	}
+	return strconv.Itoa(int(i))
 }
