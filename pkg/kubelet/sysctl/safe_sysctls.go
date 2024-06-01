@@ -60,6 +60,12 @@ var safeSysctls = []sysctl{
 		name:   "net.ipv4.tcp_keepalive_probes",
 		kernel: utilkernel.TCPKeepAliveProbesNamespacedKernelVersion,
 	},
+	{
+		name: "net.ipv4.tcp_rmem",
+	},
+	{
+		name: "net.ipv4.tcp_wmem",
+	},
 }
 
 // SafeSysctlAllowlist returns the allowlist of safe sysctls and safe sysctl patterns (ending in *).
