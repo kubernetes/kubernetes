@@ -101,8 +101,7 @@ kube::golang::server_image_targets() {
 
 IFS=" " read -ra KUBE_SERVER_IMAGE_TARGETS <<< "$(kube::golang::server_image_targets)"
 readonly KUBE_SERVER_IMAGE_TARGETS
-readonly KUBE_SERVER_LINUX_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
-readonly KUBE_SERVER_WINDOWS_IMAGE_BINARIES=("kube-proxy.exe")
+readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
 
 # The set of conformance targets we build docker image for
 kube::golang::conformance_image_targets() {
