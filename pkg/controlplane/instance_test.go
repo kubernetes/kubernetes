@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -118,9 +119,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 		t.Fatal(err)
 	}
 
-	kubeVersion := kubeversion.Get()
 	config.ControlPlane.Generic.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	config.ControlPlane.Generic.Version = &kubeVersion
 	config.ControlPlane.StorageFactory = storageFactory
 	config.ControlPlane.Generic.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.ControlPlane.Generic.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
@@ -243,9 +242,13 @@ func TestVersion(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	expectedInfo := kubeversion.Get()
+	kubeVersion := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
+	expectedInfo.Major = fmt.Sprintf("%d", kubeVersion.Major())
+	expectedInfo.Minor = fmt.Sprintf("%d", kubeVersion.Minor())
 
-	if !reflect.DeepEqual(kubeversion.Get(), info) {
-		t.Errorf("Expected %#v, Got %#v", kubeversion.Get(), info)
+	if !reflect.DeepEqual(expectedInfo, info) {
+		t.Errorf("Expected %#v, Got %#v", expectedInfo, info)
 	}
 }
 

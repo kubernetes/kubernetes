@@ -100,7 +100,7 @@ func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versio
 	}
 
 	introduced, ok := versionedPtr.(introducedInterface)
-	// skip the introduced check for test where currentVersion is 0.0
+	// skip the introduced check for test when currentVersion is 0.0 to test all apis
 	if ok && (e.currentVersion.Major() > 0 || e.currentVersion.Minor() > 0) {
 		majorIntroduced, minorIntroduced := introduced.APILifecycleIntroduced()
 		verIntroduced := apimachineryversion.MajorMinor(uint(majorIntroduced), uint(minorIntroduced))

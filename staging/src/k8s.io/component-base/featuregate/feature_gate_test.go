@@ -1280,6 +1280,48 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		}
 	})
 
+	t.Run("overrides at specific version take effect", func(t *testing.T) {
+		f := NewVersionedFeatureGate(version.MustParse("1.29"))
+		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
+		if err := f.AddVersioned(map[Feature]VersionedSpecs{
+			"TestFeature1": {
+				{Version: version.MustParse("1.28"), Default: true},
+			},
+			"TestFeature2": {
+				{Version: version.MustParse("1.26"), Default: false},
+				{Version: version.MustParse("1.29"), Default: false},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if f.OverrideDefaultAtVersion("TestFeature1", false, version.MustParse("1.27")) == nil {
+			t.Error("expected error when attempting to override the default for a feature not available at given version")
+		}
+		require.NoError(t, f.OverrideDefaultAtVersion("TestFeature2", true, version.MustParse("1.27")))
+		if !f.Enabled("TestFeature1") {
+			t.Error("expected TestFeature1 to have effective default of true")
+		}
+		if !f.Enabled("TestFeature2") {
+			t.Error("expected TestFeature2 to have effective default of true")
+		}
+		f.OpenForModification()
+		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.29")))
+		if !f.Enabled("TestFeature1") {
+			t.Error("expected TestFeature1 to have effective default of true")
+		}
+		if f.Enabled("TestFeature2") {
+			t.Error("expected TestFeature2 to have effective default of false")
+		}
+		f.OpenForModification()
+		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.26")))
+		if f.Enabled("TestFeature1") {
+			t.Error("expected TestFeature1 to have effective default of false")
+		}
+		if !f.Enabled("TestFeature2") {
+			t.Error("expected TestFeature2 to have effective default of true")
+		}
+	})
+
 	t.Run("overrides are preserved across deep copies", func(t *testing.T) {
 		f := NewVersionedFeatureGate(version.MustParse("1.29"))
 		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
@@ -1433,7 +1475,7 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 	})
 }
 
-func TestGetCurrentVersion(t *testing.T) {
+func TestFeatureSpecAtEmulationVersion(t *testing.T) {
 	specs := VersionedSpecs{{Version: version.MustParse("1.29"), Default: true, PreRelease: GA},
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: Alpha},
@@ -1469,11 +1511,41 @@ func TestGetCurrentVersion(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		t.Run(fmt.Sprintf("getCurrentVersion for emulationVersion %s", test.cVersion), func(t *testing.T) {
-			result := getCurrentVersion(specs, version.MustParse(test.cVersion))
+		t.Run(fmt.Sprintf("featureSpecAtEmulationVersion for emulationVersion %s", test.cVersion), func(t *testing.T) {
+			result := featureSpecAtEmulationVersion(specs, version.MustParse(test.cVersion))
 			if !reflect.DeepEqual(*result, test.expect) {
-				t.Errorf("%d: getCurrentVersion(, %s) Expected %v, Got %v", i, test.cVersion, test.expect, result)
+				t.Errorf("%d: featureSpecAtEmulationVersion(, %s) Expected %v, Got %v", i, test.cVersion, test.expect, result)
 			}
 		})
+	}
+}
+
+func TestOpenForModification(t *testing.T) {
+	const testBetaGate Feature = "testBetaGate"
+	f := NewVersionedFeatureGate(version.MustParse("1.29"))
+
+	err := f.AddVersioned(map[Feature]VersionedSpecs{
+		testBetaGate: {
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
+			{Version: version.MustParse("1.26"), Default: false, PreRelease: Alpha},
+		},
+	})
+	require.NoError(t, err)
+
+	if f.Enabled(testBetaGate) != true {
+		t.Errorf("Expected true")
+	}
+	err = f.SetEmulationVersion(version.MustParse("1.28"))
+	if err == nil {
+		t.Fatalf("Expected error when SetEmulationVersion after querying features")
+	}
+	if f.Enabled(testBetaGate) != true {
+		t.Errorf("Expected true")
+	}
+	f.OpenForModification()
+	require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
+	if f.Enabled(testBetaGate) != false {
+		t.Errorf("Expected false at 1.28")
 	}
 }

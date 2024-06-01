@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -3099,6 +3100,48 @@ func TestEmulatedStorageVersion(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+// TestAllowedEmulationVersions tests the TestServer can start without problem for all allowed emulation versions.
+func TestAllowedEmulationVersions(t *testing.T) {
+	tcs := []struct {
+		name             string
+		emulationVersion string
+	}{
+		{
+			name:             "default",
+			emulationVersion: utilversion.DefaultKubeEffectiveVersion().EmulationVersion().String(),
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.emulationVersion, func(t *testing.T) {
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil,
+				[]string{fmt.Sprintf("--emulated-version=kube=%s", tc.emulationVersion)}, framework.SharedEtcd())
+			defer server.TearDownFn()
+
+			rt, err := restclient.TransportFor(server.ClientConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			req, err := http.NewRequest("GET", server.ClientConfig.Host+"/", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectedStatusCode := 200
+			if resp.StatusCode != expectedStatusCode {
+				t.Errorf("expect status code: %d, got : %d\n", expectedStatusCode, resp.StatusCode)
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
 		})
 	}
 }

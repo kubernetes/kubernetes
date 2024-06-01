@@ -138,7 +138,7 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 	if clientset == nil {
 		t.Fatal("unable to create fake client set")
 	}
-
+	config.EffectiveVersion = utilversion.NewEffectiveVersion("")
 	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
 	config.OpenAPIConfig.Info.Version = "unversioned"
 	config.OpenAPIV3Config = DefaultOpenAPIV3Config(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
@@ -460,8 +460,9 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableProfiling = true
 
 	kubeVersion := fakeVersion()
-	config.Version = &kubeVersion
-	config.EffectiveVersion = utilversion.NewEffectiveVersion(kubeVersion.String())
+	effectiveVersion := utilversion.NewEffectiveVersion(kubeVersion.String())
+	effectiveVersion.Set(effectiveVersion.BinaryVersion().WithInfo(kubeVersion), effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
+	config.EffectiveVersion = effectiveVersion
 
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {

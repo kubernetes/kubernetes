@@ -59,22 +59,14 @@ type WardleServerOptions struct {
 	AlternateDNS []string
 }
 
-func mapWardleEffectiveVersionToKubeEffectiveVersion(registry utilversion.ComponentGlobalsRegistry) error {
-	wardleVer := registry.EffectiveVersionFor(apiserver.WardleComponentName)
-	kubeVer := registry.EffectiveVersionFor(utilversion.DefaultKubeComponent).(utilversion.MutableEffectiveVersion)
-	// map from wardle emulation version to kube emulation version.
-	emulationVersionMap := map[string]string{
-		"1.2": kubeVer.BinaryVersion().AddMinor(1).String(),
-		"1.1": kubeVer.BinaryVersion().String(),
-		"1.0": kubeVer.BinaryVersion().SubtractMinor(1).String(),
+func wardleEmulationVersionToKubeEmulationVersion(ver *version.Version) *version.Version {
+	if ver.Major() != 1 {
+		return nil
 	}
-	wardleEmulationVer := wardleVer.EmulationVersion()
-	if kubeEmulationVer, ok := emulationVersionMap[wardleEmulationVer.String()]; ok {
-		kubeVer.SetEmulationVersion(version.MustParse(kubeEmulationVer))
-	} else {
-		return fmt.Errorf("cannot find mapping from wardle emulation version: %s to kube version", wardleVer.EmulationVersion().String())
-	}
-	return nil
+	kubeVer := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
+	// "1.1" maps to kubeVer
+	offset := int(ver.Minor()) - 1
+	return kubeVer.OffsetMinor(offset)
 }
 
 // NewWardleServerOptions returns a new WardleServerOptions
@@ -100,11 +92,7 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 		Short: "Launch a wardle API server",
 		Long:  "Launch a wardle API server",
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
-				return err
-			}
-			// convert wardle effective version to kube effective version to be used in generic api server, and set the generic api server feature gate.
-			return mapWardleEffectiveVersionToKubeEffectiveVersion(utilversion.DefaultComponentGlobalsRegistry)
+			return utilversion.DefaultComponentGlobalsRegistry.Set()
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
@@ -133,10 +121,10 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 			{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.Alpha},
 		},
 	}))
-	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(apiserver.WardleComponentName, wardleEffectiveVersion, wardleFeatureGate, false))
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(apiserver.WardleComponentName, wardleEffectiveVersion, wardleFeatureGate))
 	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
 		utilversion.DefaultKubeComponent, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
-
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.SetEmulationVersionMapping(apiserver.WardleComponentName, utilversion.DefaultKubeComponent, wardleEmulationVersionToKubeEmulationVersion))
 	utilversion.DefaultComponentGlobalsRegistry.AddFlags(flags)
 
 	return cmd
@@ -189,8 +177,8 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	serverConfig.OpenAPIV3Config.Info.Title = "Wardle"
 	serverConfig.OpenAPIV3Config.Info.Version = "0.1"
 
-	serverConfig.FeatureGate = utilversion.DefaultComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)
-	serverConfig.EffectiveVersion = utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
+	serverConfig.FeatureGate = utilversion.DefaultComponentGlobalsRegistry.FeatureGateFor(apiserver.WardleComponentName)
+	serverConfig.EffectiveVersion = utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(apiserver.WardleComponentName)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err

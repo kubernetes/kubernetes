@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
-	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -238,8 +237,6 @@ type GenericAPIServer struct {
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
 
-	// Version will enable the /version endpoint if non-nil
-	Version *version.Info
 	// EffectiveVersion determines which apis and features are available
 	// based on when the api/feature lifecyle.
 	EffectiveVersion utilversion.EffectiveVersion

@@ -21,13 +21,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	utilversion "k8s.io/apiserver/pkg/util/version"
-	"k8s.io/sample-apiserver/pkg/apiserver"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMapBinaryEffectiveVersionToKubeEffectiveVersion(t *testing.T) {
-	wardleEffectiveVersion := utilversion.NewEffectiveVersion("1.2")
+func TestWardleEmulationVersionToKubeEmulationVersion(t *testing.T) {
 	defaultKubeEffectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 
 	testCases := []struct {
@@ -36,31 +34,25 @@ func TestMapBinaryEffectiveVersionToKubeEffectiveVersion(t *testing.T) {
 		expectedKubeEmulationVer *version.Version
 	}{
 		{
+			desc:                     "same version as than kube binary",
+			wardleEmulationVer:       version.MajorMinor(1, 1),
+			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion(),
+		},
+		{
 			desc:                     "1 version higher than kube binary",
 			wardleEmulationVer:       version.MajorMinor(1, 2),
-			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion().AddMinor(1),
+			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion().OffsetMinor(1),
 		},
 		{
 			desc:               "no mapping",
-			wardleEmulationVer: version.MajorMinor(1, 10),
+			wardleEmulationVer: version.MajorMinor(2, 10),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			registry := utilversion.NewComponentGlobalsRegistry()
-			_ = registry.Register(apiserver.WardleComponentName, wardleEffectiveVersion, nil, true)
-			_ = registry.Register(utilversion.DefaultKubeComponent, defaultKubeEffectiveVersion, nil, true)
-
-			wardleEffectiveVersion.SetEmulationVersion(tc.wardleEmulationVer)
-			err := mapWardleEffectiveVersionToKubeEffectiveVersion(registry)
-			if tc.expectedKubeEmulationVer == nil {
-				if err == nil {
-					t.Fatal("expected error, no error found")
-				}
-			} else {
-				assert.True(t, registry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().EqualTo(tc.expectedKubeEmulationVer))
-			}
+			mappedKubeEmulationVer := wardleEmulationVersionToKubeEmulationVersion(tc.wardleEmulationVer)
+			assert.True(t, mappedKubeEmulationVer.EqualTo(tc.expectedKubeEmulationVer))
 		})
 	}
 }

@@ -157,6 +157,7 @@ func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example
 		}
 
 		// If it was introduced after current compatibility version, don't use it
+		// skip the introduced check for test when currentVersion is 0.0 to test all apis
 		if introduced, hasIntroduced := exampleOfGVK.(introducedInterface); hasIntroduced && (compatibilityVersion.Major() > 0 || compatibilityVersion.Minor() > 0) {
 			// API resource lifecycles should be relative to k8s api version
 			majorIntroduced, minorIntroduced := introduced.APILifecycleIntroduced()

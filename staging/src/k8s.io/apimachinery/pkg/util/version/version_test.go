@@ -453,37 +453,42 @@ func TestHighestSupportedVersion(t *testing.T) {
 	}
 }
 
-func TestSubtractMinor(t *testing.T) {
+func TestOffsetMinor(t *testing.T) {
 	var tests = []struct {
 		version            string
-		diff               uint
+		diff               int
 		expectedComponents []uint
 	}{
 		{
 			version:            "1.0.2",
-			diff:               3,
+			diff:               -3,
 			expectedComponents: []uint{1, 0},
 		},
 		{
 			version:            "1.3.2-alpha+001",
-			diff:               2,
+			diff:               -2,
 			expectedComponents: []uint{1, 1},
 		},
 		{
 			version:            "1.3.2-alpha+001",
-			diff:               3,
+			diff:               -3,
 			expectedComponents: []uint{1, 0},
 		},
 		{
 			version:            "1.20",
-			diff:               5,
+			diff:               -5,
 			expectedComponents: []uint{1, 15},
+		},
+		{
+			version:            "1.20",
+			diff:               5,
+			expectedComponents: []uint{1, 25},
 		},
 	}
 
 	for _, test := range tests {
 		version, _ := ParseGeneric(test.version)
-		if !reflect.DeepEqual(test.expectedComponents, version.SubtractMinor(test.diff).Components()) {
+		if !reflect.DeepEqual(test.expectedComponents, version.OffsetMinor(test.diff).Components()) {
 			t.Error("parse returned un'expected components")
 		}
 	}

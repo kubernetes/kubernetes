@@ -44,7 +44,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -150,8 +149,6 @@ type Config struct {
 	// done values in this values for this map are ignored.
 	PostStartHooks map[string]PostStartHookConfigEntry
 
-	// Version will enable the /version endpoint if non-nil
-	Version *apimachineryversion.Info
 	// EffectiveVersion determines which apis and features are available
 	// based on when the api/feature lifecyle.
 	EffectiveVersion utilversion.EffectiveVersion
@@ -702,12 +699,8 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		}
 		c.ExternalAddress = net.JoinHostPort(c.ExternalAddress, strconv.Itoa(port))
 	}
-	var ver *version.Version
-	if c.EffectiveVersion != nil {
-		ver = c.EffectiveVersion.EmulationVersion()
-	}
-	completeOpenAPI(c.OpenAPIConfig, ver)
-	completeOpenAPIV3(c.OpenAPIV3Config, ver)
+	completeOpenAPI(c.OpenAPIConfig, c.EffectiveVersion.EmulationVersion())
+	completeOpenAPIV3(c.OpenAPIV3Config, c.EffectiveVersion.EmulationVersion())
 
 	if c.DiscoveryAddresses == nil {
 		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
@@ -834,7 +827,6 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		StorageVersionManager: c.StorageVersionManager,
 
 		EffectiveVersion: c.EffectiveVersion,
-		Version:          c.Version,
 		FeatureGate:      c.FeatureGate,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
@@ -1103,7 +1095,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		}
 	}
 
-	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
+	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {

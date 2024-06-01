@@ -17,11 +17,8 @@ limitations under the License.
 package version
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
-	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/version"
 )
 
@@ -123,57 +120,6 @@ func TestValidate(t *testing.T) {
 
 			if len(errs) == 0 && test.expectErrors {
 				t.Errorf("expected errors, no errors found")
-			}
-		})
-	}
-}
-
-func TestEffectiveVersionsFlag(t *testing.T) {
-	tests := []struct {
-		name                     string
-		emulationVersion         string
-		expectedEmulationVersion *version.Version
-		parseError               string
-	}{
-		{
-			name:                     "major.minor ok",
-			emulationVersion:         "1.30",
-			expectedEmulationVersion: version.MajorMinor(1, 30),
-		},
-		{
-			name:                     "v prefix ok",
-			emulationVersion:         "v1.30",
-			expectedEmulationVersion: version.MajorMinor(1, 30),
-		},
-		{
-			name:             "semantic version not ok",
-			emulationVersion: "1.30.1",
-			parseError:       "version 1.30.1 is not in the format of major.minor",
-		},
-		{
-			name:             "invalid version",
-			emulationVersion: "1.foo",
-			parseError:       "illegal version string",
-		},
-	}
-	for i, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			fs := pflag.NewFlagSet("testflag", pflag.ContinueOnError)
-			effective := NewEffectiveVersion("1.30")
-			effective.AddFlags(fs, "test")
-
-			err := fs.Parse([]string{fmt.Sprintf("--test-emulated-version=%s", test.emulationVersion)})
-			if test.parseError != "" {
-				if !strings.Contains(err.Error(), test.parseError) {
-					t.Fatalf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("%d: Parse() Expected nil, Got %v", i, err)
-			}
-			if !effective.EmulationVersion().EqualTo(test.expectedEmulationVersion) {
-				t.Errorf("%d: EmulationVersion Expected %s, Got %s", i, test.expectedEmulationVersion.String(), effective.EmulationVersion().String())
 			}
 		})
 	}
