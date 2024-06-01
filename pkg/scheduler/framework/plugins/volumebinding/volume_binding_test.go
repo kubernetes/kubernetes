@@ -937,7 +937,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 			expect: framework.QueueSkip,
 		},
 		{
-			name: "driverSpec.StorageCapacity is false",
+			name: "driverSpec.StorageCapacity is true",
 			pod:  makePod("pod-a").withCSI("test1").Pod,
 			newObj: &storagev1.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -948,10 +948,10 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: framework.Queue,
 		},
 		{
-			name: "driverSpec.StorageCapacity is true",
+			name: "driverSpec.StorageCapacity is false",
 			pod:  makePod("pod-a").withCSI("test1").Pod,
 			newObj: &storagev1.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -962,7 +962,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.Queue,
+			expect: framework.QueueSkip,
 		},
 		{
 			name: "driverSpec.StorageCapacity is nil",

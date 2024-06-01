@@ -142,7 +142,7 @@ func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, p
 			continue
 		}
 		driverSpec := modifiedCSIDriver.Spec
-		if driverSpec.StorageCapacity != nil && *driverSpec.StorageCapacity {
+		if driverSpec.StorageCapacity == nil || !*driverSpec.StorageCapacity {
 			logger.V(5).Info("CSIDriver was created or updated and this may make the Pod rejected by VolumeBinding plugin in the previous scheduling cycle schedulable")
 			return framework.Queue, err
 		}
