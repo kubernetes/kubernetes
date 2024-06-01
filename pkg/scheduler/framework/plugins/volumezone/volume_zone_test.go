@@ -581,7 +581,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: framework.Queue,
 		},
 		"new-pv-was-added-and-bound-to-pod's-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -610,7 +610,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: framework.Queue,
 		},
 		"pv-was-updated-and-changed-key": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),

@@ -299,7 +299,7 @@ func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string 
 }
 
 // isSchedulableAfterPersistentVolumeChange is invoked whenever a PersistentVolume added or updated.
-// It checks whether the change of PVC has made a previously unschedulable pod schedulable.
+// It checks whether the change of PV has made a previously unschedulable pod schedulable.
 // Changing the PV topology labels could cause the pod to become schedulable.
 func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	originalPV, modifiedPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
@@ -308,15 +308,15 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logge
 	}
 	originalPVTopologies := make([]pvTopology, 0)
 	if originalPV != nil {
-		originalPVTopologies, _ = pl.getPVTopologiesAndSort(logger, pod, originalPV)
+		originalPVTopologies = pl.getPVTopologiesAndSort(logger, originalPV)
 	}
-	modifiedPVTopologies, isPodBoundToPV := pl.getPVTopologiesAndSort(logger, pod, modifiedPV)
-	if isPodBoundToPV && !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
-		logger.V(5).Info("PV was created or updated, which might make the pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+	modifiedPVTopologies := pl.getPVTopologiesAndSort(logger, modifiedPV)
+	if !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
+		logger.V(5).Info("PV was created or updated, which might make the pod schedulable. PVTopologies are updated.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
 		return framework.Queue, nil
 	}
 
-	logger.V(5).Info("PV was created or updated, but it doesn't make this pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+	logger.V(5).Info("PV was created or updated, but it doesn't make this pod schedulable. PVTopologies are same.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
 	return framework.QueueSkip, nil
 }
 
@@ -325,7 +325,7 @@ func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.Persisten
 	podPVTopologies := make([]pvTopology, 0)
 	for _, key := range topologyLabels {
 		if value, ok := pv.ObjectMeta.Labels[key]; ok {
-			volumeVSet, err := volumehelpers.LabelZonesToSet(value)
+			labelZonesSet, err := volumehelpers.LabelZonesToSet(value)
 			if err != nil {
 				logger.V(5).Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
 				continue
@@ -333,43 +333,24 @@ func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.Persisten
 			podPVTopologies = append(podPVTopologies, pvTopology{
 				pvName: pv.Name,
 				key:    key,
-				values: sets.Set[string](volumeVSet),
+				values: sets.Set[string](labelZonesSet),
 			})
 		}
 	}
 	return podPVTopologies
 }
 
-// getPVTopologiesAndSort checks whether target PV is bound to pod's PVC.
-// If PV is bound to pod's PVC, get PVTopologies and Sort.
-func (pl *VolumeZone) getPVTopologiesAndSort(logger klog.Logger, pod *v1.Pod, pv *v1.PersistentVolume) ([]pvTopology, bool) {
-	isPodBoundToPV := false
-	podPVTopologies := make([]pvTopology, 0)
+// getPVTopologiesAndSort get PVTopologies and Sort.
+func (pl *VolumeZone) getPVTopologiesAndSort(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
+	podPVTopologies := pl.getPVTopologiesFromPV(logger, pv)
 
-	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
-	for _, pvcName := range pvcNames {
-		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-		if err != nil {
-			logger.Error(err, "unexpected error during getting PVC", "Namespace", pod.Namespace, "pvc", pvcName)
-			continue
-		}
-
-		// If target PV is bound to pod's PVC, get PVTopologies
-		pvName := pvc.Spec.VolumeName
-		if pvName == pv.Name {
-			isPodBoundToPV = true
-			podPVTopologies = append(podPVTopologies, pl.getPVTopologiesFromPV(logger, pv)...)
-			// One PV is bound to one PVC. One PV can't be bound to more than one PVC.
-			break
-		}
-	}
 	// Sort PVTopologies based on key order
 	sort.Slice(podPVTopologies, func(i, j int) bool {
 		// One PV is bound to one PVC. One PV can't be bound to more than one PVC.
 		// That's why we don't use pvName here. We use key for sorting podPVTopologies.
 		return podPVTopologies[i].key > podPVTopologies[j].key
 	})
-	return podPVTopologies, isPodBoundToPV
+	return podPVTopologies
 }
 
 // New initializes a new plugin and returns it.
