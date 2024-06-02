@@ -6234,6 +6234,8 @@ const (
 	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeSwap means that swap is provisioned on the node some workloads are able to use it.
+	NodeSwap NodeConditionType = "NodeSwap"
 )
 
 // NodeCondition contains condition information for a node.

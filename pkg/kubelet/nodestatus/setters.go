@@ -39,10 +39,12 @@ import (
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
@@ -796,6 +798,75 @@ func VolumesInUse(syncedFunc func() bool, // typically Kubelet.volumeManager.Rec
 		if syncedFunc() {
 			node.Status.VolumesInUse = volumesInUseFunc()
 		}
+		return nil
+	}
+}
+
+// SwapCondition returns a Setter that sets SwapCondition on the node.
+func SwapCondition(swapConfig config.MemorySwapConfiguration,
+	isSwapOnFunc func() (bool, error), // typically swap.IsSwapOn
+	nowFunc func() time.Time, // typically Kubelet.clock.Now
+) Setter {
+	return func(_ context.Context, node *v1.Node) error {
+		currentTime := metav1.NewTime(nowFunc())
+		var condition *v1.NodeCondition
+
+		// Check if NodeDiskPressure condition already exists and if it does, just pick it up for update.
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type == v1.NodeSwap {
+				condition = &node.Status.Conditions[i]
+			}
+		}
+
+		newCondition := false
+		// If the NodeSwap condition doesn't exist, create one
+		if condition == nil {
+			condition = &v1.NodeCondition{
+				Type:   v1.NodeSwap,
+				Status: v1.ConditionUnknown,
+			}
+			// cannot be appended to node.Status.Conditions here because it gets
+			// copied to the slice. So if we append to the slice here none of the
+			// updates we make below are reflected in the slice.
+			newCondition = true
+		}
+
+		// Update the heartbeat time
+		condition.LastHeartbeatTime = currentTime
+
+		isSwapOn, err := isSwapOnFunc()
+		if err != nil {
+			return fmt.Errorf("error checking if swap is on: %w", err)
+		}
+
+		swapBehavior := swapConfig.SwapBehavior
+		conditionMessage := fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, swapBehavior)
+
+		setSwapCondition := func(status v1.ConditionStatus) {
+			if condition.Status == status && condition.Message == conditionMessage {
+				return
+			}
+
+			condition.Status = status
+			if status == v1.ConditionTrue {
+				condition.Reason = "SwapEnabled"
+			} else {
+				condition.Reason = "SwapDisabled"
+			}
+			condition.Message = conditionMessage
+			condition.LastTransitionTime = currentTime
+		}
+
+		if isSwapOn && swapBehavior != types.NoSwap {
+			setSwapCondition(v1.ConditionTrue)
+		} else {
+			setSwapCondition(v1.ConditionFalse)
+		}
+
+		if newCondition {
+			node.Status.Conditions = append(node.Status.Conditions, *condition)
+		}
+
 		return nil
 	}
 }
