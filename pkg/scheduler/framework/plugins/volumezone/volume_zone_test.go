@@ -600,7 +600,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 					Name: "Vol_1",
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: framework.Queue,
 		},
 		"new-pv-was-added-but-not-bound-to-pod's-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),

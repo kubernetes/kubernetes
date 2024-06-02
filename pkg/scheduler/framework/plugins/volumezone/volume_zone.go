@@ -124,8 +124,12 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
 	podPVTopologies := make([]pvTopology, 0)
 
-	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
-	for _, pvcName := range pvcNames {
+	for i := range pod.Spec.Volumes {
+		volume := pod.Spec.Volumes[i]
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		pvcName := volume.PersistentVolumeClaim.ClaimName
 		if pvcName == "" {
 			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
@@ -306,17 +310,18 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logge
 	if err != nil {
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
 	}
-	originalPVTopologies := make([]pvTopology, 0)
-	if originalPV != nil {
-		originalPVTopologies = pl.getPVTopologiesAndSort(logger, originalPV)
+	if originalPV == nil {
+		logger.V(5).Info("PV is newly created, which might make the pod schedulable.")
+		return framework.Queue, nil
 	}
+	originalPVTopologies := pl.getPVTopologiesAndSort(logger, originalPV)
 	modifiedPVTopologies := pl.getPVTopologiesAndSort(logger, modifiedPV)
 	if !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
-		logger.V(5).Info("PV was created or updated, which might make the pod schedulable. PVTopologies are updated.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+		logger.V(5).Info("PV's topology was updated, which might make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
 		return framework.Queue, nil
 	}
 
-	logger.V(5).Info("PV was created or updated, but it doesn't make this pod schedulable. PVTopologies are same.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+	logger.V(5).Info("PV was updated, but the topology is unchanged, which it doesn't make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
 	return framework.QueueSkip, nil
 }
 
@@ -327,7 +332,7 @@ func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.Persisten
 		if value, ok := pv.ObjectMeta.Labels[key]; ok {
 			labelZonesSet, err := volumehelpers.LabelZonesToSet(value)
 			if err != nil {
-				logger.V(5).Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+				logger.V(5).Info("failed to parse PV's topology label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
 				continue
 			}
 			podPVTopologies = append(podPVTopologies, pvTopology{
