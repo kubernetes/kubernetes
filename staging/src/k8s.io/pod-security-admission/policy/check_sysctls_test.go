@@ -267,7 +267,7 @@ func TestSysctls_1_29(t *testing.T) {
 	}
 }
 
-func TestSysctls_1_30(t *testing.T) {
+func TestSysctls_1_32(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *corev1.Pod
@@ -308,7 +308,7 @@ func TestSysctls_1_30(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := sysctlsV1Dot30(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := sysctlsV1Dot32(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if !tc.allowed {
 				if result.Allowed {
 					t.Fatal("expected disallowed")

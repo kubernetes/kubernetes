@@ -157,7 +157,7 @@ func init() {
 		fixtureDataV1Dot29,
 	)
 
-	fixtureDataV1Dot30 := fixtureGenerator{
+	fixtureDataV1Dot32 := fixtureGenerator{
 		expectErrorSubstring: "forbidden sysctl",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			if p.Spec.SecurityContext == nil {
@@ -188,7 +188,7 @@ func init() {
 		},
 	}
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 29), check: "sysctls"},
-		fixtureDataV1Dot30,
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 32), check: "sysctls"},
+		fixtureDataV1Dot32,
 	)
 }
