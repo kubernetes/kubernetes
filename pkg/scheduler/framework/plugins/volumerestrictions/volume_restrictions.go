@@ -329,8 +329,35 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHin
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
 		// This PVC is required to exist to check its access modes.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
+			QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimAdded},
 	}
+}
+
+// isSchedulableAfterPersistentVolumeClaimAdded is invoked whenever a PersistentVolumeClaim added or changed, It checks whether
+// that change made a previously unschedulable pod schedulable.
+func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, newPersistentVolumeClaim, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
+	}
+
+	if newPersistentVolumeClaim.Namespace != pod.Namespace {
+		return framework.QueueSkip, nil
+	}
+
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		if volume.PersistentVolumeClaim.ClaimName == newPersistentVolumeClaim.Name {
+			logger.V(5).Info("PVC that is referred from the pod was created, which might make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(newPersistentVolumeClaim))
+			return framework.Queue, nil
+		}
+	}
+	logger.V(5).Info("PVC irrelevant to the Pod was created, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(newPersistentVolumeClaim))
+	return framework.QueueSkip, nil
 }
 
 // isSchedulableAfterPodDeleted is invoked whenever a pod deleted,
