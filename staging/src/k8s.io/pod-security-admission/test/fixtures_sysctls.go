@@ -188,7 +188,7 @@ func init() {
 		},
 	}
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 29), check: "sysctls"},
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 30), check: "sysctls"},
 		fixtureDataV1Dot30,
 	)
 }
