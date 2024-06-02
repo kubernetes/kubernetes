@@ -118,22 +118,6 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 	return nil, nil
 }
 
-// isWaitForFirstConsumer confirms whether storageClass's volumeBindingMode is VolumeBindingWaitForFirstConsumer or not.
-func (pl *VolumeZone) isWaitForFirstConsumer(scName string) (bool, *framework.Status) {
-	class, err := pl.scLister.Get(scName)
-	if s := getErrorAsStatus(err); !s.IsSuccess() {
-		return false, s
-	}
-	if class.VolumeBindingMode == nil {
-		return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
-	}
-	if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-		// Return true because volumeBindingMode of storageClass is VolumeBindingWaitForFirstConsumer.
-		return true, nil
-	}
-	return false, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
-}
-
 // getPVbyPod gets PVTopology from pod
 func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
 	podPVTopologies := make([]pvTopology, 0)
@@ -154,11 +138,20 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 			if len(scName) == 0 {
 				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
-			isWait, status := pl.isWaitForFirstConsumer(scName)
-			if !isWait {
-				return nil, status
+
+			class, err := pl.scLister.Get(scName)
+			if s := getErrorAsStatus(err); !s.IsSuccess() {
+				return nil, s
 			}
-			continue
+			if class.VolumeBindingMode == nil {
+				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+			}
+			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+				// Skip unbound volumes
+				continue
+			}
+
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
@@ -325,18 +318,17 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.
 	if err != nil {
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
 	}
-	isMatched := pl.checkPVCBindingToPodPV(logger, modifiedPVC, pod)
-	// updated PVC is not schedulable because PVC doesn't match the pod's PVC
-	if !isMatched {
-		logger.V(5).Info("PVC was created or updated but it doesn't make this pod schedulable. PVC is not binding to the pod.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-		return framework.QueueSkip, nil
+	if pl.IsPVCRequestedFromPod(logger, modifiedPVC, pod) {
+		logger.V(5).Info("PVC was created or updated and it might make this pod schedulable. PVC is binding to the pod.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+		return framework.Queue, nil
 	}
-	logger.V(5).Info("PVC was created or updated and it might make this pod schedulable. PVC is binding to the pod.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-	return framework.Queue, nil
+
+	logger.V(5).Info("PVC irrelevant to the Pod was created or updated, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+	return framework.QueueSkip, nil
 }
 
-// checkPVCBindingToPodPV verifies if the PVC is bound to PV of a given Pod.
-func (pl *VolumeZone) checkPVCBindingToPodPV(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
+// IsPVCRequestedFromPod verifies if the PVC is bound to PV of a given Pod.
+func (pl *VolumeZone) IsPVCRequestedFromPod(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
 	if (pvc == nil) || (pod.Namespace != pvc.Namespace) {
 		return false
 	}
