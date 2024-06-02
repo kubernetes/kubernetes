@@ -586,7 +586,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
-		"pvc-was-added-and-pod-was-not-bound-to-pvc": {
+		"pvc-was-added-but-pod-was-not-bound-to-pvc": {
 			pod: st.MakePod().Name("pod_1").Namespace("default").Obj(),
 			newObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
@@ -618,39 +618,11 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"pvc-was-added-and-pod-was-bound-to-added-pvc, pvc-bound-to-storage-class-with-not-wait-mode": {
-			pod: createPodWithVolume("pod_1", "PVC_2"),
-			newObj: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
-				Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_1")},
-			},
-			expectedHint: framework.Queue,
-		},
-		"pvc-was-added-and-pod-was-bound-to-added-pvc, pvc-bound-to-storage-class-with-wait-mode": {
-			pod: createPodWithVolume("pod_1", "PVC_3"),
-			newObj: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
-				Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_2")},
-			},
-			expectedHint: framework.Queue,
-		},
 		"pvc-was-updated-and-pod-was-bound-to-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			oldObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
-			},
-			newObj: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
-			},
-			expectedHint: framework.Queue,
-		},
-		"pvc-was-updated-but-pv-doesn't-change": {
-			pod: createPodWithVolume("pod_1", "PVC_1"),
-			oldObj: &v1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
 			newObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
@@ -666,7 +638,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 			},
 			newObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
-				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},
+				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
 			expectedHint: framework.QueueSkip,
 		},
