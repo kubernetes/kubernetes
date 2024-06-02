@@ -43,10 +43,12 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	netutils "k8s.io/utils/net"
 )
@@ -2117,6 +2119,68 @@ func TestDaemonEndpoints(t *testing.T) {
 	}
 }
 
+func TestSwapEnabledCondition(t *testing.T) {
+	now := time.Now()
+	nowFunc := func() time.Time { return now }
+
+	makeSwapConig := func(swapBehavior string) config.MemorySwapConfiguration {
+		return config.MemorySwapConfiguration{
+			SwapBehavior: swapBehavior,
+		}
+	}
+
+	cases := []struct {
+		desc             string
+		node             *v1.Node
+		isSwapOn         bool
+		swapConfig       config.MemorySwapConfiguration
+		expectConditions []v1.NodeCondition
+	}{
+		{
+			desc:       "swap is on, feature gate on, swap behavior is LimitedSwap",
+			node:       &v1.Node{},
+			isSwapOn:   true,
+			swapConfig: makeSwapConig(types.LimitedSwap),
+		},
+		{
+			desc:       "swap is on, feature gate on, swap behavior is NoSwap",
+			node:       &v1.Node{},
+			isSwapOn:   true,
+			swapConfig: makeSwapConig(types.NoSwap),
+		},
+		{
+			desc:       "swap is off, feature gate on, swap behavior is LimitedSwap",
+			node:       &v1.Node{},
+			isSwapOn:   false,
+			swapConfig: makeSwapConig(types.LimitedSwap),
+		},
+		{
+			desc:       "swap is off, feature gate on, swap behavior is NoSwap",
+			node:       &v1.Node{},
+			isSwapOn:   false,
+			swapConfig: makeSwapConig(types.NoSwap),
+		},
+	}
+	for _, tc := range cases {
+		tc.expectConditions = []v1.NodeCondition{*makeExpectedSwapCondition(tc.isSwapOn, tc.swapConfig, now, now)}
+		isSwapOnFunc := func() (bool, error) { return tc.isSwapOn, nil }
+
+		t.Run(tc.desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, true)
+			ctx := context.Background()
+
+			setter := SwapCondition(tc.swapConfig, isSwapOnFunc, nowFunc)
+
+			if err := setter(ctx, tc.node); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
+		})
+	}
+}
+
 // Test Helpers:
 
 // testEvent is used to record events for tests
@@ -2254,4 +2318,25 @@ func makeDiskPressureCondition(pressure bool, transition, heartbeat time.Time) *
 		LastTransitionTime: metav1.NewTime(transition),
 		LastHeartbeatTime:  metav1.NewTime(heartbeat),
 	}
+}
+
+func makeExpectedSwapCondition(isSwapOn bool, swapConfig config.MemorySwapConfiguration, transition, heartbeat time.Time) *v1.NodeCondition {
+	conditionMessage := fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, swapConfig.SwapBehavior)
+
+	condition := &v1.NodeCondition{
+		Type:               v1.NodeSwap,
+		LastHeartbeatTime:  metav1.NewTime(heartbeat),
+		LastTransitionTime: metav1.NewTime(transition),
+		Message:            conditionMessage,
+	}
+
+	if isSwapOn && swapConfig.SwapBehavior != types.NoSwap {
+		condition.Status = v1.ConditionTrue
+		condition.Reason = "SwapEnabled"
+	} else {
+		condition.Status = v1.ConditionFalse
+		condition.Reason = "SwapDisabled"
+	}
+
+	return condition
 }
