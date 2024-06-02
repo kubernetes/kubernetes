@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -300,8 +299,8 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logge
 		logger.V(5).Info("PV is newly created, which might make the pod schedulable.")
 		return framework.Queue, nil
 	}
-	originalPVTopologies := pl.getPVTopologiesAndSort(logger, originalPV)
-	modifiedPVTopologies := pl.getPVTopologiesAndSort(logger, modifiedPV)
+	originalPVTopologies := pl.getPVTopologiesFromPV(logger, originalPV)
+	modifiedPVTopologies := pl.getPVTopologiesFromPV(logger, modifiedPV)
 	if !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
 		logger.V(5).Info("PV's topology was updated, which might make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
 		return framework.Queue, nil
@@ -328,19 +327,6 @@ func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.Persisten
 			})
 		}
 	}
-	return podPVTopologies
-}
-
-// getPVTopologiesAndSort get PVTopologies and Sort.
-func (pl *VolumeZone) getPVTopologiesAndSort(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
-	podPVTopologies := pl.getPVTopologiesFromPV(logger, pv)
-
-	// Sort PVTopologies based on key order
-	sort.Slice(podPVTopologies, func(i, j int) bool {
-		// One PV is bound to one PVC. One PV can't be bound to more than one PVC.
-		// That's why we don't use pvName here. We use key for sorting podPVTopologies.
-		return podPVTopologies[i].key > podPVTopologies[j].key
-	})
 	return podPVTopologies
 }
 
