@@ -288,20 +288,6 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 	}
 }
 
-// getPersistentVolumeClaimNameFromPod gets pvc names bound to a pod.
-func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string {
-	var pvcNames []string
-	for i := range pod.Spec.Volumes {
-		volume := pod.Spec.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-		pvcName := volume.PersistentVolumeClaim.ClaimName
-		pvcNames = append(pvcNames, pvcName)
-	}
-	return pvcNames
-}
-
 // isSchedulableAfterPersistentVolumeChange is invoked whenever a PersistentVolume added or updated.
 // It checks whether the change of PV has made a previously unschedulable pod schedulable.
 // Changing the PV topology labels could cause the pod to become schedulable.
