@@ -321,24 +321,18 @@ func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string 
 // It checks whether the change of PVC has made a previously unschedulable pod schedulable.
 // A PVC becoming bound or using a WaitForFirstConsumer storageclass can cause the pod to become schedulable.
 func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	originalPVC, modifiedPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	_, modifiedPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
 	}
 	isMatched := pl.checkPVCBindingToPodPV(logger, modifiedPVC, pod)
 	// updated PVC is not schedulable because PVC doesn't match the pod's PVC
 	if !isMatched {
-		logger.V(5).Info("PVC was created or updated but it doesn't make this pod schedulable.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+		logger.V(5).Info("PVC was created or updated but it doesn't make this pod schedulable. PVC is not binding to the pod.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
 		return framework.QueueSkip, nil
 	}
-	wasMatched := pl.checkPVCBindingToPodPV(logger, originalPVC, pod)
-	// the PVC that didn't match the pod now matches the pod
-	if isMatched && !wasMatched {
-		logger.V(5).Info("PVC was created or updated, which might make the pod schedulable. The given PVC matches the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-		return framework.Queue, nil
-	}
-	logger.V(5).Info("PVC was created or updated but it doesn't make this pod schedulable. Nothing has changed about PV bound to PVC.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-	return framework.QueueSkip, nil
+	logger.V(5).Info("PVC was created or updated and it might make this pod schedulable. PVC is binding to the pod.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+	return framework.Queue, nil
 }
 
 // checkPVCBindingToPodPV verifies if the PVC is bound to PV of a given Pod.
@@ -348,26 +342,11 @@ func (pl *VolumeZone) checkPVCBindingToPodPV(logger klog.Logger, pvc *v1.Persist
 	}
 	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
 	for _, pvcName := range pvcNames {
-		if pvc.Name != pvcName {
-			// pod's PVC doesn't match with the given PVC
-			continue
+		if pvc.Name == pvcName {
+			logger.V(5).Info("PVC matches the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+			return true
 		}
-		logger.V(5).Info("PVC matches the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
-		pvName := pvc.Spec.VolumeName
-		if pvName == "" {
-			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
-			if len(scName) == 0 {
-				return false
-			}
-			isWait, _ := pl.isWaitForFirstConsumer(scName)
-			if !isWait {
-				logger.V(5).Info("PVC is bound to storageClass but the volumeBindingMode is not WaitForFirstConsumer", "storageClass", scName)
-				return false
-			}
-		}
-		return true
 	}
-
 	logger.V(5).Info("PVC doesn't match the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 	return false
 }
