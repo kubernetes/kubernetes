@@ -20656,7 +20656,7 @@ func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.",
+							Description: "If specified, this must be an IANA_SVC_NAME. Each named port in a pod must have a unique name, otherwise, if there are duplicate names, only the first port name referred to by services will be chosen.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

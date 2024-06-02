@@ -2128,9 +2128,9 @@ type PersistentVolumeClaimTemplate struct {
 
 // ContainerPort represents a network port in a single container.
 type ContainerPort struct {
-	// If specified, this must be an IANA_SVC_NAME and unique within the pod. Each
-	// named port in a pod must have a unique name. Name for the port that can be
-	// referred to by services.
+	// If specified, this must be an IANA_SVC_NAME. Each named port in a pod
+	// must have a unique name, otherwise, if there are duplicate names, only the
+	// first port name referred to by services will be chosen.
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	// Number of port to expose on the host.
