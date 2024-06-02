@@ -542,7 +542,6 @@ func TestWithBinding(t *testing.T) {
 }
 
 func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
-	var modeWait = storagev1.VolumeBindingWaitForFirstConsumer
 	pvLister := tf.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
@@ -558,19 +557,11 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_1")},
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
-			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_2")},
-		},
 	}
 
 	scLister := tf.StorageClassLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
-		},
-		{
-			ObjectMeta:        metav1.ObjectMeta{Name: "SC_2"},
-			VolumeBindingMode: &modeWait,
 		},
 	}
 
