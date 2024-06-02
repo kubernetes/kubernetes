@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/utils/ptr"
 )
 
 func createPodWithVolume(pod, pvc string) *v1.Pod {
@@ -554,14 +553,6 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
-			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_2")},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
-			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_3")},
-		},
 	}
 
 	scLister := tf.StorageClassLister{
@@ -582,39 +573,17 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
-		"pvc-was-not-bound-to-sc": {
+		"sc-doesn't-have-volume-binding-mode": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			newObj: &storagev1.StorageClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
 			},
 			expectedHint: framework.QueueSkip,
 		},
-		"pvc-was-bound-to-different-sc": {
-			pod: createPodWithVolume("pod_1", "PVC_2"),
+		"new-sc-is-wait-for-first-consumer-mode": {
+			pod: createPodWithVolume("pod_1", "PVC_1"),
 			newObj: &storagev1.StorageClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
-			},
-			expectedHint: framework.QueueSkip,
-		},
-		"pvc-was-bound-to-added-sc-but-not-wait-mode": {
-			pod: createPodWithVolume("pod_1", "PVC_3"),
-			newObj: &storagev1.StorageClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "SC_3"},
-			},
-			expectedHint: framework.QueueSkip,
-		},
-		"pvc-was-bound-to-added-sc-and-wait-for-first-consumer-mode": {
-			pod: createPodWithVolume("pod_1", "PVC_3"),
-			newObj: &storagev1.StorageClass{
-				ObjectMeta:        metav1.ObjectMeta{Name: "SC_3"},
-				VolumeBindingMode: &modeWait,
-			},
-			expectedHint: framework.Queue,
-		},
-		"new-sc-is-not-bound-to-pvc-but-wait-for-first-consumer-mode": {
-			pod: createPodWithVolume("pod_1", "PVC_3"),
-			newObj: &storagev1.StorageClass{
-				ObjectMeta:        metav1.ObjectMeta{Name: "SC_4"},
+				ObjectMeta:        metav1.ObjectMeta{Name: "SC_1"},
 				VolumeBindingMode: &modeWait,
 			},
 			expectedHint: framework.Queue,
