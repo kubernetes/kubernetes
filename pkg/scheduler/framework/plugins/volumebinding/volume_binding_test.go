@@ -898,6 +898,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 		name   string
 		pod    *v1.Pod
 		newObj interface{}
+		oldObj interface{}
 		err    bool
 		expect framework.QueueingHint
 	}{
@@ -912,6 +913,11 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					StorageCapacity: &trueVar,
 				},
 			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+			},
 			err:    false,
 			expect: framework.QueueSkip,
 		},
@@ -919,6 +925,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 			name:   "type conversion error",
 			pod:    makePod("pod-a").Pod,
 			newObj: new(struct{}),
+			oldObj: new(struct{}),
 			err:    true,
 			expect: framework.Queue,
 		},
@@ -933,11 +940,41 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					StorageCapacity: &trueVar,
 				},
 			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test2",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &trueVar,
+				},
+			},
 			err:    false,
 			expect: framework.QueueSkip,
 		},
 		{
-			name: "driverSpec.StorageCapacity is true",
+			name: "original StorageCapacity is nil",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: nil,
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: nil,
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name: "original StorageCapacity is false",
 			pod:  makePod("pod-a").withCSI("test1").Pod,
 			newObj: &storagev1.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
@@ -947,13 +984,51 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					StorageCapacity: &falseVar,
 				},
 			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &falseVar,
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+		{
+			name: "modified StorageCapacity is nil",
+			pod:  makePod("pod-a").withCSI("test1").Pod,
+			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: nil,
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &trueVar,
+				},
+			},
 			err:    false,
 			expect: framework.Queue,
 		},
 		{
-			name: "driverSpec.StorageCapacity is false",
+			name: "modified StorageCapacity is true",
 			pod:  makePod("pod-a").withCSI("test1").Pod,
 			newObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &trueVar,
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test1",
 				},
@@ -964,24 +1039,35 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 			err:    false,
 			expect: framework.QueueSkip,
 		},
+
 		{
-			name: "driverSpec.StorageCapacity is nil",
+			name: "modified StorageCapacity is false",
 			pod:  makePod("pod-a").withCSI("test1").Pod,
 			newObj: &storagev1.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test2",
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &falseVar,
+				},
+			},
+			oldObj: &storagev1.CSIDriver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: storagev1.CSIDriverSpec{
+					StorageCapacity: &trueVar,
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: framework.Queue,
 		},
 	}
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
 			pl := &VolumeBinding{}
 			logger, _ := ktesting.NewTestContext(t)
-			oldObj := item.newObj
-			qhint, err := pl.isSchedulableAfterCSIDriverChange(logger, item.pod, oldObj, item.newObj)
+			qhint, err := pl.isSchedulableAfterCSIDriverChange(logger, item.pod, item.oldObj, item.newObj)
 			if (err != nil) != item.err {
 				t.Errorf("isSchedulableAfterCSINodeChange failed - got: %q", err)
 			}
