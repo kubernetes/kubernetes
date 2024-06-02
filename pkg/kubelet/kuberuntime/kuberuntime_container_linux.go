@@ -180,6 +180,11 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 		return
 	}
 
+	if kubelettypes.IsCriticalPod(pod) {
+		swapConfigurationHelper.ConfigureNoSwap(lcr)
+		return
+	}
+
 	// NOTE(ehashman): Behavior is defined in the opencontainers runtime spec:
 	// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 	switch m.memorySwapBehavior {
