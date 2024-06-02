@@ -119,8 +119,18 @@ func (o containerOutputList) String() string {
 	return b.String()
 }
 
-// RunTogether returns an error the lhs and rhs run together
+// RunTogether returns an error if containers don't run together
 func (o containerOutputList) RunTogether(lhs, rhs string) error {
+	if err := o.RunTogetherLhsFirst(lhs, rhs); err != nil {
+		if err := o.RunTogetherLhsFirst(rhs, lhs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RunTogetherLhsFirst returns an error if containers don't run together or if rhs starts before lhs
+func (o containerOutputList) RunTogetherLhsFirst(lhs, rhs string) error {
 	lhsStart := o.findIndex(lhs, "Started", 0)
 	if lhsStart == -1 {
 		return fmt.Errorf("couldn't find that %s ever started, got\n%v", lhs, o)
