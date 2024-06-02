@@ -326,7 +326,7 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.
 	return framework.QueueSkip, nil
 }
 
-// IsPVCRequestedFromPod verifies if the PVC is bound to PV of a given Pod.
+// IsPVCRequestedFromPod verifies if the PVC is requested from a given Pod.
 func (pl *VolumeZone) IsPVCRequestedFromPod(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
 	if (pvc == nil) || (pod.Namespace != pvc.Namespace) {
 		return false
