@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
@@ -60,6 +61,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	reflectormetrics "k8s.io/component-base/metrics/prometheus/reflector"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
@@ -226,6 +228,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	clientBuilder, rootClientBuilder := createClientBuilders(logger, c)
 
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
+
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerMetrics) {
+		reflectormetrics.LoadReflectorMetrics()
+	}
 
 	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor) {
 		controllerContext, err := CreateControllerContext(ctx, c, rootClientBuilder, clientBuilder)
@@ -588,7 +594,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	}
 
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
-	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
+	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim), informers.WithEnableMetrics(true))
 
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
 	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim))
