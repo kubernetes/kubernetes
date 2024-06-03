@@ -737,6 +737,7 @@ spec:
 }
 
 func TestNoOpApplyWithDefaultsSameResourceVersionCRD(t *testing.T) {
+	// https://github.com/kubernetes/kubernetes/issues/124605
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)

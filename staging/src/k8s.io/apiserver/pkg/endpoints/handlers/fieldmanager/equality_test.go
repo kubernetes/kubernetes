@@ -1,5 +1,5 @@
 /*
-Copyright 20214The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ func TestEqualIgnoringFieldValueAtPath(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "extra spec fields in object a",
+			name: "extra spec field",
 			a: map[string]any{
 				"metadata": map[string]any{
 					"labels":        map[string]any{"env": "dev"},
@@ -114,7 +114,7 @@ func TestEqualIgnoringFieldValueAtPath(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "different spec field in object b",
+			name: "different spec field",
 			a: map[string]any{
 				"metadata": map[string]any{
 					"labels":        map[string]any{"env": "dev"},
@@ -158,6 +158,26 @@ func TestEqualIgnoringFieldValueAtPath(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "wrong type for metadata result in differences being ignored",
+			a: map[string]any{
+				"metadata": []any{
+					"something",
+				},
+				"spec": map[string]any{
+					"field": "value",
+				},
+			},
+			b: map[string]any{
+				"metadata": []any{
+					"something else",
+				},
+				"spec": map[string]any{
+					"field": "value",
+				},
+			},
+			want: true,
+		},
 	}
 
 	path := []string{"metadata", "managedFields"}
@@ -165,6 +185,11 @@ func TestEqualIgnoringFieldValueAtPath(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			actual := equalIgnoringValueAtPath(c.a, c.b, path)
+			if actual != c.want {
+				t.Error("Expected equality check to return ", c.want, ", but got ", actual)
+			}
+			// Check that equality is commutative
+			actual = equalIgnoringValueAtPath(c.b, c.a, path)
 			if actual != c.want {
 				t.Error("Expected equality check to return ", c.want, ", but got ", actual)
 			}
