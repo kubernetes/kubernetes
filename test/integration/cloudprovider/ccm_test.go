@@ -96,6 +96,10 @@ func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
 				Address: "10.0.0.1",
 			},
 			{
+				Type:    v1.NodeInternalIP,
+				Address: "192.168.0.1",
+			},
+			{
 				Type:    v1.NodeExternalIP,
 				Address: "132.143.154.163",
 			},
@@ -124,6 +128,9 @@ func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
 			return false, nil
 		}
 		if n.Spec.Taints[0].Key != v1.TaintNodeNotReady {
+			return false, nil
+		}
+		if len(n.Status.Addresses) != 4 {
 			return false, nil
 		}
 		return true, nil
