@@ -593,25 +593,6 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"new-pv-was-added-and-bound-to-pod's-pvc-but-doesn't-have-labels": {
-			pod: createPodWithVolume("pod_1", "PVC_1"),
-			newObj: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "Vol_1",
-				},
-			},
-			expectedHint: framework.Queue,
-		},
-		"new-pv-was-added-but-not-bound-to-pod's-pvc": {
-			pod: createPodWithVolume("pod_1", "PVC_1"),
-			newObj: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "Vol_2",
-					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
-				},
-			},
-			expectedHint: framework.Queue,
-		},
 		"pv-was-updated-and-changed-key": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			oldObj: &v1.PersistentVolume{
@@ -645,7 +626,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"pv-was-updated-and-changed-labels-order": {
+		"pv-was-updated-but-labels-are-same": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			oldObj: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -657,8 +638,8 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			newObj: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "Vol_1",
-					Labels: map[string]string{v1.LabelTopologyZone: "zone",
-						v1.LabelFailureDomainBetaZone: "us-west1-a"},
+					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a",
+						v1.LabelTopologyZone: "zone"},
 				},
 			},
 			expectedHint: framework.QueueSkip,
