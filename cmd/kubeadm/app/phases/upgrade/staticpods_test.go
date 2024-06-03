@@ -137,7 +137,7 @@ func (w *fakeWaiter) WaitForStaticPodHashChange(_, _, _ string) error {
 }
 
 // WaitForHKubelet returns a dummy nil just to implement the interface
-func (w *fakeWaiter) WaitForKubelet() error {
+func (w *fakeWaiter) WaitForKubelet(_ string, _ int32) error {
 	return nil
 }
 
