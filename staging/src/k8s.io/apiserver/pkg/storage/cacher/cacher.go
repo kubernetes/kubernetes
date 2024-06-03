@@ -912,10 +912,10 @@ func (c *Cacher) dispatchEvents() {
 	// The first successful sync with the underlying store.
 	// The cache must wait until this first sync is completed to be deemed ready.
 	// Since we cannot send a bookmark when the lastProcessedResourceVersion is 0,
-	// we poll aggressively for the first RV before entering the dispatch loop.
+	// we poll aggressively for the first list RV before entering the dispatch loop.
 	lastProcessedResourceVersion := uint64(0)
 	if err := wait.PollUntilContextCancel(wait.ContextForChannel(c.stopCh), 10*time.Millisecond, true, func(_ context.Context) (bool, error) {
-		if rv := c.watchCache.getResourceVersion(); rv != 0 {
+		if rv := c.watchCache.getListResourceVersion(); rv != 0 {
 			lastProcessedResourceVersion = rv
 			return true, nil
 		}
