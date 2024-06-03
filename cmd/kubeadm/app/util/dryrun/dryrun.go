@@ -113,8 +113,8 @@ func (w *Waiter) WaitForPodToDisappear(podName string) error {
 }
 
 // WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-func (w *Waiter) WaitForKubelet() error {
-	fmt.Println("[dryrun] Would make sure the kubelet's /healthz endpoint is healthy")
+func (w *Waiter) WaitForKubelet(healthzAddress string, healthzPort int32) error {
+	fmt.Printf("[dryrun] Would make sure the kubelet returns 'ok' at http://%s:%d/healthz\n", healthzAddress, healthzPort)
 	return nil
 }
 
