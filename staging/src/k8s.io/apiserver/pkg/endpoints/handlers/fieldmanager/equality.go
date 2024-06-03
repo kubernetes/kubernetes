@@ -86,7 +86,8 @@ func equalIgnoringValueAtPath(a, b any, path []string) bool {
 	aMap, aOk := a.(map[string]any)
 	bMap, bOk := b.(map[string]any)
 	if !aOk || !bOk {
-		return !avoidTimestampEqualities.DeepEqual(a, b)
+		// Can't traverse into non-maps, ignore
+		return true
 	}
 	if len(aMap) != len(bMap) {
 		return false
