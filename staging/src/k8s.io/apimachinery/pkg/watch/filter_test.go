@@ -38,15 +38,16 @@ func TestFilter(t *testing.T) {
 	})
 
 	go func() {
+		defer source.Close()
 		for _, item := range table {
 			source.Action(item.Type, item.Object)
 		}
-		source.Stop()
 	}()
 
+	resultCh := filtered.ResultChan()
 	var got []string
 	for {
-		event, ok := <-filtered.ResultChan()
+		event, ok := <-resultCh
 		if !ok {
 			break
 		}
@@ -66,20 +67,25 @@ func TestFilterStop(t *testing.T) {
 
 	go func() {
 		source.Add(testType("foo"))
-		filtered.Stop()
+		// Wait for watcher to stop, when close the result channel
+		<-source.StopChan()
+		source.Close()
 	}()
 
+	resultCh := filtered.ResultChan()
 	var got []string
 	for {
-		event, ok := <-filtered.ResultChan()
+		event, ok := <-resultCh
 		if !ok {
 			break
 		}
 		got = append(got, string(event.Object.(testType)))
-	}
-
-	if e, a := []string{"foo"}, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("got %v, wanted %v", e, a)
+		if e, a := []string{"foo"}, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("got %v, wanted %v", e, a)
+		} else {
+			// Got what we were looking for. Stop watching.
+			filtered.Stop()
+		}
 	}
 }
 
@@ -94,15 +100,16 @@ func TestRecorder(t *testing.T) {
 
 	source := NewFake()
 	go func() {
+		defer source.Close()
 		for _, item := range events {
 			source.Action(item.Type, item.Object)
 		}
-		source.Stop()
 	}()
 
 	recorder := NewRecorder(source)
+	resultCh := recorder.Interface.ResultChan()
 	for {
-		_, ok := <-recorder.Interface.ResultChan()
+		_, ok := <-resultCh
 		if !ok {
 			break
 		}

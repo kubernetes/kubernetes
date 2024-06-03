@@ -19,19 +19,21 @@ package rollout
 import (
 	"bytes"
 	"io"
+	"net/http"
+	"testing"
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest/fake"
 	cgtesting "k8s.io/client-go/testing"
-	"k8s.io/kubectl/pkg/scheme"
-	"net/http"
-	"testing"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 var rolloutStatusGroupVersionEncoder = schema.GroupVersion{Group: "apps", Version: "v1"}
@@ -56,8 +58,8 @@ func TestRolloutStatus(t *testing.T) {
 	}
 
 	tf.FakeDynamicClient.WatchReactionChain = nil
+	fw := watch.NewFake()
 	tf.FakeDynamicClient.AddWatchReactor("*", func(action cgtesting.Action) (handled bool, ret watch.Interface, err error) {
-		fw := watch.NewFake()
 		dep := &appsv1.Deployment{}
 		dep.Name = deploymentName
 		dep.Status = appsv1.DeploymentStatus{
@@ -76,7 +78,11 @@ func TestRolloutStatus(t *testing.T) {
 		}
 		u := &unstructured.Unstructured{}
 		u.SetUnstructuredContent(c)
-		go fw.Add(u)
+		go func() {
+			fw.Add(u)
+			<-fw.StopChan()
+			fw.Close()
+		}()
 		return true, fw, nil
 	})
 
@@ -87,6 +93,18 @@ func TestRolloutStatus(t *testing.T) {
 	expectedMsg := "deployment \"deployment/nginx-deployment\" successfully rolled out\n"
 	if buf.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
+	}
+
+	// Validate the run command stopped the watcher when done
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
 	}
 }
 
@@ -112,8 +130,8 @@ func TestRolloutStatusWithSelector(t *testing.T) {
 	}
 
 	tf.FakeDynamicClient.WatchReactionChain = nil
+	fw := watch.NewFake()
 	tf.FakeDynamicClient.AddWatchReactor("*", func(action cgtesting.Action) (handled bool, ret watch.Interface, err error) {
-		fw := watch.NewFake()
 		dep := &appsv1.Deployment{}
 		dep.Name = deploymentName
 		dep.Status = appsv1.DeploymentStatus{
@@ -134,7 +152,11 @@ func TestRolloutStatusWithSelector(t *testing.T) {
 		}
 		u := &unstructured.Unstructured{}
 		u.SetUnstructuredContent(c)
-		go fw.Add(u)
+		go func() {
+			fw.Add(u)
+			<-fw.StopChan()
+			fw.Close()
+		}()
 		return true, fw, nil
 	})
 
@@ -146,6 +168,18 @@ func TestRolloutStatusWithSelector(t *testing.T) {
 	expectedMsg := "deployment \"deployment\" successfully rolled out\n"
 	if buf.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
+	}
+
+	// Validate the run command stopped the watcher when done
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
 	}
 }
 
@@ -169,8 +203,8 @@ func TestRolloutStatusWatchDisabled(t *testing.T) {
 	}
 
 	tf.FakeDynamicClient.WatchReactionChain = nil
+	fw := watch.NewFake()
 	tf.FakeDynamicClient.AddWatchReactor("*", func(action cgtesting.Action) (handled bool, ret watch.Interface, err error) {
-		fw := watch.NewFake()
 		dep := &appsv1.Deployment{}
 		dep.Name = deploymentName
 		dep.Status = appsv1.DeploymentStatus{
@@ -189,7 +223,11 @@ func TestRolloutStatusWatchDisabled(t *testing.T) {
 		}
 		u := &unstructured.Unstructured{}
 		u.SetUnstructuredContent(c)
-		go fw.Add(u)
+		go func() {
+			fw.Add(u)
+			<-fw.StopChan()
+			fw.Close()
+		}()
 		return true, fw, nil
 	})
 
@@ -201,6 +239,18 @@ func TestRolloutStatusWatchDisabled(t *testing.T) {
 	expectedMsg := "deployment \"deployment/nginx-deployment\" successfully rolled out\n"
 	if buf.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
+	}
+
+	// Validate the run command stopped the watcher when done
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
 	}
 }
 
@@ -224,8 +274,8 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 	}
 
 	tf.FakeDynamicClient.WatchReactionChain = nil
+	fw := watch.NewFake()
 	tf.FakeDynamicClient.AddWatchReactor("*", func(action cgtesting.Action) (handled bool, ret watch.Interface, err error) {
-		fw := watch.NewFake()
 		dep := &appsv1.Deployment{}
 		dep.Name = deploymentName
 		dep.Status = appsv1.DeploymentStatus{
@@ -244,7 +294,11 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 		}
 		u := &unstructured.Unstructured{}
 		u.SetUnstructuredContent(c)
-		go fw.Add(u)
+		go func() {
+			fw.Add(u)
+			<-fw.StopChan()
+			fw.Close()
+		}()
 		return true, fw, nil
 	})
 
@@ -256,6 +310,18 @@ func TestRolloutStatusWatchDisabledUnavailable(t *testing.T) {
 	expectedMsg := "Waiting for deployment \"deployment/nginx-deployment\" rollout to finish: 0 of 1 updated replicas are available...\n"
 	if buf.String() != expectedMsg {
 		t.Errorf("expected output: %s, but got: %s", expectedMsg, buf.String())
+	}
+
+	// Validate the run command stopped the watcher when done
+	select {
+	case _, ok := <-fw.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
 	}
 }
 

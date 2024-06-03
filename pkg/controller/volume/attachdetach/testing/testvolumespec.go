@@ -200,6 +200,7 @@ func CreateTestClient() *fake.Clientset {
 	})
 
 	fakeWatch := watch.NewFake()
+	// TODO: fakeWatch.Close()
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	return fakeClient

@@ -435,9 +435,12 @@ func newClientset(opts fakeClient) *fake.Clientset {
 		f.PrependWatchReactor("certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
 			switch action.GetResource().Version {
 			case "v1":
-				w := watch.NewFakeWithChanSize(1, false)
-				w.Add(opts.generateCSR())
-				w.Stop()
+				w := watch.NewFake()
+				go func() {
+					defer w.Close()
+					w.Add(opts.generateCSR())
+					<-w.StopChan()
+				}()
 				return true, w, nil
 
 			default:

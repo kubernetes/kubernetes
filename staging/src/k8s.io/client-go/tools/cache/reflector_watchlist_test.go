@@ -112,15 +112,18 @@ func TestWatchList(t *testing.T) {
 		name                string
 		disableUseWatchList bool
 
-		// closes listWatcher after sending the specified number of watch events
-		closeAfterWatchEvents int
-		// closes listWatcher after getting the specified number of watch requests
-		closeAfterWatchRequests int
-		// closes listWatcher after getting the specified number of list requests
-		closeAfterListRequests int
-
-		// stops Watcher after sending the specified number of watch events
-		stopAfterWatchEvents int
+		// closes the stop channel after sending the specified number of watch events.
+		// This should cause ListAndWatch to cleanup and exit.
+		stopListAndWatchAfterWatchEvents int
+		// closes the stop channel after getting the specified number of watch requests
+		// This should cause ListAndWatch to cleanup and exit.
+		stopListAndWatchAfterWatchRequests int
+		// closes the stop channel after getting the specified number of list requests
+		// This should cause ListAndWatch to cleanup and exit.
+		stopListAndWatchAfterListRequests int
+		// closes the result channel after sending the specified number of watch events.
+		// This should cause the client to retry with a new Watch.
+		closeWatcherAfterWatchEvents int
 
 		watchOptionsPredicate func(options metav1.ListOptions) error
 		watchEvents           []watch.Event
@@ -133,10 +136,10 @@ func TestWatchList(t *testing.T) {
 		expectedError          error
 	}{
 		{
-			name:                  "the reflector won't be synced if the bookmark event has been received",
-			watchEvents:           []watch.Event{{Type: watch.Added, Object: makePod("p1", "1")}},
-			closeAfterWatchEvents: 1,
-			expectedWatchRequests: 1,
+			name:                             "the reflector won't be synced if the bookmark event has been received",
+			watchEvents:                      []watch.Event{{Type: watch.Added, Object: makePod("p1", "1")}},
+			stopListAndWatchAfterWatchEvents: 1,
+			expectedWatchRequests:            1,
 			expectedRequestOptions: []metav1.ListOptions{{
 				SendInitialEvents:    pointer.Bool(true),
 				AllowWatchBookmarks:  true,
@@ -145,9 +148,9 @@ func TestWatchList(t *testing.T) {
 			}},
 		},
 		{
-			name:                    "the reflector uses the old LIST/WATCH semantics if the UseWatchList is turned off",
-			disableUseWatchList:     true,
-			closeAfterWatchRequests: 1,
+			name:                               "the reflector uses the old LIST/WATCH semantics if the UseWatchList is turned off",
+			disableUseWatchList:                true,
+			stopListAndWatchAfterWatchRequests: 1,
 			podList: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "1"},
 				Items:    []v1.Pod{*makePod("p1", "1")},
@@ -178,11 +181,11 @@ func TestWatchList(t *testing.T) {
 				ListMeta: metav1.ListMeta{ResourceVersion: "1"},
 				Items:    []v1.Pod{*makePod("p1", "1")},
 			},
-			closeAfterWatchEvents: 1,
-			watchEvents:           []watch.Event{{Type: watch.Added, Object: makePod("p2", "2")}},
-			expectedWatchRequests: 2,
-			expectedListRequests:  1,
-			expectedStoreContent:  []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
+			stopListAndWatchAfterWatchEvents: 1,
+			watchEvents:                      []watch.Event{{Type: watch.Added, Object: makePod("p2", "2")}},
+			expectedWatchRequests:            2,
+			expectedListRequests:             1,
+			expectedStoreContent:             []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    pointer.Bool(true),
@@ -213,11 +216,11 @@ func TestWatchList(t *testing.T) {
 				ListMeta: metav1.ListMeta{ResourceVersion: "1"},
 				Items:    []v1.Pod{*makePod("p1", "1")},
 			},
-			closeAfterWatchEvents: 1,
-			watchEvents:           []watch.Event{{Type: watch.Added, Object: makePod("p2", "2")}},
-			expectedWatchRequests: 2,
-			expectedListRequests:  1,
-			expectedStoreContent:  []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
+			stopListAndWatchAfterWatchEvents: 1,
+			watchEvents:                      []watch.Event{{Type: watch.Added, Object: makePod("p2", "2")}},
+			expectedWatchRequests:            2,
+			expectedListRequests:             1,
+			expectedStoreContent:             []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
 			expectedRequestOptions: []metav1.ListOptions{
 				{
 					SendInitialEvents:    pointer.Bool(true),
@@ -237,8 +240,8 @@ func TestWatchList(t *testing.T) {
 			},
 		},
 		{
-			name:                  "prove that the reflector is synced after receiving a bookmark event",
-			closeAfterWatchEvents: 3,
+			name:                             "prove that the reflector is synced after receiving a bookmark event",
+			stopListAndWatchAfterWatchEvents: 3,
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod("p1", "1")},
 				{Type: watch.Added, Object: makePod("p2", "2")},
@@ -259,8 +262,8 @@ func TestWatchList(t *testing.T) {
 			expectedStoreContent: []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
 		},
 		{
-			name:                  "check if Updates and Deletes events are propagated during streaming (until the bookmark is received)",
-			closeAfterWatchEvents: 6,
+			name:                             "check if Updates and Deletes events are propagated during streaming (until the bookmark is received)",
+			stopListAndWatchAfterWatchEvents: 6,
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod("p1", "1")},
 				{Type: watch.Added, Object: makePod("p2", "2")},
@@ -306,7 +309,7 @@ func TestWatchList(t *testing.T) {
 					return nil
 				}
 			}(),
-			closeAfterWatchEvents: 2,
+			stopListAndWatchAfterWatchEvents: 2,
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod("p1", "1")},
 				{Type: watch.Bookmark, Object: &v1.Pod{
@@ -340,9 +343,9 @@ func TestWatchList(t *testing.T) {
 			expectedStoreContent: []v1.Pod{*makePod("p1", "1")},
 		},
 		{
-			name:                  "check if stopping a watcher before sync results in creating a new watch-list request",
-			stopAfterWatchEvents:  1,
-			closeAfterWatchEvents: 3,
+			name:                             "check if stopping a watcher before sync results in creating a new watch-list request",
+			closeWatcherAfterWatchEvents:     1,
+			stopListAndWatchAfterWatchEvents: 3,
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod("p1", "1")},
 				// second request
@@ -372,9 +375,9 @@ func TestWatchList(t *testing.T) {
 			expectedStoreContent: []v1.Pod{*makePod("p1", "1")},
 		},
 		{
-			name:                  "stopping a watcher after synchronization results in creating a new watch request",
-			stopAfterWatchEvents:  4,
-			closeAfterWatchEvents: 5,
+			name:                             "stopping a watcher after synchronization results in creating a new watch request",
+			closeWatcherAfterWatchEvents:     4,
+			stopListAndWatchAfterWatchEvents: 5,
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod("p1", "1")},
 				{Type: watch.Added, Object: makePod("p2", "2")},
@@ -416,7 +419,7 @@ func TestWatchList(t *testing.T) {
 					return nil
 				}
 			}(),
-			stopAfterWatchEvents: 3,
+			closeWatcherAfterWatchEvents: 3,
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod("p1", "1")},
 				{Type: watch.Bookmark, Object: &v1.Pod{
@@ -445,8 +448,8 @@ func TestWatchList(t *testing.T) {
 			expectedError:        apierrors.NewResourceExpired("rv already expired"),
 		},
 		{
-			name:                  "prove that the reflector is checking the value of the initialEventsEnd annotation",
-			closeAfterWatchEvents: 3,
+			name:                             "prove that the reflector is checking the value of the initialEventsEnd annotation",
+			stopListAndWatchAfterWatchEvents: 3,
 			watchEvents: []watch.Event{
 				{Type: watch.Added, Object: makePod("p1", "1")},
 				{Type: watch.Added, Object: makePod("p2", "2")},
@@ -470,22 +473,23 @@ func TestWatchList(t *testing.T) {
 		t.Run(s.name, func(t *testing.T) {
 			scenario := s // capture as local variable
 			listWatcher, store, reflector, stopCh := testData()
+			defer listWatcher.Watcher().Close() // Close but don't recreate
 			go func() {
 				for i, e := range scenario.watchEvents {
-					listWatcher.fakeWatcher.Action(e.Type, e.Object)
-					if i+1 == scenario.stopAfterWatchEvents {
-						listWatcher.StopAndRecreateWatch()
+					listWatcher.Watcher().Action(e.Type, e.Object)
+					if i+1 == scenario.closeWatcherAfterWatchEvents {
+						listWatcher.CloseWatcher() // Close and recreate
 						continue
 					}
-					if i+1 == scenario.closeAfterWatchEvents {
-						close(stopCh)
+					if i+1 == scenario.stopListAndWatchAfterWatchEvents {
+						close(listWatcher.stopCh)
 					}
 				}
 			}()
 			listWatcher.watchOptionsPredicate = scenario.watchOptionsPredicate
-			listWatcher.closeAfterWatchRequests = scenario.closeAfterWatchRequests
+			listWatcher.stopListAndWatchAfterWatchRequests = scenario.stopListAndWatchAfterWatchRequests
 			listWatcher.customListResponse = scenario.podList
-			listWatcher.closeAfterListRequests = scenario.closeAfterListRequests
+			listWatcher.stopListAndWatchAfterListRequests = scenario.stopListAndWatchAfterListRequests
 			if scenario.disableUseWatchList {
 				reflector.UseWatchList = ptr.To(false)
 			}
@@ -569,27 +573,24 @@ func makePod(name, rv string) *v1.Pod {
 
 func testData() (*fakeListWatcher, Store, *Reflector, chan struct{}) {
 	s := NewStore(MetaNamespaceKeyFunc)
-	stopCh := make(chan struct{})
 	lw := &fakeListWatcher{
 		fakeWatcher: watch.NewFake(),
-		stop: func() {
-			close(stopCh)
-		},
+		stopCh:      make(chan struct{}),
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	r.UseWatchList = ptr.To(true)
 
-	return lw, s, r, stopCh
+	return lw, s, r, lw.stopCh
 }
 
 type fakeListWatcher struct {
-	lock                    sync.Mutex
-	fakeWatcher             *watch.FakeWatcher
-	listCounter             int
-	watchCounter            int
-	closeAfterWatchRequests int
-	closeAfterListRequests  int
-	stop                    func()
+	lock                               sync.Mutex
+	fakeWatcher                        *watch.FakeWatcher
+	listCounter                        int
+	watchCounter                       int
+	stopListAndWatchAfterWatchRequests int
+	stopListAndWatchAfterListRequests  int
+	stopCh                             chan struct{}
 
 	requestOptions []metav1.ListOptions
 
@@ -600,8 +601,8 @@ type fakeListWatcher struct {
 func (lw *fakeListWatcher) List(options metav1.ListOptions) (runtime.Object, error) {
 	lw.listCounter++
 	lw.requestOptions = append(lw.requestOptions, options)
-	if lw.listCounter == lw.closeAfterListRequests {
-		lw.stop()
+	if lw.listCounter == lw.stopListAndWatchAfterListRequests {
+		close(lw.stopCh)
 	}
 	if lw.customListResponse != nil {
 		return lw.customListResponse, nil
@@ -612,8 +613,8 @@ func (lw *fakeListWatcher) List(options metav1.ListOptions) (runtime.Object, err
 func (lw *fakeListWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	lw.watchCounter++
 	lw.requestOptions = append(lw.requestOptions, options)
-	if lw.watchCounter == lw.closeAfterWatchRequests {
-		lw.stop()
+	if lw.watchCounter == lw.stopListAndWatchAfterWatchRequests {
+		close(lw.stopCh)
 	}
 	if lw.watchOptionsPredicate != nil {
 		if err := lw.watchOptionsPredicate(options); err != nil {
@@ -625,9 +626,17 @@ func (lw *fakeListWatcher) Watch(options metav1.ListOptions) (watch.Interface, e
 	return lw.fakeWatcher, nil
 }
 
-func (lw *fakeListWatcher) StopAndRecreateWatch() {
+// Watcher returns the FakeWatcher, locked to avoid race conditions when being recreated.
+func (lw *fakeListWatcher) Watcher() *watch.FakeWatcher {
 	lw.lock.Lock()
 	defer lw.lock.Unlock()
-	lw.fakeWatcher.Stop()
+	return lw.fakeWatcher
+}
+
+// CloseWatcher closes the result channel and creates a new watcher for the next Watch call.
+func (lw *fakeListWatcher) CloseWatcher() {
+	lw.lock.Lock()
+	defer lw.lock.Unlock()
+	lw.fakeWatcher.Close()
 	lw.fakeWatcher = watch.NewFake()
 }

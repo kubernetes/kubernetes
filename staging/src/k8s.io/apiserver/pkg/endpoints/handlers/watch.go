@@ -190,6 +190,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
 		}
 	}()
+	watcher := s.Watching
+	defer watcher.Stop()
+	// ensure the connection times out
+	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
+	defer cleanup()
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -208,10 +213,6 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// ensure the connection times out
-	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
-	defer cleanup()
-
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
@@ -220,12 +221,13 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 	kind := s.Scope.Kind
 	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer)
-	ch := s.Watching.ResultChan()
+	resultCh := watcher.ResultChan()
 	done := req.Context().Done()
 
 	for {
 		select {
 		case <-s.ServerShuttingDownCh:
+			fmt.Println("shutting down server")
 			// the server has signaled that it is shutting down (not accepting
 			// any new request), all active watch request(s) should return
 			// immediately here. The WithWatchTerminationDuringShutdown server
@@ -235,10 +237,12 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			// available apiserver instance(s).
 			return
 		case <-done:
+			fmt.Println("context closed")
 			return
 		case <-timeoutCh:
+			fmt.Println("timeout")
 			return
-		case event, ok := <-ch:
+		case event, ok := <-resultCh:
 			if !ok {
 				// End of results.
 				return
@@ -252,7 +256,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			if len(ch) == 0 {
+			if len(resultCh) == 0 {
 				flusher.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
@@ -289,7 +293,8 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 
 	kind := s.Scope.Kind
 	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer)
-	ch := s.Watching.ResultChan()
+	resultCh := s.Watching.ResultChan()
+	defer s.Watching.Stop()
 
 	for {
 		select {
@@ -297,7 +302,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-ch:
+		case event, ok := <-resultCh:
 			if !ok {
 				// End of results.
 				return

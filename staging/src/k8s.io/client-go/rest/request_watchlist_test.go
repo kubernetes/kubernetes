@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -30,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
@@ -202,6 +204,7 @@ func TestWatchListSuccess(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			ctx := context.Background()
 			fakeWatcher := watch.NewFake()
+			defer fakeWatcher.Close()
 			target := &Request{
 				c: &RESTClient{
 					content: ClientContentConfig{
@@ -211,6 +214,7 @@ func TestWatchListSuccess(t *testing.T) {
 			}
 
 			go func(watchEvents []watch.Event) {
+				defer fakeWatcher.Close()
 				for _, watchEvent := range watchEvents {
 					fakeWatcher.Action(watchEvent.Type, watchEvent.Object)
 				}
@@ -255,11 +259,21 @@ func TestWatchListFailure(t *testing.T) {
 			expectedError: fmt.Errorf("context canceled"),
 		},
 		{
-			name: "stop watcher",
+			name: "stopped watcher",
 			ctx:  context.TODO(),
 			watcher: func() *watch.FakeWatcher {
 				w := watch.NewFake()
 				w.Stop()
+				return w
+			}(),
+			expectedError: fmt.Errorf("unexpected watch close"),
+		},
+		{
+			name: "closed watcher",
+			ctx:  context.TODO(),
+			watcher: func() *watch.FakeWatcher {
+				w := watch.NewFake()
+				w.Close()
 				return w
 			}(),
 			expectedError: fmt.Errorf("unexpected watch close"),
@@ -298,7 +312,11 @@ func TestWatchListFailure(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			target := &Request{}
 			go func(w *watch.FakeWatcher, watchEvents []watch.Event) {
+				defer w.Close()
 				for _, event := range watchEvents {
+					if w.IsStopped() {
+						break
+					}
 					w.Action(event.Type, event.Object)
 				}
 			}(scenario.watcher, scenario.watchEvents)
@@ -315,8 +333,16 @@ func TestWatchListFailure(t *testing.T) {
 			if !matched {
 				t.Fatalf("unexpected err = %v, expected = %v", resErr, scenario.expectedError)
 			}
-			if !scenario.watcher.IsStopped() {
-				t.Fatalf("the watcher wasn't stopped")
+			// Validate the handleWatchList stopped the watcher when returning
+			select {
+			case _, ok := <-scenario.watcher.StopChan():
+				if !ok {
+					// closed as expected
+					break
+				}
+				t.Fatalf("Unexpected stop channel event")
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatalf("Expected watcher to be stopped")
 			}
 		})
 	}

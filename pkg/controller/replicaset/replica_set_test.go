@@ -623,6 +623,7 @@ func TestRelatedPodsLookup(t *testing.T) {
 func TestWatchControllers(t *testing.T) {
 
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client := fake.NewSimpleClientset()
 	client.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
@@ -676,6 +677,7 @@ func TestWatchPods(t *testing.T) {
 	client := fake.NewSimpleClientset()
 
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})

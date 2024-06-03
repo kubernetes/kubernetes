@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -230,6 +230,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
@@ -255,6 +256,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
@@ -292,6 +294,7 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
@@ -327,6 +330,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
@@ -374,6 +378,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 	_, ctx := klogtesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})

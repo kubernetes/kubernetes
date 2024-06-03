@@ -316,12 +316,20 @@ func TestControllerSync(t *testing.T) {
 		client := &fake.Clientset{}
 
 		fakeVolumeWatch := watch.NewFake()
+		defer fakeVolumeWatch.Close()
 		client.PrependWatchReactor("persistentvolumes", core.DefaultWatchReactor(fakeVolumeWatch, nil))
 		fakeClaimWatch := watch.NewFake()
+		defer fakeClaimWatch.Close()
 		client.PrependWatchReactor("persistentvolumeclaims", core.DefaultWatchReactor(fakeClaimWatch, nil))
-		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(watch.NewFake(), nil))
-		client.PrependWatchReactor("pods", core.DefaultWatchReactor(watch.NewFake(), nil))
+		fakeStoreageClassWatch := watch.NewFake()
+		defer fakeStoreageClassWatch.Close()
+		client.PrependWatchReactor("storageclasses", core.DefaultWatchReactor(fakeStoreageClassWatch, nil))
+		fakeNodeWatch := watch.NewFake()
+		defer fakeNodeWatch.Close()
+		client.PrependWatchReactor("nodes", core.DefaultWatchReactor(fakeNodeWatch, nil))
+		fakePodWatch := watch.NewFake()
+		defer fakePodWatch.Close()
+		client.PrependWatchReactor("pods", core.DefaultWatchReactor(fakePodWatch, nil))
 
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		ctrl, err := newTestController(ctx, client, informers, true)
@@ -343,19 +351,21 @@ func TestControllerSync(t *testing.T) {
 
 		reactor := newVolumeReactor(ctx, client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
-			claim = claim.DeepCopy()
-			reactor.AddClaim(claim)
-			go func(claim *v1.PersistentVolumeClaim) {
-				fakeClaimWatch.Add(claim)
-			}(claim)
+			reactor.AddClaim(claim.DeepCopy())
 		}
+		go func() {
+			for _, claim := range test.initialClaims {
+				fakeClaimWatch.Add(claim.DeepCopy())
+			}
+		}()
 		for _, volume := range test.initialVolumes {
-			volume = volume.DeepCopy()
-			reactor.AddVolume(volume)
-			go func(volume *v1.PersistentVolume) {
-				fakeVolumeWatch.Add(volume)
-			}(volume)
+			reactor.AddVolume(volume.DeepCopy())
 		}
+		go func() {
+			for _, volume := range test.initialVolumes {
+				fakeVolumeWatch.Add(volume.DeepCopy())
+			}
+		}()
 
 		// Start the controller
 		ctx, cancel := context.WithCancel(context.TODO())

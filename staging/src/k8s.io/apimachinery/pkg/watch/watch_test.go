@@ -17,8 +17,10 @@ limitations under the License.
 package watch_test
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,8 +48,11 @@ func TestFake(t *testing.T) {
 
 	// Prove that f implements Interface by phrasing this as a function.
 	consumer := func(w Interface) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		resultCh := w.ResultChan()
 		for _, expect := range table {
-			got, ok := <-w.ResultChan()
+			got, ok := <-resultCh
 			if !ok {
 				t.Fatalf("closed early")
 			}
@@ -58,19 +63,27 @@ func TestFake(t *testing.T) {
 				t.Fatalf("Expected %v, got %v", expect.s, a)
 			}
 		}
-		_, stillOpen := <-w.ResultChan()
-		if stillOpen {
-			t.Fatal("Never stopped")
+		for {
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Result channel never closed: %v", ctx.Err())
+			case got, ok := <-resultCh:
+				if !ok {
+					// closed after last event, as expected
+					return
+				}
+				t.Errorf("Unexpected event: %v", got)
+			}
 		}
 	}
 
 	sender := func() {
+		defer f.Close()
 		f.Add(testType("foo"))
 		f.Action(Modified, testType("qux"))
 		f.Modify(testType("bar"))
 		f.Delete(testType("bar"))
 		f.Error(testType("error: blah"))
-		f.Stop()
 	}
 
 	go sender()
@@ -93,8 +106,11 @@ func TestRaceFreeFake(t *testing.T) {
 
 	// Prove that f implements Interface by phrasing this as a function.
 	consumer := func(w Interface) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		resultCh := w.ResultChan()
 		for _, expect := range table {
-			got, ok := <-w.ResultChan()
+			got, ok := <-resultCh
 			if !ok {
 				t.Fatalf("closed early")
 			}
@@ -105,9 +121,17 @@ func TestRaceFreeFake(t *testing.T) {
 				t.Fatalf("Expected %v, got %v", expect.s, a)
 			}
 		}
-		_, stillOpen := <-w.ResultChan()
-		if stillOpen {
-			t.Fatal("Never stopped")
+		for {
+			select {
+			case <-ctx.Done():
+				t.Fatalf("Result channel never closed: %v", ctx.Err())
+			case got, ok := <-resultCh:
+				if !ok {
+					// closed after last event, as expected
+					return
+				}
+				t.Errorf("Unexpected event: %v", got)
+			}
 		}
 	}
 
@@ -117,6 +141,7 @@ func TestRaceFreeFake(t *testing.T) {
 		f.Modify(testType("bar"))
 		f.Delete(testType("bar"))
 		f.Error(testType("error: blah"))
+		// TODO: Upgrade RaceFreeFake to use Close, not just Stop
 		f.Stop()
 	}
 
@@ -146,30 +171,47 @@ func TestProxyWatcher(t *testing.T) {
 		{Error, testType("error: blah")},
 	}
 
-	ch := make(chan Event, len(events))
-	w := NewProxyWatcher(ch)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	eventCh := make(chan Event, len(events))
+	w := NewProxyWatcher(eventCh)
 
-	for _, e := range events {
-		ch <- e
+	go func() {
+		for _, e := range events {
+			eventCh <- e
+		}
+		// Wait for consumer to stop watching, then close the result channel
+		<-w.StopChan()
+		close(eventCh)
+	}()
+
+	resultCh := w.ResultChan()
+	for _, expect := range events {
+		got, ok := <-resultCh
+		if !ok {
+			t.Fatalf("closed early")
+		}
+		if !reflect.DeepEqual(expect, got) {
+			t.Errorf("Expected %#v, got %#v", expect, got)
+		}
 	}
+	// Tell the producer that the consumer is done watching
+	w.Stop()
 
-	for _, e := range events {
-		g := <-w.ResultChan()
-		if !reflect.DeepEqual(e, g) {
-			t.Errorf("Expected %#v, got %#v", e, g)
-			continue
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("Result channel never closed: %v", ctx.Err())
+		case got, ok := <-resultCh:
+			if !ok {
+				// closed after last event, as expected
+				break loop
+			}
+			t.Errorf("Unexpected event: %v", got)
 		}
 	}
 
-	w.Stop()
-
-	select {
-	// Closed channel always reads immediately
-	case <-w.StopChan():
-	default:
-		t.Error("Channel isn't closed")
-	}
-
-	// Test double close
+	// Test double stop doesn't panic
 	w.Stop()
 }

@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -29,6 +29,7 @@ import (
 
 func TestMutationDetector(t *testing.T) {
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	lw := &testLW{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			return fakeWatch, nil
@@ -44,7 +45,13 @@ func TestMutationDetector(t *testing.T) {
 		},
 	}
 	stopCh := make(chan struct{})
-	defer close(stopCh)
+	stopped := false
+	defer func() {
+		if !stopped {
+			close(stopCh)
+			stopped = true
+		}
+	}()
 	mutationFound := make(chan bool)
 
 	informer := NewSharedInformer(lw, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
@@ -60,6 +67,10 @@ func TestMutationDetector(t *testing.T) {
 	go informer.Run(stopCh)
 
 	fakeWatch.Add(pod)
+	go func() {
+		<-fakeWatch.StopChan()
+		fakeWatch.Close()
+	}()
 
 	wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 		detector.addedObjsLock.Lock()
@@ -77,4 +88,18 @@ func TestMutationDetector(t *testing.T) {
 		t.Fatalf("failed waiting for mutating detector")
 	}
 
+	close(stopCh)
+	stopped = true
+
+	// Validate the informer stopped the watcher when stopped
+	select {
+	case _, ok := <-fakeWatch.StopChan():
+		if !ok {
+			// closed as expected
+			break
+		}
+		t.Fatalf("Unexpected stop channel event")
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Expected watcher to be stopped")
+	}
 }

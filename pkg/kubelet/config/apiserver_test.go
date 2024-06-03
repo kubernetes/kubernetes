@@ -19,7 +19,7 @@ package config
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,6 +56,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	lw := fakePodLW{
 		listResp:  &v1.PodList{Items: []v1.Pod{*pod1v1}},
 		watchResp: fakeWatch,
@@ -139,6 +140,7 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	lw := fakePodLW{
 		listResp:  &v1.PodList{Items: []v1.Pod{pod1, pod2}},
 		watchResp: fakeWatch,
@@ -173,6 +175,7 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	lw := fakePodLW{
 		listResp:  &v1.PodList{Items: []v1.Pod{}},
 		watchResp: fakeWatch,

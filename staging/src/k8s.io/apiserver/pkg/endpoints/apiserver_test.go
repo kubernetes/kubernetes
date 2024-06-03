@@ -60,6 +60,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/admission"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -350,7 +351,7 @@ type SimpleRESTStorage struct {
 	namespacePresent bool
 
 	// These are set when Watch is called
-	fakeWatch                  *watch.FakeWatcher
+	fakeWatchCh                chan *watch.FakeWatcher
 	requestedLabelSelector     labels.Selector
 	requestedFieldSelector     fields.Selector
 	requestedResourceVersion   string
@@ -525,14 +526,54 @@ func (storage *SimpleRESTStorage) Watch(ctx context.Context, options *metaintern
 	if err := storage.errors["watch"]; err != nil {
 		return nil, err
 	}
-	storage.fakeWatch = watch.NewFake()
-	return storage.fakeWatch, nil
+	// Init fakeWatchCh, if needed
+	if storage.fakeWatchCh == nil {
+		storage.fakeWatchCh = make(chan *watch.FakeWatcher, 1)
+	} else {
+		// Empty buffer
+		select {
+		case <-storage.fakeWatchCh:
+			// Watch was called before WaitForWatcher
+		default:
+			// WaitForWatcher was called before Watch
+		}
+	}
+	watcher := watch.NewFake()
+	// Load buffer
+	storage.fakeWatchCh <- watcher
+	return watcher, nil
 }
 
-func (storage *SimpleRESTStorage) Watcher() *watch.FakeWatcher {
+// WaitForWatcher waits until Watch has been called to initialize the watcher,
+// then returns it. This is useful if Watch is being called asynchronously.
+// Takes a context to allow for timeout and cancellation.
+func (storage *SimpleRESTStorage) WaitForWatcher(ctx context.Context) (*watch.FakeWatcher, error) {
+	fakeWatchCh := storage.fakeWatcherChan()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case watcher, open := <-fakeWatchCh:
+			if !open {
+				// fakeWatchCh should never be closed.
+				// Go will garbage collect it with the SimpleRESTStorage.
+				return nil, fmt.Errorf("fakeWatchCh closed prematurely")
+			}
+			// Re-load buffer.
+			// This allows WaitForWatcher to be called multiple times for each Watch.
+			storage.fakeWatchCh <- watcher
+			return watcher, nil
+		}
+	}
+}
+
+func (storage *SimpleRESTStorage) fakeWatcherChan() <-chan *watch.FakeWatcher {
 	storage.lock.Lock()
 	defer storage.lock.Unlock()
-	return storage.fakeWatch
+	if storage.fakeWatchCh == nil {
+		storage.fakeWatchCh = make(chan *watch.FakeWatcher, 1)
+	}
+	return storage.fakeWatchCh
 }
 
 // Implement Connecter
@@ -2039,9 +2080,16 @@ func TestWatchTable(t *testing.T) {
 				t.Fatalf("%d: unexpected response: %#v", i, resp)
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+			defer cancel()
+			fakeWatcher, err := simpleStorage.WaitForWatcher(ctx)
+			if err != nil {
+				t.Fatalf("waiting for watcher: %v", err)
+			}
+
 			go func() {
-				defer simpleStorage.fakeWatch.Stop()
-				test.send(simpleStorage.fakeWatch)
+				defer fakeWatcher.Close()
+				test.send(fakeWatcher)
 			}()
 
 			body, err := ioutil.ReadAll(resp.Body)

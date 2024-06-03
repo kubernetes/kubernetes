@@ -49,6 +49,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	// Setup fake api client.
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("services", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
@@ -130,6 +131,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	// Setup fake api client.
 	client := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
+	defer fakeWatch.Close()
 	client.PrependWatchReactor("endpointslices", ktesting.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
