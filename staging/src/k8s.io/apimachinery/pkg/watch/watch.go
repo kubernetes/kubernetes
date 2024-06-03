@@ -322,3 +322,21 @@ func (pw *ProxyWatcher) ResultChan() <-chan Event {
 func (pw *ProxyWatcher) StopChan() <-chan struct{} {
 	return pw.stopCh
 }
+
+// MockWatcher implements watch.Interface with mockable functions.
+type MockWatcher struct {
+	StopFunc       func()
+	ResultChanFunc func() <-chan Event
+}
+
+var _ Interface = &MockWatcher{}
+
+// Stop calls StopFunc
+func (mw MockWatcher) Stop() {
+	mw.StopFunc()
+}
+
+// ResultChan calls ResultChanFunc
+func (mw MockWatcher) ResultChan() <-chan Event {
+	return mw.ResultChanFunc()
+}
