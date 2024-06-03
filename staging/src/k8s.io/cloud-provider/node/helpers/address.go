@@ -88,14 +88,12 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 	return GetNodeAddressesFromNodeIP(nodeIP.String(), cloudNodeAddresses)
 }
 
-// GetNodeAddressesFromNodeIP filters the provided list of nodeAddresses to match the
-// providedNodeIP from the Node annotation (which is assumed to be non-empty). This is
+// GetNodeAddressesFromNodeIP sorts the provided list of nodeAddresses to use the
+// providedNodeIP from the Node annotation first (which is assumed to be non-empty). This is
 // used for external cloud providers.
 //
-// It will return node addresses filtered such that:
+// It will return node addresses sorted such that:
 //   - Any address matching nodeIP will be listed first.
-//   - If nodeIP matches an address of a particular type (internal or external),
-//     that will be the *only* address of that type returned.
 //   - All remaining addresses are listed after.
 //
 // (This does not have the same behavior with `0.0.0.0` and `::` as
@@ -107,40 +105,51 @@ func GetNodeAddressesFromNodeIP(providedNodeIP string, cloudNodeAddresses []v1.N
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse node IP %q: %v", providedNodeIP, err)
 	}
-
-	enforcedNodeAddresses := []v1.NodeAddress{}
-	nodeIPTypes := make(map[v1.NodeAddressType]bool)
-
-	for _, nodeIP := range nodeIPs {
-		// For every address supplied by the cloud provider that matches nodeIP,
-		// nodeIP is the enforced node address for that address Type (like
-		// InternalIP and ExternalIP), meaning other addresses of the same Type
-		// are discarded. See #61921 for more information: some cloud providers
-		// may supply secondary IPs, so nodeIP serves as a way to ensure that the
-		// correct IPs show up on a Node object.
-
-		matched := false
-		for _, nodeAddress := range cloudNodeAddresses {
-			if netutils.ParseIPSloppy(nodeAddress.Address).Equal(nodeIP) {
-				enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-				nodeIPTypes[nodeAddress.Type] = true
-				matched = true
-			}
+	// order matters so we sort by the last first
+	for i := len(nodeIPs) - 1; i >= 0; i-- {
+		nodeIP := nodeIPs[i]
+		nodeAddresses, err := getNodeAddressesFromNodeIP(nodeIP, cloudNodeAddresses)
+		if err != nil {
+			return nil, err
 		}
+		cloudNodeAddresses = nodeAddresses
+	}
+	return cloudNodeAddresses, nil
+}
 
-		// nodeIP must be among the addresses supplied by the cloud provider
-		if !matched {
-			return nil, fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
+// getNodeAddressesFromNodeIP
+// For every address supplied by the cloud provider that matches nodeIP,
+// nodeIP is the first node address for that address Type (like
+// InternalIP and ExternalIP), meaning other addresses of the same Type
+// are listed after that. See #61921 for more information: some cloud providers
+// may supply secondary IPs, so nodeIP serves as a way to ensure that the
+// correct IPs show up on a Node object first.
+func getNodeAddressesFromNodeIP(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
+	matched := false
+	nodeAddressPerType := map[v1.NodeAddressType][]string{}
+	for _, nodeAddress := range cloudNodeAddresses {
+		if netutils.ParseIPSloppy(nodeAddress.Address).Equal(nodeIP) {
+			matched = true
+			// matched address goes first
+			nodeAddressPerType[nodeAddress.Type] = append([]string{nodeAddress.Address}, nodeAddressPerType[nodeAddress.Type]...)
+		} else {
+			// only append  during the first pass
+			nodeAddressPerType[nodeAddress.Type] = append(nodeAddressPerType[nodeAddress.Type], nodeAddress.Address)
 		}
 	}
 
+	// nodeIP must be among the addresses supplied by the cloud provider
+	if !matched {
+		return nil, fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
+	}
 	// Now use all other addresses supplied by the cloud provider NOT of the same Type
 	// as any nodeIP.
-	for _, nodeAddress := range cloudNodeAddresses {
-		if !nodeIPTypes[nodeAddress.Type] {
-			enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
+	sortedAddresses := []v1.NodeAddress{}
+	for nodeType, nodeAddresses := range nodeAddressPerType {
+		for _, address := range nodeAddresses {
+			sortedAddresses = append(sortedAddresses, v1.NodeAddress{Type: nodeType, Address: address})
 		}
 	}
 
-	return enforcedNodeAddresses, nil
+	return sortedAddresses, nil
 }
