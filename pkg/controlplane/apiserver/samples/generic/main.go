@@ -26,8 +26,7 @@ import (
 	_ "k8s.io/component-base/logs/json/register"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
 	_ "k8s.io/component-base/metrics/prometheus/version"
-
-	"k8s.io/kubernetes/cmd/sample-generic-controlplane/server"
+	"k8s.io/kubernetes/pkg/controlplane/apiserver/samples/generic/server"
 )
 
 func main() {

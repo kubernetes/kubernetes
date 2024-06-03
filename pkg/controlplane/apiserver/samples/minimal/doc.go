@@ -17,7 +17,7 @@ limitations under the License.
 // sample-minimal-controlplane is a kube-like generic control plane
 // - without CRDs
 // - with a limited set of built-in resources
-// - with aggregation
+// - with aggregation (TODO: remove)
 // - without the container domain specific APIs.
 //
 // TODO(sttts): remove/disable aggregation
