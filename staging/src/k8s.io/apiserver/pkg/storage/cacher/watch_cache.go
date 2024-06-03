@@ -644,10 +644,10 @@ func (w *watchCache) Resync() error {
 	return nil
 }
 
-func (w *watchCache) getResourceVersion() uint64 {
+func (w *watchCache) getListResourceVersion() uint64 {
 	w.RLock()
 	defer w.RUnlock()
-	return w.resourceVersion
+	return w.listResourceVersion
 }
 
 func (w *watchCache) currentCapacity() int {
