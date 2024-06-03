@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -50,7 +51,7 @@ type VersionedCheck struct {
 	OverrideCheckIDs []CheckID
 }
 
-type CheckPodFn func(*metav1.ObjectMeta, *corev1.PodSpec) CheckResult
+type CheckPodFn func(*metav1.ObjectMeta, *corev1.PodSpec, ...Option) CheckResult
 
 type CheckID string
 
@@ -80,6 +81,9 @@ type CheckResult struct {
 	// - list specific invalid containers: "container1, container2"
 	// - list specific non-default capabilities: "CAP_NET_RAW"
 	ForbiddenDetail string
+	// ErrList should only be set if Allowed is false, and is optional.
+	// ErrList is a detailed list of restricted field errors.
+	ErrList *field.ErrorList
 }
 
 // AggergateCheckResult holds the aggregate result of running CheckPod across multiple checks.
@@ -92,9 +96,11 @@ type AggregateCheckResult struct {
 	// ForbiddenDetails is a slice of the forbidden details from all the forbidden checks. It may include empty strings.
 	// ForbiddenReasons and ForbiddenDetails must have the same number of elements, and the indexes are for the same check.
 	ForbiddenDetails []string
+	// ErrLists is a slice of the field errors from all the forbidden checks.
+	ErrLists map[string]field.ErrorList
 }
 
-// ForbiddenReason returns a comma-separated string of of the forbidden reasons.
+// ForbiddenReason returns a comma-separated string of the forbidden reasons.
 // Example: host ports, privileged containers, non-default capabilities
 func (a *AggregateCheckResult) ForbiddenReason() string {
 	return strings.Join(a.ForbiddenReasons, ", ")
@@ -122,19 +128,26 @@ func (a *AggregateCheckResult) ForbiddenDetail() string {
 // UnknownForbiddenReason is used as the placeholder forbidden reason for checks that incorrectly disallow without providing a reason.
 const UnknownForbiddenReason = "unknown forbidden reason"
 
-// AggregateCheckPod runs all the checks and aggregates the forbidden results into a single CheckResult.
+// AggregateCheckResults runs all the checks and aggregates the forbidden results into a single CheckResult.
 // The aggregated reason is a comma-separated
 func AggregateCheckResults(results []CheckResult) AggregateCheckResult {
 	var (
-		reasons []string
-		details []string
+		reasons  []string
+		details  []string
+		errLists = make(map[string]field.ErrorList)
 	)
 	for _, result := range results {
 		if !result.Allowed {
 			if len(result.ForbiddenReason) == 0 {
 				reasons = append(reasons, UnknownForbiddenReason)
+				if result.ErrList != nil {
+					errLists[UnknownForbiddenReason] = *result.ErrList
+				}
 			} else {
 				reasons = append(reasons, result.ForbiddenReason)
+				if result.ErrList != nil {
+					errLists[result.ForbiddenReason] = *result.ErrList
+				}
 			}
 			details = append(details, result.ForbiddenDetail)
 		}
@@ -143,6 +156,7 @@ func AggregateCheckResults(results []CheckResult) AggregateCheckResult {
 		Allowed:          len(reasons) == 0,
 		ForbiddenReasons: reasons,
 		ForbiddenDetails: details,
+		ErrLists:         errLists,
 	}
 }
 

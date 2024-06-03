@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/pod-security-admission/api"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCheckRegistry(t *testing.T) {
@@ -169,7 +170,7 @@ func generateCheck(id CheckID, level api.Level, versions []string) Check {
 		v := versionOrPanic(ver) // Copy ver so it can be used in the CheckPod closure.
 		c.Versions = append(c.Versions, VersionedCheck{
 			MinimumVersion: v,
-			CheckPod: func(_ *metav1.ObjectMeta, _ *corev1.PodSpec) CheckResult {
+			CheckPod: func(_ *metav1.ObjectMeta, _ *corev1.PodSpec, _ ...Option) CheckResult {
 				return CheckResult{
 					ForbiddenReason: fmt.Sprintf("%s:%s", id, v),
 				}

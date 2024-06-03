@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -50,44 +51,55 @@ func CheckAllowPrivilegeEscalation() Check {
 				// Field added in 1.8:
 				// https://github.com/kubernetes/kubernetes/blob/v1.8.0/staging/src/k8s.io/api/core/v1/types.go#L4797-L4804
 				MinimumVersion: api.MajorMinorVersion(1, 8),
-				CheckPod:       allowPrivilegeEscalation_1_8,
+				CheckPod:       withOptions(allowPrivilegeEscalationV1Dot8),
 			},
 			{
 				// Starting 1.25, windows pods would be exempted from this check using pod.spec.os field when set to windows.
 				MinimumVersion: api.MajorMinorVersion(1, 25),
-				CheckPod:       allowPrivilegeEscalation_1_25,
+				CheckPod:       withOptions(allowPrivilegeEscalationV1Dot25),
 			},
 		},
 	}
 }
 
-func allowPrivilegeEscalation_1_8(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var badContainers []string
-	visitContainers(podSpec, func(container *corev1.Container) {
-		if container.SecurityContext == nil || container.SecurityContext.AllowPrivilegeEscalation == nil || *container.SecurityContext.AllowPrivilegeEscalation {
-			badContainers = append(badContainers, container.Name)
+func allowPrivilegeEscalationV1Dot8(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
+	badContainers := NewViolations(opts.withFieldErrors)
+
+	visitContainers(podSpec, opts, func(container *corev1.Container, path *field.Path) {
+		if opts.withFieldErrors {
+			path = path.Child("securityContext", "allowPrivilegeEscalation")
+			if container.SecurityContext == nil {
+				badContainers.Add(container.Name, required(path))
+			} else if container.SecurityContext.AllowPrivilegeEscalation == nil {
+				badContainers.Add(container.Name, withBadValue(forbidden(path), "nil"))
+			} else if *container.SecurityContext.AllowPrivilegeEscalation {
+				badContainers.Add(container.Name, withBadValue(forbidden(path), true))
+			}
+		} else if container.SecurityContext == nil || container.SecurityContext.AllowPrivilegeEscalation == nil || *container.SecurityContext.AllowPrivilegeEscalation {
+			badContainers.Add(container.Name)
 		}
 	})
 
-	if len(badContainers) > 0 {
+	if !badContainers.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "allowPrivilegeEscalation != false",
 			ForbiddenDetail: fmt.Sprintf(
 				"%s %s must set securityContext.allowPrivilegeEscalation=false",
-				pluralize("container", "containers", len(badContainers)),
-				joinQuote(badContainers),
+				pluralize("container", "containers", badContainers.Len()),
+				joinQuote(badContainers.Data()),
 			),
+			ErrList: badContainers.Errs(),
 		}
 	}
 	return CheckResult{Allowed: true}
 }
 
-func allowPrivilegeEscalation_1_25(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func allowPrivilegeEscalationV1Dot25(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	// Pod API validation would have failed if podOS == Windows and if privilegeEscalation has been set.
 	// We can admit the Windows pod even if privilegeEscalation has not been set.
 	if podSpec.OS != nil && podSpec.OS.Name == corev1.Windows {
 		return CheckResult{Allowed: true}
 	}
-	return allowPrivilegeEscalation_1_8(podMetadata, podSpec)
+	return allowPrivilegeEscalationV1Dot8(podMetadata, podSpec, opts)
 }

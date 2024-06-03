@@ -49,32 +49,46 @@ func CheckHostNamespaces() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       hostNamespaces_1_0,
+				CheckPod:       withOptions(hostNamespacesV1Dot0),
 			},
 		},
 	}
 }
 
-func hostNamespaces_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var hostNamespaces []string
+func hostNamespacesV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
+	hostNamespaces := NewViolations(opts.withFieldErrors)
 
 	if podSpec.HostNetwork {
-		hostNamespaces = append(hostNamespaces, "hostNetwork=true")
+		if opts.withFieldErrors {
+			hostNamespaces.Add("hostNetwork=true", withBadValue(forbidden(hostNetworkPath), true))
+		} else {
+			hostNamespaces.Add("hostNetwork=true")
+		}
+
 	}
 
 	if podSpec.HostPID {
-		hostNamespaces = append(hostNamespaces, "hostPID=true")
+		if opts.withFieldErrors {
+			hostNamespaces.Add("hostPID=true", withBadValue(forbidden(hostPIDPath), true))
+		} else {
+			hostNamespaces.Add("hostPID=true")
+		}
 	}
 
 	if podSpec.HostIPC {
-		hostNamespaces = append(hostNamespaces, "hostIPC=true")
+		if opts.withFieldErrors {
+			hostNamespaces.Add("hostIPC=true", withBadValue(forbidden(hostIPCPath), true))
+		} else {
+			hostNamespaces.Add("hostIPC=true")
+		}
 	}
 
-	if len(hostNamespaces) > 0 {
+	if !hostNamespaces.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "host namespaces",
-			ForbiddenDetail: strings.Join(hostNamespaces, ", "),
+			ForbiddenDetail: strings.Join(hostNamespaces.Data(), ", "),
+			ErrList:         hostNamespaces.Errs(),
 		}
 	}
 

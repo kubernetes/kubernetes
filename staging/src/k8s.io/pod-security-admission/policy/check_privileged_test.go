@@ -20,15 +20,21 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilpointer "k8s.io/utils/pointer"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestPrivileged(t *testing.T) {
 	tests := []struct {
-		name         string
-		pod          *corev1.Pod
-		expectReason string
-		expectDetail string
+		name          string
+		pod           *corev1.Pod
+		opts          options
+		expectReason  string
+		expectDetail  string
+		expectErrList field.ErrorList
 	}{
 		{
 			name: "privileged",
@@ -44,11 +50,33 @@ func TestPrivileged(t *testing.T) {
 			expectReason: `privileged`,
 			expectDetail: `containers "d", "e" must not set securityContext.privileged=true`,
 		},
+		{
+			name: "privileged, enable field error list",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "a", SecurityContext: nil},
+					{Name: "b", SecurityContext: &corev1.SecurityContext{}},
+					{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: utilpointer.Bool(false)}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{Privileged: utilpointer.Bool(true)}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{Privileged: utilpointer.Bool(true)}},
+				},
+			}},
+			opts: options{
+				withFieldErrors: true,
+			},
+			expectReason: `privileged`,
+			expectDetail: `containers "d", "e" must not set securityContext.privileged=true`,
+			expectErrList: field.ErrorList{
+				{Type: field.ErrorTypeForbidden, Field: "spec.containers[3].securityContext.privileged", BadValue: true},
+				{Type: field.ErrorTypeForbidden, Field: "spec.containers[4].securityContext.privileged", BadValue: true},
+			},
+		},
 	}
 
+	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "Detail"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := privileged_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := privilegedV1Dot0(&tc.pod.ObjectMeta, &tc.pod.Spec, tc.opts)
 			if result.Allowed {
 				t.Fatal("expected disallowed")
 			}
@@ -57,6 +85,11 @@ func TestPrivileged(t *testing.T) {
 			}
 			if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
 				t.Errorf("expected\n%s\ngot\n%s", e, a)
+			}
+			if result.ErrList != nil {
+				if diff := cmp.Diff(tc.expectErrList, *result.ErrList, cmpOpts...); diff != "" {
+					t.Errorf("unexpected field errors (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}
