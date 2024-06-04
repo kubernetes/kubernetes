@@ -279,12 +279,12 @@ func TestRuleMatches(t *testing.T) {
 		name string
 		rule rbacv1.PolicyRule
 
-		requestsToExpected []requestToTest
+		requestsToExpected []*requestToTest
 	}{
 		{
 			name: "star verb, exact match other",
 			rule: rbacv1helpers.NewRule("*").Groups("group1").Resources("resource1").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{resourceRequest("verb1").Group("group1").Resource("resource1").New(), true},
 				{resourceRequest("verb1").Group("group2").Resource("resource1").New(), false},
 				{resourceRequest("verb1").Group("group1").Resource("resource2").New(), false},
@@ -298,7 +298,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star group, exact match other",
 			rule: rbacv1helpers.NewRule("verb1").Groups("*").Resources("resource1").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{resourceRequest("verb1").Group("group1").Resource("resource1").New(), true},
 				{resourceRequest("verb1").Group("group2").Resource("resource1").New(), true},
 				{resourceRequest("verb1").Group("group1").Resource("resource2").New(), false},
@@ -312,7 +312,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star resource, exact match other",
 			rule: rbacv1helpers.NewRule("verb1").Groups("group1").Resources("*").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{resourceRequest("verb1").Group("group1").Resource("resource1").New(), true},
 				{resourceRequest("verb1").Group("group2").Resource("resource1").New(), false},
 				{resourceRequest("verb1").Group("group1").Resource("resource2").New(), true},
@@ -326,7 +326,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "tuple expansion",
 			rule: rbacv1helpers.NewRule("verb1", "verb2").Groups("group1", "group2").Resources("resource1", "resource2").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{resourceRequest("verb1").Group("group1").Resource("resource1").New(), true},
 				{resourceRequest("verb1").Group("group2").Resource("resource1").New(), true},
 				{resourceRequest("verb1").Group("group1").Resource("resource2").New(), true},
@@ -340,7 +340,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "subresource expansion",
 			rule: rbacv1helpers.NewRule("*").Groups("*").Resources("resource1/subresource1").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{resourceRequest("verb1").Group("group1").Resource("resource1").Subresource("subresource1").New(), true},
 				{resourceRequest("verb1").Group("group2").Resource("resource1").Subresource("subresource2").New(), false},
 				{resourceRequest("verb1").Group("group1").Resource("resource2").Subresource("subresource1").New(), false},
@@ -354,7 +354,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star nonresource, exact match other",
 			rule: rbacv1helpers.NewRule("verb1").URLs("*").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{nonresourceRequest("verb1").URL("/foo").New(), true},
 				{nonresourceRequest("verb1").URL("/foo/bar").New(), true},
 				{nonresourceRequest("verb1").URL("/foo/baz").New(), true},
@@ -370,7 +370,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star nonresource subpath",
 			rule: rbacv1helpers.NewRule("verb1").URLs("/foo/*").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{nonresourceRequest("verb1").URL("/foo").New(), false},
 				{nonresourceRequest("verb1").URL("/foo/bar").New(), true},
 				{nonresourceRequest("verb1").URL("/foo/baz").New(), true},
@@ -386,7 +386,7 @@ func TestRuleMatches(t *testing.T) {
 		{
 			name: "star verb, exact nonresource",
 			rule: rbacv1helpers.NewRule("*").URLs("/foo", "/foo/bar/one").RuleOrDie(),
-			requestsToExpected: []requestToTest{
+			requestsToExpected: []*requestToTest{
 				{nonresourceRequest("verb1").URL("/foo").New(), true},
 				{nonresourceRequest("verb1").URL("/foo/bar").New(), false},
 				{nonresourceRequest("verb1").URL("/foo/baz").New(), false},
