@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -178,6 +179,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if delegateHandler == nil {
 		delegateHandler = http.NotFoundHandler()
 	}
+
+	delegateHandler = genericapifilters.WithMuxAndDiscoveryComplete(delegateHandler, hasCRDInformerSyncedSignal)
 
 	versionDiscoveryHandler := &versionDiscoveryHandler{
 		discovery: map[schema.GroupVersion]*discovery.APIVersionHandler{},

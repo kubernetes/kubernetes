@@ -53,6 +53,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -150,8 +151,6 @@ func TestConvertFieldLabel(t *testing.T) {
 }
 
 func TestRouting(t *testing.T) {
-	hasSynced := false
-
 	crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	crdLister := listers.NewCustomResourceDefinitionLister(crdIndexer)
 
@@ -165,7 +164,7 @@ func TestRouting(t *testing.T) {
 	delegateCalled := false
 	delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		delegateCalled = true
-		if !hasSynced {
+		if !genericapifilters.NoMuxAndDiscoveryIncompleteKey(req.Context()) {
 			http.Error(w, "", 503)
 			return
 		}
@@ -362,8 +361,11 @@ func TestRouting(t *testing.T) {
 			for _, contentType := range []string{"json", "yaml", "proto", "unknown"} {
 				t.Run(contentType, func(t *testing.T) {
 					delegateCalled = false
-					hasSynced = tc.HasSynced
-
+					hasInformerSyncedSignal := make(chan struct{})
+					if tc.HasSynced {
+						close(hasInformerSyncedSignal)
+					}
+					handler := genericapifilters.WithMuxAndDiscoveryComplete(handler, hasInformerSyncedSignal)
 					recorder := httptest.NewRecorder()
 
 					req := httptest.NewRequest(tc.Method, tc.Path, tc.Body)
