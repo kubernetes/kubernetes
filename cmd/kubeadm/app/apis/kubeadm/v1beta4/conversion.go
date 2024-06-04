@@ -25,7 +25,12 @@ import (
 
 // Convert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration converts a private InitConfiguration to a public InitConfiguration.
 func Convert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
-	return autoConvert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in, out, s)
+	err := autoConvert_kubeadm_InitConfiguration_To_v1beta4_InitConfiguration(in, out, s)
+	timeoutControlPlane := kubeadm.GetConversionTimeoutControlPlane() // Remove with v1beta3.
+	if timeoutControlPlane != nil {
+		out.Timeouts.ControlPlaneComponentHealthCheck = timeoutControlPlane
+	}
+	return err
 }
 
 // Convert_v1beta4_InitConfiguration_To_kubeadm_InitConfiguration converts a public InitConfiguration to a private InitConfiguration.
@@ -46,14 +51,25 @@ func Convert_kubeadm_APIServer_To_v1beta4_APIServer(in *kubeadm.APIServer, out *
 
 // Convert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration is required due to missing TimeoutForControlPlane in v1beta4
 func Convert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	err := autoConvert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 	out.APIServer.TimeoutForControlPlane = &metav1.Duration{}
-	return autoConvert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
+	return err
 }
 
 // Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration converts a public JoinConfiguration to a private JoinConfiguration.
 func Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	err := autoConvert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 	out.Discovery.Timeout = in.Timeouts.Discovery.DeepCopy()
+	return err
+}
+
+// Convert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration converts a private JoinConfinguration to a public JoinCOnfiguration.
+func Convert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	err := autoConvert_kubeadm_JoinConfiguration_To_v1beta4_JoinConfiguration(in, out, s)
+	timeoutControlPlane := kubeadm.GetConversionTimeoutControlPlane() // Remove with v1beta3.
+	if timeoutControlPlane != nil {
+		out.Timeouts.ControlPlaneComponentHealthCheck = timeoutControlPlane
+	}
 	return err
 }
 

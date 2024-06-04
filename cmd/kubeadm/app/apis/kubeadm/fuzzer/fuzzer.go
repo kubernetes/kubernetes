@@ -89,9 +89,7 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.CIImageRepository = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
 	obj.KubernetesVersion = "qux"
 	obj.CIKubernetesVersion = "" // This fields doesn't exists in public API >> using default to get the roundtrip test pass
-	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
-		Duration: 0,
-	}
+	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{}
 	obj.ControllerManager.ExtraEnvs = nil
 	obj.APIServer.ExtraEnvs = nil
 	obj.Scheduler.ExtraEnvs = nil

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -307,7 +308,19 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	var initcfg *kubeadmapi.InitConfiguration
 	var clustercfg *kubeadmapi.ClusterConfiguration
 
-	for gvk, fileContent := range gvkmap {
+	// Sort the GVKs deterministically by GVK string.
+	// This allows ClusterConfiguration to be decoded first.
+	gvks := make([]schema.GroupVersionKind, 0, len(gvkmap))
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
+	}
+	sort.Slice(gvks, func(i, j int) bool {
+		return gvks[i].String() < gvks[j].String()
+	})
+
+	for _, gvk := range gvks {
+		fileContent := gvkmap[gvk]
+
 		// first, check if this GVK is supported and possibly not deprecated
 		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated, allowExperimental); err != nil {
 			return nil, err
