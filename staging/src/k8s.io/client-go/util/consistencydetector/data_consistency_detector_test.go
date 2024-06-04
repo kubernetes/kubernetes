@@ -61,6 +61,59 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
+			name: "legacy, the limit is removed from the list options when it wasn't honored by the watch cache",
+			listResponse: &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
+				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
+			},
+			requestOptions:       metav1.ListOptions{ResourceVersion: "0", Limit: 2},
+			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
+			expectedListRequests: 1,
+			expectedRequestOptions: []metav1.ListOptions{
+				{
+					ResourceVersion:      "2",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+				},
+			},
+		},
+
+		{
+			name: "the limit is NOT removed from the list options for non-legacy request",
+			listResponse: &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
+				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
+			},
+			requestOptions:       metav1.ListOptions{ResourceVersion: "2", Limit: 2},
+			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
+			expectedListRequests: 1,
+			expectedRequestOptions: []metav1.ListOptions{
+				{
+					Limit:                2,
+					ResourceVersion:      "2",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+				},
+			},
+		},
+
+		{
+			name: "legacy, the limit is NOT removed from the list options when the watch cache is disabled",
+			listResponse: &v1.PodList{
+				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
+				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
+			},
+			requestOptions:       metav1.ListOptions{ResourceVersion: "0", Limit: 5},
+			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
+			expectedListRequests: 1,
+			expectedRequestOptions: []metav1.ListOptions{
+				{
+					Limit:                5,
+					ResourceVersion:      "2",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+				},
+			},
+		},
+
+		{
 			name: "data consistency check won't panic when there is no data",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
