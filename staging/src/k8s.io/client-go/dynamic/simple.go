@@ -19,7 +19,6 @@ package dynamic
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/util/consistencydetector"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -30,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/consistencydetector"
+	"k8s.io/klog/v2"
 )
 
 type DynamicClient struct {
@@ -299,6 +300,13 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("list request for %v", c.resource), c.list, opts, result)
 		}
 	}()
+	if canFormWatchListRequest(opts) {
+		result, err = c.watchList(ctx, opts)
+		if err != nil {
+			klog.Warningf("The watchlist request ended with an error, falling back to the standard LIST semantics, err = %v", err)
+			return c.list(ctx, opts)
+		}
+	}
 	return c.list(ctx, opts)
 }
 
@@ -327,6 +335,12 @@ func (c *dynamicResourceClient) list(ctx context.Context, opts metav1.ListOption
 		return nil, err
 	}
 	return list, nil
+}
+
+// watchList establishes a watch stream with the server and returns the list of Examples
+func (c *dynamicResourceClient) watchList(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	// TODO: implement
+	return nil, nil
 }
 
 func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
@@ -444,4 +458,10 @@ func (c *dynamicResourceClient) makeURLSegments(name string) []string {
 	}
 
 	return url
+}
+
+func canFormWatchListRequest(opts metav1.ListOptions) bool {
+	// TODO: check if watchList FG is on
+	// TODO: check opts
+	return false
 }
