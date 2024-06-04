@@ -19,6 +19,7 @@ package dynamic
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/util/consistencydetector"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -292,7 +293,16 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
-func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (result *unstructured.UnstructuredList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("list request for %v", c.resource), c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+func (c *dynamicResourceClient) list(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
 		return nil, err
 	}
