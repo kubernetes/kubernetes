@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -152,14 +153,20 @@ func IgnoreManagedFieldsTimestampsTransformer(
 		return newObj, nil
 	}
 
+	eqFn := equalities.DeepEqual
+	if _, ok := newObj.(*unstructured.Unstructured); ok {
+		// Use strict equality with unstructured
+		eqFn = equalities.DeepEqualWithNilDifferentFromEmpty
+	}
+
 	// This condition ensures the managed fields are always compared first. If
 	//	this check fails, the if statement will short circuit. If the check
 	// 	succeeds the slow path is taken which compares entire objects.
-	if !equalities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
+	if !eqFn(oldManagedFields, newManagedFields) {
 		return newObj, nil
 	}
 
-	if equalities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
+	if eqFn(newObj, oldObj) {
 		// Remove any changed timestamps, so that timestamp is not the only
 		// change seen by etcd.
 		//
