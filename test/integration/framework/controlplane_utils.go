@@ -98,3 +98,11 @@ func SharedEtcd() *storagebackend.Config {
 	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg
 }
+
+// DefaultAPIServerFlags returns the default flags used to run kube-apiserver on tests
+func DefaultTestServerFlags() []string {
+	return []string{
+		"--endpoint-reconciler-type=none",            // Disable Endpoints Reconciler so it does not keep failing trying to use 127.0.0.1 as a valid Endpoint.
+		"--disable-admission-plugins=ServiceAccount", // Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	}
+}
