@@ -30,6 +30,7 @@ var dataConsistencyDetectionForListFromCacheEnabled = false
 
 func init() {
 	dataConsistencyDetectionForListFromCacheEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR"))
+	dataConsistencyDetectionForListFromCacheEnabled = true
 }
 
 // CheckListFromCacheDataConsistencyIfRequested performs a data consistency check only when
