@@ -144,7 +144,7 @@ func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, p
 		if (originalCSIDriver.Spec.StorageCapacity != nil && *originalCSIDriver.Spec.StorageCapacity) &&
 			(modifiedCSIDriver.Spec.StorageCapacity == nil || !*modifiedCSIDriver.Spec.StorageCapacity) {
 			logger.V(5).Info("CSIDriver was updated and storage capacity got disabled, which may make the pod schedulable")
-			return framework.Queue, err
+			return framework.Queue, nil
 		}
 	}
 
