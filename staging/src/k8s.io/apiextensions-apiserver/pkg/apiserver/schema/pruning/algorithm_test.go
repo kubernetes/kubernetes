@@ -146,12 +146,12 @@ func TestPrune(t *testing.T) {
 					Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
 					Generic: structuralschema.Generic{
 						Type: "object",
-						AdditionalProperties: &structuralschema.StructuralOrBool{
-							Structural: &structuralschema.Structural{
-								Generic: structuralschema.Generic{Type: "object"},
-								Properties: map[string]structuralschema.Structural{
-									"specified": {Generic: structuralschema.Generic{Type: "object"}},
-								},
+					},
+					AdditionalProperties: &structuralschema.StructuralOrBool{
+						Structural: &structuralschema.Structural{
+							Generic: structuralschema.Generic{Type: "object"},
+							Properties: map[string]structuralschema.Structural{
+								"specified": {Generic: structuralschema.Generic{Type: "object"}},
 							},
 						},
 					},
@@ -159,12 +159,12 @@ func TestPrune(t *testing.T) {
 				"preservingAdditionalPropertiesKeyPruneValues": {
 					Generic: structuralschema.Generic{
 						Type: "object",
-						AdditionalProperties: &structuralschema.StructuralOrBool{
-							Structural: &structuralschema.Structural{
-								Generic: structuralschema.Generic{Type: "object"},
-								Properties: map[string]structuralschema.Structural{
-									"specified": {Generic: structuralschema.Generic{Type: "object"}},
-								},
+					},
+					AdditionalProperties: &structuralschema.StructuralOrBool{
+						Structural: &structuralschema.Structural{
+							Generic: structuralschema.Generic{Type: "object"},
+							Properties: map[string]structuralschema.Structural{
+								"specified": {Generic: structuralschema.Generic{Type: "object"}},
 							},
 						},
 					},
@@ -203,12 +203,10 @@ func TestPrune(t *testing.T) {
 			Properties: map[string]structuralschema.Structural{
 				"a": {},
 				"c": {
-					Generic: structuralschema.Generic{
-						AdditionalProperties: &structuralschema.StructuralOrBool{
-							Structural: &structuralschema.Structural{
-								Generic: structuralschema.Generic{
-									Type: "integer",
-								},
+					AdditionalProperties: &structuralschema.StructuralOrBool{
+						Structural: &structuralschema.Structural{
+							Generic: structuralschema.Generic{
+								Type: "integer",
 							},
 						},
 					},
@@ -220,10 +218,8 @@ func TestPrune(t *testing.T) {
 			Properties: map[string]structuralschema.Structural{
 				"a": {},
 				"c": {
-					Generic: structuralschema.Generic{
-						AdditionalProperties: &structuralschema.StructuralOrBool{
-							Bool: false,
-						},
+					AdditionalProperties: &structuralschema.StructuralOrBool{
+						Bool: false,
 					},
 				},
 			},
