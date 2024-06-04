@@ -299,7 +299,8 @@ func TestNoOpApplyWithEmptyMap(t *testing.T) {
 		t.Fatalf("Failed to create object: %v", err)
 	}
 
-	// Sleep for one second to make sure that the times of each update operation is different.
+	// This sleep is necessary to consistently produce different timestamps because the time field in managedFields has
+	// 1 second granularity and if both apply requests happen during the same second, this test would flake.
 	time.Sleep(1 * time.Second)
 
 	createdObject, err := client.AppsV1().RESTClient().Get().Namespace("default").Resource(deploymentsResource).Name(deploymentName).Do(context.TODO()).Get()
