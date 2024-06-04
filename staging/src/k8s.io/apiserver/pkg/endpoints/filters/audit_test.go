@@ -111,6 +111,15 @@ func TestAuditResponseWriterDecoratorWithFake(t *testing.T) {
 	})
 }
 
+func TestAuditResponseWriterDecoratorWithHTTPServer(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithHTTPServer(t, func(verifier http.Handler) http.Handler {
+		fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil)
+		handler := WithAudit(verifier, &fakeAuditSink{}, fakeRuleEvaluator, nil)
+		handler = WithAuditInit(handler)
+		return handler
+	})
+}
+
 func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 	ev := &auditinternal.Event{}
 	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriter{}, ev, nil, nil)

@@ -47,3 +47,7 @@ func TestLatencyTrackerResponseWriterDecoratorConstruction(t *testing.T) {
 func TestLatencyTrackerResponseWriterWithFake(t *testing.T) {
 	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, WithLatencyTrackers)
 }
+
+func TestLatencyTrackerResponseWriterDecoratorWithHTTPServer(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithHTTPServer(t, WithLatencyTrackers)
+}

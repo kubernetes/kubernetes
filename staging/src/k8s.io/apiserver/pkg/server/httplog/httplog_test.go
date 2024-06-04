@@ -193,3 +193,9 @@ func TestHTTPLogResponseWriterDecoratorConstruction(t *testing.T) {
 		t.Errorf("expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
+
+func TestHTTPLogResponseWriterDecoratorWithHTTPServer(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithHTTPServer(t, func(h http.Handler) http.Handler {
+		return withLogging(h, DefaultStacktracePred, func() bool { return true })
+	})
+}
