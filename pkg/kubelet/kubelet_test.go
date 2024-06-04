@@ -40,7 +40,6 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 	core "k8s.io/client-go/testing"
 	"k8s.io/mount-utils"
 
@@ -3054,15 +3053,13 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	}
 	var prober volume.DynamicPluginProber
 	tp := noopoteltrace.NewTracerProvider()
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	cadvisor := cadvisortest.NewMockInterface(mockCtrl)
-	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).AnyTimes()
+	cadvisor := cadvisortest.NewMockInterface(t)
+	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
 	cadvisor.EXPECT().ImagesFsInfo().Return(cadvisorapiv2.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
 		Available: 600,
-	}, nil).AnyTimes()
+	}, nil).Maybe()
 	tlsOptions := &server.TLSOptions{
 		Config: &tls.Config{
 			MinVersion: 0,

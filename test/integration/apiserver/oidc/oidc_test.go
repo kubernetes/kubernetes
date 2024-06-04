@@ -62,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
+	"k8s.io/kubernetes/test/utils/oidc/handlers"
 	utilsnet "k8s.io/utils/net"
 )
 
@@ -170,7 +171,7 @@ jwt:
 					apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID,
 						oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix, oidcUsernameClaim: "user"}, &signingPrivateKey.PublicKey)
 				}
-				oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey))
+				oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
 
 				adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 				configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
@@ -178,7 +179,7 @@ jwt:
 				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
 			}, configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					// This asserts the minimum valid claims for an ID token required by the authenticator.
@@ -191,7 +192,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -213,7 +214,7 @@ jwt:
 			name:                    "wrong client ID",
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, _ *rsa.PrivateKey) {
-				oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(utilsoidc.Token{}, utilsoidc.ErrBadClientID)
+				oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(handlers.Token{}, utilsoidc.ErrBadClientID)
 			},
 			configureClient: configureClientWithEmptyIDToken,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -249,7 +250,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				configureOIDCServerToReturnExpiredIDToken(t, 1, oidcServer, signingPrivateKey)
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).Return(utilsoidc.Token{
+				oidcServer.TokenHandler().EXPECT().Token().Times(1).Return(handlers.Token{
 					IDToken:      "",
 					AccessToken:  defaultStubAccessToken,
 					RefreshToken: defaultStubRefreshToken,
@@ -308,12 +309,12 @@ jwt:
 
 				anotherSigningPrivateKey, _ := keyFunc(t)
 
-				oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, &anotherSigningPrivateKey.PublicKey))
+				oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, &anotherSigningPrivateKey.PublicKey)).Maybe()
 
 				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
 			},
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -324,7 +325,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -369,12 +370,12 @@ jwt:
 						&signingPrivateKey.PublicKey)
 				}
 
-				oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, &signingPrivateKey.PublicKey))
+				oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, &signingPrivateKey.PublicKey)).Maybe()
 
 				return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
 			},
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -385,7 +386,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -414,7 +415,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*ecdsa.PrivateKey, *ecdsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *ecdsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -425,7 +426,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -511,7 +512,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 		{
 			name: "cache returns stale client if refresh token is not updated in config",
 			configureUpdatingTokenBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -522,7 +523,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 				configureOIDCServerToReturnExpiredRefreshTokenErrorOnTryingToUpdateIDToken(oidcServer)
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -614,7 +615,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -625,7 +626,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -661,7 +662,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -674,7 +675,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -711,7 +712,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -723,7 +724,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -761,7 +762,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -773,7 +774,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -813,7 +814,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -825,7 +826,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -865,7 +866,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -878,7 +879,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -914,7 +915,7 @@ jwt:
 			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
-				oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 					t,
 					signingPrivateKey,
 					map[string]interface{}{
@@ -926,7 +927,7 @@ jwt:
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
-				))
+				)).Times(1)
 			},
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -1420,7 +1421,7 @@ func configureBasicTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.Jo
 
 	oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath := configureTestInfrastructure(t, fn, keyFunc)
 
-	oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+	oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 		t,
 		signingPrivateKey,
 		map[string]interface{}{
@@ -1431,7 +1432,7 @@ func configureBasicTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.Jo
 		},
 		defaultStubAccessToken,
 		defaultStubRefreshToken,
-	))
+	)).Times(1)
 
 	return oidcServer, apiServer, caCertContent, caFilePath
 }
@@ -1500,12 +1501,12 @@ jwt:
     message: "the hd claim must be set to example.com"
 `, tt.issuerURL, discoveryURL, indentCertificateAuthority(string(caCertContent)))
 
-			oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey))
+			oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
 
 			apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey)
 
 			idTokenLifetime := time.Second * 1200
-			oidcServer.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+			oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 				t,
 				signingPrivateKey,
 				map[string]interface{}{
@@ -1517,7 +1518,7 @@ jwt:
 				},
 				defaultStubAccessToken,
 				defaultStubRefreshToken,
-			))
+			)).Times(1)
 
 			tokenURL, err := oidcServer.TokenURL()
 			require.NoError(t, err)
@@ -1579,13 +1580,13 @@ jwt:
       expression: "claims.uid"
 `, oidcServer1.URL(), indentCertificateAuthority(string(caCertContent1)), oidcServer2.URL(), indentCertificateAuthority(string(caCertContent2)))
 
-	oidcServer1.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1))
-	oidcServer2.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2))
+	oidcServer1.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey1)).Maybe()
+	oidcServer2.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey2)).Maybe()
 
 	apiServer := startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey1)
 
 	idTokenLifetime := time.Second * 1200
-	oidcServer1.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+	oidcServer1.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 		t,
 		signingPrivateKey1,
 		map[string]interface{}{
@@ -1597,9 +1598,9 @@ jwt:
 		},
 		defaultStubAccessToken,
 		defaultStubRefreshToken,
-	))
+	)).Times(1)
 
-	oidcServer2.TokenHandler().EXPECT().Token().Times(1).DoAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+	oidcServer2.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 		t,
 		signingPrivateKey2,
 		map[string]interface{}{
@@ -1613,7 +1614,7 @@ jwt:
 		},
 		defaultStubAccessToken,
 		defaultStubRefreshToken,
-	))
+	)).Times(1)
 
 	tokenURL1, err := oidcServer1.TokenURL()
 	require.NoError(t, err)
@@ -1681,7 +1682,7 @@ func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePub
 		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, publicKey)
 	}
 
-	oidcServer.JwksHandler().EXPECT().KeySet().AnyTimes().DoAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey))
+	oidcServer.JwksHandler().EXPECT().KeySet().RunAndReturn(utilsoidc.DefaultJwksHandlerBehavior(t, publicKey)).Maybe()
 
 	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 	configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
@@ -1791,7 +1792,7 @@ func fetchOIDCCredentials(t *testing.T, oidcTokenURL string, caCertContent []byt
 		},
 	}}
 
-	token := new(utilsoidc.Token)
+	token := new(handlers.Token)
 
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -1817,7 +1818,7 @@ func fetchExpiredToken(t *testing.T, oidcServer *utilsoidc.TestServer, caCertCon
 func configureOIDCServerToReturnExpiredIDToken(t *testing.T, returningExpiredTokenTimes int, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 	t.Helper()
 
-	oidcServer.TokenHandler().EXPECT().Token().Times(returningExpiredTokenTimes).DoAndReturn(func() (utilsoidc.Token, error) {
+	oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(func() (handlers.Token, error) {
 		token, err := utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
 			t,
 			signingPrivateKey,
@@ -1831,11 +1832,11 @@ func configureOIDCServerToReturnExpiredIDToken(t *testing.T, returningExpiredTok
 			defaultStubRefreshToken,
 		)()
 		return token, err
-	})
+	}).Times(returningExpiredTokenTimes)
 }
 
 func configureOIDCServerToReturnExpiredRefreshTokenErrorOnTryingToUpdateIDToken(oidcServer *utilsoidc.TestServer) {
-	oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(utilsoidc.Token{}, utilsoidc.ErrRefreshTokenExpired)
+	oidcServer.TokenHandler().EXPECT().Token().Times(2).Return(handlers.Token{}, utilsoidc.ErrRefreshTokenExpired)
 }
 
 func generateCert(t *testing.T) (cert, key []byte, certFilePath, keyFilePath string) {
