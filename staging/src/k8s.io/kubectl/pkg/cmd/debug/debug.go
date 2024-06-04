@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -212,7 +213,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
 	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
 	if !cmdutil.DebugCustomProfile.IsDisabled() {
-		cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON file containing a partial container spec to customize built-in debug profiles."))
+		cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON or YAML file containing a partial container spec to customize built-in debug profiles."))
 	}
 }
 
@@ -293,7 +294,10 @@ func (o *DebugOptions) Complete(restClientGetter genericclioptions.RESTClientGet
 
 		err = json.Unmarshal(customProfileBytes, &o.CustomProfile)
 		if err != nil {
-			return fmt.Errorf("%s does not contain a valid container spec: %w", o.CustomProfileFile, err)
+			err = yaml.Unmarshal(customProfileBytes, &o.CustomProfile)
+			if err != nil {
+				return fmt.Errorf("%s does not contain a valid container spec: %w", o.CustomProfileFile, err)
+			}
 		}
 	}
 
