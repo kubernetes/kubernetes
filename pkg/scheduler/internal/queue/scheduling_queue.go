@@ -776,6 +776,11 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEve
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent) {
 	activated := false
 	for _, pInfo := range podInfoList {
+		// Since there may be many gated pods and they will not move from the
+		// unschedulable pool, we skip calling the expensive isPodWorthRequeueing.
+		if pInfo.Gated {
+			continue
+		}
 		// If the event doesn't help making the Pod schedulable, continue.
 		// Note: we don't run the check if pInfo.UnschedulablePlugins is nil, which denotes
 		// either there is some abnormal error, or scheduling the pod failed by plugins other than PreFilter, Filter and Permit.
