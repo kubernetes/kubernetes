@@ -36,12 +36,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	// Group=example.crd.code-generator.k8s.io, Version=v1
 	case v1.SchemeGroupVersion.WithKind("ClusterTestType"):
 		return &examplev1.ClusterTestTypeApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("ClusterTestTypeStatus"):
+		return &examplev1.ClusterTestTypeStatusApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("TestType"):
 		return &examplev1.TestTypeApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("TestTypeStatus"):
+		return &examplev1.TestTypeStatusApplyConfiguration{}
 
 		// Group=example.test.crd.code-generator.k8s.io, Version=v1
 	case example2v1.SchemeGroupVersion.WithKind("TestType"):
 		return &applyconfigurationexample2v1.TestTypeApplyConfiguration{}
+	case example2v1.SchemeGroupVersion.WithKind("TestTypeStatus"):
+		return &applyconfigurationexample2v1.TestTypeStatusApplyConfiguration{}
 
 	}
 	return nil
