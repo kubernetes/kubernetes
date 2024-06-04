@@ -92,8 +92,9 @@ func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.Cu
 		requirePrunedDefaults:                    true,
 		requireAtomicSetType:                     true,
 		requireMapListKeysMapSetValidation:       true,
-		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
-		allowInvalidCABundle:                     true,
+		// strictCost is always true to enforce cost limits.
+		celEnvironmentSet:    environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		allowInvalidCABundle: true,
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -234,13 +235,9 @@ func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *ap
 		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
 		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
-<<<<<<< HEAD
-		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
-		allowInvalidCABundle:                     allowInvalidCABundle(oldObj.Spec.Conversion),
-=======
-		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
-		allowInvalidCABundle:                     allowInvalidCABundle(oldObj),
->>>>>>> dd3ee33417f (comments liggitt)
+		// strictCost is always true to enforce cost limits.
+		celEnvironmentSet:    environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		allowInvalidCABundle: allowInvalidCABundle(oldObj),
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
 }
