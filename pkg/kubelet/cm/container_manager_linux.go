@@ -208,14 +208,14 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine if swap is on: %w", err)
 	}
-
+	nodeRef := nodeRefFromNode(string(nodeConfig.NodeName))
 	if isSwapOn {
 		if failSwapOn {
 			return nil, fmt.Errorf("running with swap on is not supported, please disable swap or set --fail-swap-on flag to false")
 		}
 
 		if !swap.IsTmpfsNoswapOptionSupported(mountUtil, nodeConfig.KubeletRootDir) {
-			nodeRef := nodeRefFromNode(string(nodeConfig.NodeName))
+
 			recorder.Event(nodeRef, v1.EventTypeWarning, events.PossibleMemoryBackedVolumesOnDisk,
 				"The tmpfs noswap option is not supported. Memory-backed volumes (e.g. secrets, emptyDirs, etc.) "+
 					"might be swapped to disk and should no longer be considered secure.",

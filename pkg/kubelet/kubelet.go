@@ -34,6 +34,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -204,6 +205,12 @@ const (
 
 	// instrumentationScope is the name of OpenTelemetry instrumentation scope
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet"
+
+	// Warning message for the users still using cgroup v1
+	cgroupV1MaintenanceModeWarning = "Cgroup v1 detected. Cgroup v1 support has been transitioned into maintenance mode, please plan for the migration towards Cgroup v2."
+
+	// Url of the cgroup v1 maintenance mode KEP
+	cgroupV1MaintenanceModeURL = "https://git.k8s.io/enhancements/keps/sig-node/4569-cgroup-v1-maintenance-mode"
 )
 
 var (
@@ -1592,6 +1599,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 // Run starts the kubelet reacting to config updates
 func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	ctx := context.Background()
+
 	if kl.logServer == nil {
 		file := http.FileServer(http.Dir(nodeLogDir))
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLogQuery) && kl.kubeletConfiguration.EnableSystemLogQuery {
@@ -1641,6 +1649,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		klog.ErrorS(err, "Failed to initialize internal modules")
 		os.Exit(1)
 	}
+
+	kl.warnCgroupV1Usage()
 
 	// Start volume manager
 	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
@@ -3081,4 +3091,14 @@ func (kl *Kubelet) PrepareDynamicResources(pod *v1.Pod) error {
 // This method implements the RuntimeHelper interface
 func (kl *Kubelet) UnprepareDynamicResources(pod *v1.Pod) error {
 	return kl.containerManager.UnprepareDynamicResources(pod)
+}
+
+func (kl *Kubelet) warnCgroupV1Usage() {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		metrics.CgroupVersion.Set(2) // cgroup v2
+	} else {
+		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.CgroupV1, "%s More information at %s", cgroupV1MaintenanceModeWarning, cgroupV1MaintenanceModeURL)
+		klog.V(2).InfoS(cgroupV1MaintenanceModeWarning, "url", cgroupV1MaintenanceModeURL)
+		metrics.CgroupVersion.Set(1) // cgroup v1
+	}
 }
