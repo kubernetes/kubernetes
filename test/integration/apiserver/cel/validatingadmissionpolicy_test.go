@@ -2131,6 +2131,217 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 	}
 }
 
+// Test_CostLimitForValidation tests the cost limit set for a ValidatingAdmissionPolicy.
+func Test_CostLimitForValidation(t *testing.T) {
+	testcases := []struct {
+		name                  string
+		policy                *admissionregistrationv1.ValidatingAdmissionPolicy
+		policyBinding         *admissionregistrationv1.ValidatingAdmissionPolicyBinding
+		namespace             *v1.Namespace
+		err                   string
+		failureReason         metav1.StatusReason
+		strictCostEnforcement bool
+	}{
+		{
+			name: "With StrictCostEnforcementForVAP: Single expression exceeds per call cost limit for native library",
+			policy: withValidations([]admissionregistrationv1.Validation{
+				{
+					Expression: "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))",
+				},
+			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:                   "operation cancelled: actual cost limit exceeded",
+			failureReason:         metav1.StatusReasonInvalid,
+			strictCostEnforcement: true,
+		},
+		{
+			name: "With StrictCostEnforcementForVAP: Expression exceeds per call cost limit for extended library",
+			policy: withValidations([]admissionregistrationv1.Validation{
+				{
+
+					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:                   "operation cancelled: actual cost limit exceeded",
+			failureReason:         metav1.StatusReasonInvalid,
+			strictCostEnforcement: true,
+		},
+		{
+			name: "With StrictCostEnforcementForVAP: Expression exceeds per call cost limit for extended library in variables",
+			policy: withVariables([]admissionregistrationv1.Variable{
+				{
+					Name:       "authzCheck",
+					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			}, withValidations([]admissionregistrationv1.Validation{
+				{
+					Expression: "variables.authzCheck",
+				},
+			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:                   "operation cancelled: actual cost limit exceeded",
+			failureReason:         metav1.StatusReasonInvalid,
+			strictCostEnforcement: true,
+		},
+		{
+			name: "With StrictCostEnforcementForVAP: Expression exceeds per call cost limit for extended library in matchConditions",
+			policy: withMatchConditions([]admissionregistrationv1.MatchCondition{
+				{
+					Name:       "test",
+					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			}, withValidations([]admissionregistrationv1.Validation{
+				{
+					Expression: "true",
+				},
+			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:                   "operation cancelled: actual cost limit exceeded",
+			failureReason:         metav1.StatusReasonInvalid,
+			strictCostEnforcement: true,
+		},
+		{
+			name:          "With StrictCostEnforcementForVAP: Expression exceeds per policy cost limit for extended library",
+			policy:        withValidations(generateValidationsWithAuthzCheck(29, "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()"), withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:                   "validation failed due to running out of cost budget, no further validation rules will be run",
+			failureReason:         metav1.StatusReasonInvalid,
+			strictCostEnforcement: true,
+		},
+		{
+			name: "Without StrictCostEnforcementForVAP: Single expression exceeds per call cost limit for native library",
+			policy: withValidations([]admissionregistrationv1.Validation{
+				{
+					Expression: "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(x, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(y, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z3, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z4, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].all(z5, int('1'.find('[0-9]*')) < 100)))))))",
+				},
+			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:                   "operation cancelled: actual cost limit exceeded",
+			failureReason:         metav1.StatusReasonInvalid,
+			strictCostEnforcement: false,
+		},
+		{
+			name: "Without StrictCostEnforcementForVAP: Expression does not exceed per call cost limit for extended library",
+			policy: withValidations([]admissionregistrationv1.Validation{
+				{
+
+					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			strictCostEnforcement: false,
+		},
+		{
+			name: "Without StrictCostEnforcementForVAP: Expression does not exceed per call cost limit for extended library in variables",
+			policy: withVariables([]admissionregistrationv1.Variable{
+				{
+					Name:       "authzCheck",
+					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed() && authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			}, withValidations([]admissionregistrationv1.Validation{
+				{
+					Expression: "variables.authzCheck",
+				},
+			}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			strictCostEnforcement: false,
+		},
+		{
+			name:          "Without StrictCostEnforcementForVAP: Expression does not exceed per policy cost limit for extended library",
+			policy:        withValidations(generateValidationsWithAuthzCheck(29, "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()"), withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix")))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			strictCostEnforcement: false,
+		},
+	}
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForVAP, testcase.strictCostEnforcement)()
+
+			server, err := apiservertesting.StartTestServer(t, nil, []string{
+				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+			}, framework.SharedEtcd())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer server.TearDownFn()
+
+			config := server.ClientConfig
+
+			client, err := clientset.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policy := withWaitReadyConstraintAndExpression(testcase.policy)
+			if _, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := createAndWaitReady(t, client, testcase.policyBinding, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
+
+			checkExpectedError(t, err, testcase.err)
+			checkFailureReason(t, err, testcase.failureReason)
+		})
+	}
+}
+
+// generate n validation rules with provided expression
+func generateValidationsWithAuthzCheck(num int, exp string) []admissionregistrationv1.Validation {
+	var validations = make([]admissionregistrationv1.Validation, num)
+	for i := 0; i < num; i++ {
+		validations[i].Expression = exp
+	}
+	return validations
+}
+
 // TestCRDParams tests that a CustomResource can be used as a param resource for a ValidatingAdmissionPolicy.
 func TestCRDParams(t *testing.T) {
 	testcases := []struct {
@@ -2722,6 +2933,12 @@ func createAndWaitReadyNamespacedWithWarnHandler(t *testing.T, client clientset.
 		} else if err != nil && strings.Contains(err.Error(), "not yet synced to use for admission") {
 			t.Logf("waiting for policy to be ready. Marker: %v. Admission not synced yet: %v", marker, err)
 			return false, nil
+		} else if err != nil && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
+			t.Logf("policy is ready and exceeds the budget: %v", err)
+			return true, nil
+		} else if err != nil && strings.Contains(err.Error(), "operation cancelled: actual cost limit exceeded") {
+			t.Logf("policy is ready and exceeds the budget: %v", err)
+			return true, nil
 		} else {
 			t.Logf("waiting for policy to be ready. Marker: %v, Last marker patch response: %v", marker, err)
 			return false, err
@@ -2853,6 +3070,16 @@ func withPolicyExistsLabels(labels []string, policy *admissionregistrationv1.Val
 
 func withValidations(validations []admissionregistrationv1.Validation, policy *admissionregistrationv1.ValidatingAdmissionPolicy) *admissionregistrationv1.ValidatingAdmissionPolicy {
 	policy.Spec.Validations = validations
+	return policy
+}
+
+func withVariables(variables []admissionregistrationv1.Variable, policy *admissionregistrationv1.ValidatingAdmissionPolicy) *admissionregistrationv1.ValidatingAdmissionPolicy {
+	policy.Spec.Variables = variables
+	return policy
+}
+
+func withMatchConditions(matchConditions []admissionregistrationv1.MatchCondition, policy *admissionregistrationv1.ValidatingAdmissionPolicy) *admissionregistrationv1.ValidatingAdmissionPolicy {
+	policy.Spec.MatchConditions = matchConditions
 	return policy
 }
 
@@ -2995,7 +3222,7 @@ func checkExpectedError(t *testing.T, err error, expectedErr string) {
 		t.Fatal("got error but expected none")
 	}
 
-	if err.Error() != expectedErr {
+	if !strings.Contains(err.Error(), expectedErr) {
 		t.Logf("actual validation error: %v", err)
 		t.Logf("expected validation error: %v", expectedErr)
 		t.Error("unexpected validation error")

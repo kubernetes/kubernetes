@@ -39,6 +39,8 @@ import (
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/apiserver/pkg/cel/openapi"
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -210,6 +212,7 @@ func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression strin
 		options := plugincel.OptionalVariableDeclarations{
 			HasParams:     ctx.paramDeclType != nil,
 			HasAuthorizer: true,
+			StrictCost:    utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP),
 		}
 		compiler.CompileAndStoreVariables(convertv1beta1Variables(ctx.variables), options, environment.StoredExpressions)
 		result := compiler.CompileCELExpression(celExpression(expression), options, environment.StoredExpressions)
@@ -391,7 +394,7 @@ func (c *TypeChecker) tryRefreshRESTMapper() {
 }
 
 func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*environment.EnvSet, error) {
-	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	baseEnv := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForVAP))
 	requestType := plugincel.BuildRequestType()
 	namespaceType := plugincel.BuildNamespaceType()
 

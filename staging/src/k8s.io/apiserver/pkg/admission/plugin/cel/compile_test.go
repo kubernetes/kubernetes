@@ -178,7 +178,7 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 	}
 
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+	base := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true)
 	extended, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 999),
 		EnvOptions:        []celgo.EnvOption{library.Test()},
@@ -254,7 +254,7 @@ func TestCompileValidatingPolicyExpression(t *testing.T) {
 }
 
 func BenchmarkCompile(b *testing.B) {
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		options := OptionalVariableDeclarations{HasParams: rand.Int()%2 == 0, HasAuthorizer: rand.Int()%2 == 0}
