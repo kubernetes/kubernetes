@@ -441,11 +441,11 @@ func TestMigrateOldConfig(t *testing.T) {
 	}
 }
 
-// Test the migration of extra args from v1beta3 to v1beta4, as this is the only breaking change that is migrated.
-// Another breaking change is the removal of ClusterConfiguration.TimeoutForControlPlane, but this field is not
-// migrated to InitConfiguration.Timeouts.ControlPlaneComponentHealthCheck due to API machinery limitations.
-// Remove this test once v1beta3 is removed.
-func TestMigrateV1Beta3ExtraArgs(t *testing.T) {
+// Test the migration of all breaking changes in v1beta4, marked as "MIGRATED" in the YAML below:
+// - ExtraArgs
+// - ClusterConfiguration.APIServer.TimeoutForControlPlane -> {Init|Join}Configuration.Timeout.ControlPlaneComponentHealthCheck
+// - JoinConfiguration.Discovery.Timeout -> JoinConfiguration.Timeout.Discovery
+func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 	var (
 		gv    = kubeadmapiv1old.SchemeGroupVersion.String()
 		gvNew = kubeadmapiv1.SchemeGroupVersion.String()
@@ -465,27 +465,45 @@ func TestMigrateV1Beta3ExtraArgs(t *testing.T) {
 		  advertiseAddress: 1.2.3.4
 		  bindPort: 6443
 		nodeRegistration:
-		  criSocket: unix:///var/run/containerd/containerd.sock
-		  kubeletExtraArgs:
+		  criSocket: unix:///some-socket-path
+		  kubeletExtraArgs: # MIGRATED
 		    foo: bar
 		  name: node
 		---
 		apiServer:
-		  timeoutForControlPlane: 2m0s ### note: this is note migrated!
-		  extraArgs:
+		  timeoutForControlPlane: 2m32s # MIGRATED
+		  extraArgs: # MIGRATED
 		    foo: bar
 		apiVersion: %[1]s
 		controllerManager:
-		  extraArgs:
+		  extraArgs: # MIGRATED
 		    foo: bar
 		etcd:
 		  local:
-		    extraArgs:
+		    extraArgs: # MIGRATED
 		      foo: bar
 		kind: ClusterConfiguration
+		kubernetesVersion: v1.10.0
 		scheduler:
-		  extraArgs:
+		  extraArgs: # MIGRATED
 		    foo: bar
+		---
+		apiVersion: %[1]s
+		kind: JoinConfiguration
+		nodeRegistration:
+		  criSocket: unix:///some-socket-path
+		  imagePullPolicy: IfNotPresent
+		  kubeletExtraArgs: # MIGRATED
+		    foo: baz
+		  name: foo
+		  taints: null
+		discovery:
+		  bootstrapToken:
+		    apiServerEndpoint: some-address:6443
+		    token: abcdef.0123456789abcdef
+		    unsafeSkipCAVerification: true
+		  tlsBootstrapToken: abcdef.0123456789abcdef
+		  timeout: 2m10s # MIGRATED
 		`, gv))
 
 		expectedOutput = dedent.Dedent(fmt.Sprintf(`
@@ -503,7 +521,7 @@ func TestMigrateV1Beta3ExtraArgs(t *testing.T) {
 		  advertiseAddress: 1.2.3.4
 		  bindPort: 6443
 		nodeRegistration:
-		  criSocket: unix:///var/run/containerd/containerd.sock
+		  criSocket: unix:///some-socket-path
 		  imagePullPolicy: IfNotPresent
 		  imagePullSerial: true
 		  kubeletExtraArgs:
@@ -514,7 +532,7 @@ func TestMigrateV1Beta3ExtraArgs(t *testing.T) {
 		  - effect: NoSchedule
 		    key: node-role.kubernetes.io/control-plane
 		timeouts:
-		  controlPlaneComponentHealthCheck: 4m0s
+		  controlPlaneComponentHealthCheck: 2m32s
 		  discovery: 5m0s
 		  etcdAPICall: 2m0s
 		  kubeletHealthCheck: 4m0s
@@ -545,7 +563,7 @@ func TestMigrateV1Beta3ExtraArgs(t *testing.T) {
 		      value: bar
 		imageRepository: registry.k8s.io
 		kind: ClusterConfiguration
-		kubernetesVersion: v1.30.1
+		kubernetesVersion: v1.10.0
 		networking:
 		  dnsDomain: cluster.local
 		  serviceSubnet: 10.96.0.0/12
@@ -554,6 +572,33 @@ func TestMigrateV1Beta3ExtraArgs(t *testing.T) {
 		  extraArgs:
 		  - name: foo
 		    value: bar
+		---
+		apiVersion: %[1]s
+		caCertPath: /etc/kubernetes/pki/ca.crt
+		discovery:
+		  bootstrapToken:
+		    apiServerEndpoint: some-address:6443
+		    token: abcdef.0123456789abcdef
+		    unsafeSkipCAVerification: true
+		  tlsBootstrapToken: abcdef.0123456789abcdef
+		kind: JoinConfiguration
+		nodeRegistration:
+		  criSocket: unix:///some-socket-path
+		  imagePullPolicy: IfNotPresent
+		  imagePullSerial: true
+		  kubeletExtraArgs:
+		  - name: foo
+		    value: baz
+		  name: foo
+		  taints: null
+		timeouts:
+		  controlPlaneComponentHealthCheck: 2m32s
+		  discovery: 2m10s
+		  etcdAPICall: 2m0s
+		  kubeletHealthCheck: 4m0s
+		  kubernetesAPICall: 1m0s
+		  tlsBootstrap: 5m0s
+		  upgradeManifests: 5m0s
 		`, gvNew))
 	)
 

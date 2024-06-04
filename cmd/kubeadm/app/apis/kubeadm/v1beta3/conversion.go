@@ -77,6 +77,9 @@ func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *Cl
 	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	out.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
 	out.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
+	if in.APIServer.TimeoutForControlPlane != nil && in.APIServer.TimeoutForControlPlane.Duration != 0 {
+		kubeadm.SetConversionTimeoutControlPlane(in.APIServer.TimeoutForControlPlane)
+	}
 	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
