@@ -34,8 +34,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	// Group=example-group.hyphens.code-generator.k8s.io, Version=v1
 	case v1.SchemeGroupVersion.WithKind("ClusterTestType"):
 		return &examplev1.ClusterTestTypeApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("ClusterTestTypeStatus"):
+		return &examplev1.ClusterTestTypeStatusApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("TestType"):
 		return &examplev1.TestTypeApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("TestTypeStatus"):
+		return &examplev1.TestTypeStatusApplyConfiguration{}
 
 	}
 	return nil

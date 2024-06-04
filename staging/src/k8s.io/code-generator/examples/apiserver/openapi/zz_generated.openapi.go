@@ -2731,7 +2731,7 @@ func schema_apiserver_apis_core_v1_TestTypeStatus(ref common.ReferenceCallback) 
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"Blah": {
+					"blah": {
 						SchemaProps: spec.SchemaProps{
 							Default: "",
 							Type:    []string{"string"},
@@ -2739,7 +2739,7 @@ func schema_apiserver_apis_core_v1_TestTypeStatus(ref common.ReferenceCallback) 
 						},
 					},
 				},
-				Required: []string{"Blah"},
+				Required: []string{"blah"},
 			},
 		},
 	}
@@ -2841,7 +2841,7 @@ func schema_apiserver_apis_example_v1_TestTypeStatus(ref common.ReferenceCallbac
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"Blah": {
+					"blah": {
 						SchemaProps: spec.SchemaProps{
 							Default: "",
 							Type:    []string{"string"},
@@ -2849,7 +2849,7 @@ func schema_apiserver_apis_example_v1_TestTypeStatus(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"Blah"},
+				Required: []string{"blah"},
 			},
 		},
 	}
@@ -2951,7 +2951,7 @@ func schema_apiserver_apis_example2_v1_TestTypeStatus(ref common.ReferenceCallba
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"Blah": {
+					"blah": {
 						SchemaProps: spec.SchemaProps{
 							Default: "",
 							Type:    []string{"string"},
@@ -2959,7 +2959,7 @@ func schema_apiserver_apis_example2_v1_TestTypeStatus(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"Blah"},
+				Required: []string{"blah"},
 			},
 		},
 	}
@@ -3061,7 +3061,7 @@ func schema_apiserver_apis_example3io_v1_TestTypeStatus(ref common.ReferenceCall
 			SchemaProps: spec.SchemaProps{
 				Type: []string{"object"},
 				Properties: map[string]spec.Schema{
-					"Blah": {
+					"blah": {
 						SchemaProps: spec.SchemaProps{
 							Default: "",
 							Type:    []string{"string"},
@@ -3069,7 +3069,7 @@ func schema_apiserver_apis_example3io_v1_TestTypeStatus(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"Blah"},
+				Required: []string{"blah"},
 			},
 		},
 	}

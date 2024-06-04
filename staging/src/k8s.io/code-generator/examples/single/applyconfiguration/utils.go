@@ -19,9 +19,12 @@ limitations under the License.
 package applyconfiguration
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	testing "k8s.io/client-go/testing"
 	v1 "k8s.io/code-generator/examples/single/api/v1"
 	apiv1 "k8s.io/code-generator/examples/single/applyconfiguration/api/v1"
+	internal "k8s.io/code-generator/examples/single/applyconfiguration/internal"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no
@@ -31,9 +34,17 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	// Group=example.crd.code-generator.k8s.io, Version=v1
 	case v1.SchemeGroupVersion.WithKind("ClusterTestType"):
 		return &apiv1.ClusterTestTypeApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("ClusterTestTypeStatus"):
+		return &apiv1.ClusterTestTypeStatusApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("TestType"):
 		return &apiv1.TestTypeApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("TestTypeStatus"):
+		return &apiv1.TestTypeStatusApplyConfiguration{}
 
 	}
 	return nil
+}
+
+func NewTypeConverter(scheme *runtime.Scheme) *testing.TypeConverter {
+	return &testing.TypeConverter{Scheme: scheme, TypeResolver: internal.Parser()}
 }
