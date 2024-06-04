@@ -160,7 +160,7 @@ func init() {
 func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
 
 	kubeClientSet, err := kubernetes.NewForConfig(server.ClientConfig)
