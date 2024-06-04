@@ -139,7 +139,6 @@ type ScheduleResult struct {
 	SuggestedHost string
 	// The number of nodes the scheduler evaluated the pod against in the filtering
 	// phase and beyond.
-	// Note that it contains the number of nodes that filtered out by PreFilterResult.
 	EvaluatedNodes int
 	// The number of nodes out of the evaluated ones that fit the pod.
 	FeasibleNodes int
