@@ -98,7 +98,7 @@ func websocketConfig(url *url.URL, config *restclient.Config, protocols []string
 
 func TestWebsocketWatchClientTimeout(t *testing.T) {
 	// server setup
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	// object setup
@@ -199,7 +199,7 @@ func TestWebsocketWatchClientTimeout(t *testing.T) {
 
 func TestWatchClientTimeoutXXX(t *testing.T) {
 	// server setup
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	t.Run("direct", func(t *testing.T) {

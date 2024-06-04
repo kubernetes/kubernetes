@@ -54,7 +54,7 @@ const (
 )
 
 func TestRun(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -133,7 +133,7 @@ func TestLivezAndReadyz(t *testing.T) {
 // apiextensions-server and the kube-aggregator server, both part of
 // the delegation chain in kube-apiserver.
 func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	kubeclient, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -191,7 +191,7 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 }
 
 func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 	apiextensionsclient, err := apiextensionsclientset.NewForConfig(server.ClientConfig)
 	if err != nil {

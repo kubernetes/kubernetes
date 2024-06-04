@@ -79,7 +79,7 @@ func TestPortforward(t *testing.T) {
 	backendPort, _ := strconv.Atoi(backendURL.Port())
 
 	etcd := framework.SharedEtcd()
-	server := kastesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, etcd)
+	server := kastesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcd)
 	defer server.TearDownFn()
 
 	adminClient, err := kubernetes.NewForConfig(server.ClientConfig)
