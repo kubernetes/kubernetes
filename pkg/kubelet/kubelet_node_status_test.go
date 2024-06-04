@@ -55,7 +55,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -212,6 +214,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 			kubelet.nodeStatusMaxImages = tc.nodeStatusMaxImages
+			kubelet.kubeletConfiguration.MemorySwap.SwapBehavior = types.NoSwap
+			isSwapOn, _ := swap.IsSwapOn()
 			kubelet.kubeClient = nil // ensure only the heartbeat client is used
 			kubelet.containerManager = &localCM{
 				ContainerManager: cm.NewStubContainerManager(),
@@ -269,6 +273,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 							Status:             v1.ConditionFalse,
 							Reason:             "KubeletHasSufficientPID",
 							Message:            "kubelet has sufficient PID available",
+							LastHeartbeatTime:  metav1.Time{},
+							LastTransitionTime: metav1.Time{},
+						},
+						{
+							Type:               v1.NodeSwap,
+							Status:             v1.ConditionFalse,
+							Reason:             "SwapDisabled",
+							Message:            fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, kubelet.kubeletConfiguration.MemorySwap.SwapBehavior),
 							LastHeartbeatTime:  metav1.Time{},
 							LastTransitionTime: metav1.Time{},
 						},
@@ -344,7 +356,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
-	kubelet.kubeClient = nil        // ensure only the heartbeat client is used
+	kubelet.kubeletConfiguration.MemorySwap.SwapBehavior = types.NoSwap
+	isSwapOn, _ := swap.IsSwapOn()
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatableReservation: v1.ResourceList{
@@ -388,6 +402,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientPID",
 					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
+					LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					Type:               v1.NodeSwap,
+					Status:             v1.ConditionFalse,
+					Reason:             "SwapDisabled",
+					Message:            fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, kubelet.kubeletConfiguration.MemorySwap.SwapBehavior),
 					LastHeartbeatTime:  metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					LastTransitionTime: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 				},
@@ -449,6 +471,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientPID",
 					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodeSwap,
+					Status:             v1.ConditionFalse,
+					Reason:             "SwapDisabled",
+					Message:            fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, kubelet.kubeletConfiguration.MemorySwap.SwapBehavior),
 					LastHeartbeatTime:  metav1.Time{},
 					LastTransitionTime: metav1.Time{},
 				},
@@ -604,7 +634,9 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
-	kubelet.kubeClient = nil        // ensure only the heartbeat client is used
+	kubelet.kubeletConfiguration.MemorySwap.SwapBehavior = types.NoSwap
+	isSwapOn, _ := swap.IsSwapOn()
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatableReservation: v1.ResourceList{
@@ -662,6 +694,14 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientPID",
 					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
+					LastHeartbeatTime:  metav1.Time{},
+					LastTransitionTime: metav1.Time{},
+				},
+				{
+					Type:               v1.NodeSwap,
+					Status:             v1.ConditionFalse,
+					Reason:             "SwapDisabled",
+					Message:            fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, kubelet.kubeletConfiguration.MemorySwap.SwapBehavior),
 					LastHeartbeatTime:  metav1.Time{},
 					LastTransitionTime: metav1.Time{},
 				},
@@ -828,7 +868,9 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	clock := testKubelet.fakeClock
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = 5 // don't truncate the image list that gets constructed by hand for this test
-	kubelet.kubeClient = nil        // ensure only the heartbeat client is used
+	kubelet.kubeletConfiguration.MemorySwap.SwapBehavior = types.NoSwap
+	isSwapOn, _ := swap.IsSwapOn()
+	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	kubelet.containerManager = &localCM{
 		ContainerManager: cm.NewStubContainerManager(),
 		allocatableReservation: v1.ResourceList{
@@ -886,6 +928,14 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 					Status:             v1.ConditionFalse,
 					Reason:             "KubeletHasSufficientPID",
 					Message:            fmt.Sprintf("kubelet has sufficient PID available"),
+					LastHeartbeatTime:  now,
+					LastTransitionTime: now,
+				},
+				{
+					Type:               v1.NodeSwap,
+					Status:             v1.ConditionFalse,
+					Reason:             "SwapDisabled",
+					Message:            fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, kubelet.kubeletConfiguration.MemorySwap.SwapBehavior),
 					LastHeartbeatTime:  now,
 					LastTransitionTime: now,
 				},
