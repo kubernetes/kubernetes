@@ -92,8 +92,8 @@ func ValidateCustomResourceDefinition(ctx context.Context, obj *apiextensions.Cu
 		requirePrunedDefaults:                    true,
 		requireAtomicSetType:                     true,
 		requireMapListKeysMapSetValidation:       true,
-		// strictCost is always true to enforce cost limits.
 		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
+		allowInvalidCABundle:                     true,
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -234,8 +234,13 @@ func ValidateCustomResourceDefinitionUpdate(ctx context.Context, obj, oldObj *ap
 		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 		preexistingExpressions:                   findPreexistingExpressions(&oldObj.Spec),
 		versionsWithUnchangedSchemas:             findVersionsWithUnchangedSchemas(obj, oldObj),
+<<<<<<< HEAD
 		celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
 		allowInvalidCABundle:                     allowInvalidCABundle(oldObj.Spec.Conversion),
+=======
+		celEnvironmentSet:                        environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+		allowInvalidCABundle:                     allowInvalidCABundle(oldObj),
+>>>>>>> dd3ee33417f (comments liggitt)
 	}
 	return validateCustomResourceDefinitionUpdate(ctx, obj, oldObj, opts)
 }
@@ -548,7 +553,12 @@ func validateConversionReviewVersions(versions []string, requireRecognizedVersio
 }
 
 // Allows invalid CA Bundle to be specified only if the existing CABundle is invalid
-func allowInvalidCABundle(oldConversion *apiextensions.CustomResourceConversion) bool {
+// or if the CRD is not established yet.
+func allowInvalidCABundle(oldCRD *apiextensions.CustomResourceDefinition) bool {
+	if !apiextensions.IsCRDConditionTrue(oldCRD, apiextensions.Established) {
+		return true
+	}
+	oldConversion := oldCRD.Spec.Conversion
 	if oldConversion == nil || oldConversion.WebhookClientConfig == nil ||
 		len(oldConversion.WebhookClientConfig.CABundle) == 0 {
 		return false

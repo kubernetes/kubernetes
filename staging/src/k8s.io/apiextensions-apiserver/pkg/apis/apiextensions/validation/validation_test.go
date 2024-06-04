@@ -259,7 +259,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "webhookconfig: invalid CABundle",
+			name: "webhookconfig: invalid CABundle should be allowed on Create",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
 				Spec: apiextensions.CustomResourceDefinitionSpec{
@@ -305,9 +305,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			errors: []validationMatch{
-				invalid("spec", "conversion", "webhookClientConfig", "caBundle"),
-			},
+			errors: []validationMatch{},
 		},
 		{
 			name: "webhookconfig: valid CABundle",
@@ -354,6 +352,9 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
 				},
 			},
 			errors: []validationMatch{},
@@ -5720,6 +5721,126 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: []byte("Cg=="),
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					PreserveUnknownFields: ptr.To(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{},
+		},
+		{
+			name: "webhookconfig: existing valid CABundle should be able to transition to invalid pre-serving",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Conversion: &apiextensions.CustomResourceConversion{
+						Strategy: apiextensions.ConversionStrategyType("Webhook"),
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{
+							Service: &apiextensions.ServiceReference{
+								Name:      "n",
+								Namespace: "ns",
+								Port:      443,
+							},
+							CABundle: exampleCert,
+						},
+						ConversionReviewVersions: []string{"version2"},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "kind",
+						ListKind: "listkind",
+					},
 				},
 			},
 			resource: &apiextensions.CustomResourceDefinition{
@@ -5834,6 +5955,9 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
 				},
 			},
 			resource: &apiextensions.CustomResourceDefinition{
@@ -5889,6 +6013,9 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
+					Conditions: []apiextensions.CustomResourceDefinitionCondition{
+						{Type: apiextensions.Established, Status: apiextensions.ConditionTrue},
+					},
 					StoredVersions: []string{"version"},
 				},
 			},
@@ -5896,7 +6023,6 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				invalid("spec", "conversion", "webhookClientConfig", "caBundle"),
 			},
 		},
-
 		{
 			name: "unchanged",
 			old: &apiextensions.CustomResourceDefinition{
