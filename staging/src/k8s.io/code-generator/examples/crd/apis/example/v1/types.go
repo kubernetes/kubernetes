@@ -44,16 +44,18 @@ type TestTypeList struct {
 }
 
 type TestTypeStatus struct {
-	Blah string
+	Blah string `json:"blah"`
 }
 
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ClusterTestTypeList struct {
-	metav1.TypeMeta
-	metav1.ListMeta
-	Items []ClusterTestType
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []ClusterTestType `json:"items"`
 }
 
 // +genclient
@@ -71,5 +73,5 @@ type ClusterTestType struct {
 }
 
 type ClusterTestTypeStatus struct {
-	Blah string
+	Blah string `json:"blah"`
 }
