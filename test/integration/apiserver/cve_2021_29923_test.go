@@ -39,7 +39,7 @@ func gvr(g, v, r string) schema.GroupVersionResource {
 // xref: https://issues.k8s.io/100895
 func TestCanaryCVE_2021_29923(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)

@@ -55,7 +55,7 @@ import (
 // the internalTrafficPolicy field was being defaulted in older versions. New versions stop defaulting the
 // field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -99,7 +99,7 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 // but drops the field on read. This test exists due to historic reasons where the internalTrafficPolicy field was being defaulted
 // in older versions. New versions stop defaulting the field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -146,7 +146,7 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 // field was being defaulted in older versions. New versions stop defaulting the field and drop on read, but for compatibility reasons
 // we still accept the field.
 func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -207,7 +207,7 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 // Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy tests that removing externalIPs from a
 // ClusterIP Service results in the externalTrafficPolicy field being dropped.
 func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -298,7 +298,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, true)
 
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -569,7 +569,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 }
 
 func Test_ServiceClusterIPSelector(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -708,7 +708,7 @@ func Test_ServiceClusterIPSelector(t *testing.T) {
 func Test_ServiceWatchUntil(t *testing.T) {
 	svcReadyTimeout := 30 * time.Second
 
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	ctx, cancel := context.WithCancel(context.Background())

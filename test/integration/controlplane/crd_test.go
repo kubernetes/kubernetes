@@ -44,7 +44,7 @@ import (
 )
 
 func TestCRDShadowGroup(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	testNamespace := "test-crd-shadow-group"
@@ -114,7 +114,7 @@ func TestCRDShadowGroup(t *testing.T) {
 }
 
 func TestCRD(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	testNamespace := "test-crd"
@@ -168,7 +168,7 @@ func TestCRD(t *testing.T) {
 }
 
 func TestCRDOpenAPI(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
 	if err != nil {
