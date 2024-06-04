@@ -756,8 +756,8 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 					// etcd.
 					framework.StartEtcd(b, output)
 
-					// 30 minutes should be plenty enough even for the 5000-node tests.
-					timeout := 30 * time.Minute
+					// 45 minutes should be plenty enough even for the 5000-node tests.
+					timeout := 45 * time.Minute
 					tCtx = ktesting.WithTimeout(tCtx, timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
 					for feature, flag := range tc.FeatureGates {
