@@ -51,17 +51,18 @@ var Manifest = map[string]string{
 }
 
 type Config struct {
-	DisableAttach              bool
-	DriverName                 string
-	AttachLimit                int64
-	NodeExpansionRequired      bool
-	NodeVolumeStatRequired     bool
-	VolumeMountGroupRequired   bool
-	DisableControllerExpansion bool
-	DisableOnlineExpansion     bool
-	PermissiveTargetPath       bool
-	EnableTopology             bool
-	IO                         DirIO
+	DisableAttach               bool
+	DriverName                  string
+	AttachLimit                 int64
+	NodeExpansionRequired       bool
+	NodeVolumeStatRequired      bool
+	NodeVolumeConditionRequired bool
+	VolumeMountGroupRequired    bool
+	DisableControllerExpansion  bool
+	DisableOnlineExpansion      bool
+	PermissiveTargetPath        bool
+	EnableTopology              bool
+	IO                          DirIO
 }
 
 // DirIO is an abstraction over direct os calls.
