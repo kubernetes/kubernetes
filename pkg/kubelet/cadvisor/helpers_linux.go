@@ -35,6 +35,13 @@ type imageFsInfoProvider struct {
 // ImageFsInfoLabel returns the image fs label for the configured runtime.
 // For remote runtimes, it handles additional runtimes natively understood by cAdvisor.
 func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
+
+	// This is a temporary workaround to get stats for cri-dockerd from cadvisor
+	// and should be removed. Related to https://github.com/Mirantis/cri-dockerd/issues/135
+	if UsingCriDockerdSocket(i.runtimeEndpoint) {
+		return cadvisorfs.LabelDockerImages, nil
+	}
+
 	if detectCrioWorkaround(i) {
 		return cadvisorfs.LabelCrioImages, nil
 	}
