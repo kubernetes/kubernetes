@@ -404,15 +404,18 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.NodeToStatusMap) ([]*framework.NodeInfo, framework.NodeToStatusMap) {
 	var potentialNodes []*framework.NodeInfo
 	nodeStatuses := make(framework.NodeToStatusMap)
+	unresolvableStatus := framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
 	for _, node := range nodes {
-		name := node.Node().Name
-		// We rely on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
-		// to determine whether preemption may help or not on the node.
-		if m[name].Code() == framework.UnschedulableAndUnresolvable {
-			nodeStatuses[node.Node().Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
-			continue
+		nodeName := node.Node().Name
+		// We only attempt preemption on nodes with status 'Unschedulable'. For
+		// diagnostic purposes, we propagate UnschedulableAndUnresolvable if either
+		// implied by absence in map or explicitly set.
+		status, ok := m[nodeName]
+		if status.Code() == framework.Unschedulable {
+			potentialNodes = append(potentialNodes, node)
+		} else if !ok || status.Code() == framework.UnschedulableAndUnresolvable {
+			nodeStatuses[nodeName] = unresolvableStatus
 		}
-		potentialNodes = append(potentialNodes, node)
 	}
 	return potentialNodes, nodeStatuses
 }

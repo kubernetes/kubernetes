@@ -222,6 +222,9 @@ const ExtenderName = "Extender"
 
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
+	// NodeToStatusMap records the status of each retriable node (status Unschedulable)
+	// While this map may contain UnschedulableAndUnresolvable statuses, the absence of
+	// a node should be interpreted as UnschedulableAndUnresolvable.
 	NodeToStatusMap      NodeToStatusMap
 	UnschedulablePlugins sets.String
 	// PreFilterMsg records the messages returned from PreFilter plugins.
