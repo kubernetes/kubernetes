@@ -648,6 +648,15 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 				logger.V(4).Info("Node was in a taint queue, but it's ready now. Ignoring taint request", "node", klog.KRef("", value.Value))
 				return true, 0
 			}
+			pods, err := nc.getPodsAssignedToNode(node.Name)
+			if err != nil {
+				klog.Warningf("unable to list pods of node %v: %v", node.Name, err)
+				return false, 1 * time.Second
+			}
+			if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
+				klog.Warningf("unable to mark all pods NotReady on node %v: %v; queuing for retry", node.Name, err)
+				return false, 1 * time.Second
+			}
 			result := controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
 			if result {
 				// Count the number of evictions.
