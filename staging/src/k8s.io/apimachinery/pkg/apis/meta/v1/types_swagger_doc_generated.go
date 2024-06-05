@@ -135,6 +135,17 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
 }
 
+var map_FieldSelectorRequirement = map[string]string{
+	"":         "FieldSelectorRequirement is a selector that contains values, a key, and an operator that relates the key and values.",
+	"key":      "key is the field selector key that the requirement applies to.",
+	"operator": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. The list of operators may grow in the future.",
+	"values":   "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty.",
+}
+
+func (FieldSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_FieldSelectorRequirement
+}
+
 var map_FieldsV1 = map[string]string{
 	"": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
 }
