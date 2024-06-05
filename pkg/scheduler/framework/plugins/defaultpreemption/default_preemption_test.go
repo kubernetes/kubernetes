@@ -288,7 +288,8 @@ func TestPostFilter(t *testing.T) {
 				st.MakeNode().Name("node4").Capacity(nodeRes).Obj(),
 			},
 			filteredNodesStatuses: framework.NodeToStatusMap{
-				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable),
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable),
 			},
 			wantResult: framework.NewPostFilterResultWithNominatedNode(""),
@@ -1771,7 +1772,15 @@ func TestPreempt(t *testing.T) {
 				State:      state,
 				Interface:  &pl,
 			}
-			res, status := pe.Preempt(ctx, test.pod, make(framework.NodeToStatusMap))
+
+			// so that these nodes are eligible for preemption, we set their status
+			// to Unschedulable.
+			nodeToStatusMap := make(framework.NodeToStatusMap, len(nodes))
+			for _, n := range nodes {
+				nodeToStatusMap[n.Name] = framework.NewStatus(framework.Unschedulable)
+			}
+
+			res, status := pe.Preempt(ctx, test.pod, nodeToStatusMap)
 			if !status.IsSuccess() && !status.IsUnschedulable() {
 				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}

@@ -105,6 +105,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
+				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
 			},
 			expected: sets.New("node1", "node4"),
 		},
@@ -113,6 +114,8 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
 				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
+				"node3": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
+				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
 			},
 			expected: sets.New("node2", "node3", "node4"),
 		},
@@ -121,6 +124,8 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
 				"node2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
+				"node3": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
+				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
 			},
 			expected: sets.New("node2", "node3", "node4"),
 		},
@@ -128,6 +133,9 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			name: "Node condition errors should be considered unresolvable",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
+				"node2": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
+				"node3": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
+				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
 			},
 			expected: sets.New("node2", "node3", "node4"),
 		},
@@ -137,6 +145,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumezone.ErrReasonConflict),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumebinding.ErrReasonNodeConflict)),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumebinding.ErrReasonBindConflict)),
+				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
 			},
 			expected: sets.New("node4"),
 		},
@@ -146,12 +155,14 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
+				"node4": framework.NewStatus(framework.Unschedulable, "Unschedulable"),
 			},
 			expected: sets.New("node1", "node3", "node4"),
 		},
 		{
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
 			nodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable, ""),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
@@ -161,6 +172,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
 			nodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable, ""),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, podtopologyspread.ErrReasonNodeLabelNotMatch),
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),

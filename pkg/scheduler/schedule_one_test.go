@@ -2213,7 +2213,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			nodes:              []string{"node1", "node2", "node3"},
 			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 			wantNodes:          sets.New("node2"),
-			wantEvaluatedNodes: pointer.Int32(3),
+			wantEvaluatedNodes: pointer.Int32(1),
 		},
 		{
 			name: "test prefilter plugin returning non-intersecting nodes",
@@ -2274,6 +2274,34 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					},
 					UnschedulablePlugins: sets.Set[string]{},
 					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter2",
+				},
+			},
+		},
+		{
+			name: "test some nodes are filtered out by prefilter plugin and other are filtered out by filter plugin",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(
+					"FakePreFilter",
+					st.NewFakePreFilterPlugin("FakePreFilter", &framework.PreFilterResult{NodeNames: sets.New[string]("node2")}, nil),
+				),
+				st.RegisterFilterPlugin(
+					"FakeFilter",
+					st.NewFakeFilterPlugin(map[string]framework.Code{"node2": framework.Unschedulable}),
+				),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes: []string{"node1", "node2"},
+			pod:   st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wErr: &framework.FitError{
+				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+				NumAllNodes: 2,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"node2": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-prefilter").WithFailedPlugin("FakeFilter"),
+					},
+					UnschedulablePlugins: sets.New("FakeFilter"),
+					PreFilterMsg:         "",
 				},
 			},
 		},
@@ -2348,10 +2376,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result"),
-						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result"),
-					},
+					NodeToStatusMap: framework.NodeToStatusMap{},
 				},
 			},
 		},
