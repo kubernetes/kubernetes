@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/klog/v2"
+	secretutil "k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
@@ -42,8 +43,9 @@ const (
 
 // secretPlugin implements the VolumePlugin interface.
 type secretPlugin struct {
-	host      volume.VolumeHost
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	host          volume.VolumeHost
+	getSecret     func(namespace, name string) (*v1.Secret, error)
+	getSecretSync func(namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.VolumePlugin = &secretPlugin{}
@@ -61,6 +63,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	plugin.getSecret = host.GetSecretFunc()
+	plugin.getSecretSync = secretutil.NewSimpleSecretManager(host.GetKubeClient()).GetSecret
 	return nil
 }
 
@@ -102,10 +105,11 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volu
 			plugin.host.GetMounter(plugin.GetPluginName()),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
-		source:    *spec.Volume.Secret,
-		pod:       *pod,
-		opts:      &opts,
-		getSecret: plugin.getSecret,
+		source:        *spec.Volume.Secret,
+		pod:           *pod,
+		opts:          &opts,
+		getSecret:     plugin.getSecret,
+		getSecretSync: plugin.getSecretSync,
 	}, nil
 }
 
@@ -154,10 +158,11 @@ func (sv *secretVolume) GetPath() string {
 type secretVolumeMounter struct {
 	*secretVolume
 
-	source    v1.SecretVolumeSource
-	pod       v1.Pod
-	opts      *volume.VolumeOptions
-	getSecret func(namespace, name string) (*v1.Secret, error)
+	source        v1.SecretVolumeSource
+	pod           v1.Pod
+	opts          *volume.VolumeOptions
+	getSecret     func(namespace, name string) (*v1.Secret, error)
+	getSecretSync func(namespace, name string) (*v1.Secret, error)
 }
 
 var _ volume.Mounter = &secretVolumeMounter{}
@@ -184,7 +189,14 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	}
 
 	optional := b.source.Optional != nil && *b.source.Optional
-	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
+	var secret *v1.Secret
+	if b.pod.Status.Phase == v1.PodPending {
+		secret, err = b.getSecretSync(b.pod.Namespace, b.source.SecretName)
+		klog.V(4).Infof("volume mount %v for pod %v %v at %v, err: %v", b.volName, b.pod.UID, b.pod.Status.Phase, dir, err)
+	} else {
+		secret, err = b.getSecret(b.pod.Namespace, b.source.SecretName)
+		klog.V(4).Infof("volume mount %v for pod %v %v at %v, err: %v", b.volName, b.pod.UID, b.pod.Status.Phase, dir, err)
+	}
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
 			klog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
