@@ -20,7 +20,6 @@ import (
 	"context"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -200,7 +199,6 @@ func TestNodeConditionsChanged(t *testing.T) {
 }
 
 func TestUpdatePodInCache(t *testing.T) {
-	ttl := 10 * time.Second
 	nodeName := "node"
 
 	tests := []struct {
@@ -225,7 +223,7 @@ func TestUpdatePodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           cache.New(ctx, ttl),
+				Cache:           cache.New(ctx),
 				SchedulingQueue: queue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}

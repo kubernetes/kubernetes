@@ -1706,7 +1706,7 @@ func TestPreempt(t *testing.T) {
 
 			waitingPods := frameworkruntime.NewWaitingPodsMap()
 
-			cache := internalcache.New(ctx, time.Duration(0))
+			cache := internalcache.New(ctx)
 			for _, pod := range test.pods {
 				cache.AddPod(logger, pod)
 			}

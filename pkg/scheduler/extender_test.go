@@ -20,7 +20,6 @@ import (
 	"context"
 	"reflect"
 	"testing"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -328,7 +327,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			cache := internalcache.New(ctx, time.Duration(0))
+			cache := internalcache.New(ctx)
 			for _, name := range test.nodes {
 				cache.AddNode(logger, createNode(name))
 			}

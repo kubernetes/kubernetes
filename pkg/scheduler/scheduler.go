@@ -50,12 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
-const (
-	// Duration the scheduler will wait before expiring an assumed pod.
-	// See issue #106361 for more details about this parameter and its value.
-	durationToExpireAssumedPod time.Duration = 0
-)
-
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
@@ -338,7 +332,7 @@ func New(ctx context.Context,
 		fwk.SetPodNominator(podQueue)
 	}
 
-	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod)
+	schedulerCache := internalcache.New(ctx)
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)

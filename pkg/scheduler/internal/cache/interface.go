@@ -71,9 +71,6 @@ type Cache interface {
 	// After expiration, its information would be subtracted.
 	AssumePod(logger klog.Logger, pod *v1.Pod) error
 
-	// FinishBinding signals that cache for assumed pod can be expired
-	FinishBinding(logger klog.Logger, pod *v1.Pod) error
-
 	// ForgetPod removes an assumed pod from cache.
 	ForgetPod(logger klog.Logger, pod *v1.Pod) error
 

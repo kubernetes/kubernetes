@@ -956,14 +956,21 @@ func (sched *Scheduler) assume(logger klog.Logger, assumed *v1.Pod, host string)
 func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, targetNode string, state *framework.CycleState) (status *framework.Status) {
 	logger := klog.FromContext(ctx)
 	defer func() {
-		sched.finishBinding(logger, fwk, assumed, targetNode, status)
+		if !status.IsSuccess() {
+			logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
+			return
+		}
+
+		fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 	}()
 
 	bound, err := sched.extendersBinding(logger, assumed, targetNode)
 	if bound {
-		return framework.AsStatus(err)
+		status = framework.AsStatus(err)
+		return
 	}
-	return fwk.RunBindPlugins(ctx, state, assumed, targetNode)
+	status = fwk.RunBindPlugins(ctx, state, assumed, targetNode)
+	return
 }
 
 // TODO(#87159): Move this to a Plugin.
@@ -983,18 +990,6 @@ func (sched *Scheduler) extendersBinding(logger klog.Logger, pod *v1.Pod, node s
 		return true, err
 	}
 	return false, nil
-}
-
-func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framework, assumed *v1.Pod, targetNode string, status *framework.Status) {
-	if finErr := sched.Cache.FinishBinding(logger, assumed); finErr != nil {
-		logger.Error(finErr, "Scheduler cache FinishBinding failed")
-	}
-	if !status.IsSuccess() {
-		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
-		return
-	}
-
-	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 
 func getAttemptsLabel(p *framework.QueuedPodInfo) string {

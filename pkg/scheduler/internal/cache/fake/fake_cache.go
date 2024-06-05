@@ -37,9 +37,6 @@ func (c *Cache) AssumePod(logger klog.Logger, pod *v1.Pod) error {
 	return nil
 }
 
-// FinishBinding is a fake method for testing.
-func (c *Cache) FinishBinding(logger klog.Logger, pod *v1.Pod) error { return nil }
-
 // ForgetPod is a fake method for testing.
 func (c *Cache) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	c.ForgetFunc(pod)
