@@ -57,7 +57,7 @@ func cleanupJob(ctx context.Context, f *framework.Framework, job *batchv1.Job) {
 
 	framework.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
 	removeFinalizerFunc := func(j *batchv1.Job) {
-		j.ObjectMeta.Finalizers = slice.RemoveString(j.ObjectMeta.Finalizers, dummyFinalizer, nil)
+		j.ObjectMeta.Finalizers = slice.Remove(j.ObjectMeta.Finalizers, dummyFinalizer)
 	}
 	_, err := updateJobWithRetries(ctx, c, ns, job.Name, removeFinalizerFunc)
 	framework.ExpectNoError(err)
