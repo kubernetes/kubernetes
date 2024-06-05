@@ -130,12 +130,15 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			if len(node.Status.Addresses) > 0 {
 				return nil
 			}
-			// If nodeIPs are not specified wait for the external cloud-provider to set the node addresses.
+			// If nodeIPs are not set wait for the external cloud-provider to set the node addresses.
+			// If the nodeIP is the unspecified address 0.0.0.0 or ::, then use the IP of the default gateway of
+			// the corresponding IP family to bootstrap the node until the out-of-tree provider overrides it later.
+			// xref: https://github.com/kubernetes/kubernetes/issues/125348
 			// Otherwise uses them on the assumption that the installer/administrator has the previous knowledge
 			// required to ensure the external cloud provider will use the same addresses to avoid the issues explained
 			// in https://github.com/kubernetes/kubernetes/issues/120720.
 			// We are already hinting the external cloud provider via the annotation AnnotationAlphaProvidedIPAddr.
-			if !nodeIPSpecified {
+			if nodeIP == nil {
 				node.Status.Addresses = []v1.NodeAddress{
 					{Type: v1.NodeHostName, Address: hostname},
 				}
