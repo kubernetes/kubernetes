@@ -277,6 +277,33 @@
       initPods: 5000
       measurePods: 1000
 
+# This test case simulates the scheduling of daemonset.
+# https://github.com/kubernetes/kubernetes/issues/124709
+- name: SchedulingDaemonset
+  defaultPodTemplatePath: config/templates/daemonset-pod.yaml
+  workloadTemplate:
+    # Create one node with a specific name (scheduler-perf-node),
+    # which is supposed to get all Pods created in this test case.
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: config/templates/node-with-name.yaml
+    # Create other nodes that the scheduler has to filter out with PreFilterResult from NodeAffinity plugin.
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: config/templates/node-default.yaml
+    # Create pods with nodeAffinity (metadata.name=scheduler-perf-node).
+    # This scenario doesn't schedule each Pod to each Node though, 
+    # they go through completely the same scheduling process as daemonset pods does.
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 15000Nodes
+    labels: [performance, fast]
+    params:
+      initNodes: 15000
+      measurePods: 30000
+
 - name: SchedulingNodeAffinity
   defaultPodTemplatePath: config/templates/pod-with-node-affinity.yaml
   workloadTemplate:
