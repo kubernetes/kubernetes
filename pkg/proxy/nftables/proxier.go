@@ -1391,7 +1391,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.NodePort() != 0 {
 			if hasEndpoints {
 				// Jump to the external destination chain.  For better or for
-				// worse, nodeports are not subect to loadBalancerSourceRanges,
+				// worse, nodeports are not subject to loadBalancerSourceRanges,
 				// and we can't change that.
 				tx.Add(&knftables.Element{
 					Map: serviceNodePortsMap,
@@ -1560,13 +1560,13 @@ func (proxier *Proxier) syncProxyRules() {
 		// If Cluster policy is in use, create the chain and create rules jumping
 		// from clusterPolicyChain to the clusterEndpoints
 		if usesClusterPolicyChain {
-			proxier.writeServiceToEndpointRules(tx, svcPortNameString, svcInfo, clusterPolicyChain, clusterEndpoints)
+			proxier.writeServiceToEndpointRules(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
 		}
 
 		// If Local policy is in use, create rules jumping from localPolicyChain
 		// to the localEndpoints
 		if usesLocalPolicyChain {
-			proxier.writeServiceToEndpointRules(tx, svcPortNameString, svcInfo, localPolicyChain, localEndpoints)
+			proxier.writeServiceToEndpointRules(tx, svcInfo, localPolicyChain, localEndpoints)
 		}
 
 		// Generate the per-endpoint chains
@@ -1699,7 +1699,7 @@ func (proxier *Proxier) syncProxyRules() {
 	conntrack.CleanStaleEntries(proxier.conntrack, proxier.svcPortMap, serviceUpdateResult, endpointUpdateResult)
 }
 
-func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcPortNameString string, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
+func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 		ipX := "ip"
