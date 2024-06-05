@@ -35,7 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
-	"k8s.io/kubernetes/pkg/util/slice"
+	"k8s.io/kubernetes/pkg/util/finalizers"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -202,7 +202,7 @@ func (c *Controller) addFinalizer(ctx context.Context, pvc *v1.PersistentVolumeC
 
 func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolumeClaim) error {
 	claimClone := pvc.DeepCopy()
-	claimClone.ObjectMeta.Finalizers = slice.RemoveString(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil)
+	claimClone.ObjectMeta.Finalizers = finalizers.Remove(claimClone.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(ctx, claimClone, metav1.UpdateOptions{})
 	logger := klog.FromContext(ctx)
 	if err != nil {

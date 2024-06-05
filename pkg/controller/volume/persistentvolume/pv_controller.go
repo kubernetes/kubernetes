@@ -20,12 +20,12 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/slice"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
+	"k8s.io/kubernetes/pkg/util/finalizers"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -1518,9 +1519,9 @@ func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx co
 	volume = newVolume
 	volumeClone := volume.DeepCopy()
 	pvFinalizers := volumeClone.Finalizers
-	if pvFinalizers != nil && slice.ContainsString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+	if pvFinalizers != nil && slices.Contains(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer) {
 		pvUpdateNeeded = true
-		pvFinalizers = slice.RemoveString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
+		pvFinalizers = finalizers.Remove(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer)
 	}
 	if pvUpdateNeeded {
 		volumeClone.SetFinalizers(pvFinalizers)
