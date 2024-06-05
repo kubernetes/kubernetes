@@ -119,6 +119,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		serviceChanges:      proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
 		endpointsMap:        make(proxy.EndpointsMap),
 		endpointsChanges:    proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipFamily, nil, nil),
+		needFullSync:        true,
 		nftables:            nft,
 		masqueradeMark:      "0x4000",
 		conntrack:           conntrack.NewFake(),
@@ -130,6 +131,12 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		networkInterfacer:   networkInterfacer,
 		staleChains:         make(map[string]time.Time),
 		serviceCIDRs:        serviceCIDRs,
+		clusterIPs:          newNFTElementStorage("set", clusterIPsSet),
+		serviceIPs:          newNFTElementStorage("map", serviceIPsMap),
+		firewallIPs:         newNFTElementStorage("map", firewallIPsMap),
+		noEndpointServices:  newNFTElementStorage("map", noEndpointServicesMap),
+		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
+		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
