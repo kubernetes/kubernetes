@@ -651,11 +651,11 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
 				klog.Warningf("unable to list pods of node %v: %v", node.Name, err)
-				return false, 1 * time.Second
+				return false, 50 * time.Millisecond
 			}
 			if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 				klog.Warningf("unable to mark all pods NotReady on node %v: %v; queuing for retry", node.Name, err)
-				return false, 1 * time.Second
+				return false, 50 * time.Millisecond
 			}
 			result := controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
 			if result {
