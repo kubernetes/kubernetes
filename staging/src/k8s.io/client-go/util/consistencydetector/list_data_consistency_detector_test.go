@@ -29,7 +29,7 @@ import (
 
 var (
 	emptyListFunc = func(_ context.Context, opts metav1.ListOptions) (*v1.PodList, error) {
-		return nil, nil
+		return &v1.PodList{}, nil
 	}
 	emptyListOptions = metav1.ListOptions{}
 )
@@ -37,7 +37,7 @@ var (
 func TestDriveCheckListFromCacheDataConsistencyIfRequested(t *testing.T) {
 	ctx := context.TODO()
 
-	CheckListFromCacheDataConsistencyIfRequested(ctx, "", emptyListFunc, emptyListOptions, nil)
+	CheckListFromCacheDataConsistencyIfRequested(ctx, "", emptyListFunc, emptyListOptions, &v1.PodList{})
 }
 
 func TestCheckListFromCacheDataConsistencyIfRequestedInternalPanics(t *testing.T) {
