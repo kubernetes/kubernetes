@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 func (re *RawExtension) UnmarshalJSON(in []byte) error {
@@ -48,4 +50,49 @@ func (re RawExtension) MarshalJSON() ([]byte, error) {
 	}
 	// TODO: Check whether ContentType is actually JSON before returning it.
 	return re.Raw, nil
+}
+
+var selfDescribedTagPrefix = []byte{0xd9, 0xd9, 0xf7}
+
+func (re RawExtension) MarshalCBOR() ([]byte, error) {
+	if re.Raw == nil {
+		if re.Object != nil {
+			return cbor.Marshal(re.Object)
+		}
+		return []byte{0xf6}, nil
+	}
+
+	if bytes.HasPrefix(re.Raw, selfDescribedTagPrefix) {
+		// The encoding of the head of a "self-described CBOR" tag is invalid as the prefix
+		// of a Unicode text, and it prefixes all encoded objects produced by the
+		// apimachinery CBOR serializer.
+		return re.Raw, nil
+	}
+
+	// If the encoded data item is not enclosed in a self-described CBOR tag then assume the
+	// bytes are JSON-encoded.
+	var u interface{}
+	if err := json.Unmarshal(re.Raw, &u); err != nil {
+		return nil, err
+	}
+	return cbor.Marshal(u)
+}
+
+func (re *RawExtension) UnmarshalCBOR(in []byte) error {
+	// For now, all inputs are transcoded to JSON to remain compatible with programs that assume
+	// the Raw field contains JSON.
+	var u interface{}
+	if err := cbor.Unmarshal(in, &u); err != nil {
+		return err
+	}
+	if u == nil {
+		return nil
+	}
+	j, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+
+	re.Raw = j
+	return nil
 }

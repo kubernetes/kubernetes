@@ -161,6 +161,8 @@ func TestRoundtripToUnstructured(t *testing.T) {
 			{Version: "v1", Kind: "RangeAllocation"},
 			{Version: "v1", Kind: "ConfigMap"},
 			{Version: "v1", Kind: "ConfigMapList"},
+			{Group: "admission.k8s.io", Version: "v1beta1", Kind: "AdmissionReview"},
+			{Group: "admission.k8s.io", Version: "v1", Kind: "AdmissionReview"},
 			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfiguration"},
 			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfigurationList"},
 			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfiguration"},
@@ -173,24 +175,6 @@ func TestRoundtripToUnstructured(t *testing.T) {
 			{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"},
 			{Group: "certificates.k8s.io", Version: "v1", Kind: "CertificateSigningRequest"},
 			{Group: "certificates.k8s.io", Version: "v1", Kind: "CertificateSigningRequestList"},
-		},
-		// If a RawExtension's bytes are invalid JSON, its containing object can't be encoded to JSON.
-		"rawextension needs to work in programs that assume json": {
-			{Version: "v1", Kind: "List"},
-			{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1beta1", Kind: "ControllerRevisionList"},
-			{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1beta2", Kind: "ControllerRevisionList"},
-			{Group: "apps", Version: "v1", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1", Kind: "ControllerRevisionList"},
-			{Group: "admission.k8s.io", Version: "v1beta1", Kind: "AdmissionReview"},
-			{Group: "admission.k8s.io", Version: "v1", Kind: "AdmissionReview"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaim"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParametersList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParametersList"},
 		},
 	}
 
