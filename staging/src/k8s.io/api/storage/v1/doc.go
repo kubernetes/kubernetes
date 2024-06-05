@@ -18,5 +18,6 @@ limitations under the License.
 // +k8s:protobuf-gen=package
 // +groupName=storage.k8s.io
 // +k8s:openapi-gen=true
+// +k8s:prerelease-lifecycle-gen=true
 
 package v1 // import "k8s.io/api/storage/v1"

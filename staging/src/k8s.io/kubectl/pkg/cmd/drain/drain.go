@@ -343,7 +343,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 
 			printObj(info.Object, o.Out)
 		} else {
-			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error:%s, continuing command...\n", info.Name, err)
+			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error: %s, continuing command...\n", info.Name, err)
 
 			if !drainedNodes.Has(info.Name) {
 				fatal = append(fatal, err)

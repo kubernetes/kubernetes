@@ -46,7 +46,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -109,7 +109,7 @@ type Controller struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// The deletedObjects cache keeps track of Pods for which we know that
 	// they have existed and have been removed. For those we can be sure
@@ -142,8 +142,11 @@ func NewController(
 		claimsSynced:        claimInformer.Informer().HasSynced,
 		templateLister:      templateInformer.Lister(),
 		templatesSynced:     templateInformer.Informer().HasSynced,
-		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_claim"),
-		deletedObjects:      newUIDCache(maxUIDCacheEntries),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_claim"},
+		),
+		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
 
 	metrics.RegisterMetrics()
@@ -392,8 +395,8 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer ec.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting ephemeral volume controller")
-	defer logger.Info("Shutting down ephemeral volume controller")
+	logger.Info("Starting resource claim controller")
+	defer logger.Info("Shutting down resource claim controller")
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -401,7 +404,7 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.claimsSynced) {
+	if !cache.WaitForNamedCacheSync("resource_claim", ctx.Done(), ec.podSynced, ec.podSchedulingSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 
@@ -424,7 +427,7 @@ func (ec *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer ec.queue.Done(key)
 
-	err := ec.syncHandler(ctx, key.(string))
+	err := ec.syncHandler(ctx, key)
 	if err == nil {
 		ec.queue.Forget(key)
 		return true
@@ -547,7 +550,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	return nil
 }
 
-// handleResourceClaim is invoked for each volume of a pod.
+// handleResourceClaim is invoked for each resource claim of a pod.
 func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim, newPodClaims *map[string]string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
 	ctx = klog.NewContext(ctx, logger)
@@ -719,7 +722,7 @@ func (ec *Controller) ensurePodSchedulingContext(ctx context.Context, pod *v1.Po
 						Kind:       "Pod",
 						Name:       pod.Name,
 						UID:        pod.UID,
-						Controller: pointer.Bool(true),
+						Controller: ptr.To(true),
 					},
 				},
 			},
@@ -948,7 +951,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 
 func owningPod(claim *resourcev1alpha2.ResourceClaim) (string, types.UID) {
 	for _, owner := range claim.OwnerReferences {
-		if pointer.BoolDeref(owner.Controller, false) &&
+		if ptr.Deref(owner.Controller, false) &&
 			owner.APIVersion == "v1" &&
 			owner.Kind == "Pod" {
 			return owner.Name, owner.UID

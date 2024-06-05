@@ -28,7 +28,7 @@ import (
 // mustCreateEnv creates the default env for testing, with given option.
 // it fatally fails the test if the env fails to set up.
 func mustCreateEnv(t testing.TB, envOptions ...cel.EnvOption) *cel.Env {
-	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()).
+	envSet, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true).
 		Extend(environment.VersionedOptions{
 			IntroducedVersion: version.MajorMinor(1, 30),
 			EnvOptions:        envOptions,

@@ -32,7 +32,7 @@ import (
 	_ "gotest.tools/gotestsum"
 
 	// mockgen
-	_ "github.com/golang/mock/mockgen"
+	_ "go.uber.org/mock/mockgen"
 
 	// tools like cpu
 	_ "go.uber.org/automaxprocs"

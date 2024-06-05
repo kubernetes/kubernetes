@@ -20,8 +20,8 @@ package v1alpha2
 
 import (
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -39,30 +39,10 @@ type ResourceSliceLister interface {
 
 // resourceSliceLister implements the ResourceSliceLister interface.
 type resourceSliceLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha2.ResourceSlice]
 }
 
 // NewResourceSliceLister returns a new ResourceSliceLister.
 func NewResourceSliceLister(indexer cache.Indexer) ResourceSliceLister {
-	return &resourceSliceLister{indexer: indexer}
-}
-
-// List lists all ResourceSlices in the indexer.
-func (s *resourceSliceLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceSlice, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha2.ResourceSlice))
-	})
-	return ret, err
-}
-
-// Get retrieves the ResourceSlice from the index for a given name.
-func (s *resourceSliceLister) Get(name string) (*v1alpha2.ResourceSlice, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha2.Resource("resourceslice"), name)
-	}
-	return obj.(*v1alpha2.ResourceSlice), nil
+	return &resourceSliceLister{listers.New[*v1alpha2.ResourceSlice](indexer, v1alpha2.Resource("resourceslice"))}
 }

@@ -28,6 +28,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
+	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
+
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
@@ -57,19 +61,27 @@ import (
 	restclient "k8s.io/client-go/rest"
 	kubeversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
+	netutils "k8s.io/utils/net"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	flowcontrolv1bet3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/storageversionhashdata"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
+	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
+	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
+	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
+	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	netutils "k8s.io/utils/net"
-
-	"github.com/stretchr/testify/assert"
+	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
+	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
 
 // setUp is a convenience function for setting up for (most) tests.
@@ -77,53 +89,57 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
-		GenericConfig: genericapiserver.NewConfig(legacyscheme.Codecs),
-		ExtraConfig: ExtraConfig{
-			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
-			APIServerServicePort:    443,
-			MasterCount:             1,
-			EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,
-			ServiceIPRange:          net.IPNet{IP: netutils.ParseIPSloppy("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
+		ControlPlane: controlplaneapiserver.Config{
+			Generic: genericapiserver.NewConfig(legacyscheme.Codecs),
+			Extra: controlplaneapiserver.Extra{
+				APIResourceConfigSource: DefaultAPIResourceConfigSource(),
+			},
+		},
+		Extra: Extra{
+			APIServerServicePort:   443,
+			MasterCount:            1,
+			EndpointReconcilerType: reconcilers.MasterCountReconcilerType,
+			ServiceIPRange:         net.IPNet{IP: netutils.ParseIPSloppy("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
 		},
 	}
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
-	storageConfig.StorageObjectCountTracker = config.GenericConfig.StorageObjectCountTracker
+	storageConfig.StorageObjectCountTracker = config.ControlPlane.Generic.StorageObjectCountTracker
 	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
-	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
+	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.ControlPlane.Generic)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	kubeVersion := kubeversion.Get()
-	config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	config.GenericConfig.Version = &kubeVersion
-	config.ExtraConfig.StorageFactory = storageFactory
-	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	config.GenericConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
-	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
-	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
+	config.ControlPlane.Generic.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	config.ControlPlane.Generic.Version = &kubeVersion
+	config.ControlPlane.StorageFactory = storageFactory
+	config.ControlPlane.Generic.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+	config.ControlPlane.Generic.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
+	config.ControlPlane.Generic.LegacyAPIGroupPrefixes = sets.NewString("/api")
+	config.Extra.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
+	config.ControlPlane.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
 		DialContext:     func(ctx context.Context, network, addr string) (net.Conn, error) { return nil, nil },
 		TLSClientConfig: &tls.Config{},
 	})
 
 	// set fake SecureServingInfo because the listener port is needed for the kubernetes service
-	config.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
+	config.ControlPlane.Generic.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
 	getOpenAPIDefinitions := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)
 	namer := openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme)
-	config.GenericConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, namer)
+	config.ControlPlane.Generic.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(getOpenAPIDefinitions, namer)
 
-	clientset, err := kubernetes.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	clientset, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
 	if err != nil {
 		t.Fatalf("unable to create client set due to %v", err)
 	}
-	config.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, config.GenericConfig.LoopbackClientConfig.Timeout)
+	config.ControlPlane.VersionedInformers = informers.NewSharedInformerFactory(clientset, config.ControlPlane.Generic.LoopbackClientConfig.Timeout)
 
 	return server, *config, assert.New(t)
 }
@@ -153,26 +169,21 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	storageProvider, err := corerest.New(corerest.Config{
-		GenericConfig: corerest.GenericConfig{
-			StorageFactory:       apiserverCfg.ExtraConfig.StorageFactory,
-			EventTTL:             apiserverCfg.ExtraConfig.EventTTL,
-			LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
-			Informers:            apiserverCfg.ExtraConfig.VersionedInformers,
-		},
+		GenericConfig: *apiserverCfg.ControlPlane.NewCoreGenericConfig(),
 		Proxy: corerest.ProxyConfig{
-			Transport:           apiserverCfg.ExtraConfig.ProxyTransport,
-			KubeletClientConfig: apiserverCfg.ExtraConfig.KubeletClientConfig,
+			Transport:           apiserverCfg.ControlPlane.Extra.ProxyTransport,
+			KubeletClientConfig: apiserverCfg.Extra.KubeletClientConfig,
 		},
 		Services: corerest.ServicesConfig{
-			ClusterIPRange: apiserverCfg.ExtraConfig.ServiceIPRange,
-			NodePortRange:  apiserverCfg.ExtraConfig.ServiceNodePortRange,
+			ClusterIPRange: apiserverCfg.Extra.ServiceIPRange,
+			NodePortRange:  apiserverCfg.Extra.ServiceNodePortRange,
 		},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 
-	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := storageProvider.NewRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
@@ -188,7 +199,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ControlPlane.APIResourceConfigSource, apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -200,15 +211,16 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	}
 }
 
-func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, Config, *assert.Assertions) {
+func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, CompletedConfig, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	apiserver, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
+	completed := config.Complete()
+	apiserver, err := completed.New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	return apiserver, etcdserver, config, assert
+	return apiserver, etcdserver, completed, assert
 }
 
 // TestVersion tests /version
@@ -218,7 +230,7 @@ func TestVersion(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/version", nil)
 	resp := httptest.NewRecorder()
-	s.GenericAPIServer.Handler.ServeHTTP(resp, req)
+	s.ControlPlane.GenericAPIServer.Handler.ServeHTTP(resp, req)
 	if resp.Code != 200 {
 		t.Fatalf("expected http 200, got: %d", resp.Code)
 	}
@@ -253,7 +265,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	apiserver, etcdserver, _, assert := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(apiserver.ControlPlane.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")
@@ -310,7 +322,7 @@ func TestStorageVersionHashes(t *testing.T) {
 	apiserver, etcdserver, _, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(apiserver.ControlPlane.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	c := &restclient.Config{
 		Host:          server.URL,
@@ -472,5 +484,69 @@ func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
 			continue // this is another beta of a legacy beta resource with no stable equivalent
 		}
 		t.Errorf("no new beta resources can be enabled by default, see https://github.com/kubernetes/enhancements/blob/0ad0fc8269165ca300d05ca51c7ce190a79976a5/keps/sig-architecture/3136-beta-apis-off-by-default/README.md: %v", gvr)
+	}
+}
+
+// TestGenericStorageProviders is a smoke test that ensures that the kube
+// storage providers and the generic storage providers don't unexpectedly
+// divert, i.e. the later is an equally ordered subset.
+func TestGenericStorageProviders(t *testing.T) {
+	_, config, _ := setUp(t)
+	completed := config.Complete()
+
+	// create kube storage providers
+	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kube, err := completed.StorageProviders(client.Discovery())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create generic storage providers. These should be an equally ordered subset
+	generic, err := completed.ControlPlane.GenericStorageProviders(client.Discovery())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	g := 0 // generic index
+	for k := range kube {
+		kt := reflect.TypeOf(kube[k])
+		var gt reflect.Type
+		if g < len(generic) {
+			gt = reflect.TypeOf(generic[g])
+		}
+
+		// special case: we identify full core and generic core
+		if kt.Kind() == reflect.Ptr && kt.Elem().PkgPath() == reflect.TypeOf(corerest.Config{}).PkgPath() {
+			kt = reflect.TypeOf(&corerest.GenericConfig{})
+		}
+
+		if kt == gt {
+			g++
+			continue
+		}
+
+		switch kube[k].(type) {
+		case autoscalingrest.RESTStorageProvider,
+			batchrest.RESTStorageProvider,
+			discoveryrest.StorageProvider,
+			networkingrest.RESTStorageProvider,
+			noderest.RESTStorageProvider,
+			policyrest.RESTStorageProvider,
+			schedulingrest.RESTStorageProvider,
+			storagerest.RESTStorageProvider,
+			appsrest.StorageProvider,
+			resourcerest.RESTStorageProvider:
+			// all these are non-generic, but kube specific
+			continue
+		default:
+			t.Errorf("Unexpected, uncategorized storage %T from %s. Put into the list above for kube-specific APIs, or into GenericStorageProviders for generic APIs", kube[k], kt.PkgPath())
+		}
+	}
+
+	if g != len(generic) {
+		t.Errorf("Unexpected, generic APIs found: %#v", generic[g:])
 	}
 }

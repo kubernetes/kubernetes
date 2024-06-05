@@ -128,7 +128,7 @@ func TestOIDC(t *testing.T) {
 }
 
 func TestStructuredAuthenticationConfig(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	t.Log("Testing OIDC authenticator with authentication config")
 	runTests(t, true)
@@ -565,7 +565,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 }
 
 func TestStructuredAuthenticationConfigCEL(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	type testRun[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey] struct {
 		name                    string
@@ -973,7 +973,7 @@ func TestStructuredAuthenticationConfigReload(t *testing.T) {
 	t.Cleanup(func() { options.UpdateAuthenticationConfigTimeout = origUpdateAuthenticationConfigTimeout })
 	options.UpdateAuthenticationConfigTimeout = 2 * hardCodedTokenCacheTTLAndPollInterval // needs to be large enough for polling to run multiple times
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	tests := []struct {
 		name                          string
@@ -1332,7 +1332,19 @@ jwt:
 			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			tt.assertErrFn(t, err)
 
-			err = os.WriteFile(apiServer.ServerOpts.Authentication.AuthenticationConfigFile, []byte(tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))), 0600)
+			// Create a temporary file
+			tempFile, err := os.CreateTemp("", "tempfile")
+			require.NoError(t, err)
+			defer func() {
+				_ = tempFile.Close()
+			}()
+
+			// Write the new content to the temporary file
+			_, err = tempFile.Write([]byte(tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))))
+			require.NoError(t, err)
+
+			// Atomically replace the original file with the temporary file
+			err = os.Rename(tempFile.Name(), apiServer.ServerOpts.Authentication.AuthenticationConfigFile)
 			require.NoError(t, err)
 
 			if tt.waitAfterConfigSwap {
@@ -1427,7 +1439,7 @@ func configureBasicTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.Jo
 // TestStructuredAuthenticationDiscoveryURL tests that the discovery URL configured in jwt.issuer.discoveryURL is used to
 // fetch the discovery document and the issuer in jwt.issuer.url is used to validate the ID token.
 func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	tests := []struct {
 		name         string
@@ -1523,7 +1535,7 @@ jwt:
 }
 
 func TestMultipleJWTAuthenticators(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 
 	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
 	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)

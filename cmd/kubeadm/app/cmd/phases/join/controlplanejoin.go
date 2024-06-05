@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -69,7 +68,6 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 				ArgsValidator:  cobra.NoArgs,
 			},
 			newEtcdLocalSubphase(),
-			newUpdateStatusSubphase(),
 			newMarkControlPlaneSubphase(),
 		},
 	}
@@ -81,19 +79,6 @@ func newEtcdLocalSubphase() workflow.Phase {
 		Short:         "Add a new local etcd member",
 		Run:           runEtcdPhase,
 		InheritFlags:  getControlPlaneJoinPhaseFlags("etcd"),
-		ArgsValidator: cobra.NoArgs,
-	}
-}
-
-func newUpdateStatusSubphase() workflow.Phase {
-	return workflow.Phase{
-		Name: "update-status",
-		Short: fmt.Sprintf(
-			"Register the new control-plane node into the ClusterStatus maintained in the %s ConfigMap (DEPRECATED)",
-			kubeadmconstants.KubeadmConfigConfigMap,
-		),
-		Run:           runUpdateStatusPhase,
-		InheritFlags:  getControlPlaneJoinPhaseFlags("update-status"),
 		ArgsValidator: cobra.NoArgs,
 	}
 }
@@ -127,7 +112,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	// in case of local etcd
+	// in case of external etcd
 	if cfg.Etcd.External != nil {
 		fmt.Println("[control-plane-join] Using external etcd - no local stacked instance added")
 		return nil
@@ -156,19 +141,6 @@ func runEtcdPhase(c workflow.RunData) error {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
-	return nil
-}
-
-func runUpdateStatusPhase(c workflow.RunData) error {
-	data, ok := c.(JoinData)
-	if !ok {
-		return errors.New("control-plane-join phase invoked with an invalid data struct")
-	}
-
-	if data.Cfg().ControlPlane != nil {
-		fmt.Println("The 'update-status' phase is deprecated and will be removed in a future release. " +
-			"Currently it performs no operation")
-	}
 	return nil
 }
 

@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -39,6 +38,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -48,6 +48,12 @@ import (
 )
 
 const defaultExpectedTypeName = "<unspecified>"
+
+var (
+	// We try to spread the load on apiserver by setting timeouts for
+	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
+	defaultMinWatchTimeout = 5 * time.Minute
+)
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
@@ -72,6 +78,8 @@ type Reflector struct {
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
 	resyncPeriod   time.Duration
+	// minWatchTimeout defines the minimum timeout for watch requests.
+	minWatchTimeout time.Duration
 	// clock allows tests to manipulate time
 	clock clock.Clock
 	// paginatedResult defines whether pagination should be forced for list calls.
@@ -151,12 +159,6 @@ func DefaultWatchErrorHandler(r *Reflector, err error) {
 	}
 }
 
-var (
-	// We try to spread the load on apiserver by setting timeouts for
-	// watch requests - it is random in [minWatchTimeout, 2*minWatchTimeout].
-	minWatchTimeout = 5 * time.Minute
-)
-
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
 // The indexer is configured to key on namespace
 func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
@@ -194,6 +196,10 @@ type ReflectorOptions struct {
 	// (do not resync).
 	ResyncPeriod time.Duration
 
+	// MinWatchTimeout, if non-zero, defines the minimum timeout for watch requests send to kube-apiserver.
+	// However, values lower than 5m will not be honored to avoid negative performance impact on controlplane.
+	MinWatchTimeout time.Duration
+
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
 }
@@ -213,9 +219,14 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	if reflectorClock == nil {
 		reflectorClock = clock.RealClock{}
 	}
+	minWatchTimeout := defaultMinWatchTimeout
+	if options.MinWatchTimeout > defaultMinWatchTimeout {
+		minWatchTimeout = options.MinWatchTimeout
+	}
 	r := &Reflector{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
+		minWatchTimeout: minWatchTimeout,
 		typeDescription: options.TypeDescription,
 		listerWatcher:   lw,
 		store:           store,
@@ -243,9 +254,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	// don't overwrite UseWatchList if already set
 	// because the higher layers (e.g. storage/cacher) disabled it on purpose
 	if r.UseWatchList == nil {
-		if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
-			r.UseWatchList = ptr.To(true)
-		}
+		r.UseWatchList = ptr.To(clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient))
 	}
 
 	return r
@@ -415,7 +424,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		start := r.clock.Now()
 
 		if w == nil {
-			timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+			timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 			options := metav1.ListOptions{
 				ResourceVersion: r.LastSyncResourceVersion(),
 				// We want to avoid situations of hanging watchers. Stop any watchers that do not
@@ -642,7 +651,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
-		timeoutSeconds := int64(minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
+		timeoutSeconds := int64(r.minWatchTimeout.Seconds() * (rand.Float64() + 1.0))
 		options := metav1.ListOptions{
 			ResourceVersion:      lastKnownRV,
 			AllowWatchBookmarks:  true,
@@ -686,7 +695,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 	// we utilize the temporaryStore to ensure independence from the current store implementation.
 	// as of today, the store is implemented as a queue and will be drained by the higher-level
 	// component as soon as it finishes replacing the content.
-	checkWatchListConsistencyIfRequested(stopCh, r.name, resourceVersion, r.listerWatcher, temporaryStore)
+	checkWatchListDataConsistencyIfRequested(wait.ContextForChannel(stopCh), r.name, resourceVersion, wrapListFuncWithContext(r.listerWatcher.List), temporaryStore.List)
 
 	if err = r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
 		return nil, fmt.Errorf("unable to sync watch-list result: %v", err)
@@ -721,6 +730,8 @@ func watchHandler(start time.Time,
 	stopCh <-chan struct{},
 ) error {
 	eventCount := 0
+	initialEventsEndBookmarkWarningTicker := newInitialEventsEndBookmarkTicker(name, clock, start, exitOnInitialEventsEndBookmark != nil)
+	defer initialEventsEndBookmarkWarningTicker.Stop()
 	if exitOnInitialEventsEndBookmark != nil {
 		// set it to false just in case somebody
 		// made it positive
@@ -780,7 +791,7 @@ loop:
 				}
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
-				if meta.GetAnnotations()["k8s.io/initial-events-end"] == "true" {
+				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
 					if exitOnInitialEventsEndBookmark != nil {
 						*exitOnInitialEventsEndBookmark = true
 					}
@@ -798,6 +809,9 @@ loop:
 				klog.V(4).Infof("exiting %v Watch because received the bookmark that marks the end of initial events stream, total %v items received in %v", name, eventCount, watchDuration)
 				return nil
 			}
+			initialEventsEndBookmarkWarningTicker.observeLastEventTimeStamp(clock.Now())
+		case <-initialEventsEndBookmarkWarningTicker.C():
+			initialEventsEndBookmarkWarningTicker.warnIfExpired()
 		}
 	}
 
@@ -918,3 +932,95 @@ func isWatchErrorRetriable(err error) bool {
 	}
 	return false
 }
+
+// wrapListFuncWithContext simply wraps ListFunction into another function that accepts a context and ignores it.
+func wrapListFuncWithContext(listFn ListFunc) func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+	return func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+		return listFn(options)
+	}
+}
+
+// initialEventsEndBookmarkTicker a ticker that produces a warning if the bookmark event
+// which marks the end of the watch stream, has not been received within the defined tick interval.
+//
+// Note:
+// The methods exposed by this type are not thread-safe.
+type initialEventsEndBookmarkTicker struct {
+	clock.Ticker
+	clock clock.Clock
+	name  string
+
+	watchStart           time.Time
+	tickInterval         time.Duration
+	lastEventObserveTime time.Time
+}
+
+// newInitialEventsEndBookmarkTicker returns a noop ticker if exitOnInitialEventsEndBookmarkRequested is false.
+// Otherwise, it returns a ticker that exposes a method producing a warning if the bookmark event,
+// which marks the end of the watch stream, has not been received within the defined tick interval.
+//
+// Note that the caller controls whether to call t.C() and t.Stop().
+//
+// In practice, the reflector exits the watchHandler as soon as the bookmark event is received and calls the t.C() method.
+func newInitialEventsEndBookmarkTicker(name string, c clock.Clock, watchStart time.Time, exitOnInitialEventsEndBookmarkRequested bool) *initialEventsEndBookmarkTicker {
+	return newInitialEventsEndBookmarkTickerInternal(name, c, watchStart, 10*time.Second, exitOnInitialEventsEndBookmarkRequested)
+}
+
+func newInitialEventsEndBookmarkTickerInternal(name string, c clock.Clock, watchStart time.Time, tickInterval time.Duration, exitOnInitialEventsEndBookmarkRequested bool) *initialEventsEndBookmarkTicker {
+	clockWithTicker, ok := c.(clock.WithTicker)
+	if !ok || !exitOnInitialEventsEndBookmarkRequested {
+		if exitOnInitialEventsEndBookmarkRequested {
+			klog.Warningf("clock does not support WithTicker interface but exitOnInitialEventsEndBookmark was requested")
+		}
+		return &initialEventsEndBookmarkTicker{
+			Ticker: &noopTicker{},
+		}
+	}
+
+	return &initialEventsEndBookmarkTicker{
+		Ticker:       clockWithTicker.NewTicker(tickInterval),
+		clock:        c,
+		name:         name,
+		watchStart:   watchStart,
+		tickInterval: tickInterval,
+	}
+}
+
+func (t *initialEventsEndBookmarkTicker) observeLastEventTimeStamp(lastEventObserveTime time.Time) {
+	t.lastEventObserveTime = lastEventObserveTime
+}
+
+func (t *initialEventsEndBookmarkTicker) warnIfExpired() {
+	if err := t.produceWarningIfExpired(); err != nil {
+		klog.Warning(err)
+	}
+}
+
+// produceWarningIfExpired returns an error that represents a warning when
+// the time elapsed since the last received event exceeds the tickInterval.
+//
+// Note that this method should be called when t.C() yields a value.
+func (t *initialEventsEndBookmarkTicker) produceWarningIfExpired() error {
+	if _, ok := t.Ticker.(*noopTicker); ok {
+		return nil /*noop ticker*/
+	}
+	if t.lastEventObserveTime.IsZero() {
+		return fmt.Errorf("%s: awaiting required bookmark event for initial events stream, no events received for %v", t.name, t.clock.Since(t.watchStart))
+	}
+	elapsedTime := t.clock.Now().Sub(t.lastEventObserveTime)
+	hasBookmarkTimerExpired := elapsedTime >= t.tickInterval
+
+	if !hasBookmarkTimerExpired {
+		return nil
+	}
+	return fmt.Errorf("%s: hasn't received required bookmark event marking the end of initial events stream, received last event %v ago", t.name, elapsedTime)
+}
+
+var _ clock.Ticker = &noopTicker{}
+
+// TODO(#115478): move to k8s/utils repo
+type noopTicker struct{}
+
+func (t *noopTicker) C() <-chan time.Time { return nil }
+
+func (t *noopTicker) Stop() {}

@@ -160,6 +160,7 @@ function kube::release::package_node_tarballs() {
       "${release_stage}/node/bin/"
 
     cp -R "${KUBE_ROOT}/LICENSES" "${release_stage}/"
+    echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
@@ -234,6 +235,7 @@ function kube::release::package_server_tarballs() {
       "${release_stage}/server/bin/"
 
     cp -R "${KUBE_ROOT}/LICENSES" "${release_stage}/"
+    echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 

@@ -43,20 +43,22 @@ var resourceclassesKind = v1alpha2.SchemeGroupVersion.WithKind("ResourceClass")
 
 // Get takes name of the resourceClass, and returns the corresponding resourceClass object, and an error if there is any.
 func (c *FakeResourceClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceClass, err error) {
+	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(resourceclassesResource, name), &v1alpha2.ResourceClass{})
+		Invokes(testing.NewRootGetAction(resourceclassesResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClass), err
 }
 
 // List takes label and field selectors, and returns the list of ResourceClasses that match those selectors.
 func (c *FakeResourceClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClassList, err error) {
+	emptyResult := &v1alpha2.ResourceClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(resourceclassesResource, resourceclassesKind, opts), &v1alpha2.ResourceClassList{})
+		Invokes(testing.NewRootListAction(resourceclassesResource, resourceclassesKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
@@ -80,20 +82,22 @@ func (c *FakeResourceClasses) Watch(ctx context.Context, opts v1.ListOptions) (w
 
 // Create takes the representation of a resourceClass and creates it.  Returns the server's representation of the resourceClass, and an error, if there is any.
 func (c *FakeResourceClasses) Create(ctx context.Context, resourceClass *v1alpha2.ResourceClass, opts v1.CreateOptions) (result *v1alpha2.ResourceClass, err error) {
+	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(resourceclassesResource, resourceClass), &v1alpha2.ResourceClass{})
+		Invokes(testing.NewRootCreateAction(resourceclassesResource, resourceClass), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClass), err
 }
 
 // Update takes the representation of a resourceClass and updates it. Returns the server's representation of the resourceClass, and an error, if there is any.
 func (c *FakeResourceClasses) Update(ctx context.Context, resourceClass *v1alpha2.ResourceClass, opts v1.UpdateOptions) (result *v1alpha2.ResourceClass, err error) {
+	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(resourceclassesResource, resourceClass), &v1alpha2.ResourceClass{})
+		Invokes(testing.NewRootUpdateAction(resourceclassesResource, resourceClass), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClass), err
 }
@@ -115,10 +119,11 @@ func (c *FakeResourceClasses) DeleteCollection(ctx context.Context, opts v1.Dele
 
 // Patch applies the patch and returns the patched resourceClass.
 func (c *FakeResourceClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClass, err error) {
+	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourceclassesResource, name, pt, data, subresources...), &v1alpha2.ResourceClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(resourceclassesResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClass), err
 }
@@ -136,10 +141,11 @@ func (c *FakeResourceClasses) Apply(ctx context.Context, resourceClass *resource
 	if name == nil {
 		return nil, fmt.Errorf("resourceClass.Name must be provided to Apply")
 	}
+	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourceclassesResource, *name, types.ApplyPatchType, data), &v1alpha2.ResourceClass{})
+		Invokes(testing.NewRootPatchSubresourceAction(resourceclassesResource, *name, types.ApplyPatchType, data), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1alpha2.ResourceClass), err
 }

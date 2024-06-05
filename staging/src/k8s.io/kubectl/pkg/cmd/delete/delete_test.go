@@ -36,7 +36,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func fakecmd() *cobra.Command {
@@ -60,8 +60,8 @@ func TestDeleteFlagValidation(t *testing.T) {
 	}{
 		{
 			flags: DeleteFlags{
-				Raw:         pointer.String("test"),
-				Interactive: pointer.Bool(true),
+				Raw:         ptr.To("test"),
+				Interactive: ptr.To(true),
 			},
 			expectedErr: "--interactive can not be used with --raw",
 		},
@@ -306,7 +306,7 @@ func TestDeleteObject(t *testing.T) {
 
 func TestPreviewResultEqualToResult(t *testing.T) {
 	deleteFlags := NewDeleteCommandFlags("")
-	deleteFlags.Interactive = pointer.Bool(true)
+	deleteFlags.Interactive = ptr.To(true)
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()

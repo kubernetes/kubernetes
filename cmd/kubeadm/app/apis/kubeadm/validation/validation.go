@@ -75,6 +75,9 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, ValidateEncryptionAlgorithm(c.EncryptionAlgorithm, field.NewPath("encryptionAlgorithm"))...)
 	allErrs = append(allErrs, componentconfigs.Validate(c)...)
+	for _, certError := range ValidateCertValidity(c) {
+		klog.Warningf("WARNING: %s", certError.Error())
+	}
 	return allErrs
 }
 
@@ -767,6 +770,22 @@ func ValidateUpgradeConfiguration(c *kubeadm.UpgradeConfiguration) field.ErrorLi
 	}
 	if c.Node.Patches != nil {
 		allErrs = append(allErrs, ValidateAbsolutePath(c.Node.Patches.Directory, field.NewPath("patches").Child("directory"))...)
+	}
+	return allErrs
+}
+
+// ValidateCertValidity validates if the values for cert validity are too big
+func ValidateCertValidity(cfg *kubeadm.ClusterConfiguration) []error {
+	var allErrs []error
+	if cfg.CertificateValidityPeriod != nil && cfg.CertificateValidityPeriod.Duration > constants.CertificateValidityPeriod {
+		allErrs = append(allErrs,
+			errors.Errorf("certificateValidityPeriod: the value %v is more than the recommended default for certificate expiration: %v",
+				cfg.CertificateValidityPeriod.Duration, constants.CertificateValidityPeriod))
+	}
+	if cfg.CACertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod.Duration > constants.CACertificateValidityPeriod {
+		allErrs = append(allErrs,
+			errors.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
+				cfg.CACertificateValidityPeriod.Duration, constants.CACertificateValidityPeriod))
 	}
 	return allErrs
 }

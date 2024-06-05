@@ -19,10 +19,11 @@ package statefulset
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"sync"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -165,7 +166,7 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 func scSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
 	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	clientSet, err := clientset.NewForConfig(config)

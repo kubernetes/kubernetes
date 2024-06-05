@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -298,10 +297,8 @@ func TestStatefulSetControllerAddPod(t *testing.T) {
 
 	ssc.addPod(logger, pod1)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -309,10 +306,8 @@ func TestStatefulSetControllerAddPod(t *testing.T) {
 
 	ssc.addPod(logger, pod2)
 	key, done = ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -349,7 +344,7 @@ func TestStatefulSetControllerAddPodNoSet(t *testing.T) {
 	ssc.addPod(logger, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
-	if key != nil {
+	if key != "" {
 		t.Errorf("StatefulSet enqueued key for Pod with no Set %s", key)
 	}
 }
@@ -369,10 +364,8 @@ func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	fakeResourceVersion(pod1)
 	ssc.updatePod(logger, &prev, pod1)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -381,10 +374,8 @@ func TestStatefulSetControllerUpdatePod(t *testing.T) {
 	fakeResourceVersion(pod2)
 	ssc.updatePod(logger, &prev, pod2)
 	key, done = ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -400,7 +391,7 @@ func TestStatefulSetControllerUpdatePodWithNoSet(t *testing.T) {
 	ssc.updatePod(logger, &prev, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
-	if key != nil {
+	if key != "" {
 		t.Errorf("StatefulSet enqueued key for Pod with no Set %s", key)
 	}
 }
@@ -414,7 +405,7 @@ func TestStatefulSetControllerUpdatePodWithSameVersion(t *testing.T) {
 	ssc.updatePod(logger, pod, pod)
 	ssc.queue.ShutDown()
 	key, _ := ssc.queue.Get()
-	if key != nil {
+	if key != "" {
 		t.Errorf("StatefulSet enqueued key for Pod with no Set %s", key)
 	}
 }
@@ -488,20 +479,16 @@ func TestStatefulSetControllerDeletePod(t *testing.T) {
 
 	ssc.deletePod(logger, pod1)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set1); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
 
 	ssc.deletePod(logger, pod2)
 	key, done = ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set2); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -534,10 +521,8 @@ func TestStatefulSetControllerDeletePodTombstone(t *testing.T) {
 	tombstone := cache.DeletedFinalStateUnknown{Key: tombstoneKey, Obj: pod}
 	ssc.deletePod(logger, tombstone)
 	key, done := ssc.queue.Get()
-	if key == nil || done {
+	if key == "" || done {
 		t.Error("failed to enqueue StatefulSet")
-	} else if key, ok := key.(string); !ok {
-		t.Error("key is not a string")
 	} else if expectedKey, _ := controller.KeyFunc(set); expectedKey != key {
 		t.Errorf("expected StatefulSet key %s found %s", expectedKey, key)
 	}
@@ -684,7 +669,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 }
 
 func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	testFn := func(t *testing.T, scaledownPolicy, deletionPolicy apps.PersistentVolumeClaimRetentionPolicyType) {
 		set := newStatefulSet(4)
@@ -819,7 +804,7 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 }
 
 func TestStaleOwnerRefOnScaleup(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 
 	for _, policy := range []*apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		{
@@ -946,15 +931,14 @@ func newFakeStatefulSetController(ctx context.Context, initialObjects ...runtime
 	ssh := history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions())
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
-	recorder := record.NewFakeRecorder(10)
-	ssc.control = NewDefaultStatefulSetControl(spc, ssu, ssh, recorder)
+	ssc.control = NewDefaultStatefulSetControl(spc, ssu, ssh)
 
 	return ssc, spc, om, ssh
 }
 
 func fakeWorker(ssc *StatefulSetController) {
 	if obj, done := ssc.queue.Get(); !done {
-		ssc.sync(context.TODO(), obj.(string))
+		_ = ssc.sync(context.TODO(), obj)
 		ssc.queue.Done(obj)
 	}
 }

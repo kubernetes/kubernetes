@@ -19,6 +19,7 @@ package attachdetach
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -44,44 +45,9 @@ const (
 	csiPDUniqueNamePrefix    = "kubernetes.io/csi/pd.csi.storage.gke.io^projects/UNSPECIFIED/zones/UNSPECIFIED/disks/"
 )
 
-func Test_NewAttachDetachController_Positive(t *testing.T) {
-	// Arrange
-	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+func createADC(t testing.TB, tCtx ktesting.TContext, fakeKubeClient *fake.Clientset,
+	informerFactory informers.SharedInformerFactory, plugins []volume.VolumePlugin) *attachDetachController {
 
-	// Act
-	tCtx := ktesting.Init(t)
-	_, err := NewAttachDetachController(
-		tCtx,
-		fakeKubeClient,
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Storage().V1().CSINodes(),
-		informerFactory.Storage().V1().CSIDrivers(),
-		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
-		nil, /* plugins */
-		nil, /* prober */
-		false,
-		5*time.Second,
-		false,
-		DefaultTimerConfig,
-	)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
-	}
-}
-
-func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
-	// Arrange
-	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-
-	logger, tCtx := ktesting.NewTestContext(t)
 	adcObj, err := NewAttachDetachController(
 		tCtx,
 		fakeKubeClient,
@@ -92,11 +58,10 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
-		controllervolumetesting.CreateTestPlugin(),
+		plugins,
 		nil, /* prober */
 		false,
-		5*time.Second,
+		1*time.Second,
 		false,
 		DefaultTimerConfig,
 	)
@@ -104,13 +69,32 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
-	adc := adcObj.(*attachDetachController)
+	return adcObj.(*attachDetachController)
+}
+
+func Test_NewAttachDetachController_Positive(t *testing.T) {
+	// Arrange
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	tCtx := ktesting.Init(t)
+
+	// Act
+	createADC(t, tCtx, fakeKubeClient, informerFactory, nil)
+}
+
+func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
+	// Arrange
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+
+	logger, tCtx := ktesting.NewTestContext(t)
+	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, controllervolumetesting.CreateTestPlugin())
 
 	// Act
 	informerFactory.Start(tCtx.Done())
 	informerFactory.WaitForCacheSync(tCtx.Done())
 
-	err = adc.populateActualStateOfWorld(logger)
+	err := adc.populateActualStateOfWorld(logger)
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
 	}
@@ -163,12 +147,12 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 	}
 }
 
-func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
+func largeClusterClient(t testing.TB, numNodes int) *fake.Clientset {
 	// Arrange
 	fakeKubeClient := fake.NewSimpleClientset()
 
-	// populate 10000 nodes, each with 100 volumes
-	for i := 0; i < 10000; i++ {
+	// populate numNodes nodes, each with 100 volumes
+	for i := 0; i < numNodes; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		node := &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -194,49 +178,62 @@ func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
 				},
 			}, metav1.CreateOptions{})
 			if err != nil {
-				b.Fatalf("failed to create PV: %v", err)
+				t.Fatalf("failed to create PV: %v", err)
 			}
 		}
 		_, err := fakeKubeClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{})
 		if err != nil {
-			b.Fatalf("failed to create node: %v", err)
+			t.Fatalf("failed to create node: %v", err)
 		}
 	}
+
+	return fakeKubeClient
+}
+
+func BenchmarkPopulateActualStateOfWorld(b *testing.B) {
+	fakeKubeClient := largeClusterClient(b, 10000)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
 	logger, tCtx := ktesting.NewTestContext(b)
-	adcObj, err := NewAttachDetachController(
-		tCtx,
-		fakeKubeClient,
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Storage().V1().CSINodes(),
-		informerFactory.Storage().V1().CSIDrivers(),
-		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
-		nil, /* plugins */
-		nil, /* prober */
-		false,
-		5*time.Second,
-		false,
-		DefaultTimerConfig,
-	)
-
-	if err != nil {
-		b.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
-	}
-	adc := adcObj.(*attachDetachController)
+	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
 
 	// Act
 	informerFactory.Start(tCtx.Done())
 	informerFactory.WaitForCacheSync(tCtx.Done())
 
 	b.ResetTimer()
-	err = adc.populateActualStateOfWorld(logger)
+	for i := 0; i < b.N; i++ {
+		err := adc.populateActualStateOfWorld(logger)
+		if err != nil {
+			b.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
+		}
+	}
+}
+
+func BenchmarkNodeUpdate(b *testing.B) {
+	fakeKubeClient := largeClusterClient(b, 3000)
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+
+	logger, tCtx := ktesting.NewTestContext(b)
+	adc := createADC(b, tCtx, fakeKubeClient, informerFactory, nil)
+
+	informerFactory.Start(tCtx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
+
+	err := adc.populateActualStateOfWorld(logger.V(2))
 	if err != nil {
 		b.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
+	}
+
+	node, err := fakeKubeClient.CoreV1().Nodes().Get(context.Background(), "node-123", metav1.GetOptions{})
+	if err != nil {
+		b.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)
+	}
+	// Act
+	runtime.GC()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		adc.nodeUpdate(logger, node, node)
 	}
 }
 
@@ -274,7 +271,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		plugins,
 		prober,
 		false,
@@ -528,28 +524,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 
 	// Create the controller
 	logger, tCtx := ktesting.NewTestContext(t)
-	adcObj, err := NewAttachDetachController(
-		tCtx,
-		fakeKubeClient,
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Storage().V1().CSINodes(),
-		informerFactory.Storage().V1().CSIDrivers(),
-		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
-		plugins,
-		nil, /* prober */
-		false,
-		1*time.Second,
-		false,
-		DefaultTimerConfig,
-	)
-	if err != nil {
-		t.Fatalf("NewAttachDetachController failed with error. Expected: <no error> Actual: <%v>", err)
-	}
-	adc := adcObj.(*attachDetachController)
+	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 
 	// Add existing objects (created by testplugin) to the respective informers
 	pods, err := fakeKubeClient.CoreV1().Pods(v1.NamespaceAll).List(tCtx, metav1.ListOptions{})

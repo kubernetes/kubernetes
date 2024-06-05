@@ -114,7 +114,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: kubedns
-        image: registry.k8s.io/dns/k8s-dns-kube-dns:1.22.28
+        image: registry.k8s.io/dns/k8s-dns-kube-dns:1.23.0
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
@@ -170,7 +170,7 @@ spec:
           runAsUser: 1001
           runAsGroup: 1001
       - name: dnsmasq
-        image: registry.k8s.io/dns/k8s-dns-dnsmasq-nanny:1.22.28
+        image: registry.k8s.io/dns/k8s-dns-dnsmasq-nanny:1.23.0
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -217,7 +217,7 @@ spec:
               - NET_BIND_SERVICE
               - SETGID
       - name: sidecar
-        image: registry.k8s.io/dns/k8s-dns-sidecar:1.22.28
+        image: registry.k8s.io/dns/k8s-dns-sidecar:1.23.0
         livenessProbe:
           httpGet:
             path: /metrics

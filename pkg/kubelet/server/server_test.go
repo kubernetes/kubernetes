@@ -37,7 +37,6 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -361,7 +360,6 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		fw.fakeAuth,
-		oteltrace.NewNoopTracerProvider(),
 		kubeCfg,
 	)
 	fw.serverUnderTest = &server
@@ -561,7 +559,7 @@ func TestAuthzCoverage(t *testing.T) {
 
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -864,7 +862,7 @@ func TestCheckpointContainer(t *testing.T) {
 
 	setupTest := func(featureGate bool) *serverTestFramework {
 		// Enable features.ContainerCheckpoint during test
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)
 
 		fw := newServerTest()
 		// GetPodByName() should always fail

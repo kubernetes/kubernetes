@@ -43,12 +43,13 @@ var initializers []func()
 var finalizers []func()
 
 const (
-	defaultPrefixMatching  = false
-	defaultCommandSorting  = true
-	defaultCaseInsensitive = false
+	defaultPrefixMatching   = false
+	defaultCommandSorting   = true
+	defaultCaseInsensitive  = false
+	defaultTraverseRunHooks = false
 )
 
-// EnablePrefixMatching allows to set automatic prefix matching. Automatic prefix matching can be a dangerous thing
+// EnablePrefixMatching allows setting automatic prefix matching. Automatic prefix matching can be a dangerous thing
 // to automatically enable in CLI tools.
 // Set this to true to enable it.
 var EnablePrefixMatching = defaultPrefixMatching
@@ -59,6 +60,10 @@ var EnableCommandSorting = defaultCommandSorting
 
 // EnableCaseInsensitive allows case-insensitive commands names. (case sensitive by default)
 var EnableCaseInsensitive = defaultCaseInsensitive
+
+// EnableTraverseRunHooks executes persistent pre-run and post-run hooks from all parents.
+// By default this is disabled, which means only the first run hook to be found is executed.
+var EnableTraverseRunHooks = defaultTraverseRunHooks
 
 // MousetrapHelpText enables an information splash screen on Windows
 // if the CLI is started from explorer.exe.

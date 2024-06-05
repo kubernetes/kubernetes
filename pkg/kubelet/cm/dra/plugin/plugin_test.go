@@ -20,11 +20,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func getFakeNode() (*v1.Node, error) {
+	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}}, nil
+}
 
 func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
 	newRegistrationHandler := func() *RegistrationHandler {
-		return NewRegistrationHandler(nil, "worker")
+		return NewRegistrationHandler(nil, getFakeNode)
 	}
 
 	for _, test := range []struct {
@@ -50,7 +56,7 @@ func TestRegistrationHandler_ValidatePlugin(t *testing.T) {
 			description: "plugin already registered with a higher supported version",
 			handler: func() *RegistrationHandler {
 				handler := newRegistrationHandler()
-				if err := handler.RegisterPlugin("this-plugin-already-exists-and-has-a-long-name-so-it-doesnt-collide", "", []string{"v1.1.0"}); err != nil {
+				if err := handler.RegisterPlugin("this-plugin-already-exists-and-has-a-long-name-so-it-doesnt-collide", "", []string{"v1.1.0"}, nil); err != nil {
 					t.Fatal(err)
 				}
 				return handler

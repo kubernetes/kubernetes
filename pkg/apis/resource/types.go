@@ -499,11 +499,11 @@ type ResourceSlice struct {
 	// objects with a certain driver name.
 	DriverName string
 
-	NodeResourceModel
+	ResourceModel
 }
 
-// NodeResourceModel must have one and only one field set.
-type NodeResourceModel struct {
+// ResourceModel must have one and only one field set.
+type ResourceModel struct {
 	// NamedResources describes available resources using the named resources model.
 	NamedResources *NamedResourcesResources
 }

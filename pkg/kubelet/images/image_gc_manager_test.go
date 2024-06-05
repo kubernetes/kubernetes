@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -172,7 +172,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 }
 
 func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 	testRuntimeHandler := "test-runtimeHandler"
 	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)

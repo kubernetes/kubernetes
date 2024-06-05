@@ -90,8 +90,8 @@ type Controller struct {
 	nodeLister          corelisters.NodeLister
 	nodeListerSynced    cache.InformerSynced
 	// services and nodes that need to be synced
-	serviceQueue workqueue.RateLimitingInterface
-	nodeQueue    workqueue.RateLimitingInterface
+	serviceQueue workqueue.TypedRateLimitingInterface[string]
+	nodeQueue    workqueue.TypedRateLimitingInterface[string]
 	// lastSyncedNodes is used when reconciling node state and keeps track of
 	// the last synced set of nodes per service key. This is accessed from the
 	// service and node controllers, hence it is protected by a lock.
@@ -109,22 +109,23 @@ func New(
 	clusterName string,
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
-	broadcaster := record.NewBroadcaster()
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
-
 	registerMetrics()
 	s := &Controller{
 		cloud:            cloud,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
-		eventBroadcaster: broadcaster,
-		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		nodeQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
-		lastSyncedNodes:  make(map[string][]*v1.Node),
+		serviceQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](minRetryDelay, maxRetryDelay),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "service"},
+		),
+		nodeQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](minRetryDelay, maxRetryDelay),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node"},
+		),
+		lastSyncedNodes: make(map[string][]*v1.Node),
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -219,6 +220,9 @@ func (c *Controller) enqueueNode(obj interface{}) {
 // It's an error to call Run() more than once for a given ServiceController
 // object.
 func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
+	c.eventBroadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	c.eventRecorder = c.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
+
 	defer runtime.HandleCrash()
 	defer c.serviceQueue.ShutDown()
 	defer c.nodeQueue.ShutDown()
@@ -284,7 +288,7 @@ func (c *Controller) processNextServiceItem(ctx context.Context) bool {
 	}
 	defer c.serviceQueue.Done(key)
 
-	err := c.syncService(ctx, key.(string))
+	err := c.syncService(ctx, key)
 	if err == nil {
 		c.serviceQueue.Forget(key)
 		return true

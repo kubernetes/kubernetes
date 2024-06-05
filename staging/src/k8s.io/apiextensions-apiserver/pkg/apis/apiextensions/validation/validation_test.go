@@ -4373,7 +4373,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 }
 
 func TestSelectableFields(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, true)
 	singleVersionList := []apiextensions.CustomResourceDefinitionVersion{
 		{
 			Name:    "version",
@@ -7312,7 +7312,7 @@ func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.
 	}
 
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(version.MajorMinor(1, 998))
+	base := environment.MustBaseEnvSet(version.MajorMinor(1, 998), true)
 	envSet, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 999),
 		EnvOptions:        []cel.EnvOption{library.Test()},
@@ -10104,7 +10104,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			if tt.opts.celEnvironmentSet == nil {
-				tt.opts.celEnvironmentSet = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+				tt.opts.celEnvironmentSet = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true)
 			}
 			got := validateCustomResourceDefinitionValidation(ctx, &tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 
@@ -10635,7 +10635,7 @@ func TestCelContext(t *testing.T) {
 			celContext := RootCELContext(tt.schema)
 			celContext.converter = converter
 			opts := validationOptions{
-				celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+				celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
 			}
 			openAPIV3Schema := &specStandardValidatorV3{
 				allowDefaults:            opts.allowDefaults,

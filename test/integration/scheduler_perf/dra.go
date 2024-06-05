@@ -237,13 +237,13 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourcev1alpha2.
 		NodeName:   nodeName,
 		DriverName: driverName,
 
-		NodeResourceModel: resourcev1alpha2.NodeResourceModel{
+		ResourceModel: resourcev1alpha2.ResourceModel{
 			NamedResources: &resourcev1alpha2.NamedResourcesResources{},
 		},
 	}
 
 	for i := 0; i < capacity; i++ {
-		slice.NodeResourceModel.NamedResources.Instances = append(slice.NodeResourceModel.NamedResources.Instances,
+		slice.ResourceModel.NamedResources.Instances = append(slice.ResourceModel.NamedResources.Instances,
 			resourcev1alpha2.NamedResourcesInstance{
 				Name: fmt.Sprintf("instance-%d", i),
 			},

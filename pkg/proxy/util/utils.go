@@ -19,18 +19,16 @@ package util
 import (
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
@@ -48,25 +46,6 @@ func isValidEndpoint(host string, port int) bool {
 	return host != "" && port > 0
 }
 
-// BuildPortsToEndpointsMap builds a map of portname -> all ip:ports for that
-// portname. Explode Endpoints.Subsets[*] into this structure.
-func BuildPortsToEndpointsMap(endpoints *v1.Endpoints) map[string][]string {
-	portsToEndpoints := map[string][]string{}
-	for i := range endpoints.Subsets {
-		ss := &endpoints.Subsets[i]
-		for i := range ss.Ports {
-			port := &ss.Ports[i]
-			for i := range ss.Addresses {
-				addr := &ss.Addresses[i]
-				if isValidEndpoint(addr.IP, int(port.Port)) {
-					portsToEndpoints[port.Name] = append(portsToEndpoints[port.Name], net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port))))
-				}
-			}
-		}
-	}
-	return portsToEndpoints
-}
-
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
 func IsZeroCIDR(cidr string) bool {
@@ -74,51 +53,6 @@ func IsZeroCIDR(cidr string) bool {
 		return true
 	}
 	return false
-}
-
-// IsLoopBack checks if a given IP address is a loopback address.
-func IsLoopBack(ip string) bool {
-	netIP := netutils.ParseIPSloppy(ip)
-	if netIP != nil {
-		return netIP.IsLoopback()
-	}
-	return false
-}
-
-// GetLocalAddrs returns a list of all network addresses on the local system
-func GetLocalAddrs() ([]net.IP, error) {
-	var localAddrs []net.IP
-
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, addr := range addrs {
-		ip, _, err := netutils.ParseCIDRSloppy(addr.String())
-		if err != nil {
-			return nil, err
-		}
-
-		localAddrs = append(localAddrs, ip)
-	}
-
-	return localAddrs, nil
-}
-
-// GetLocalAddrSet return a local IPSet.
-// If failed to get local addr, will assume no local ips.
-func GetLocalAddrSet() netutils.IPSet {
-	localAddrs, err := GetLocalAddrs()
-	if err != nil {
-		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs")
-	} else if len(localAddrs) == 0 {
-		klog.InfoS("No local addresses were found")
-	}
-
-	localAddrSet := netutils.IPSet{}
-	localAddrSet.Insert(localAddrs...)
-	return localAddrSet
 }
 
 // ShouldSkipService checks if a given service should skip proxying
@@ -260,20 +194,6 @@ func AppendPortIfNeeded(addr string, port int32) string {
 	return fmt.Sprintf("[%s]:%d", addr, port)
 }
 
-// ShuffleStrings copies strings from the specified slice into a copy in random
-// order. It returns a new slice.
-func ShuffleStrings(s []string) []string {
-	if s == nil {
-		return nil
-	}
-	shuffled := make([]string, len(s))
-	perm := utilrand.Perm(len(s))
-	for i, j := range perm {
-		shuffled[j] = s[i]
-	}
-	return shuffled
-}
-
 // EnsureSysctl sets a kernel sysctl to a given numeric value.
 func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 	if oldVal, _ := sysctl.GetSysctl(name); oldVal != newVal {
@@ -310,18 +230,6 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 	}
 
 	return ""
-}
-
-// RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
-// closes the ports opened in this sync.
-func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]netutils.Closeable) {
-	for k, v := range replacementPortsMap {
-		// Only close newly opened local ports - leave ones that were open before this update
-		if originalPortsMap[k] == nil {
-			klog.V(2).InfoS("Closing local port", "port", k.String())
-			v.Close()
-		}
-	}
 }
 
 func IsVIPMode(ing v1.LoadBalancerIngress) bool {

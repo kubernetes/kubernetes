@@ -46,8 +46,8 @@ import (
 // 7. Perform another Storage Version Migration for secrets
 // 8. Verify that the resource version of the secret is not updated. i.e. it was a no-op update
 func TestStorageVersionMigration(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
 
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Millisecond
@@ -148,8 +148,8 @@ func TestStorageVersionMigration(t *testing.T) {
 // 10. Verify RV and Generations of CRs
 // 11. Verify the list of CRs at v2 works
 func TestStorageVersionMigrationWithCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
 	// decode errors are expected when using conversation webhooks
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
@@ -181,7 +181,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	shutdownServer := svmTest.createConversionWebhook(ctx, t, certCtx)
 
 	// add v2 for serving only
-	svmTest.updateCRD(ctx, t, crd.Name, v2CRDVersion)
+	svmTest.updateCRD(ctx, t, crd.Name, v2CRDVersion, []string{"v1", "v2"}, "v1")
 
 	// create another CR
 	cr2 := svmTest.createCR(ctx, t, "cr2", "v2")
@@ -195,7 +195,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	}
 
 	// add v2 as storage version
-	svmTest.updateCRD(ctx, t, crd.Name, v2StorageCRDVersion)
+	svmTest.updateCRD(ctx, t, crd.Name, v2StorageCRDVersion, []string{"v1", "v2"}, "v2")
 
 	// create CR with v1
 	cr3 := svmTest.createCR(ctx, t, "cr3", "v1")
@@ -257,7 +257,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	}
 
 	// update CRD to v1 not serving and storage followed by webhook shutdown
-	svmTest.updateCRD(ctx, t, crd.Name, v1NotServingCRDVersion)
+	svmTest.updateCRD(ctx, t, crd.Name, v1NotServingCRDVersion, []string{"v2"}, "v2")
 	shutdownServer()
 
 	// assert RV and Generations of CRs

@@ -61,7 +61,7 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
 
-	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer s.TearDownFn()
 
 	metrics, err := scrapeMetrics(s)
@@ -79,7 +79,7 @@ func TestAPIServerProcessMetrics(t *testing.T) {
 func TestAPIServerStorageMetrics(t *testing.T) {
 	config := framework.SharedEtcd()
 	config.Transport.ServerList = []string{config.Transport.ServerList[0], config.Transport.ServerList[0]}
-	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, config)
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), config)
 	defer s.TearDownFn()
 
 	metrics, err := scrapeMetrics(s)
@@ -101,7 +101,7 @@ func TestAPIServerStorageMetrics(t *testing.T) {
 }
 
 func TestAPIServerMetrics(t *testing.T) {
-	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer s.TearDownFn()
 
 	// Make a request to the apiserver to ensure there's at least one data point
@@ -130,7 +130,7 @@ func TestAPIServerMetrics(t *testing.T) {
 
 func TestAPIServerMetricsLabels(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have service account controller running.
-	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer s.TearDownFn()
 
 	clientConfig := restclient.CopyConfig(s.ClientConfig)
@@ -283,7 +283,7 @@ func TestAPIServerMetricsPods(t *testing.T) {
 	}
 
 	// Disable ServiceAccount admission plugin as we don't have service account controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	clientConfig := restclient.CopyConfig(server.ClientConfig)
@@ -391,7 +391,7 @@ func TestAPIServerMetricsNamespaces(t *testing.T) {
 		}
 	}
 
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	clientConfig := restclient.CopyConfig(server.ClientConfig)

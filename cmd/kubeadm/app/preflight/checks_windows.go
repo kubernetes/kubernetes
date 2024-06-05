@@ -20,34 +20,17 @@ limitations under the License.
 package preflight
 
 import (
-	"os/user"
-
 	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 )
-
-// The "Well-known SID" of Administrator group
-// https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
-const administratorSID = "S-1-5-32-544"
 
 // Check validates if a user has elevated (administrator) privileges.
 func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
-	currUser, err := user.Current()
-	if err != nil {
-		return nil, []error{errors.Wrap(err, "cannot get current user")}
+	hProcessToken := windows.GetCurrentProcessToken()
+	if hProcessToken.IsElevated() {
+		return nil, nil
 	}
-
-	groupIds, err := currUser.GroupIds()
-	if err != nil {
-		return nil, []error{errors.Wrap(err, "cannot get group IDs for current user")}
-	}
-
-	for _, sid := range groupIds {
-		if sid == administratorSID {
-			return nil, nil
-		}
-	}
-
-	return nil, []error{errors.New("user is not running as administrator")}
+	return nil, []error{errors.New("the kubeadm process must be run by a user with elevated privileges")}
 }
 
 // Check number of memory required by kubeadm

@@ -31,6 +31,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/utils/ptr"
 )
 
 type testCase struct {
@@ -45,7 +46,7 @@ const KubeReservedMemory = 0.35
 
 var _ = SIGDescribe("OOMKiller for pod using more memory than node allocatable [LinuxOnly]", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("nodeallocatable-oomkiller-test")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	testCases := []testCase{
 		{
@@ -211,6 +212,16 @@ func getOOMTargetContainer(name string) v1.Container {
 				v1.ResourceMemory: resource.MustParse("15Mi"),
 			},
 		},
+		SecurityContext: &v1.SecurityContext{
+			SeccompProfile: &v1.SeccompProfile{
+				Type: v1.SeccompProfileTypeRuntimeDefault,
+			},
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsUser:                ptr.To[int64](999),
+			RunAsGroup:               ptr.To[int64](999),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+		},
 	}
 }
 
@@ -234,6 +245,16 @@ func getOOMTargetContainerMultiProcess(name string) v1.Container {
 				v1.ResourceMemory: resource.MustParse("15Mi"),
 			},
 		},
+		SecurityContext: &v1.SecurityContext{
+			SeccompProfile: &v1.SeccompProfile{
+				Type: v1.SeccompProfileTypeRuntimeDefault,
+			},
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsUser:                ptr.To[int64](999),
+			RunAsGroup:               ptr.To[int64](999),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
+		},
 	}
 }
 
@@ -248,6 +269,16 @@ func getOOMTargetContainerWithoutLimit(name string) v1.Container {
 			"-c",
 			// use the dd tool to attempt to allocate huge block of memory which exceeds the node allocatable
 			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=10G",
+		},
+		SecurityContext: &v1.SecurityContext{
+			SeccompProfile: &v1.SeccompProfile{
+				Type: v1.SeccompProfileTypeRuntimeDefault,
+			},
+			AllowPrivilegeEscalation: ptr.To(false),
+			RunAsUser:                ptr.To[int64](999),
+			RunAsGroup:               ptr.To[int64](999),
+			RunAsNonRoot:             ptr.To(true),
+			Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
 		},
 	}
 }

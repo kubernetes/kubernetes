@@ -57,7 +57,7 @@ func TestCompileClaimsExpression(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestCompileUserExpression(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -135,7 +135,7 @@ func TestCompileClaimsExpressionError(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestCompileUserExpressionError(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

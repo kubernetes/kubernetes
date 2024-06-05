@@ -164,9 +164,9 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 // Swap is only configured if a swap cgroup controller is available and the NodeSwap feature gate is enabled.
 func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
 	if !swapControllerAvailable() {
-		klog.InfoS("No swap cgroup controller present", "swapBehavior", m.memorySwapBehavior, "pod", klog.KObj(pod), "containerName", container.Name)
 		return
 	}
+
 	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo)
 	if m.memorySwapBehavior == kubelettypes.LimitedSwap {
 		if !isCgroup2UnifiedMode() {
@@ -436,4 +436,21 @@ func calcSwapForBurstablePods(containerMemoryRequest, nodeTotalMemory, totalPods
 	swapAllocation := containerMemoryProportion * float64(totalPodsSwapAvailable)
 
 	return int64(swapAllocation), nil
+}
+
+func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
+	if statusUser == nil {
+		return nil
+	}
+
+	user := &kubecontainer.ContainerUser{}
+	if statusUser.GetLinux() != nil {
+		user.Linux = &kubecontainer.LinuxContainerUser{
+			UID:                statusUser.GetLinux().GetUid(),
+			GID:                statusUser.GetLinux().GetGid(),
+			SupplementalGroups: statusUser.GetLinux().GetSupplementalGroups(),
+		}
+	}
+
+	return user
 }

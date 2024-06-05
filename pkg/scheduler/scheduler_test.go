@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -662,6 +661,9 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+				},
 			},
 		},
 		{
@@ -674,6 +676,9 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
+				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
 		},
@@ -692,13 +697,16 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: framework.Node, ActionType: framework.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
+				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -800,7 +808,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[framework.GVK]framework.ActionType{
-				framework.Node: framework.Add,
+				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{
@@ -830,7 +838,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			},
 			want: map[framework.GVK]framework.ActionType{
 				framework.Pod:  framework.Add,
-				framework.Node: framework.Add,
+				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{
@@ -986,7 +994,6 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fakeClient.EventsV1()})
-			defer eventBroadcaster.Shutdown()
 			eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, fakePermit)
 
 			outOfTreeRegistry := frameworkruntime.Registry{
@@ -994,8 +1001,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			}
 
 			_, ctx := ktesting.NewTestContext(t)
-			// timeout equals to the permit plugin waiting time.
-			ctx, cancel := context.WithTimeout(ctx, 100*time.Second)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			scheduler, err := New(
@@ -1043,23 +1049,17 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			// Wait all pods in waitSchedulingPods to be scheduled.
 			wg.Wait()
 
-			// When permit plugin emits the event, pod may not been added to the waitingPods pool yet, so we use pollUntil here.
-			if err := wait.PollUntilContextCancel(ctx, 100*time.Microsecond, true, func(context.Context) (done bool, err error) {
-				// Ensure that all waitingPods in scheduler can be obtained from any profiles.
-				for _, fwk := range scheduler.Profiles {
-					actualPodNamesInWaitingPods := sets.NewString()
-					fwk.IterateOverWaitingPods(func(pod framework.WaitingPod) {
-						actualPodNamesInWaitingPods.Insert(pod.GetPod().Name)
-					})
-					// Validate the name of pods in waitingPods matches expectations.
-					if actualPodNamesInWaitingPods.Len() != len(tc.expectPodNamesInWaitingPods) ||
-						!actualPodNamesInWaitingPods.HasAll(tc.expectPodNamesInWaitingPods...) {
-						return false, fmt.Errorf("Unexpected waitingPods in scheduler profile %s, expect: %#v, got: %#v", fwk.ProfileName(), tc.expectPodNamesInWaitingPods, actualPodNamesInWaitingPods.List())
-					}
+			// Ensure that all waitingPods in scheduler can be obtained from any profiles.
+			for _, fwk := range scheduler.Profiles {
+				actualPodNamesInWaitingPods := sets.NewString()
+				fwk.IterateOverWaitingPods(func(pod framework.WaitingPod) {
+					actualPodNamesInWaitingPods.Insert(pod.GetPod().Name)
+				})
+				// Validate the name of pods in waitingPods matches expectations.
+				if actualPodNamesInWaitingPods.Len() != len(tc.expectPodNamesInWaitingPods) ||
+					!actualPodNamesInWaitingPods.HasAll(tc.expectPodNamesInWaitingPods...) {
+					t.Fatalf("Unexpected waitingPods in scheduler profile %s, expect: %#v, got: %#v", fwk.ProfileName(), tc.expectPodNamesInWaitingPods, actualPodNamesInWaitingPods.List())
 				}
-				return true, nil
-			}); err != nil {
-				t.Fatal("got unexpected result")
 			}
 		})
 	}

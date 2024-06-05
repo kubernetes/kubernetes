@@ -1,7 +1,7 @@
-linux/amd64=alpine:3.12
-linux/arm=arm32v6/alpine:3.12
-linux/arm64=arm64v8/alpine:3.12
-linux/ppc64le=ppc64le/alpine:3.12
-linux/s390x=s390x/alpine:3.12
+linux/amd64=alpine:3.16
+linux/arm=arm32v6/alpine:3.16
+linux/arm64=arm64v8/alpine:3.16
+linux/ppc64le=ppc64le/alpine:3.16
+linux/s390x=s390x/alpine:3.16
 windows/amd64/1809=REGISTRY/busybox:1.29-2-windows-amd64-1809
 windows/amd64/ltsc2022=REGISTRY/busybox:1.29-2-windows-amd64-ltsc2022

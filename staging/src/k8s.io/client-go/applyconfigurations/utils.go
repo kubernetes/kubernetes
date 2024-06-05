@@ -681,6 +681,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ContainerStateWaitingApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerStatus"):
 		return &applyconfigurationscorev1.ContainerStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ContainerUser"):
+		return &applyconfigurationscorev1.ContainerUserApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CSIPersistentVolumeSource"):
 		return &applyconfigurationscorev1.CSIPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CSIVolumeSource"):
@@ -767,6 +769,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.LimitRangeItemApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRangeSpec"):
 		return &applyconfigurationscorev1.LimitRangeSpecApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("LinuxContainerUser"):
+		return &applyconfigurationscorev1.LinuxContainerUserApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LoadBalancerIngress"):
 		return &applyconfigurationscorev1.LoadBalancerIngressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LoadBalancerStatus"):
@@ -801,10 +805,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeConfigStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeDaemonEndpoints"):
 		return &applyconfigurationscorev1.NodeDaemonEndpointsApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeClass"):
-		return &applyconfigurationscorev1.NodeRuntimeClassApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeClassFeatures"):
-		return &applyconfigurationscorev1.NodeRuntimeClassFeaturesApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandler"):
+		return &applyconfigurationscorev1.NodeRuntimeHandlerApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandlerFeatures"):
+		return &applyconfigurationscorev1.NodeRuntimeHandlerFeaturesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeSelector"):
 		return &applyconfigurationscorev1.NodeSelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeSelectorRequirement"):
@@ -1559,8 +1563,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.NamedResourcesResourcesApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("NamedResourcesStringSlice"):
 		return &resourcev1alpha2.NamedResourcesStringSliceApplyConfiguration{}
-	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceModel"):
-		return &resourcev1alpha2.NodeResourceModelApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContext"):
 		return &resourcev1alpha2.PodSchedulingContextApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContextSpec"):
@@ -1597,6 +1599,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.ResourceFilterModelApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceHandle"):
 		return &resourcev1alpha2.ResourceHandleApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("ResourceModel"):
+		return &resourcev1alpha2.ResourceModelApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceRequest"):
 		return &resourcev1alpha2.ResourceRequestApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("ResourceRequestModel"):

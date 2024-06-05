@@ -25,10 +25,8 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
 	"k8s.io/klog/v2"
 	namedresourcesmodel "k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/structured/namedresources"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 )
 
 // resources is a map "node name" -> "driver name" -> available and
@@ -41,11 +39,22 @@ type ResourceModels struct {
 	NamedResources namedresourcesmodel.Model
 }
 
+// resourceSliceLister is the subset of resourcev1alpha2listers.ResourceSliceLister needed by
+// newResourceModel.
+type resourceSliceLister interface {
+	List(selector labels.Selector) (ret []*resourcev1alpha2.ResourceSlice, err error)
+}
+
+// assumeCacheLister is the subset of volumebinding.AssumeCache needed by newResourceModel.
+type assumeCacheLister interface {
+	List(indexObj interface{}) []interface{}
+}
+
 // newResourceModel parses the available information about resources. Objects
 // with an unknown structured parameter model silently ignored. An error gets
 // logged later when parameters required for a pod depend on such an unknown
 // model.
-func newResourceModel(logger klog.Logger, resourceSliceLister resourcev1alpha2listers.ResourceSliceLister, claimAssumeCache volumebinding.AssumeCache, inFlightAllocations *sync.Map) (resources, error) {
+func newResourceModel(logger klog.Logger, resourceSliceLister resourceSliceLister, claimAssumeCache assumeCacheLister, inFlightAllocations *sync.Map) (resources, error) {
 	model := make(resources)
 
 	slices, err := resourceSliceLister.List(labels.Everything())
@@ -112,7 +121,7 @@ func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClas
 				p.parameters = append(p.parameters, request.VendorParameters)
 				p.requests = append(p.requests, request.ResourceRequestModel.NamedResources)
 			default:
-				return nil, fmt.Errorf("claim parameters %s: driverRequersts[%d].requests[%d]: no supported structured parameters found", klog.KObj(claimParameters), i, e)
+				return nil, fmt.Errorf("claim parameters %s: driverRequests[%d].requests[%d]: no supported structured parameters found", klog.KObj(claimParameters), i, e)
 			}
 		}
 		if len(p.requests) > 0 {
@@ -128,12 +137,10 @@ func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClas
 	}
 	for driverName, perDriver := range namedresourcesRequests {
 		var filter *resourcev1alpha2.NamedResourcesFilter
-		if classParameters != nil {
-			for _, f := range classParameters.Filters {
-				if f.DriverName == driverName && f.ResourceFilterModel.NamedResources != nil {
-					filter = f.ResourceFilterModel.NamedResources
-					break
-				}
+		for _, f := range classParameters.Filters {
+			if f.DriverName == driverName && f.ResourceFilterModel.NamedResources != nil {
+				filter = f.ResourceFilterModel.NamedResources
+				break
 			}
 		}
 		controller, err := namedresourcesmodel.NewClaimController(filter, perDriver.requests)

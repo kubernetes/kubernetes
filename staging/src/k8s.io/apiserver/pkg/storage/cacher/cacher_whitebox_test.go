@@ -192,7 +192,7 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 
 	t.Run("ConsistentListFromStorage", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
 		)
@@ -202,7 +202,7 @@ func TestGetListCacheBypass(t *testing.T) {
 
 	})
 	t.Run("ConsistentListFromCache", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
 		)
@@ -338,8 +338,6 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Fatalf("unexpected error waiting for the cache to be ready")
 	}
 
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
@@ -348,12 +346,32 @@ func TestWatchCacheBypass(t *testing.T) {
 		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
 	}
 
-	// With unset RV, check if cacher is bypassed.
 	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
 		ResourceVersion: "",
+		Predicate:       storage.Everything,
 	})
-	if err != errDummy {
-		t.Errorf("Watch with unset RV should bypass cacher: %v", err)
+	if err != nil {
+		t.Errorf("Watch with RV=0 should be served from cache: %v", err)
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, false)
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+		Predicate:       storage.Everything,
+	})
+	if err != nil {
+		t.Errorf("With WatchFromStorageWithoutResourceVersion disabled, watch with unset RV should be served from cache: %v", err)
+	}
+
+	// Inject error to underlying layer and check if cacher is not bypassed.
+	backingStorage.injectError(errDummy)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutResourceVersion, true)
+	_, err = cacher.Watch(context.TODO(), "pod/ns", storage.ListOptions{
+		ResourceVersion: "",
+		Predicate:       storage.Everything,
+	})
+	if !errors.Is(err, errDummy) {
+		t.Errorf("With WatchFromStorageWithoutResourceVersion enabled, watch with unset RV should be served from storage: %v", err)
 	}
 }
 
@@ -431,7 +449,14 @@ func TestEmptyWatchEventCache(t *testing.T) {
 				if e, a := tt.expectedEvent.Object, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 					t.Errorf("Expected: %#v, got: %#v", e, a)
 				}
-			case <-time.After(3 * time.Second):
+			case <-time.After(1 * time.Second):
+				// the watch was established otherwise
+				// we would be blocking on cache.Watch(...)
+				// in addition to that, the tests are serial in nature,
+				// meaning that there is no other actor
+				// that could add items to the database,
+				// which could result in receiving new items.
+				// given that waiting 1s seems okay
 				if tt.expectedEvent != nil {
 					t.Errorf("Failed to get an event")
 				}
@@ -457,7 +482,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// terminate instead of hanging forever.
 	go func() {
 		defer cancel()
-		cacher.clock.Sleep(5 * time.Second)
+		cacher.clock.Sleep(1 * time.Second)
 	}()
 
 	// Watch hangs waiting on watchcache being initialized.
@@ -1619,8 +1644,8 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 }
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 
 	scenarios := []struct {
 		name               string
@@ -1640,7 +1665,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				ResourceVersion:   "105",
 			},
 			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
-				require.NotEqual(t, 0, s.requestWatchProgressCounter, "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
+				require.NotEqual(t, 0, s.getRequestWatchProgressCounter(), "expected store.RequestWatchProgressCounter to be > 0. It looks like watch progress wasn't requested!")
 			},
 		},
 
@@ -1717,6 +1742,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
+			t.Parallel()
 			var backingStorage *dummyStorage
 			if scenario.backingStorage != nil {
 				backingStorage = scenario.backingStorage
@@ -1876,16 +1902,13 @@ func BenchmarkCacher_GetList(b *testing.B) {
 	}
 }
 
-// TestDoNotPopExpiredWatchersWhenNoEventsSeen makes sure that
-// a bookmark event will be delivered after the cacher has seen an event.
-// Previously the watchers have been removed from the "want bookmark" queue.
-func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)()
+// TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived makes sure that
+// a bookmark event will be delivered even if the cacher has not received an event.
+func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
+	require.NoError(t, err, "failed to create cacher")
 	defer cacher.Stop()
 
 	// wait until cacher is initialized.
@@ -1903,30 +1926,11 @@ func TestDoNotPopExpiredWatchersWhenNoEventsSeen(t *testing.T) {
 	require.NoError(t, err, "failed to create watch: %v")
 	defer w.Stop()
 
-	// Ensure that popExpiredWatchers is called to ensure that our watch isn't removed from bookmarkWatchers.
-	// We do that every ~1s, so waiting 2 seconds seems enough.
-	time.Sleep(2 * time.Second)
-
-	// Send an event to ensure that lastProcessedResourceVersion in Cacher will change to non-zero value.
-	makePod := func(rv uint64) *example.Pod {
-		return &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            fmt.Sprintf("pod-%d", rv),
-				Namespace:       "ns",
-				ResourceVersion: fmt.Sprintf("%d", rv),
-				Annotations:     map[string]string{},
-			},
-		}
-	}
-	err = cacher.watchCache.Add(makePod(102))
-	require.NoError(t, err)
-
 	verifyEvents(t, w, []watch.Event{
-		{Type: watch.Added, Object: makePod(102)},
 		{Type: watch.Bookmark, Object: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "102",
-				Annotations:     map[string]string{"k8s.io/initial-events-end": "true"},
+				ResourceVersion: "100",
+				Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
 			},
 		}},
 	}, true)
@@ -2024,9 +2028,11 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		// | Unset           | true/false          | nil/true/false        |
 		// +-----------------+---------------------+-----------------------+
 		{
-			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
-			opts:                         listOptions(true, nil, ""),
-			expectedWatchResourceVersion: 100,
+			name: "RV=unset, allowWatchBookmarks=true, sendInitialEvents=nil",
+			opts: listOptions(true, nil, ""),
+			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
+			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
+			expectedWatchResourceVersion: 0,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
@@ -2039,9 +2045,11 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 			expectedWatchResourceVersion: 100,
 		},
 		{
-			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
-			opts:                         listOptions(false, nil, ""),
-			expectedWatchResourceVersion: 100,
+			name: "RV=unset, allowWatchBookmarks=false, sendInitialEvents=nil",
+			opts: listOptions(false, nil, ""),
+			// Expecting RV 0, due to https://github.com/kubernetes/kubernetes/pull/123935 reverted to serving those requests from watch cache.
+			// Set to 100, when WatchFromStorageWithoutResourceVersion is set to true.
+			expectedWatchResourceVersion: 0,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true, legacy",
@@ -2384,7 +2392,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)
 			_, cacher, _, terminate := testSetupWithEtcdServer(t)
 			t.Cleanup(terminate)
 			if err := cacher.ready.wait(context.TODO()); err != nil {
@@ -2416,9 +2424,8 @@ func TestWatchStreamSeparation(t *testing.T) {
 			if tc.useWatchCacheContextMetadata {
 				contextMetadata = cacher.watchCache.waitingUntilFresh.contextMetadata
 			}
-			// Wait before sending watch progress request to avoid https://github.com/etcd-io/etcd/issues/17507
-			// TODO(https://github.com/etcd-io/etcd/issues/17507): Remove sleep when etcd is upgraded to version with fix.
-			time.Sleep(time.Second)
+			// For the first 100ms from watch creation, watch progress requests are ignored.
+			time.Sleep(200 * time.Millisecond)
 			err = cacher.storage.RequestWatchProgress(metadata.NewOutgoingContext(context.Background(), contextMetadata))
 			if err != nil {
 				t.Fatal(err)
@@ -2429,13 +2436,13 @@ func TestWatchStreamSeparation(t *testing.T) {
 			etcdWatchResourceVersion := waitForEtcdBookmark()
 			gotEtcdWatchBookmark := etcdWatchResourceVersion == lastResourceVersion
 			if gotEtcdWatchBookmark != tc.expectBookmarkOnEtcd {
-				t.Errorf("Unexpected etcd bookmark check result, rv: %d, got: %v, want: %v", etcdWatchResourceVersion, etcdWatchResourceVersion, tc.expectBookmarkOnEtcd)
+				t.Errorf("Unexpected etcd bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", etcdWatchResourceVersion, lastResourceVersion, tc.expectBookmarkOnEtcd)
 			}
 
 			watchCacheResourceVersion := getCacherRV()
 			cacherGotBookmark := watchCacheResourceVersion == lastResourceVersion
 			if cacherGotBookmark != tc.expectBookmarkOnWatchCache {
-				t.Errorf("Unexpected watch cache bookmark check result, rv: %d, got: %v, want: %v", watchCacheResourceVersion, cacherGotBookmark, tc.expectBookmarkOnWatchCache)
+				t.Errorf("Unexpected watch cache bookmark check result, rv: %d, lastRV: %d, wantMatching: %v", watchCacheResourceVersion, lastResourceVersion, tc.expectBookmarkOnWatchCache)
 			}
 		})
 	}

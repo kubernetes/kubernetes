@@ -80,8 +80,14 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		token:  options.TokenGenerator,
 		rootCA: options.RootCA,
 
-		syncServiceAccountQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_service"),
-		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
+		syncServiceAccountQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[serviceAccountQueueKey](),
+			workqueue.TypedRateLimitingQueueConfig[serviceAccountQueueKey]{Name: "serviceaccount_tokens_service"},
+		),
+		syncSecretQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[secretQueueKey](),
+			workqueue.TypedRateLimitingQueueConfig[secretQueueKey]{Name: "serviceaccount_tokens_service"},
+		),
 
 		maxRetries: maxRetries,
 	}
@@ -143,14 +149,14 @@ type TokensController struct {
 	// syncServiceAccountQueue handles service account events:
 	//   * ensures tokens are removed for service accounts which no longer exist
 	// key is "<namespace>/<name>/<uid>"
-	syncServiceAccountQueue workqueue.RateLimitingInterface
+	syncServiceAccountQueue workqueue.TypedRateLimitingInterface[serviceAccountQueueKey]
 
 	// syncSecretQueue handles secret events:
 	//   * deletes tokens whose service account no longer exists
 	//   * updates tokens with missing token or namespace data, or mismatched ca data
 	//   * ensures service account secret references are removed for tokens which are deleted
 	// key is a secretQueueKey{}
-	syncSecretQueue workqueue.RateLimitingInterface
+	syncSecretQueue workqueue.TypedRateLimitingInterface[secretQueueKey]
 
 	maxRetries int
 }
@@ -189,14 +195,14 @@ func (e *TokensController) queueServiceAccountUpdateSync(oldObj interface{}, new
 }
 
 // complete optionally requeues key, then calls queue.Done(key)
-func (e *TokensController) retryOrForget(logger klog.Logger, queue workqueue.RateLimitingInterface, key interface{}, requeue bool) {
+func retryOrForget[T comparable](logger klog.Logger, queue workqueue.TypedRateLimitingInterface[T], key T, requeue bool, maxRetries int) {
 	if !requeue {
 		queue.Forget(key)
 		return
 	}
 
 	requeueCount := queue.NumRequeues(key)
-	if requeueCount < e.maxRetries {
+	if requeueCount < maxRetries {
 		queue.AddRateLimited(key)
 		return
 	}
@@ -227,7 +233,7 @@ func (e *TokensController) syncServiceAccount(ctx context.Context) {
 
 	retry := false
 	defer func() {
-		e.retryOrForget(logger, e.syncServiceAccountQueue, key, retry)
+		retryOrForget(logger, e.syncServiceAccountQueue, key, retry, e.maxRetries)
 	}()
 
 	saInfo, err := parseServiceAccountKey(key)
@@ -263,7 +269,7 @@ func (e *TokensController) syncSecret(ctx context.Context) {
 	// Track whether or not we should retry this sync
 	retry := false
 	defer func() {
-		e.retryOrForget(logger, e.syncSecretQueue, key, retry)
+		retryOrForget(logger, e.syncSecretQueue, key, retry, e.maxRetries)
 	}()
 
 	secretInfo, err := parseSecretQueueKey(key)
@@ -571,7 +577,7 @@ type serviceAccountQueueKey struct {
 	uid       types.UID
 }
 
-func makeServiceAccountKey(sa *v1.ServiceAccount) interface{} {
+func makeServiceAccountKey(sa *v1.ServiceAccount) serviceAccountQueueKey {
 	return serviceAccountQueueKey{
 		namespace: sa.Namespace,
 		name:      sa.Name,
@@ -599,7 +605,7 @@ type secretQueueKey struct {
 	saUID types.UID
 }
 
-func makeSecretQueueKey(secret *v1.Secret) interface{} {
+func makeSecretQueueKey(secret *v1.Secret) secretQueueKey {
 	return secretQueueKey{
 		namespace: secret.Namespace,
 		name:      secret.Name,

@@ -36,7 +36,6 @@ func TestReconstructVolumes(t *testing.T) {
 	tests := []struct {
 		name                                string
 		volumePaths                         []string
-		expectedVolumesNeedReportedInUse    []string
 		expectedVolumesNeedDevicePath       []string
 		expectedVolumesFailedReconstruction []string
 		verifyFunc                          func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
@@ -47,7 +46,6 @@ func TestReconstructVolumes(t *testing.T) {
 				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
 				filepath.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
-			expectedVolumesNeedReportedInUse:    []string{"fake-plugin/pvc-abcdef", "fake-plugin/pvc-abcdef"},
 			expectedVolumesNeedDevicePath:       []string{"fake-plugin/pvc-abcdef", "fake-plugin/pvc-abcdef"},
 			expectedVolumesFailedReconstruction: []string{},
 			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
@@ -75,7 +73,6 @@ func TestReconstructVolumes(t *testing.T) {
 			volumePaths: []string{
 				filepath.Join("pod1", "volumes", "missing-plugin", "pvc-abcdef"),
 			},
-			expectedVolumesNeedReportedInUse:    []string{},
 			expectedVolumesNeedDevicePath:       []string{},
 			expectedVolumesFailedReconstruction: []string{"pvc-abcdef"},
 		},
@@ -115,14 +112,6 @@ func TestReconstructVolumes(t *testing.T) {
 			}
 			if !reflect.DeepEqual(expectedVolumes, rcInstance.volumesNeedUpdateFromNodeStatus) {
 				t.Errorf("Expected expectedVolumesNeedDevicePath:\n%v\n got:\n%v", expectedVolumes, rcInstance.volumesNeedUpdateFromNodeStatus)
-			}
-
-			expectedVolumes = make([]v1.UniqueVolumeName, len(tc.expectedVolumesNeedReportedInUse))
-			for i := range tc.expectedVolumesNeedReportedInUse {
-				expectedVolumes[i] = v1.UniqueVolumeName(tc.expectedVolumesNeedReportedInUse[i])
-			}
-			if !reflect.DeepEqual(expectedVolumes, rcInstance.volumesNeedReportedInUse) {
-				t.Errorf("Expected volumesNeedReportedInUse:\n%v\n got:\n%v", expectedVolumes, rcInstance.volumesNeedReportedInUse)
 			}
 
 			volumesFailedReconstruction := sets.NewString()
@@ -344,7 +333,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			rcInstance.volumesNeedUpdateFromNodeStatus = nil
 
 			// Act 2 - reconcile once
-			rcInstance.reconcileNew()
+			rcInstance.reconcile()
 
 			// Assert 2
 			// MountDevice was attempted

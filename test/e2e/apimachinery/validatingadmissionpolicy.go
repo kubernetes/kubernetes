@@ -18,6 +18,8 @@ package apimachinery
 
 import (
 	"context"
+	"fmt"
+	"math/rand/v2"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -31,9 +33,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	applyadmissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/openapi3"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -130,7 +137,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   Description:
 	   The ValidatingAdmissionPolicy should type check the expressions defined inside policy.
 	*/
-	framework.ConformanceIt("should type check validation expressions", func(ctx context.Context) {
+	framework.It("should type check validation expressions", func(ctx context.Context) {
 		var policy *admissionregistrationv1.ValidatingAdmissionPolicy
 		ginkgo.By("creating the policy with correct types", func() {
 			policy = newValidatingAdmissionPolicyBuilder(f.UniqueName+".correct-policy.example.com").
@@ -280,7 +287,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 	   Description:
 	   The ValidatingAdmissionPolicy should type check a CRD.
 	*/
-	framework.ConformanceIt("should type check a CRD", func(ctx context.Context) {
+	framework.It("should type check a CRD", func(ctx context.Context) {
 		crd := crontabExampleCRD()
 		crd.Spec.Group = "stable." + f.UniqueName
 		crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
@@ -356,6 +363,16 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 					return false, err
 				}
 				if policy.Status.TypeChecking != nil {
+					// TODO(#123829) Remove once the schema watcher is merged.
+					// If the warnings are empty, touch the policy to retry type checking
+					if len(policy.Status.TypeChecking.ExpressionWarnings) == 0 {
+						applyConfig := applyadmissionregistrationv1.ValidatingAdmissionPolicy(policy.Name).WithLabels(map[string]string{
+							"touched": time.Now().String(),
+							"random":  fmt.Sprintf("%d", rand.Int()),
+						})
+						_, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Apply(ctx, applyConfig, metav1.ApplyOptions{})
+						return false, err
+					}
 					return true, nil
 				}
 				return false, nil
@@ -370,6 +387,472 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy [Privileged:ClusterAdmin]", func(
 			gomega.Expect(warning.FieldRef).To(gomega.Equal("spec.validations[1].expression"))
 			gomega.Expect(warning.Warning).To(gomega.ContainSubstring("undefined field 'maxRetries'"))
 		})
+	})
+
+	/*
+	   Release: v1.30
+	   Testname: ValidatingAdmissionPolicy API
+	   Description:
+	   The admissionregistration.k8s.io API group MUST exist in the
+	     /apis discovery document.
+	   The admissionregistration.k8s.io/v1 API group/version MUST exist
+	     in the /apis/admissionregistration.k8s.io discovery document.
+	   The validatingadmisionpolicy and validatingadmissionpolicy/status
+	     resources MUST exist in the
+	     /apis/admissionregistration.k8s.io/v1 discovery document.
+	   The validatingadmisionpolicy resource must support create, get,
+	     list, watch, update, patch, delete, and deletecollection.
+	*/
+	framework.ConformanceIt("should support ValidatingAdmissionPolicy API operations", func(ctx context.Context) {
+		vapVersion := "v1"
+		ginkgo.By("getting /apis")
+		{
+			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
+			framework.ExpectNoError(err)
+			found := false
+			for _, group := range discoveryGroups.Groups {
+				if group.Name == admissionregistrationv1.GroupName {
+					for _, version := range group.Versions {
+						if version.Version == vapVersion {
+							found = true
+							break
+						}
+					}
+				}
+			}
+			if !found {
+				framework.Failf("expected ValidatingAdmissionPolicy API group/version, got %#v", discoveryGroups.Groups)
+			}
+		}
+
+		ginkgo.By("getting /apis/admissionregistration.k8s.io")
+		{
+			group := &metav1.APIGroup{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do(ctx).Into(group)
+			framework.ExpectNoError(err)
+			found := false
+			for _, version := range group.Versions {
+				if version.Version == vapVersion {
+					found = true
+					break
+				}
+			}
+			if !found {
+				framework.Failf("expected ValidatingAdmissionPolicy API version, got %#v", group.Versions)
+			}
+		}
+
+		ginkgo.By("getting /apis/admissionregistration.k8s.io/" + vapVersion)
+		{
+			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(admissionregistrationv1.SchemeGroupVersion.String())
+			framework.ExpectNoError(err)
+			foundVAP, foundVAPStatus := false, false
+			for _, resource := range resources.APIResources {
+				switch resource.Name {
+				case "validatingadmissionpolicies":
+					foundVAP = true
+				case "validatingadmissionpolicies/status":
+					foundVAPStatus = true
+				}
+			}
+			if !foundVAP {
+				framework.Failf("expected validatingadmissionpolicies, got %#v", resources.APIResources)
+			}
+			if !foundVAPStatus {
+				framework.Failf("expected validatingadmissionpolicies/status, got %#v", resources.APIResources)
+			}
+		}
+
+		client := f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies()
+		labelKey, labelValue := "example-e2e-vap-label", utilrand.String(8)
+		label := fmt.Sprintf("%s=%s", labelKey, labelValue)
+
+		template := &admissionregistrationv1.ValidatingAdmissionPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "e2e-example-vap-",
+				Labels: map[string]string{
+					labelKey: labelValue,
+				},
+			},
+			Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+				Validations: []admissionregistrationv1.Validation{
+					{
+						Expression: "object.spec.replicas <= 100",
+					},
+				},
+				MatchConstraints: &admissionregistrationv1.MatchResources{
+					ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{
+						{
+							RuleWithOperations: admissionregistrationv1.RuleWithOperations{
+								Operations: []admissionregistrationv1.OperationType{"CREATE"},
+								Rule: admissionregistrationv1.Rule{
+									APIGroups:   []string{"apps"},
+									APIVersions: []string{"v1"},
+									Resources:   []string{"deployments"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.By("creating")
+		_, err := client.Create(ctx, template, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		_, err = client.Create(ctx, template, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		vapCreated, err := client.Create(ctx, template, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("getting")
+		vapRead, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		gomega.Expect(vapRead.UID).To(gomega.Equal(vapCreated.UID))
+
+		ginkgo.By("listing")
+		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("watching")
+		framework.Logf("starting watch")
+		vapWatch, err := client.Watch(ctx, metav1.ListOptions{ResourceVersion: list.ResourceVersion, LabelSelector: label})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("patching")
+		patchBytes := []byte(`{"metadata":{"annotations":{"patched":"true"}},"spec":{"failurePolicy":"Ignore"}}`)
+		vapPatched, err := client.Patch(ctx, vapCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+		framework.ExpectNoError(err)
+		gomega.Expect(vapPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(vapPatched.Spec.FailurePolicy).To(gomega.HaveValue(gomega.Equal(admissionregistrationv1.Ignore)), "patched object should have the applied spec")
+
+		ginkgo.By("updating")
+		var vapUpdated *admissionregistrationv1.ValidatingAdmissionPolicy
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			vap, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			vapToUpdate := vap.DeepCopy()
+			vapToUpdate.Annotations["updated"] = "true"
+			fail := admissionregistrationv1.Fail
+			vapToUpdate.Spec.FailurePolicy = &fail
+
+			vapUpdated, err = client.Update(ctx, vapToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update validatingadmissionpolicy %q", vapCreated.Name)
+		gomega.Expect(vapUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
+		gomega.Expect(vapUpdated.Spec.FailurePolicy).To(gomega.HaveValue(gomega.Equal(admissionregistrationv1.Fail)), "updated object should have the applied spec")
+
+		framework.Logf("waiting for watch events with expected annotations")
+		for sawAnnotation := false; !sawAnnotation; {
+			select {
+			case evt, ok := <-vapWatch.ResultChan():
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
+				vapWatched, isFS := evt.Object.(*admissionregistrationv1.ValidatingAdmissionPolicy)
+				if !isFS {
+					framework.Failf("expected an object of type: %T, but got %T", &admissionregistrationv1.ValidatingAdmissionPolicy{}, evt.Object)
+				}
+				if vapWatched.Annotations["patched"] == "true" {
+					sawAnnotation = true
+					vapWatch.Stop()
+				} else {
+					framework.Logf("missing expected annotations, waiting: %#v", vapWatched.Annotations)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				framework.Fail("timed out waiting for watch event")
+			}
+		}
+
+		ginkgo.By("getting /status")
+		resource := admissionregistrationv1.SchemeGroupVersion.WithResource("validatingadmissionpolicies")
+		vapStatusRead, err := f.DynamicClient.Resource(resource).Get(ctx, vapCreated.Name, metav1.GetOptions{}, "status")
+		framework.ExpectNoError(err)
+		gomega.Expect(vapStatusRead.GetObjectKind().GroupVersionKind()).To(gomega.Equal(admissionregistrationv1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy")))
+		gomega.Expect(vapStatusRead.GetUID()).To(gomega.Equal(vapCreated.UID))
+
+		ginkgo.By("patching /status")
+		patchBytes = []byte(`{"status":{"conditions":[{"type":"PatchStatusFailed","status":"False","reason":"e2e","message":"Set from an e2e test","lastTransitionTime":"2024-01-01T00:00:00Z"}]}}`)
+		vapStatusPatched, err := client.Patch(ctx, vapCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err)
+		hasCondition := false
+		for i := range vapStatusPatched.Status.Conditions {
+			if vapStatusPatched.Status.Conditions[i].Type == "PatchStatusFailed" {
+				hasCondition = true
+			}
+		}
+		gomega.Expect(hasCondition).To(gomega.BeTrueBecause("expect the patched status exist"))
+
+		ginkgo.By("updating /status")
+		var vapStatusUpdated *admissionregistrationv1.ValidatingAdmissionPolicy
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			vap, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			vapStatusToUpdate := vap.DeepCopy()
+			vapStatusToUpdate.Status.Conditions = append(vapStatusToUpdate.Status.Conditions, metav1.Condition{
+				Type:               "StatusUpdateFailed",
+				Status:             metav1.ConditionFalse,
+				Reason:             "E2E",
+				Message:            "Set from an e2e test",
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			})
+			vapStatusUpdated, err = client.UpdateStatus(ctx, vapStatusToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update status of validatingadmissionpolicy %q", vapCreated.Name)
+		hasCondition = false
+		for i := range vapStatusUpdated.Status.Conditions {
+			if vapStatusUpdated.Status.Conditions[i].Type == "StatusUpdateFailed" {
+				hasCondition = true
+			}
+		}
+		gomega.Expect(hasCondition).To(gomega.BeTrueBecause("expect the updated status exist"))
+
+		ginkgo.By("deleting")
+		err = client.Delete(ctx, vapCreated.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+		vapTmp, err := client.Get(ctx, vapCreated.Name, metav1.GetOptions{})
+		switch {
+		case err == nil && vapTmp.GetDeletionTimestamp() != nil && len(vapTmp.GetFinalizers()) > 0:
+			// deletion requested successfully, object is blocked by finalizers
+		case err == nil:
+			framework.Failf("expected deleted object, got %#v", vapTmp)
+		case apierrors.IsNotFound(err):
+			// deleted successfully
+		default:
+			framework.Failf("expected 404, got %#v", err)
+		}
+
+		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
+		var itemsWithoutFinalizer []admissionregistrationv1.ValidatingAdmissionPolicy
+		for _, item := range list.Items {
+			if len(item.GetFinalizers()) == 0 {
+				itemsWithoutFinalizer = append(itemsWithoutFinalizer, item)
+			}
+		}
+		framework.ExpectNoError(err)
+		gomega.Expect(itemsWithoutFinalizer).To(gomega.HaveLen(2), "filtered list should have 2 items")
+
+		ginkgo.By("deleting a collection")
+		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
+		framework.ExpectNoError(err)
+
+		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
+		var itemsColWithoutFinalizer []admissionregistrationv1.ValidatingAdmissionPolicy
+		for _, item := range list.Items {
+			if !(item.GetDeletionTimestamp() != nil && len(item.GetFinalizers()) > 0) {
+				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
+			}
+		}
+		framework.ExpectNoError(err)
+		gomega.Expect(itemsColWithoutFinalizer).To(gomega.BeEmpty(), "filtered list should have 0 items")
+	})
+
+	/*
+	   Release: v1.30
+	   Testname: ValidatingadmissionPolicyBinding API
+	   Description:
+	   The admissionregistration.k8s.io API group MUST exist in the
+	     /apis discovery document.
+	   The admissionregistration.k8s.io/v1 API group/version MUST exist
+	     in the /apis/admissionregistration.k8s.io discovery document.
+	   The ValidatingadmissionPolicyBinding resources MUST exist in the
+	     /apis/admissionregistration.k8s.io/v1 discovery document.
+	   The ValidatingadmissionPolicyBinding resource must support create, get,
+	     list, watch, update, patch, delete, and deletecollection.
+	*/
+	framework.ConformanceIt("should support ValidatingAdmissionPolicyBinding API operations", func(ctx context.Context) {
+		vapbVersion := "v1"
+		ginkgo.By("getting /apis")
+		{
+			discoveryGroups, err := f.ClientSet.Discovery().ServerGroups()
+			framework.ExpectNoError(err)
+			found := false
+			for _, group := range discoveryGroups.Groups {
+				if group.Name == admissionregistrationv1.GroupName {
+					for _, version := range group.Versions {
+						if version.Version == vapbVersion {
+							found = true
+							break
+						}
+					}
+				}
+			}
+			if !found {
+				framework.Failf("expected ValidatingAdmissionPolicyBinding API group/version, got %#v", discoveryGroups.Groups)
+			}
+		}
+
+		ginkgo.By("getting /apis/admissionregistration.k8s.io")
+		{
+			group := &metav1.APIGroup{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do(ctx).Into(group)
+			framework.ExpectNoError(err)
+			found := false
+			for _, version := range group.Versions {
+				if version.Version == vapbVersion {
+					found = true
+					break
+				}
+			}
+			if !found {
+				framework.Failf("expected ValidatingAdmissionPolicyBinding API version, got %#v", group.Versions)
+			}
+		}
+
+		ginkgo.By("getting /apis/admissionregistration.k8s.io/" + vapbVersion)
+		{
+			resources, err := f.ClientSet.Discovery().ServerResourcesForGroupVersion(admissionregistrationv1.SchemeGroupVersion.String())
+			framework.ExpectNoError(err)
+			foundVAPB := false
+			for _, resource := range resources.APIResources {
+				switch resource.Name {
+				case "validatingadmissionpolicybindings":
+					foundVAPB = true
+				}
+			}
+			if !foundVAPB {
+				framework.Failf("expected validatingadmissionpolicybindings, got %#v", resources.APIResources)
+			}
+		}
+
+		client := f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings()
+		labelKey, labelValue := "example-e2e-vapb-label", utilrand.String(8)
+		label := fmt.Sprintf("%s=%s", labelKey, labelValue)
+
+		template := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "e2e-example-vapb-",
+				Labels: map[string]string{
+					labelKey: labelValue,
+				},
+			},
+			Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+				PolicyName:        "replicalimit-policy.example.com",
+				ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
+			},
+		}
+
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.By("creating")
+		_, err := client.Create(ctx, template, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		_, err = client.Create(ctx, template, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		vapbCreated, err := client.Create(ctx, template, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("getting")
+		vapbRead, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		gomega.Expect(vapbRead.UID).To(gomega.Equal(vapbCreated.UID))
+
+		ginkgo.By("listing")
+		list, err := client.List(ctx, metav1.ListOptions{LabelSelector: label})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("watching")
+		framework.Logf("starting watch")
+		vapbWatch, err := client.Watch(ctx, metav1.ListOptions{ResourceVersion: list.ResourceVersion, LabelSelector: label})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("patching")
+		patchBytes := []byte(`{"metadata":{"annotations":{"patched":"true"}},"spec":{"validationActions":["Warn"]}}`)
+		vapbPatched, err := client.Patch(ctx, vapbCreated.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+		framework.ExpectNoError(err)
+		gomega.Expect(vapbPatched.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
+		gomega.Expect(vapbPatched.Spec.ValidationActions).To(gomega.Equal([]admissionregistrationv1.ValidationAction{admissionregistrationv1.Warn}), "patched object should have the applied spec")
+
+		ginkgo.By("updating")
+		var vapbUpdated *admissionregistrationv1.ValidatingAdmissionPolicyBinding
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			vap, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			vapbToUpdate := vap.DeepCopy()
+			vapbToUpdate.Annotations["updated"] = "true"
+			vapbToUpdate.Spec.ValidationActions = []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny}
+
+			vapbUpdated, err = client.Update(ctx, vapbToUpdate, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to update validatingadmissionpolicybinding %q", vapbCreated.Name)
+		gomega.Expect(vapbUpdated.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
+		gomega.Expect(vapbUpdated.Spec.ValidationActions).To(gomega.Equal([]admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny}), "updated object should have the applied spec")
+
+		framework.Logf("waiting for watch events with expected annotations")
+		for sawAnnotation := false; !sawAnnotation; {
+			select {
+			case evt, ok := <-vapbWatch.ResultChan():
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
+				vapbWatched, isFS := evt.Object.(*admissionregistrationv1.ValidatingAdmissionPolicyBinding)
+				if !isFS {
+					framework.Failf("expected an object of type: %T, but got %T", &admissionregistrationv1.ValidatingAdmissionPolicyBinding{}, evt.Object)
+				}
+				if vapbWatched.Annotations["patched"] == "true" {
+					sawAnnotation = true
+					vapbWatch.Stop()
+				} else {
+					framework.Logf("missing expected annotations, waiting: %#v", vapbWatched.Annotations)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				framework.Fail("timed out waiting for watch event")
+			}
+		}
+		ginkgo.By("deleting")
+		err = client.Delete(ctx, vapbCreated.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+		vapbTmp, err := client.Get(ctx, vapbCreated.Name, metav1.GetOptions{})
+		switch {
+		case err == nil && vapbTmp.GetDeletionTimestamp() != nil && len(vapbTmp.GetFinalizers()) > 0:
+			// deletion requested successfully, object is blocked by finalizers
+		case err == nil:
+			framework.Failf("expected deleted object, got %#v", vapbTmp)
+		case apierrors.IsNotFound(err):
+			// deleted successfully
+		default:
+			framework.Failf("expected 404, got %#v", err)
+		}
+
+		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
+		var itemsWithoutFinalizer []admissionregistrationv1.ValidatingAdmissionPolicyBinding
+		for _, item := range list.Items {
+			if len(item.GetFinalizers()) == 0 {
+				itemsWithoutFinalizer = append(itemsWithoutFinalizer, item)
+			}
+		}
+		framework.ExpectNoError(err)
+		gomega.Expect(itemsWithoutFinalizer).To(gomega.HaveLen(2), "filtered list should have 2 items")
+
+		ginkgo.By("deleting a collection")
+		err = client.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: label})
+		framework.ExpectNoError(err)
+
+		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
+		var itemsColWithoutFinalizer []admissionregistrationv1.ValidatingAdmissionPolicyBinding
+		for _, item := range list.Items {
+			if !(item.GetDeletionTimestamp() != nil && len(item.GetFinalizers()) > 0) {
+				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
+			}
+		}
+		framework.ExpectNoError(err)
+		gomega.Expect(itemsColWithoutFinalizer).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 })
 

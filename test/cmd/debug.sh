@@ -26,7 +26,6 @@ run_kubectl_debug_pod_tests() {
   kube::log::status "Testing kubectl debug (pod tests)"
 
   ### Pod Troubleshooting by ephemeral containers
-
   # Pre-Condition: Pod "nginx" is created
   kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -38,7 +37,6 @@ run_kubectl_debug_pod_tests() {
   kubectl delete pod target "${kube_flags[@]:?}"
 
   ### Pod Troubleshooting by Copy
-
   # Pre-Condition: Pod "nginx" is created
   kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
@@ -48,6 +46,26 @@ run_kubectl_debug_pod_tests() {
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
+  # Clean up
+  kubectl delete pod target target-copy "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "nginx" with labels, annotations, probes and initContainers is created
+  kubectl create -f hack/testdata/pod-with-metadata-and-probes.yaml
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Command: create a copy of target with a new debug container with --keep-* flags
+  # --keep-* flags intentionally don't work with legacyProfile(Only labels are removed)
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --keep-labels=true --keep-annotations=true --keep-liveness=true --keep-readiness=true --keep-startup=true --keep-init-containers=false --attach=false "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert pod/target-copy '{{.metadata.labels}}' '<no value>'
+  kube::test::get_object_assert pod/target-copy '{{.metadata.annotations}}' 'map\[test:test\]'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "livenessProbe")}}:{{end}}{{end}}' ':'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "readinessProbe")}}:{{end}}{{end}}' ':'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "startupProbe")}}:{{end}}{{end}}' ':'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.initContainers}}{{.name}}:{{end}}' 'init:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.initContainers}}{{.image}}:{{end}}' "busybox:"
   # Clean up
   kubectl delete pod target target-copy "${kube_flags[@]:?}"
 
@@ -133,20 +151,44 @@ run_kubectl_debug_general_tests() {
   kube::log::status "Testing kubectl debug profile general"
 
   ### Debug by pod copy
-  ### probes are removed, sets SYS_PTRACE in debugging container, sets shareProcessNamespace
-
-  # Pre-Condition: Pod "nginx" is created
-  kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  # Pre-Condition: Pod "nginx" with labels, annotations, probes and initContainers is created
+  kubectl create -f hack/testdata/pod-with-metadata-and-probes.yaml
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
   # Command: create a copy of target with a new debug container
+  # labels, annotations, probes are removed and initContainers are kept, sets SYS_PTRACE in debugging container, sets shareProcessNamespace
   kubectl debug --profile general target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false "${kube_flags[@]:?}"
   # Post-Conditions
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert pod/target-copy '{{.metadata.labels}}' '<no value>'
+  kube::test::get_object_assert pod/target-copy '{{.metadata.annotations}}' '<no value>'
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "livenessProbe")}}:{{end}}{{end}}' ''
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "readinessProbe")}}:{{end}}{{end}}' ''
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "startupProbe")}}:{{end}}{{end}}' ''
+  kube::test::get_object_assert pod/target-copy '{{range.spec.initContainers}}{{.name}}:{{end}}' 'init:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.initContainers}}{{.image}}:{{end}}' "busybox:"
+  kube::test::get_object_assert pod/target-copy '{{(index (index .spec.containers 1).securityContext.capabilities.add 0)}}' 'SYS_PTRACE'
+  kube::test::get_object_assert pod/target-copy '{{.spec.shareProcessNamespace}}' 'true'
+  # Clean up
+  kubectl delete pod target target-copy "${kube_flags[@]:?}"
+
+  # Pre-Condition: Pod "nginx" with labels, annotations, probes and initContainers is created
+  kubectl create -f hack/testdata/pod-with-metadata-and-probes.yaml
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Command: create a copy of target with a new debug container with --keep-* flags
+  # labels, annotations, probes are kept and initContainers are removed, sets SYS_PTRACE in debugging container, sets shareProcessNamespace
+  kubectl debug --profile general target -it --copy-to=target-copy --image=busybox --container=debug-container --keep-labels=true --keep-annotations=true --keep-liveness=true --keep-readiness=true --keep-startup=true --keep-init-containers=false --attach=false "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
+  kube::test::get_object_assert pod/target-copy '{{.metadata.labels}}' 'map\[run:target\]'
+  kube::test::get_object_assert pod/target-copy '{{.metadata.annotations}}' 'map\[test:test\]'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.image}}:{{end}}' "${IMAGE_NGINX:?}:busybox:"
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "livenessProbe")}}:{{end}}{{end}}' ':'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "readinessProbe")}}:{{end}}{{end}}' ':'
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{if (index . "startupProbe")}}:{{end}}{{end}}' ':'
+  kube::test::get_object_assert pod/target-copy '{{.spec.initContainers}}' '<no value>'
   kube::test::get_object_assert pod/target-copy '{{(index (index .spec.containers 1).securityContext.capabilities.add 0)}}' 'SYS_PTRACE'
   kube::test::get_object_assert pod/target-copy '{{.spec.shareProcessNamespace}}' 'true'
   # Clean up

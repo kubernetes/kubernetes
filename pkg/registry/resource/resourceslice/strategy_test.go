@@ -30,7 +30,7 @@ var slice = &resource.ResourceSlice{
 	},
 	NodeName:   "valid-node-name",
 	DriverName: "testdriver.example.com",
-	NodeResourceModel: resource.NodeResourceModel{
+	ResourceModel: resource.ResourceModel{
 		NamedResources: &resource.NamedResourcesResources{},
 	},
 }

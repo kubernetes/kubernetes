@@ -54,7 +54,7 @@ import (
 const remotePort = "8765"
 
 func TestPortforward(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PortForwardWebsockets, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PortForwardWebsockets, true)
 	t.Setenv("KUBECTL_PORT_FORWARD_WEBSOCKETS", "true")
 
 	var podName string
@@ -79,7 +79,7 @@ func TestPortforward(t *testing.T) {
 	backendPort, _ := strconv.Atoi(backendURL.Port())
 
 	etcd := framework.SharedEtcd()
-	server := kastesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, etcd)
+	server := kastesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcd)
 	defer server.TearDownFn()
 
 	adminClient, err := kubernetes.NewForConfig(server.ClientConfig)

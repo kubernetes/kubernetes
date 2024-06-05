@@ -31,7 +31,7 @@ import (
 
 func TestMakeUserNsManagerSwitch(t *testing.T) {
 	// Create the manager with the feature gate enabled, to record some pods on disk.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	pods := []types.UID{"pod-1", "pod-2"}
 
@@ -53,7 +53,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 
 	// Test re-init works when the feature gate is disabled and there were some
 	// pods written on disk.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 	m2, err := MakeUserNsManager(testUserNsPodsManager)
 	require.NoError(t, err)
 
@@ -66,7 +66,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 
 func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 	// Enable the feature gate to create some pods on disk.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	pods := []types.UID{"pod-1", "pod-2"}
 
@@ -88,7 +88,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 
 	// Test no-op when the feature gate is disabled and there were some
 	// pods registered on disk.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 	// Create a new manager with the feature gate off and verify the userns range is nil.
 	m2, err := MakeUserNsManager(testUserNsPodsManager)
 	require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 
 func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 	// Enable the feature gate to create some pods on disk.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	listPods := []types.UID{"pod-1", "pod-2"}
 	pods := []types.UID{"pod-3", "pod-4"}
@@ -125,7 +125,7 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 
 	// Test cleanup works when the feature gate is disabled and there were some
 	// pods registered.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 	err = m.CleanupOrphanedPodUsernsAllocations(nil, nil)
 	require.NoError(t, err)
 

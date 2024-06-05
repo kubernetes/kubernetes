@@ -18,6 +18,7 @@ package testing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -83,13 +84,15 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // files that because Golang testing's call to os.Exit will not give a stop channel go routine
 // enough time to remove temporary files.
 func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
-	stopCh := make(chan struct{})
+	// TODO: this is a candidate for using what is now test/utils/ktesting,
+	// should that become a staging repo.
+	ctx, cancel := context.WithCancelCause(context.Background())
 	var errCh chan error
 	tearDown := func() {
-		// Closing stopCh is stopping apiextensions apiserver and its
+		// Cancel is stopping apiextensions apiserver and its
 		// delegates, which itself is cleaning up after itself,
 		// including shutting down its storage layer.
-		close(stopCh)
+		cancel(errors.New("tearing down"))
 
 		// If the apiextensions apiserver was started, let's wait for
 		// it to shutdown clearly.
@@ -166,13 +169,13 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	}
 
 	errCh = make(chan error)
-	go func(stopCh <-chan struct{}) {
+	go func() {
 		defer close(errCh)
 
-		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
+		if err := server.GenericAPIServer.PrepareRun().RunWithContext(ctx); err != nil {
 			errCh <- err
 		}
-	}(stopCh)
+	}()
 
 	t.Logf("Waiting for /healthz to be ok...")
 

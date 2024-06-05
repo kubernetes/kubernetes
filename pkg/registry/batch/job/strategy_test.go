@@ -35,7 +35,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -51,7 +50,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 			{
 				Action: batch.PodFailurePolicyActionFailJob,
 				OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-					ContainerName: pointer.String("container-name"),
+					ContainerName: ptr.To("container-name"),
 					Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 					Values:        []int32{1},
 				},
@@ -63,7 +62,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 			{
 				Action: batch.PodFailurePolicyActionIgnore,
 				OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-					ContainerName: pointer.String("updated-container-name"),
+					ContainerName: ptr.To("updated-container-name"),
 					Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 					Values:        []int32{2},
 				},
@@ -220,8 +219,8 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
-					MaxFailedIndexes:     pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+					MaxFailedIndexes:     ptr.To[int32](1),
 				},
 			},
 			wantJob: batch.Job{
@@ -229,8 +228,8 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
-					MaxFailedIndexes:     pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+					MaxFailedIndexes:     ptr.To[int32](1),
 				},
 			},
 		},
@@ -250,8 +249,8 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
 					Template:             validPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
-					MaxFailedIndexes:     pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+					MaxFailedIndexes:     ptr.To[int32](1),
 				},
 			},
 			wantJob: batch.Job{
@@ -520,7 +519,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: validPodTemplateSpec,
-					Suspend:  pointer.Bool(false),
+					Suspend:  ptr.To(false),
 				},
 			},
 			updatedJob: batch.Job{
@@ -528,7 +527,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: validPodTemplateSpec,
-					Suspend:  pointer.Bool(true),
+					Suspend:  ptr.To(true),
 				},
 			},
 			wantJob: batch.Job{
@@ -536,7 +535,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: validPodTemplateSpec,
-					Suspend:  pointer.Bool(true),
+					Suspend:  ptr.To(true),
 				},
 			},
 		},
@@ -553,7 +552,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: validPodTemplateSpec,
-					Suspend:  pointer.Bool(true),
+					Suspend:  ptr.To(true),
 				},
 			},
 			wantJob: batch.Job{
@@ -561,7 +560,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector: validSelector,
 					Template: validPodTemplateSpec,
-					Suspend:  pointer.Bool(true),
+					Suspend:  ptr.To(true),
 				},
 			},
 		},
@@ -569,10 +568,10 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForUpdate(ctx, &tc.updatedJob, &tc.job)
@@ -596,7 +595,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 			{
 				Action: batch.PodFailurePolicyActionFailJob,
 				OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
-					ContainerName: pointer.String("container-name"),
+					ContainerName: ptr.To("container-name"),
 					Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
 					Values:        []int32{1},
 				},
@@ -626,7 +625,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       validPodTemplateSpec,
 				},
 			},
@@ -634,7 +633,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       expectedPodTemplateSpec,
 				},
 			},
@@ -687,20 +686,20 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             validPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
-					MaxFailedIndexes:     pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+					MaxFailedIndexes:     ptr.To[int32](1),
 				},
 			},
 			wantJob: batch.Job{
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             expectedPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
-					MaxFailedIndexes:     pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+					MaxFailedIndexes:     ptr.To[int32](1),
 				},
 			},
 		},
@@ -710,17 +709,17 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             validPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
-					MaxFailedIndexes:     pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+					MaxFailedIndexes:     ptr.To[int32](1),
 				},
 			},
 			wantJob: batch.Job{
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             expectedPodTemplateSpec,
 					BackoffLimitPerIndex: nil,
 					MaxFailedIndexes:     nil,
@@ -733,7 +732,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:         validSelector,
-					ManualSelector:   pointer.Bool(false),
+					ManualSelector:   ptr.To(false),
 					Template:         validPodTemplateSpec,
 					PodFailurePolicy: podFailurePolicy,
 				},
@@ -742,7 +741,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:         validSelector,
-					ManualSelector:   pointer.Bool(false),
+					ManualSelector:   ptr.To(false),
 					Template:         expectedPodTemplateSpec,
 					PodFailurePolicy: podFailurePolicy,
 				},
@@ -754,7 +753,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             validPodTemplateSpec,
 					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
 				},
@@ -763,7 +762,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             expectedPodTemplateSpec,
 					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
 				},
@@ -775,7 +774,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             validPodTemplateSpec,
 					PodReplacementPolicy: podReplacementPolicy(batch.Failed),
 				},
@@ -784,7 +783,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             expectedPodTemplateSpec,
 					PodReplacementPolicy: nil,
 				},
@@ -796,7 +795,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:         validSelector,
-					ManualSelector:   pointer.Bool(false),
+					ManualSelector:   ptr.To(false),
 					Template:         validPodTemplateSpec,
 					PodFailurePolicy: podFailurePolicy,
 				},
@@ -805,7 +804,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:         validSelector,
-					ManualSelector:   pointer.Bool(false),
+					ManualSelector:   ptr.To(false),
 					Template:         expectedPodTemplateSpec,
 					PodFailurePolicy: nil,
 				},
@@ -816,7 +815,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       validPodTemplateSpec,
 				},
 				Status: batch.JobStatus{
@@ -827,7 +826,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       expectedPodTemplateSpec,
 				},
 			},
@@ -839,9 +838,9 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             validPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -859,7 +858,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       expectedPodTemplateSpec,
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{},
@@ -874,9 +873,9 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(false),
+					ManualSelector:       ptr.To(false),
 					Template:             validPodTemplateSpec,
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
@@ -908,7 +907,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       expectedPodTemplateSpec,
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
@@ -937,7 +936,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       validPodTemplateSpec,
 					ManagedBy:      ptr.To("custom-controller-name"),
 				},
@@ -946,7 +945,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       expectedPodTemplateSpec,
 				},
 			},
@@ -957,7 +956,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       validPodTemplateSpec,
 					ManagedBy:      ptr.To("custom-controller-name"),
 				},
@@ -966,7 +965,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				ObjectMeta: getValidObjectMeta(1),
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template:       expectedPodTemplateSpec,
 					ManagedBy:      ptr.To("custom-controller-name"),
 				},
@@ -976,11 +975,11 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManageBy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManageBy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
 			ctx := genericapirequest.NewDefaultContext()
 
 			Strategy.PrepareForCreate(ctx, &tc.job)
@@ -1047,12 +1046,12 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Parallelism = pointer.Int32Ptr(2)
+				job.Spec.Parallelism = ptr.To[int32](2)
 			},
 		},
 		"update completions disallowed": {
@@ -1065,13 +1064,13 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Completions:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Completions:    ptr.To[int32](1),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(2)
+				job.Spec.Completions = ptr.To[int32](2)
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
@@ -1090,8 +1089,8 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -1112,8 +1111,8 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -1131,8 +1130,8 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -1153,9 +1152,9 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Suspend:        pointer.BoolPtr(true),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
 				},
 				Status: batch.JobStatus{
 					StartTime: &now,
@@ -1179,9 +1178,9 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Suspend:        pointer.BoolPtr(true),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
+					Suspend:        ptr.To(true),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -1201,7 +1200,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 						MatchLabels:      map[string]string{"a": "b"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}},
 					},
-					ManualSelector: pointer.BoolPtr(true),
+					ManualSelector: ptr.To(true),
 					Template:       validPodTemplateSpec,
 				},
 			},
@@ -1222,7 +1221,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{batch.LegacyControllerUidLabel: "test"},
 					},
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test"},
@@ -1252,7 +1251,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{batch.ControllerUidLabel: "test"},
 					},
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.JobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test", batch.ControllerUidLabel: "test"},
@@ -1281,10 +1280,10 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					Completions:          pointer.Int32(2),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					Completions:          ptr.To[int32](2),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(true),
+					ManualSelector:       ptr.To(true),
 					Template:             validPodTemplateSpecNever,
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
@@ -1306,8 +1305,8 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
 			errs := Strategy.ValidateUpdate(ctx, newJob, tc.job)
@@ -1349,8 +1348,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 
@@ -1364,8 +1363,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 		},
@@ -1380,8 +1379,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 
@@ -1395,8 +1394,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 		},
@@ -1413,8 +1412,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{ImagePullSecrets: []api.LocalObjectReference{{Name: ""}}},
 					},
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 
@@ -1428,8 +1427,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 			wantWarningsCount: 1,
@@ -1445,8 +1444,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    pointer.Int32(100_001),
-					Parallelism:    pointer.Int32(10_001),
+					Completions:    ptr.To[int32](100_001),
+					Parallelism:    ptr.To[int32](10_001),
 					Template:       validPodTemplateSpec,
 				},
 			},
@@ -1459,8 +1458,8 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Completions:    pointer.Int32(100_001),
-					Parallelism:    pointer.Int32(10_000),
+					Completions:    ptr.To[int32](100_001),
+					Parallelism:    ptr.To[int32](10_000),
 					Template:       validPodTemplateSpec,
 				},
 			},
@@ -1533,8 +1532,8 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 				},
 				Spec: batch.JobSpec{
 					CompletionMode: completionModePtr(batch.IndexedCompletion),
-					Parallelism:    pointer.Int32(100_001),
-					Completions:    pointer.Int32(100_001),
+					Parallelism:    ptr.To[int32](100_001),
+					Completions:    ptr.To[int32](100_001),
 					Template:       validPodTemplate,
 				},
 			},
@@ -1577,7 +1576,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: batchLabels,
@@ -1589,7 +1588,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: batchLabels,
@@ -1603,7 +1602,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
@@ -1615,7 +1614,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
@@ -1629,7 +1628,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{},
@@ -1641,7 +1640,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{},
@@ -1681,8 +1680,8 @@ func TestJobStrategy_Validate(t *testing.T) {
 						},
 						Spec: validPodSpec,
 					},
-					Completions:    pointer.Int32Ptr(2),
-					ManualSelector: pointer.BoolPtr(true),
+					Completions:    ptr.To[int32](2),
+					ManualSelector: ptr.To(true),
 				},
 			},
 			wantJob: &batch.Job{
@@ -1695,8 +1694,8 @@ func TestJobStrategy_Validate(t *testing.T) {
 						},
 						Spec: validPodSpec,
 					},
-					Completions:    pointer.Int32Ptr(2),
-					ManualSelector: pointer.BoolPtr(true),
+					Completions:    ptr.To[int32](2),
+					ManualSelector: ptr.To(true),
 				},
 			},
 		},
@@ -1705,16 +1704,16 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
 						},
 						Spec: validPodSpec,
 					},
-					Completions:             pointer.Int32Ptr(2),
-					Suspend:                 pointer.BoolPtr(true),
-					TTLSecondsAfterFinished: pointer.Int32Ptr(0),
+					Completions:             ptr.To[int32](2),
+					Suspend:                 ptr.To(true),
+					TTLSecondsAfterFinished: ptr.To[int32](0),
 					CompletionMode:          completionModePtr(batch.IndexedCompletion),
 				},
 			},
@@ -1722,16 +1721,16 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
 						},
 						Spec: validPodSpec,
 					},
-					Completions:             pointer.Int32Ptr(2),
-					Suspend:                 pointer.BoolPtr(true),
-					TTLSecondsAfterFinished: pointer.Int32Ptr(0),
+					Completions:             ptr.To[int32](2),
+					Suspend:                 ptr.To(true),
+					TTLSecondsAfterFinished: ptr.To[int32](0),
 					CompletionMode:          completionModePtr(batch.IndexedCompletion),
 				},
 			},
@@ -1741,7 +1740,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
@@ -1759,7 +1758,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       defaultSelector,
-					ManualSelector: pointer.Bool(false),
+					ManualSelector: ptr.To(false),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
@@ -1782,7 +1781,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(true),
+					ManualSelector: ptr.To(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validSelector.MatchLabels,
@@ -1806,7 +1805,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(true),
+					ManualSelector: ptr.To(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validSelector.MatchLabels,
@@ -1835,7 +1834,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(true),
+					ManualSelector: ptr.To(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validSelector.MatchLabels,
@@ -1859,7 +1858,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
-					ManualSelector: pointer.Bool(true),
+					ManualSelector: ptr.To(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validSelector.MatchLabels,
@@ -1888,10 +1887,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					Completions:          pointer.Int32(2),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					Completions:          ptr.To[int32](2),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(true),
+					ManualSelector:       ptr.To(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validSelector.MatchLabels,
@@ -1915,10 +1914,10 @@ func TestJobStrategy_Validate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Spec: batch.JobSpec{
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					Completions:          pointer.Int32(2),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					Completions:          ptr.To[int32](2),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 					Selector:             validSelector,
-					ManualSelector:       pointer.Bool(true),
+					ManualSelector:       ptr.To(true),
 					Template: api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: validSelector.MatchLabels,
@@ -1942,8 +1941,8 @@ func TestJobStrategy_Validate(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			errs := Strategy.Validate(ctx, tc.job)
 			if len(errs) != int(tc.wantWarningCount) {
 				t.Errorf("want warnings %d but got %d, errors: %v", tc.wantWarningCount, len(errs), errs)
@@ -2001,7 +2000,7 @@ func TestStatusStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 				},
 				Status: batch.JobStatus{
 					Active: 11,
@@ -2012,7 +2011,7 @@ func TestStatusStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 				},
 				Status: batch.JobStatus{
 					Active: 12,
@@ -2023,7 +2022,7 @@ func TestStatusStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 				},
 				Status: batch.JobStatus{
 					Active: 12,
@@ -2036,7 +2035,7 @@ func TestStatusStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(3),
+					Parallelism: ptr.To[int32](3),
 				},
 			},
 			newJob: &batch.Job{
@@ -2044,7 +2043,7 @@ func TestStatusStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 				},
 			},
 			wantJob: &batch.Job{
@@ -2052,7 +2051,7 @@ func TestStatusStrategy_PrepareForUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(3),
+					Parallelism: ptr.To[int32](3),
 				},
 			},
 		},
@@ -2114,7 +2113,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 				},
 			},
 			newJob: &batch.Job{
@@ -2126,7 +2125,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 				},
 			},
 			wantJob: &batch.Job{
@@ -2138,7 +2137,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:    validSelector,
 					Template:    validPodTemplateSpec,
-					Parallelism: pointer.Int32(4),
+					Parallelism: ptr.To[int32](4),
 				},
 			},
 		},
@@ -2271,7 +2270,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.active"},
 			},
 		},
-		"invalid attempt to transition to Complete=True with terminating > 0": {
+		"transition to Failed condition with terminating>0 and ready>0": {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -2279,19 +2278,16 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
-					StartTime:      &now,
-					CompletionTime: &now,
-					Terminating:    ptr.To[int32](1),
+					StartTime: &now,
 					Conditions: []batch.JobCondition{
 						{
-							Type:   batch.JobComplete,
+							Type:   batch.JobFailed,
 							Status: api.ConditionTrue,
 						},
 					},
+					Terminating: ptr.To[int32](1),
+					Ready:       ptr.To[int32](1),
 				},
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "status.terminating"},
 			},
 		},
 		"invalid attempt to transition to Failed=True with uncountedTerminatedPods.Failed>0": {
@@ -2885,7 +2881,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Completions:          ptr.To[int32](5),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 			},
 			newJob: &batch.Job{
@@ -2893,7 +2889,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Completions:          ptr.To[int32](5),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 				Status: batch.JobStatus{
 					FailedIndexes: ptr.To("invalid format"),
@@ -2910,7 +2906,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Completions:          ptr.To[int32](5),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 				Status: batch.JobStatus{
 					FailedIndexes: ptr.To("invalid format"),
@@ -2921,34 +2917,12 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Completions:          ptr.To[int32](5),
 					CompletionMode:       completionModePtr(batch.IndexedCompletion),
-					BackoffLimitPerIndex: pointer.Int32(1),
+					BackoffLimitPerIndex: ptr.To[int32](1),
 				},
 				Status: batch.JobStatus{
 					FailedIndexes: ptr.To("invalid format"),
 					Active:        1,
 				},
-			},
-		},
-		"invalid attempt to set more ready pods than active": {
-			enableJobManagedBy: true,
-			job: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Completions: ptr.To[int32](5),
-				},
-			},
-			newJob: &batch.Job{
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Completions: ptr.To[int32](5),
-				},
-				Status: batch.JobStatus{
-					Active: 1,
-					Ready:  ptr.To[int32](2),
-				},
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeInvalid, Field: "status.ready"},
 			},
 		},
 		"more ready pods than active, but allowed": {
@@ -3439,8 +3413,8 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
 
 			errs := StatusStrategy.ValidateUpdate(ctx, tc.newJob, tc.job)
 			if diff := cmp.Diff(tc.wantErrs, errs, ignoreErrValueDetail); diff != "" {
@@ -3485,8 +3459,8 @@ func TestJobStrategy_GetAttrs(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 		},
@@ -3501,8 +3475,8 @@ func TestJobStrategy_GetAttrs(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: ptr.To(true),
+					Parallelism:    ptr.To[int32](1),
 				},
 			},
 		},

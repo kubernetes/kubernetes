@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	v1 "k8s.io/api/core/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -37,17 +38,15 @@ const (
 	// DRAPluginName is the name of the in-tree DRA Plugin.
 	DRAPluginName   = "kubernetes.io/dra"
 	v1alpha3Version = "v1alpha3"
-	v1alpha2Version = "v1alpha2"
 )
 
-// Plugin is a description of a DRA Plugin, defined by an endpoint
-// and the highest DRA version supported.
+// Plugin is a description of a DRA Plugin, defined by an endpoint.
 type plugin struct {
 	sync.Mutex
 	conn                    *grpc.ClientConn
 	endpoint                string
-	version                 string
 	highestSupportedVersion *utilversion.Version
+	clientTimeout           time.Duration
 }
 
 func (p *plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
@@ -82,18 +81,6 @@ func (p *plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	return p.conn, nil
 }
 
-func (p *plugin) getVersion() string {
-	p.Lock()
-	defer p.Unlock()
-	return p.version
-}
-
-func (p *plugin) setVersion(version string) {
-	p.Lock()
-	p.version = version
-	p.Unlock()
-}
-
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
 	controller *nodeResourcesController
@@ -104,18 +91,18 @@ type RegistrationHandler struct {
 // Must only be called once per process because it manages global state.
 // If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
-func NewRegistrationHandler(kubeClient kubernetes.Interface, nodeName string) *RegistrationHandler {
+func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1.Node, error)) *RegistrationHandler {
 	handler := &RegistrationHandler{}
 
 	// If kubelet ever gets an API for stopping registration handlers, then
 	// that would need to be hooked up with stopping the controller.
-	handler.controller = startNodeResourcesController(context.TODO(), kubeClient, nodeName)
+	handler.controller = startNodeResourcesController(context.TODO(), kubeClient, getNode)
 
 	return handler
 }
 
 // RegisterPlugin is called when a plugin can be registered.
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
+func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	klog.InfoS("Register new DRA plugin", "name", pluginName, "endpoint", endpoint)
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, versions)
@@ -123,11 +110,18 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
+	var timeout time.Duration
+	if pluginClientTimeout == nil {
+		timeout = PluginClientTimeout
+	} else {
+		timeout = *pluginClientTimeout
+	}
+
 	pluginInstance := &plugin{
 		conn:                    nil,
 		endpoint:                endpoint,
-		version:                 v1alpha3Version,
 		highestSupportedVersion: highestSupportedVersion,
+		clientTimeout:           timeout,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key

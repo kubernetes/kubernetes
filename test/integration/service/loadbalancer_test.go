@@ -44,7 +44,7 @@ import (
 // Test_ServiceLoadBalancerAllocateNodePorts tests that a Service with spec.allocateLoadBalancerNodePorts=false
 // does not allocate node ports for the Service.
 func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -84,7 +84,7 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 // Test_ServiceUpdateLoadBalancerAllocateNodePorts tests that a Service that is updated from ClusterIP to LoadBalancer
 // with spec.allocateLoadBalancerNodePorts=false does not allocate node ports for the Service
 func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -134,7 +134,7 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 // Test_ServiceLoadBalancerSwitchToDeallocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=false, does not de-allocate existing node ports.
 func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -184,7 +184,7 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 // Test_ServiceLoadBalancerDisableAllocatedNodePort test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=false can de-allocate existing node ports.
 func Test_ServiceLoadBalancerDisableAllocatedNodePort(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -235,7 +235,7 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePort(t *testing.T) {
 // Test_ServiceLoadBalancerDisableAllocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=false can de-allocate one of existing node ports.
 func Test_ServiceLoadBalancerDisableAllocatedNodePorts(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -293,7 +293,7 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePorts(t *testing.T) {
 // Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=false with path can de-allocate one of existing node ports.
 func Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -366,7 +366,7 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch(t *testing.T) {
 // Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts test that switching a Service
 // to spec.allocateLoadBalancerNodePorts=true from false, allocate new node ports.
 func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -426,7 +426,7 @@ func serviceHasNodePorts(svc *corev1.Service) bool {
 // Test_ServiceLoadBalancerEnableLoadBalancerClass tests that when a LoadBalancer
 // type of service has spec.LoadBalancerClass set, cloud provider should not create default load balancer.
 func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -472,7 +472,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 // type of service has spec.LoadBalancerClass set, it should be immutable as long as the service type
 // is still LoadBalancer.
 func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -523,7 +523,7 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 // Test_UpdateLoadBalancerWithLoadBalancerClass tests that when a Load Balancer type of Service that
 // is updated from non loadBalancerClass set to loadBalancerClass set, it should be not allowed.
 func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -573,7 +573,7 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 // Test_ServiceLoadBalancerMixedProtocolSetup tests that a LoadBalancer Service with different protocol values
 // can be created.
 func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -664,8 +664,8 @@ func Test_ServiceLoadBalancerIPMode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client, err := clientset.NewForConfig(server.ClientConfig)

@@ -277,6 +277,7 @@ func TestAddFlags(t *testing.T) {
 			ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
 		},
 		AggregatorRejectForwardingRedirects: true,
+		SystemNamespaces:                    []string{"kube-system", "kube-public", "default"},
 	}
 
 	expected.Authentication.OIDC.UsernameClaim = "sub"

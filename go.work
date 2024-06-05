@@ -17,6 +17,7 @@ use (
 	./staging/src/k8s.io/component-helpers
 	./staging/src/k8s.io/controller-manager
 	./staging/src/k8s.io/cri-api
+	./staging/src/k8s.io/cri-client
 	./staging/src/k8s.io/csi-translation-lib
 	./staging/src/k8s.io/dynamic-resource-allocation
 	./staging/src/k8s.io/endpointslice
@@ -27,7 +28,6 @@ use (
 	./staging/src/k8s.io/kube-scheduler
 	./staging/src/k8s.io/kubectl
 	./staging/src/k8s.io/kubelet
-	./staging/src/k8s.io/legacy-cloud-providers
 	./staging/src/k8s.io/metrics
 	./staging/src/k8s.io/mount-utils
 	./staging/src/k8s.io/pod-security-admission

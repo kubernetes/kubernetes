@@ -39,6 +39,12 @@ type InstrumentOption interface {
 	Float64ObservableGaugeOption
 }
 
+// HistogramOption applies options to histogram instruments.
+type HistogramOption interface {
+	Int64HistogramOption
+	Float64HistogramOption
+}
+
 type descOpt string
 
 func (o descOpt) applyFloat64Counter(c Float64CounterConfig) Float64CounterConfig {
@@ -170,6 +176,23 @@ func (o unitOpt) applyInt64ObservableGauge(c Int64ObservableGaugeConfig) Int64Ob
 //
 // The unit u should be defined using the appropriate [UCUM](https://ucum.org) case-sensitive code.
 func WithUnit(u string) InstrumentOption { return unitOpt(u) }
+
+// WithExplicitBucketBoundaries sets the instrument explicit bucket boundaries.
+//
+// This option is considered "advisory", and may be ignored by API implementations.
+func WithExplicitBucketBoundaries(bounds ...float64) HistogramOption { return bucketOpt(bounds) }
+
+type bucketOpt []float64
+
+func (o bucketOpt) applyFloat64Histogram(c Float64HistogramConfig) Float64HistogramConfig {
+	c.explicitBucketBoundaries = o
+	return c
+}
+
+func (o bucketOpt) applyInt64Histogram(c Int64HistogramConfig) Int64HistogramConfig {
+	c.explicitBucketBoundaries = o
+	return c
+}
 
 // AddOption applies options to an addition measurement. See
 // [MeasurementOption] for other options that can be used as an AddOption.

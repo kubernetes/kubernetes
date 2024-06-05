@@ -26,6 +26,7 @@ import (
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
@@ -97,6 +98,8 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.Etcd.Local.ExtraEnvs = []kubeadm.EnvVar{}
 	obj.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	obj.Proxy.Disabled = false
+	obj.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
+	obj.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {
@@ -159,8 +162,14 @@ func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.Node.EtcdUpgrade = ptr.To(true)
+	obj.Node.CertificateRenewal = ptr.To(false)
+	obj.Node.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Node.ImagePullSerial = ptr.To(true)
+
 	obj.Apply.EtcdUpgrade = ptr.To(true)
 	obj.Apply.CertificateRenewal = ptr.To(false)
-	obj.Node.CertificateRenewal = ptr.To(false)
+	obj.Apply.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Apply.ImagePullSerial = ptr.To(true)
+
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }

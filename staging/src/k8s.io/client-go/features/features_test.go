@@ -30,6 +30,15 @@ func TestAddFeaturesToExistingFeatureGates(t *testing.T) {
 	require.Equal(t, defaultKubernetesFeatureGates, fakeFeatureGates.specs)
 }
 
+func TestReplaceFeatureGatesWithWarningIndicator(t *testing.T) {
+	defaultFeatureGates := FeatureGates()
+	require.Panics(t, func() { defaultFeatureGates.Enabled("Foo") }, "reading an unregistered feature gate Foo should panic")
+
+	if !replaceFeatureGatesWithWarningIndicator(defaultFeatureGates) {
+		t.Error("replacing the default feature gates after reading a value hasn't produced a warning")
+	}
+}
+
 type fakeRegistry struct {
 	specs map[Feature]FeatureSpec
 }

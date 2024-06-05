@@ -1,0 +1,6 @@
+GET /apis/flops/v1alpha1/namespaces/mops/flips/mips/fin?resourceVersion=42 HTTP/1.1
+Host: example.com
+Accept: application/json
+Accept-Encoding: gzip
+User-Agent: TestGoldenRequest
+

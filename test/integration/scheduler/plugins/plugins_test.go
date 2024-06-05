@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
@@ -77,9 +78,10 @@ type PreEnqueuePlugin struct {
 }
 
 type PreFilterPlugin struct {
-	numPreFilterCalled int
-	failPreFilter      bool
-	rejectPreFilter    bool
+	numPreFilterCalled   int
+	failPreFilter        bool
+	rejectPreFilter      bool
+	preFilterResultNodes sets.Set[string]
 }
 
 type ScorePlugin struct {
@@ -521,6 +523,9 @@ func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state *framework.Cycle
 	if pp.rejectPreFilter {
 		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
+	if len(pp.preFilterResultNodes) != 0 {
+		return &framework.PreFilterResult{NodeNames: pp.preFilterResultNodes}, nil
+	}
 	return nil, nil
 }
 
@@ -620,9 +625,10 @@ func TestPreFilterPlugin(t *testing.T) {
 	testContext := testutils.InitTestAPIServer(t, "prefilter-plugin", nil)
 
 	tests := []struct {
-		name   string
-		fail   bool
-		reject bool
+		name                 string
+		fail                 bool
+		reject               bool
+		preFilterResultNodes sets.Set[string]
 	}{
 		{
 			name:   "disable fail and reject flags",
@@ -639,6 +645,18 @@ func TestPreFilterPlugin(t *testing.T) {
 			fail:   false,
 			reject: true,
 		},
+		{
+			name:                 "inject legal node names in PreFilterResult",
+			fail:                 false,
+			reject:               false,
+			preFilterResultNodes: sets.New[string]("test-node-0", "test-node-1"),
+		},
+		{
+			name:                 "inject legal and illegal node names in PreFilterResult",
+			fail:                 false,
+			reject:               false,
+			preFilterResultNodes: sets.New[string]("test-node-0", "non-existent-node"),
+		},
 	}
 
 	for _, test := range tests {
@@ -654,6 +672,7 @@ func TestPreFilterPlugin(t *testing.T) {
 
 			preFilterPlugin.failPreFilter = test.fail
 			preFilterPlugin.rejectPreFilter = test.reject
+			preFilterPlugin.preFilterResultNodes = test.preFilterResultNodes
 			// Create a best effort pod.
 			pod, err := testutils.CreatePausePod(testCtx.ClientSet,
 				testutils.InitPausePod(&testutils.PausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
@@ -662,7 +681,7 @@ func TestPreFilterPlugin(t *testing.T) {
 			}
 
 			if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			} else if test.fail {
@@ -1133,7 +1152,7 @@ func TestPrebindPlugin(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
 				}
 			} else if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be unschedulable")
 				}
 			} else if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
@@ -1365,7 +1384,7 @@ func TestUnReservePermitPlugins(t *testing.T) {
 			}
 
 			if test.reject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 
@@ -1437,7 +1456,7 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 			}
 
 			if test.wantReject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
 				}
 
@@ -1883,7 +1902,7 @@ func TestPermitPlugin(t *testing.T) {
 				}
 			} else {
 				if test.reject || test.timeout {
-					if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+					if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 						t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 					}
 				} else {
@@ -2049,10 +2068,10 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 			}
 
 			if test.waitReject {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, podA); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, podA); err != nil {
 					t.Errorf("Didn't expect the first pod to be scheduled. error: %v", err)
 				}
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, podB); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, podB); err != nil {
 					t.Errorf("Didn't expect the second pod to be scheduled. error: %v", err)
 				}
 				if !((permitPlugin.waitingPod == podA.Name && permitPlugin.rejectingPod == podB.Name) ||
@@ -2244,7 +2263,7 @@ func TestPreEnqueuePlugin(t *testing.T) {
 					t.Errorf("Expected the enqueuePlugin plugin to be called at least once, but got 0")
 				}
 			} else {
-				if err := testutils.WaitForPodSchedulingGated(testCtx.ClientSet, pod, 10*time.Second); err != nil {
+				if err := testutils.WaitForPodSchedulingGated(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
 					t.Errorf("Expected the pod to be scheduling waiting, but got: %v", err)
 				}
 				// Also verify preFilterPlugin is not called.
@@ -2556,7 +2575,7 @@ func TestActivatePods(t *testing.T) {
 
 	// Wait for the 2 executor pods to be unschedulable.
 	for _, pod := range pods {
-		if err := testutils.WaitForPodUnschedulable(cs, pod); err != nil {
+		if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, cs, pod); err != nil {
 			t.Errorf("Failed to wait for Pod %v to be unschedulable: %v", pod.Name, err)
 		}
 	}
@@ -2658,7 +2677,7 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 		{
 			name:          "preEnqueue plugin with event registered",
 			enqueuePlugin: &SchedulingGatesPluginWithEvents{SchedulingGates: schedulinggates.SchedulingGates{}},
-			count:         3,
+			count:         2,
 		},
 	}
 
@@ -2702,7 +2721,7 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 				return
 			}
 
-			if err := testutils.WaitForPodSchedulingGated(testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
+			if err := testutils.WaitForPodSchedulingGated(testCtx.Ctx, testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
 				t.Errorf("Expected the pod to be gated, but got: %v", err)
 				return
 			}
@@ -2742,7 +2761,7 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 			}
 
 			// Pod should still be unschedulable because scheduling gates still exist, theoretically, it's a waste rescheduling.
-			if err := testutils.WaitForPodSchedulingGated(testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
+			if err := testutils.WaitForPodSchedulingGated(testCtx.Ctx, testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
 				t.Errorf("Expected the pod to be gated, but got: %v", err)
 				return
 			}

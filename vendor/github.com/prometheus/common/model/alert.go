@@ -90,13 +90,13 @@ func (a *Alert) Validate() error {
 		return fmt.Errorf("start time must be before end time")
 	}
 	if err := a.Labels.Validate(); err != nil {
-		return fmt.Errorf("invalid label set: %s", err)
+		return fmt.Errorf("invalid label set: %w", err)
 	}
 	if len(a.Labels) == 0 {
 		return fmt.Errorf("at least one label pair required")
 	}
 	if err := a.Annotations.Validate(); err != nil {
-		return fmt.Errorf("invalid annotations: %s", err)
+		return fmt.Errorf("invalid annotations: %w", err)
 	}
 	return nil
 }

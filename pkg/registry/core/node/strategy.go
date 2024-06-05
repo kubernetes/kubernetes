@@ -104,7 +104,7 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-		node.Status.RuntimeClasses = nil
+		node.Status.RuntimeHandlers = nil
 	}
 }
 

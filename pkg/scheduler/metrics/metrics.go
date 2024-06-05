@@ -38,7 +38,24 @@ const (
 	Binding = "binding"
 )
 
-// Below are possible values for the extension_point label.
+// ExtentionPoints is a list of possible values for the extension_point label.
+var ExtentionPoints = []string{
+	PreFilter,
+	Filter,
+	PreFilterExtensionAddPod,
+	PreFilterExtensionRemovePod,
+	PostFilter,
+	PreScore,
+	Score,
+	ScoreExtensionNormalize,
+	PreBind,
+	Bind,
+	PostBind,
+	Reserve,
+	Unreserve,
+	Permit,
+}
+
 const (
 	PreFilter                   = "PreFilter"
 	Filter                      = "Filter"
@@ -132,7 +149,7 @@ var (
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "pod_scheduling_sli_duration_seconds",
-			Help:      "E2e latency for a pod being scheduled, from the time the pod enters the scheduling queue an d might involve multiple scheduling attempts.",
+			Help:      "E2e latency for a pod being scheduled, from the time the pod enters the scheduling queue and might involve multiple scheduling attempts.",
 			// Start with 10ms with the last bucket being [~88m, Inf).
 			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
 			StabilityLevel: metrics.BETA,

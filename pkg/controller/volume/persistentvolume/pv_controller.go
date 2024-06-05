@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
@@ -119,18 +118,6 @@ import (
 // claims at the same time. The controller must recover from any conflicts
 // that may arise from these conditions.
 
-// CloudVolumeCreatedForClaimNamespaceTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-// with namespace of a persistent volume claim used to create this volume.
-const CloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
-
-// CloudVolumeCreatedForClaimNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-// with name of a persistent volume claim used to create this volume.
-const CloudVolumeCreatedForClaimNameTag = "kubernetes.io/created-for/pvc/name"
-
-// CloudVolumeCreatedForVolumeNameTag is a name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
-// with name of appropriate Kubernetes persistent volume .
-const CloudVolumeCreatedForVolumeNameTag = "kubernetes.io/created-for/pv/name"
-
 // Number of retries when we create a PV object for a provisioned volume.
 const createProvisionedPVRetryCount = 5
 
@@ -167,10 +154,8 @@ type PersistentVolumeController struct {
 	kubeClient                clientset.Interface
 	eventBroadcaster          record.EventBroadcaster
 	eventRecorder             record.EventRecorder
-	cloud                     cloudprovider.Interface
 	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
-	clusterName               string
 	resyncPeriod              time.Duration
 
 	// Cache of the last known version of volumes and claims. This cache is
@@ -202,8 +187,8 @@ type PersistentVolumeController struct {
 	// version errors in API server and other checks in this controller),
 	// however overall speed of multi-worker controller would be lower than if
 	// it runs single thread only.
-	claimQueue  *workqueue.Type
-	volumeQueue *workqueue.Type
+	claimQueue  *workqueue.Typed[string]
+	volumeQueue *workqueue.Typed[string]
 
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
@@ -1653,17 +1638,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 		return pluginName, err
 	}
 
-	// Gather provisioning options
-	tags := make(map[string]string)
-	tags[CloudVolumeCreatedForClaimNamespaceTag] = claim.Namespace
-	tags[CloudVolumeCreatedForClaimNameTag] = claim.Name
-	tags[CloudVolumeCreatedForVolumeNameTag] = pvName
-
 	options := vol.VolumeOptions{
 		PersistentVolumeReclaimPolicy: *storageClass.ReclaimPolicy,
 		MountOptions:                  storageClass.MountOptions,
-		CloudTags:                     &tags,
-		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
 		PVC:                           claim,
 		Parameters:                    storageClass.Parameters,

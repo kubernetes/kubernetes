@@ -105,7 +105,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(resourceVersion, opts)
+	return w.getAllEventsSinceLocked(resourceVersion, "", opts)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -140,30 +140,41 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 
 type immediateTickerFactory struct{}
 
-func (t *immediateTickerFactory) NewTicker(d time.Duration) clock.Ticker {
-	return &immediateTicker{stopCh: make(chan struct{})}
+func (t *immediateTickerFactory) NewTimer(d time.Duration) clock.Timer {
+	timer := immediateTicker{
+		c: make(chan time.Time),
+	}
+	timer.Reset(d)
+	return &timer
 }
 
 type immediateTicker struct {
-	stopCh chan struct{}
+	c chan time.Time
+}
+
+func (t *immediateTicker) Reset(d time.Duration) (active bool) {
+	select {
+	case <-t.c:
+		active = true
+	default:
+	}
+	go func() {
+		t.c <- time.Now()
+	}()
+	return active
 }
 
 func (t *immediateTicker) C() <-chan time.Time {
-	ch := make(chan time.Time)
-	go func() {
-		for {
-			select {
-			case ch <- time.Now():
-			case <-t.stopCh:
-				return
-			}
-		}
-	}()
-	return ch
+	return t.c
 }
 
-func (t *immediateTicker) Stop() {
-	close(t.stopCh)
+func (t *immediateTicker) Stop() bool {
+	select {
+	case <-t.c:
+		return true
+	default:
+		return false
+	}
 }
 
 func (w *testWatchCache) RequestWatchProgress(ctx context.Context) error {
@@ -523,7 +534,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
 	defer store.Stop()
@@ -592,7 +603,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)
 			ctx := context.Background()
 			store := newTestWatchCache(3, &cache.Indexers{})
 			defer store.Stop()

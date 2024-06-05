@@ -49,7 +49,7 @@ import (
 // 6. start the new apiserver with the new ServiceCIDRs on the flags and shutdown the old one
 // 7. delete the kubernetes.default service, the new apiserver will recreate it within the new ServiceCIDR
 func TestMigrateServiceCIDR(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 	tCtx := ktesting.Init(t)
 
 	cidr1 := "192.168.0.0/29"
@@ -209,7 +209,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 
 	// ServiceCIDR controller
 	tCtx2 := ktesting.Init(t)
-	defer tCtx.Cancel("tearing down ServiceCIDR controller 2")
+	defer tCtx2.Cancel("tearing down ServiceCIDR controller 2")
 	informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
 	go servicecidrs.NewController(
 		tCtx2,

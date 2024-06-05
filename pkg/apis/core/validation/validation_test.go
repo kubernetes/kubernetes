@@ -558,7 +558,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(scenario.volume, nil)
 			errs := ValidatePersistentVolume(scenario.volume, opts)
@@ -1000,7 +1000,7 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolume(nil, tc.oldPv)
 			if opts != tc.expectValidationOpts {
@@ -1572,7 +1572,7 @@ func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 		originalNewPV := scenario.newPV.DeepCopy()
 		originalOldPV := scenario.oldPV.DeepCopy()
@@ -2173,7 +2173,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			var errs field.ErrorList
 			if ephemeral {
@@ -3022,8 +3022,8 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, scenario.enableVolumeAttributesClass)
 
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
@@ -3086,7 +3086,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaim(nil, tc.oldPvc)
 			if opts != tc.expectValidationOpts {
@@ -3117,7 +3117,7 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.enableVolumeAttributesClass)
 
 			opts := ValidationOptionsForPersistentVolumeClaimTemplate(nil, tc.oldPvcTemplate)
 			if opts != tc.expectValidationOpts {
@@ -5400,99 +5400,6 @@ func TestValidateVolumes(t *testing.T) {
 
 }
 
-func TestValidateReadOnlyPersistentDisks(t *testing.T) {
-	cases := []struct {
-		name        string
-		volumes     []core.Volume
-		oldVolume   []core.Volume
-		gateValue   bool
-		expectError bool
-	}{{
-		name:        "gate on, read-only disk, nil old",
-		gateValue:   true,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		oldVolume:   []core.Volume(nil),
-		expectError: false,
-	}, {
-		name:        "gate off, read-only disk, nil old",
-		gateValue:   false,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		oldVolume:   []core.Volume(nil),
-		expectError: false,
-	}, {
-		name:        "gate on, read-write, nil old",
-		gateValue:   true,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		oldVolume:   []core.Volume(nil),
-		expectError: false,
-	}, {
-		name:        "gate off, read-write, nil old",
-		gateValue:   false,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		oldVolume:   []core.Volume(nil),
-		expectError: true,
-	}, {
-		name:        "gate on, new read-only and old read-write",
-		gateValue:   true,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		expectError: false,
-	}, {
-		name:        "gate off, new read-only and old read-write",
-		gateValue:   false,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		expectError: false,
-	}, {
-		name:        "gate on, new read-write and old read-write",
-		gateValue:   true,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		expectError: false,
-	}, {
-		name:        "gate off, new read-write and old read-write",
-		gateValue:   false,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		expectError: false,
-	}, {
-		name:        "gate on, new read-only and old read-only",
-		gateValue:   true,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		expectError: false,
-	}, {
-		name:        "gate off, new read-only and old read-only",
-		gateValue:   false,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		expectError: false,
-	}, {
-		name:        "gate on, new read-write and old read-only",
-		gateValue:   true,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		expectError: false,
-	}, {
-		name:        "gate off, new read-write and old read-only",
-		gateValue:   false,
-		volumes:     []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: false}}}},
-		oldVolume:   []core.Volume{{VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{ReadOnly: true}}}},
-		expectError: true,
-	},
-	}
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			fidPath := field.NewPath("testField")
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, testCase.gateValue)()
-			errs := ValidateReadOnlyPersistentDisks(testCase.volumes, testCase.oldVolume, fidPath)
-			if !testCase.expectError && len(errs) != 0 {
-				t.Errorf("expected success, got:%v", errs)
-			}
-		})
-	}
-}
-
 func TestHugePagesIsolation(t *testing.T) {
 	testCases := map[string]struct {
 		pod         *core.Pod
@@ -7683,7 +7590,7 @@ func TestValidatePullPolicy(t *testing.T) {
 }
 
 func TestValidateResizePolicy(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 	type T struct {
@@ -13318,7 +13225,7 @@ func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
 }
 
 func TestValidatePodUpdate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	var (
 		activeDeadlineSecondsZero     = int64(0)
 		activeDeadlineSecondsNegative = int64(-30)
@@ -18120,7 +18027,7 @@ func TestValidateServiceCreate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := range tc.featureGates {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)
 			}
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
@@ -21403,7 +21310,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)
 
 			validateOpts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
 
@@ -22647,6 +22554,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.SeccompProfile",
 		"SecurityContext.ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
+		"SecurityContext.SupplementalGroupsPolicy",
 		"SecurityContext.Sysctls",
 		"SecurityContext.WindowsOptions",
 	)
@@ -24094,8 +24002,8 @@ func TestCrossNamespaceSource(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)()
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CrossNamespaceVolumeDataSource, true)
 		opts := PersistentVolumeClaimSpecValidationOptions{}
 		if tc.expectedFail {
 			if errs := ValidatePersistentVolumeClaimSpec(tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
@@ -25876,7 +25784,7 @@ func TestValidateDownwardAPIHostIPs(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHostIPs, testCase.featureEnabled)
 
 			errs := validateDownwardAPIHostIPs(testCase.fieldSel, field.NewPath("fieldSel"), PodValidationOptions{AllowHostIPsField: testCase.featureEnabled})
 			if testCase.expectError && len(errs) == 0 {
@@ -26269,8 +26177,8 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
 			status := core.LoadBalancerStatus{}
 			tc.tweakLBStatus(&status)
 			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
@@ -26336,5 +26244,235 @@ func TestValidateSleepAction(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TODO: merge these test to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
+func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
+	fldPath := field.NewPath("spec")
+	badSupplementalGroupsPolicyEmpty := ptr.To(core.SupplementalGroupsPolicy(""))
+	badSupplementalGroupsPolicyNotSupported := ptr.To(core.SupplementalGroupsPolicy("not-supported"))
+
+	validatePodSpecTestCases := map[string]struct {
+		securityContext *core.PodSecurityContext
+		wantFieldErrors field.ErrorList
+	}{
+		"nil SecurityContext is valid": {
+			securityContext: nil,
+		},
+		"nil SupplementalGroupsPolicy is valid": {
+			securityContext: &core.PodSecurityContext{},
+		},
+		"SupplementalGroupsPolicyMerge is valid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
+			},
+		},
+		"SupplementalGroupsPolicyStrict is valid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyStrict),
+			},
+		},
+		"empty SupplementalGroupsPolicy is invalid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: badSupplementalGroupsPolicyEmpty,
+			},
+			wantFieldErrors: field.ErrorList{
+				field.NotSupported(
+					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
+					badSupplementalGroupsPolicyEmpty, sets.List(validSupplementalGroupsPolicies)),
+			},
+		},
+		"not-supported SupplementalGroupsPolicy is invalid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: badSupplementalGroupsPolicyNotSupported,
+			},
+			wantFieldErrors: field.ErrorList{
+				field.NotSupported(
+					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
+					badSupplementalGroupsPolicyNotSupported, sets.List(validSupplementalGroupsPolicies)),
+			},
+		},
+	}
+	for name, tt := range validatePodSpecTestCases {
+		t.Run(name, func(t *testing.T) {
+			podSpec := &core.PodSpec{
+				SecurityContext: tt.securityContext,
+				Containers: []core.Container{
+					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+			}
+			if tt.wantFieldErrors == nil {
+				tt.wantFieldErrors = field.ErrorList{}
+			}
+			errs := ValidatePodSpec(podSpec, nil, fldPath, PodValidationOptions{})
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TODO: merge these testcases to TestValidateWindowsPodSecurityContext after SupplementalGroupsPolicy feature graduates to Beta
+func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T) {
+	fldPath := field.NewPath("spec")
+
+	testCases := map[string]struct {
+		securityContext *core.PodSecurityContext
+		wantFieldErrors field.ErrorList
+	}{
+		"nil SecurityContext is valid": {
+			securityContext: nil,
+		},
+		"nil SupplementalGroupdPolicy is valid": {
+			securityContext: &core.PodSecurityContext{},
+		},
+		"non-empty SupplementalGroupdPolicy is invalid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Forbidden(
+					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
+					"cannot be set for a windows pod"),
+			},
+		},
+	}
+
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			podSpec := &core.PodSpec{
+				OS:              &core.PodOS{Name: core.Windows},
+				SecurityContext: tt.securityContext,
+				Containers: []core.Container{
+					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+			}
+			if tt.wantFieldErrors == nil {
+				tt.wantFieldErrors = field.ErrorList{}
+			}
+			errs := validateWindows(podSpec, fldPath)
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TODO: merge these testcases to TestValidatePodStatusUpdate after SupplementalGroupsPolicy feature graduates to Beta
+func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
+	badUID := int64(-1)
+	badGID := int64(-1)
+
+	containerTypes := map[string]func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus){
+		"container": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
+			podStatus.ContainerStatuses = containerStatus
+		},
+		"initContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
+			podStatus.InitContainerStatuses = containerStatus
+		},
+		"ephemeralContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
+			podStatus.EphemeralContainerStatuses = containerStatus
+		},
+	}
+
+	testCases := map[string]struct {
+		podOSes           []*core.PodOS
+		containerStatuses []core.ContainerStatus
+		wantFieldErrors   field.ErrorList
+	}{
+		"nil container user is valid": {
+			podOSes:           []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{},
+		},
+		"empty container user is valid": {
+			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{},
+			}},
+		},
+		"container user with valid ids": {
+			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{
+					Linux: &core.LinuxContainerUser{},
+				},
+			}},
+		},
+		"container user with invalid ids": {
+			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{
+					Linux: &core.LinuxContainerUser{
+						UID:                badUID,
+						GID:                badGID,
+						SupplementalGroups: []int64{badGID},
+					},
+				},
+			}},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(field.NewPath("[0].linux.uid"), badUID, "must be between 0 and 2147483647, inclusive"),
+				field.Invalid(field.NewPath("[0].linux.gid"), badGID, "must be between 0 and 2147483647, inclusive"),
+				field.Invalid(field.NewPath("[0].linux.supplementalGroups[0]"), badGID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"user.linux must not be set in windows": {
+			podOSes: []*core.PodOS{{Name: core.Windows}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{
+					Linux: &core.LinuxContainerUser{},
+				},
+			}},
+			wantFieldErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("[0].linux"), "cannot be set for a windows pod"),
+			},
+		},
+	}
+
+	for name, tt := range testCases {
+		for _, podOS := range tt.podOSes {
+			for containerType, setContainerStatuses := range containerTypes {
+				t.Run(fmt.Sprintf("[podOS=%v][containerType=%s] %s", podOS, containerType, name), func(t *testing.T) {
+					oldPod := &core.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "foo",
+							ResourceVersion: "1",
+						},
+						Spec: core.PodSpec{
+							OS: podOS,
+						},
+						Status: core.PodStatus{},
+					}
+					newPod := &core.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "foo",
+							ResourceVersion: "1",
+						},
+						Spec: core.PodSpec{
+							OS: podOS,
+						},
+					}
+					setContainerStatuses(&newPod.Status, tt.containerStatuses)
+					var expectedFieldErrors field.ErrorList
+					for _, err := range tt.wantFieldErrors {
+						expectedField := fmt.Sprintf("%s%s", field.NewPath("status").Child(containerType+"Statuses"), err.Field)
+						expectedFieldErrors = append(expectedFieldErrors, &field.Error{
+							Type:     err.Type,
+							Field:    expectedField,
+							BadValue: err.BadValue,
+							Detail:   err.Detail,
+						})
+					}
+					errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
+					if diff := cmp.Diff(expectedFieldErrors, errs); diff != "" {
+						t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+					}
+				})
+			}
+		}
 	}
 }

@@ -20,8 +20,8 @@ package v1alpha2
 
 import (
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type ResourceClaimParametersLister interface {
 
 // resourceClaimParametersLister implements the ResourceClaimParametersLister interface.
 type resourceClaimParametersLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1alpha2.ResourceClaimParameters]
 }
 
 // NewResourceClaimParametersLister returns a new ResourceClaimParametersLister.
 func NewResourceClaimParametersLister(indexer cache.Indexer) ResourceClaimParametersLister {
-	return &resourceClaimParametersLister{indexer: indexer}
-}
-
-// List lists all ResourceClaimParameters in the indexer.
-func (s *resourceClaimParametersLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceClaimParameters, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha2.ResourceClaimParameters))
-	})
-	return ret, err
+	return &resourceClaimParametersLister{listers.New[*v1alpha2.ResourceClaimParameters](indexer, v1alpha2.Resource("resourceclaimparameters"))}
 }
 
 // ResourceClaimParameters returns an object that can list and get ResourceClaimParameters.
 func (s *resourceClaimParametersLister) ResourceClaimParameters(namespace string) ResourceClaimParametersNamespaceLister {
-	return resourceClaimParametersNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return resourceClaimParametersNamespaceLister{listers.NewNamespaced[*v1alpha2.ResourceClaimParameters](s.ResourceIndexer, namespace)}
 }
 
 // ResourceClaimParametersNamespaceLister helps list and get ResourceClaimParameters.
@@ -74,26 +66,5 @@ type ResourceClaimParametersNamespaceLister interface {
 // resourceClaimParametersNamespaceLister implements the ResourceClaimParametersNamespaceLister
 // interface.
 type resourceClaimParametersNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ResourceClaimParameters in the indexer for a given namespace.
-func (s resourceClaimParametersNamespaceLister) List(selector labels.Selector) (ret []*v1alpha2.ResourceClaimParameters, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha2.ResourceClaimParameters))
-	})
-	return ret, err
-}
-
-// Get retrieves the ResourceClaimParameters from the indexer for a given namespace and name.
-func (s resourceClaimParametersNamespaceLister) Get(name string) (*v1alpha2.ResourceClaimParameters, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha2.Resource("resourceclaimparameters"), name)
-	}
-	return obj.(*v1alpha2.ResourceClaimParameters), nil
+	listers.ResourceIndexer[*v1alpha2.ResourceClaimParameters]
 }

@@ -397,11 +397,11 @@ func ValidateResourceSlice(resourceSlice *resource.ResourceSlice) field.ErrorLis
 		allErrs = append(allErrs, validateNodeName(resourceSlice.NodeName, field.NewPath("nodeName"))...)
 	}
 	allErrs = append(allErrs, validateResourceDriverName(resourceSlice.DriverName, field.NewPath("driverName"))...)
-	allErrs = append(allErrs, validateNodeResourceModel(&resourceSlice.NodeResourceModel, nil)...)
+	allErrs = append(allErrs, validateResourceModel(&resourceSlice.ResourceModel, nil)...)
 	return allErrs
 }
 
-func validateNodeResourceModel(model *resource.NodeResourceModel, fldPath *field.Path) field.ErrorList {
+func validateResourceModel(model *resource.ResourceModel, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	entries := sets.New[string]()
 	if model.NamedResources != nil {

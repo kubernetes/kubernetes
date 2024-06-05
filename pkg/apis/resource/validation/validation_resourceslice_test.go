@@ -34,7 +34,7 @@ func testResourceSlice(name, nodeName, driverName string) *resource.ResourceSlic
 		},
 		NodeName:   nodeName,
 		DriverName: driverName,
-		NodeResourceModel: resource.NodeResourceModel{
+		ResourceModel: resource.ResourceModel{
 			NamedResources: &resource.NamedResourcesResources{},
 		},
 	}
@@ -192,7 +192,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: field.ErrorList{field.Required(nil, "exactly one structured model field must be set")},
 			slice: func() *resource.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName)
-				slice.NodeResourceModel = resource.NodeResourceModel{}
+				slice.ResourceModel = resource.ResourceModel{}
 				return slice
 			}(),
 		},

@@ -484,7 +484,7 @@ func TestPreemption(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			filter.Tokens = test.initTokens
 			filter.EnablePreFilter = test.enablePreFilter
 			filter.Unresolvable = test.unresolvable
@@ -679,7 +679,7 @@ func TestDisablePreemption(t *testing.T) {
 				t.Errorf("Error while creating high priority pod: %v", err)
 			}
 			// Ensure preemptor should keep unschedulable.
-			if err := waitForPodUnschedulable(cs, preemptor); err != nil {
+			if err := waitForPodUnschedulable(testCtx.Ctx, cs, preemptor); err != nil {
 				t.Errorf("Preemptor %v should not become scheduled", preemptor.Name)
 			}
 

@@ -20,7 +20,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -34,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/pkg/volume"
-	utilptr "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestLoadPodFromFile(t *testing.T) {
@@ -169,14 +168,14 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: ptr.To[int64](1000),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: ptr.To[int64](1000),
 							},
 						},
 						{
@@ -195,25 +194,62 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(999),
+								RunAsUser: ptr.To[int64](999),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: ptr.To[int64](1000),
 							},
 						},
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: ptr.To[int64](1000),
+							},
+						},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								SecurityContext: &v1.SecurityContext{
+									RunAsUser: ptr.To[int64](1001),
+								},
 							},
 						},
 					},
 				},
 			},
 			wantFsUser: nil,
+		},
+		{
+			desc: "init and regular containers have runAsUser specified and the same",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{},
+					InitContainers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: ptr.To[int64](1000),
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: ptr.To[int64](1000),
+							},
+						},
+						{
+							SecurityContext: &v1.SecurityContext{
+								RunAsUser: ptr.To[int64](1000),
+							},
+						},
+					},
+				},
+			},
+			wantFsUser: ptr.To[int64](1000),
 		},
 		{
 			desc: "all have runAsUser specified and the same",
@@ -223,25 +259,34 @@ func TestFsUserFrom(t *testing.T) {
 					InitContainers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: ptr.To[int64](1000),
 							},
 						},
 					},
 					Containers: []v1.Container{
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: ptr.To[int64](1000),
 							},
 						},
 						{
 							SecurityContext: &v1.SecurityContext{
-								RunAsUser: utilptr.Int64Ptr(1000),
+								RunAsUser: ptr.To[int64](1000),
+							},
+						},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								SecurityContext: &v1.SecurityContext{
+									RunAsUser: ptr.To[int64](1000),
+								},
 							},
 						},
 					},
 				},
 			},
-			wantFsUser: utilptr.Int64Ptr(1000),
+			wantFsUser: ptr.To[int64](1000),
 		},
 	}
 
@@ -258,30 +303,6 @@ func TestFsUserFrom(t *testing.T) {
 				t.Errorf("FsUserFrom(%v) = %d, want %d", test.pod, *fsUser, *test.wantFsUser)
 			}
 		})
-	}
-}
-
-func TestGenerateVolumeName(t *testing.T) {
-
-	// Normal operation, no truncate
-	v1 := GenerateVolumeName("kubernetes", "pv-cinder-abcde", 255)
-	if v1 != "kubernetes-dynamic-pv-cinder-abcde" {
-		t.Errorf("Expected kubernetes-dynamic-pv-cinder-abcde, got %s", v1)
-	}
-
-	// Truncate trailing "6789-dynamic"
-	prefix := strings.Repeat("0123456789", 9) // 90 characters prefix + 8 chars. of "-dynamic"
-	v2 := GenerateVolumeName(prefix, "pv-cinder-abcde", 100)
-	expect := prefix[:84] + "-pv-cinder-abcde"
-	if v2 != expect {
-		t.Errorf("Expected %s, got %s", expect, v2)
-	}
-
-	// Truncate really long cluster name
-	prefix = strings.Repeat("0123456789", 1000) // 10000 characters prefix
-	v3 := GenerateVolumeName(prefix, "pv-cinder-abcde", 100)
-	if v3 != expect {
-		t.Errorf("Expected %s, got %s", expect, v3)
 	}
 }
 
@@ -616,12 +637,12 @@ func TestMakeAbsolutePath(t *testing.T) {
 }
 
 func TestGetPodVolumeNames(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)
 	tests := []struct {
 		name                    string
 		pod                     *v1.Pod
-		expectedMounts          sets.String
-		expectedDevices         sets.String
+		expectedMounts          sets.Set[string]
+		expectedDevices         sets.Set[string]
 		expectedSELinuxContexts map[string][]*v1.SELinuxOptions
 	}{
 		{
@@ -629,8 +650,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{},
 			},
-			expectedMounts:  sets.NewString(),
-			expectedDevices: sets.NewString(),
+			expectedMounts:  sets.New[string](),
+			expectedDevices: sets.New[string](),
 		},
 		{
 			name: "pod with volumes",
@@ -673,8 +694,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol2"),
-			expectedDevices: sets.NewString("vol3", "vol4"),
+			expectedMounts:  sets.New[string]("vol1", "vol2"),
+			expectedDevices: sets.New[string]("vol3", "vol4"),
 		},
 		{
 			name: "pod with init containers",
@@ -717,8 +738,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol2"),
-			expectedDevices: sets.NewString("vol3", "vol4"),
+			expectedMounts:  sets.New[string]("vol1", "vol2"),
+			expectedDevices: sets.New[string]("vol3", "vol4"),
 		},
 		{
 			name: "pod with multiple containers",
@@ -776,8 +797,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol3"),
-			expectedDevices: sets.NewString("vol2", "vol4"),
+			expectedMounts:  sets.New[string]("vol1", "vol3"),
+			expectedDevices: sets.New[string]("vol2", "vol4"),
 		},
 		{
 			name: "pod with ephemeral containers",
@@ -818,8 +839,8 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts:  sets.NewString("vol1", "vol2"),
-			expectedDevices: sets.NewString(),
+			expectedMounts:  sets.New[string]("vol1", "vol2"),
+			expectedDevices: sets.New[string](),
 		},
 		{
 			name: "pod with SELinuxOptions",
@@ -891,7 +912,7 @@ func TestGetPodVolumeNames(t *testing.T) {
 					},
 				},
 			},
-			expectedMounts: sets.NewString("vol1", "vol2", "vol3"),
+			expectedMounts: sets.New[string]("vol1", "vol2", "vol3"),
 			expectedSELinuxContexts: map[string][]*v1.SELinuxOptions{
 				"vol1": {
 					{
@@ -927,10 +948,10 @@ func TestGetPodVolumeNames(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mounts, devices, contexts := GetPodVolumeNames(test.pod)
 			if !mounts.Equal(test.expectedMounts) {
-				t.Errorf("Expected mounts: %q, got %q", mounts.List(), test.expectedMounts.List())
+				t.Errorf("Expected mounts: %q, got %q", sets.List[string](mounts), sets.List[string](test.expectedMounts))
 			}
 			if !devices.Equal(test.expectedDevices) {
-				t.Errorf("Expected devices: %q, got %q", devices.List(), test.expectedDevices.List())
+				t.Errorf("Expected devices: %q, got %q", sets.List[string](devices), sets.List[string](test.expectedDevices))
 			}
 			if len(contexts) == 0 {
 				contexts = nil

@@ -56,7 +56,7 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OpenAPIEnums, tc.featureEnabled)
 
 			getDefinitionsFn := openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 				defs := generated.GetOpenAPIDefinitions(ref)
@@ -77,8 +77,8 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 
 			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-					config.GenericConfig.OpenAPIConfig.GetDefinitions = getDefinitionsFn
+					config.ControlPlane.Generic.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+					config.ControlPlane.Generic.OpenAPIConfig.GetDefinitions = getDefinitionsFn
 				},
 			})
 			defer tearDownFn()

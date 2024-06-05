@@ -24,7 +24,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -154,16 +153,7 @@ func GRPCStreamInterceptor(interceptor grpc.StreamServerInterceptor) Option {
 	}
 }
 
-// NodeV1alpha2 explicitly chooses whether the DRA gRPC API v1alpha2
-// gets enabled.
-func NodeV1alpha2(enabled bool) Option {
-	return func(o *options) error {
-		o.nodeV1alpha2 = enabled
-		return nil
-	}
-}
-
-// NodeV1alpha2 explicitly chooses whether the DRA gRPC API v1alpha3
+// NodeV1alpha3 explicitly chooses whether the DRA gRPC API v1alpha3
 // gets enabled.
 func NodeV1alpha3(enabled bool) Option {
 	return func(o *options) error {
@@ -182,7 +172,7 @@ type options struct {
 	unaryInterceptors          []grpc.UnaryServerInterceptor
 	streamInterceptors         []grpc.StreamServerInterceptor
 
-	nodeV1alpha2, nodeV1alpha3 bool
+	nodeV1alpha3 bool
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -200,7 +190,6 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 	o := options{
 		logger:        klog.Background(),
 		grpcVerbosity: 4,
-		nodeV1alpha2:  true,
 		nodeV1alpha3:  true,
 	}
 	for _, option := range opts {
@@ -229,11 +218,6 @@ func Start(nodeServer interface{}, opts ...Option) (result DRAPlugin, finalErr e
 		if nodeServer, ok := nodeServer.(drapbv1alpha3.NodeServer); ok && o.nodeV1alpha3 {
 			o.logger.V(5).Info("registering drapbv1alpha3.NodeServer")
 			drapbv1alpha3.RegisterNodeServer(grpcServer, nodeServer)
-			implemented = true
-		}
-		if nodeServer, ok := nodeServer.(drapbv1alpha2.NodeServer); ok && o.nodeV1alpha2 {
-			o.logger.V(5).Info("registering drapbv1alpha2.NodeServer")
-			drapbv1alpha2.RegisterNodeServer(grpcServer, nodeServer)
 			implemented = true
 		}
 	})

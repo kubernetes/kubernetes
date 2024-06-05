@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -122,19 +123,15 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithSeria
 							},
 						},
 					}
-					pod = e2epod.NewPodClient(f).Create(ctx, pod)
-					framework.ExpectNoError(e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout))
-					var err error
-					pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
-					gomega.Expect(pod.Status.ContainerStatuses[0].State.Waiting.Message).To(
-						gomega.ContainSubstring("failed to resolve recursive read-only mode: volume \"mnt\" requested recursive read-only mode, but it is not read-only"))
+					_, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+					gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("spec.containers[0].volumeMounts.recursiveReadOnly: Forbidden: may only be specified when readOnly is true")))
 				}) // By
 				// See also the unit test [pkg/kubelet.TestResolveRecursiveReadOnly] for more invalid conditions (e.g., incompatible mount propagation)
 			}) // It
 		}) // Context
 		ginkgo.Context("when the runtime does not support recursive read-only mounts", func() {
 			f.It("should accept non-recursive read-only mounts", func(ctx context.Context) {
+				e2eskipper.SkipUnlessFeatureGateEnabled(features.RecursiveReadOnlyMounts)
 				ginkgo.By("waiting for the node to be ready", func() {
 					waitForNodeReady(ctx)
 					if supportsRRO(ctx, f) {
@@ -175,6 +172,7 @@ var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", framework.WithSeria
 				}) // By
 			}) // It
 			f.It("should reject recursive read-only mounts", func(ctx context.Context) {
+				e2eskipper.SkipUnlessFeatureGateEnabled(features.RecursiveReadOnlyMounts)
 				ginkgo.By("waiting for the node to be ready", func() {
 					waitForNodeReady(ctx)
 					if supportsRRO(ctx, f) {
@@ -233,7 +231,7 @@ func supportsRRO(ctx context.Context, f *framework.Framework) bool {
 	// Assuming that there is only one node, because this is a node e2e test.
 	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	node := nodeList.Items[0]
-	for _, f := range node.Status.RuntimeClasses {
+	for _, f := range node.Status.RuntimeHandlers {
 		if f.Name == "" && f.Features != nil && *f.Features.RecursiveReadOnlyMounts {
 			return true
 		}

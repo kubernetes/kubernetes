@@ -30,11 +30,11 @@ import (
 // ResourceSliceApplyConfiguration represents an declarative configuration of the ResourceSlice type for use
 // with apply.
 type ResourceSliceApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration       `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration    `json:"metadata,omitempty"`
-	NodeName                            *string `json:"nodeName,omitempty"`
-	DriverName                          *string `json:"driverName,omitempty"`
-	NodeResourceModelApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	NodeName                         *string `json:"nodeName,omitempty"`
+	DriverName                       *string `json:"driverName,omitempty"`
+	ResourceModelApplyConfiguration  `json:",inline"`
 }
 
 // ResourceSlice constructs an declarative configuration of the ResourceSlice type for use with

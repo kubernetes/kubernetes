@@ -32,8 +32,8 @@ func TestAdmission(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(cfg *controlplane.Config) {
-			cfg.GenericConfig.EnableProfiling = true
-			cfg.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+			cfg.ControlPlane.Generic.EnableProfiling = true
+			cfg.ControlPlane.Generic.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
 		},
 	})
 	defer tearDownFn()

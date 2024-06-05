@@ -84,12 +84,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 
 	// Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      cm.nodeInfo.Name,
-		UID:       types.UID(cm.nodeInfo.Name),
-		Namespace: "",
-	}
+	nodeRef := nodeRefFromNode(cm.nodeInfo.Name)
 
 	// If Node Allocatable is enforced on a node that has not been drained or is updated on an existing node to a lower value,
 	// existing memory usage across pods might be higher than current Node Allocatable Memory Limits.
@@ -264,4 +259,14 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 		return fmt.Errorf("invalid Node Allocatable configuration. %s", strings.Join(errors, " "))
 	}
 	return nil
+}
+
+// Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.
+func nodeRefFromNode(nodeName string) *v1.ObjectReference {
+	return &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      nodeName,
+		UID:       types.UID(nodeName),
+		Namespace: "",
+	}
 }

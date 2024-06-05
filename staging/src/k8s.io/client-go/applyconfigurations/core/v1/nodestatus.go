@@ -36,7 +36,7 @@ type NodeStatusApplyConfiguration struct {
 	VolumesInUse    []v1.UniqueVolumeName                  `json:"volumesInUse,omitempty"`
 	VolumesAttached []AttachedVolumeApplyConfiguration     `json:"volumesAttached,omitempty"`
 	Config          *NodeConfigStatusApplyConfiguration    `json:"config,omitempty"`
-	RuntimeClasses  []NodeRuntimeClassApplyConfiguration   `json:"runtimeClasses,omitempty"`
+	RuntimeHandlers []NodeRuntimeHandlerApplyConfiguration `json:"runtimeHandlers,omitempty"`
 }
 
 // NodeStatusApplyConfiguration constructs an declarative configuration of the NodeStatus type for use with
@@ -155,15 +155,15 @@ func (b *NodeStatusApplyConfiguration) WithConfig(value *NodeConfigStatusApplyCo
 	return b
 }
 
-// WithRuntimeClasses adds the given value to the RuntimeClasses field in the declarative configuration
+// WithRuntimeHandlers adds the given value to the RuntimeHandlers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the RuntimeClasses field.
-func (b *NodeStatusApplyConfiguration) WithRuntimeClasses(values ...*NodeRuntimeClassApplyConfiguration) *NodeStatusApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the RuntimeHandlers field.
+func (b *NodeStatusApplyConfiguration) WithRuntimeHandlers(values ...*NodeRuntimeHandlerApplyConfiguration) *NodeStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithRuntimeClasses")
+			panic("nil value passed to WithRuntimeHandlers")
 		}
-		b.RuntimeClasses = append(b.RuntimeClasses, *values[i])
+		b.RuntimeHandlers = append(b.RuntimeHandlers, *values[i])
 	}
 	return b
 }

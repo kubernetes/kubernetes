@@ -33,7 +33,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -474,7 +473,7 @@ func TestDropServiceStatusDisabledFields(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			dropServiceStatusDisabledFields(tc.svc, tc.oldSvc)
 
 			if !reflect.DeepEqual(tc.svc, tc.compareSvc) {
@@ -566,22 +565,22 @@ func TestDropTypeDependentFields(t *testing.T) {
 		}
 	}
 	setAllocateLoadBalancerNodePortsTrue := func(svc *api.Service) {
-		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+		svc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 	}
 	setAllocateLoadBalancerNodePortsFalse := func(svc *api.Service) {
-		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+		svc.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 	}
 	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
 		svc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
 	setLoadBalancerClass := func(svc *api.Service) {
-		svc.Spec.LoadBalancerClass = utilpointer.String("test-load-balancer-class")
+		svc.Spec.LoadBalancerClass = ptr.To("test-load-balancer-class")
 	}
 	clearLoadBalancerClass := func(svc *api.Service) {
 		svc.Spec.LoadBalancerClass = nil
 	}
 	changeLoadBalancerClass := func(svc *api.Service) {
-		svc.Spec.LoadBalancerClass = utilpointer.String("test-load-balancer-class-changed")
+		svc.Spec.LoadBalancerClass = ptr.To("test-load-balancer-class-changed")
 	}
 
 	testCases := []struct {
@@ -796,6 +795,70 @@ func TestMatchService(t *testing.T) {
 		fieldSelector fields.Selector
 		expectMatch   bool
 	}{
+		{
+			name: "match on name",
+			in: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=test"),
+			expectMatch:   true,
+		},
+		{
+			name: "match on namespace",
+			in: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=testns"),
+			expectMatch:   true,
+		},
+		{
+			name: "no match on name",
+			in: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.name=nomatch"),
+			expectMatch:   false,
+		},
+		{
+			name: "no match on namespace",
+			in: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "testns",
+				},
+				Spec: api.ServiceSpec{ClusterIP: api.ClusterIPNone},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("metadata.namespace=nomatch"),
+			expectMatch:   false,
+		},
+		{
+			name: "match on loadbalancer type service",
+			in: &api.Service{
+				Spec: api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			expectMatch:   true,
+		},
+		{
+			name: "no match on nodeport type service",
+			in: &api.Service{
+				Spec: api.ServiceSpec{Type: api.ServiceTypeNodePort},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.type=LoadBalancer"),
+			expectMatch:   false,
+		},
 		{
 			name: "match on headless service",
 			in: &api.Service{

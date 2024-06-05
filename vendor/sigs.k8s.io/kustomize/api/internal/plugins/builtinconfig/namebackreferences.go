@@ -47,6 +47,8 @@ type NameBackReferences struct {
 	// TODO: rename json 'fieldSpecs' to 'referrers' for clarity.
 	// This will, however, break anyone using a custom config.
 	Referrers types.FsSlice `json:"fieldSpecs,omitempty" yaml:"fieldSpecs,omitempty"`
+
+	// Note: If any new pointer based members are added, DeepCopy needs to be updated
 }
 
 func (n NameBackReferences) String() string {
@@ -64,6 +66,17 @@ func (s nbrSlice) Len() int      { return len(s) }
 func (s nbrSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s nbrSlice) Less(i, j int) bool {
 	return s[i].Gvk.IsLessThan(s[j].Gvk)
+}
+
+// DeepCopy returns a new copy of nbrSlice
+func (s nbrSlice) DeepCopy() nbrSlice {
+	ret := make(nbrSlice, len(s))
+	copy(ret, s)
+	for i, slice := range ret {
+		ret[i].Referrers = slice.Referrers.DeepCopy()
+	}
+
+	return ret
 }
 
 func (s nbrSlice) mergeAll(o nbrSlice) (result nbrSlice, err error) {

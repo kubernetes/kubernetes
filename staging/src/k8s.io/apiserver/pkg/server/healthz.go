@@ -118,7 +118,7 @@ func (s *GenericAPIServer) AddLivezChecks(delay time.Duration, checks ...healthz
 // that we can register that the api-server is no longer ready while we attempt to gracefully
 // shutdown.
 func (s *GenericAPIServer) addReadyzShutdownCheck(stopCh <-chan struct{}) error {
-	return s.AddReadyzChecks(shutdownCheck{stopCh})
+	return s.AddReadyzChecks(healthz.NewShutdownHealthz(stopCh))
 }
 
 // installHealthz creates the healthz endpoint for this server
@@ -137,25 +137,6 @@ func (s *GenericAPIServer) installReadyz() {
 // installLivez creates the livez endpoint for this server.
 func (s *GenericAPIServer) installLivez() {
 	s.livezRegistry.installHandler(s.Handler.NonGoRestfulMux)
-}
-
-// shutdownCheck fails if the embedded channel is closed. This is intended to allow for graceful shutdown sequences
-// for the apiserver.
-type shutdownCheck struct {
-	StopCh <-chan struct{}
-}
-
-func (shutdownCheck) Name() string {
-	return "shutdown"
-}
-
-func (c shutdownCheck) Check(req *http.Request) error {
-	select {
-	case <-c.StopCh:
-		return fmt.Errorf("process is shutting down")
-	default:
-	}
-	return nil
 }
 
 // delayedHealthCheck wraps a health check which will not fail until the explicitly defined delay has elapsed. This

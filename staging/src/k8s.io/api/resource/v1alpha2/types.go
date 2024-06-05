@@ -26,6 +26,8 @@ import (
 const (
 	// Finalizer is the finalizer that gets set for claims
 	// which were allocated through a builtin controller.
+	// Reserved for use by Kubernetes, DRA driver controllers must
+	// use their own finalizer.
 	Finalizer = "dra.k8s.io/delete-protection"
 )
 
@@ -186,7 +188,7 @@ type ResourceHandle struct {
 	// plugin should be invoked to process this ResourceHandle's data once it
 	// lands on a node. This may differ from the DriverName set in
 	// ResourceClaimStatus this ResourceHandle is embedded in.
-	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+	DriverName string `json:"driverName" protobuf:"bytes,1,name=driverName"`
 
 	// Data contains the opaque data associated with this ResourceHandle. It is
 	// set by the controller component of the resource driver whose name
@@ -554,11 +556,11 @@ type ResourceSlice struct {
 	// objects with a certain driver name.
 	DriverName string `json:"driverName" protobuf:"bytes,3,name=driverName"`
 
-	NodeResourceModel `json:",inline" protobuf:"bytes,4,name=nodeResourceModel"`
+	ResourceModel `json:",inline" protobuf:"bytes,4,name=resourceModel"`
 }
 
-// NodeResourceModel must have one and only one field set.
-type NodeResourceModel struct {
+// ResourceModel must have one and only one field set.
+type ResourceModel struct {
 	// NamedResources describes available resources using the named resources model.
 	//
 	// +optional

@@ -1,5 +1,26 @@
 # ChangeLog
 
+## v0.0.16
+
+- Fixed a bug in `Fake.ParseDump()` when using IPv6. (`@npinaeva`)
+
+## v0.0.15
+
+- knftables now requires the nft binary to be v1.0.1 or later. This is
+  because earlier versions (a) had bugs that might cause them to crash
+  when parsing rules created by later versions of nft, and (b) always
+  parsed the entire ruleset at startup, even if you were only trying
+  to operate on a single table. The combination of those two factors
+  means that older versions of nft can't reliably be used from inside
+  a container. (`@danwinship`)
+
+- Fixed a bug that meant we were never setting comments on
+  tables/chains/sets/etc, even if nft and the kernel were both new
+  enough to support it. (`@tnqn`)
+
+- Added `Fake.ParseDump()`, to load a `Fake` from a `Fake.Dump()`
+  output. (`@npinaeva`)
+
 ## v0.0.14
 
 - Renamed the package `"sigs.k8s.io/knftables"`, reflecting its new

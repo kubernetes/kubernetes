@@ -40,7 +40,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -359,14 +358,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		klog.V(2).InfoS("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
-	if kl.keepTerminatedPodVolumes {
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		klog.V(2).InfoS("Setting node annotation to keep pod volumes of terminated pods attached to the node")
-		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
-	}
-
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
@@ -554,15 +545,19 @@ func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
-	// To reduce the load on etcd, we are serving GET operations from
-	// apiserver cache (the data might be slightly delayed but it doesn't
+	// To reduce the load on control-plane, we are serving GET operations from
+	// local lister (the data might be slightly delayed but it doesn't
 	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
-	opts := metav1.GetOptions{}
+	var originalNode *v1.Node
+	var err error
+
 	if tryNumber == 0 {
-		util.FromApiserverCache(&opts)
+		originalNode, err = kl.nodeLister.Get(string(kl.nodeName))
+	} else {
+		opts := metav1.GetOptions{}
+		originalNode, err = kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	}
-	originalNode, err := kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
@@ -741,10 +736,8 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.DaemonEndpoints(kl.daemonEndpoints),
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
 		nodestatus.GoRuntime(),
-		nodestatus.RuntimeClasses(kl.runtimeState.runtimeHandlers),
+		nodestatus.RuntimeHandlers(kl.runtimeState.runtimeHandlers),
 	)
-	// Volume limits
-	setters = append(setters, nodestatus.VolumeLimits(kl.volumePluginMgr.ListVolumePluginWithLimits))
 
 	setters = append(setters,
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),

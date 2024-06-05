@@ -84,7 +84,7 @@ var (
 		},
 		[]string{"endpoint"},
 	)
-	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"cluster"}, nil, compbasemetrics.STABLE, "")
+	storageSizeDescription   = compbasemetrics.NewDesc("apiserver_storage_size_bytes", "Size of the storage database file physically allocated in bytes.", []string{"storage_cluster_id"}, nil, compbasemetrics.STABLE, "")
 	storageMonitor           = &monitorCollector{monitorGetter: func() ([]Monitor, error) { return nil, nil }}
 	etcdEventsReceivedCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -288,21 +288,21 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 	}
 
 	for i, m := range monitors {
-		cluster := fmt.Sprintf("etcd-%d", i)
+		storageClusterID := fmt.Sprintf("etcd-%d", i)
 
-		klog.V(4).InfoS("Start collecting storage metrics", "cluster", cluster)
+		klog.V(4).InfoS("Start collecting storage metrics", "storage_cluster_id", storageClusterID)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		metrics, err := m.Monitor(ctx)
 		cancel()
 		m.Close()
 		if err != nil {
-			klog.InfoS("Failed to get storage metrics", "cluster", cluster, "err", err)
+			klog.InfoS("Failed to get storage metrics", "storage_cluster_id", storageClusterID, "err", err)
 			continue
 		}
 
-		metric, err := compbasemetrics.NewConstMetric(storageSizeDescription, compbasemetrics.GaugeValue, float64(metrics.Size), cluster)
+		metric, err := compbasemetrics.NewConstMetric(storageSizeDescription, compbasemetrics.GaugeValue, float64(metrics.Size), storageClusterID)
 		if err != nil {
-			klog.ErrorS(err, "Failed to create metric", "cluster", cluster)
+			klog.ErrorS(err, "Failed to create metric", "storage_cluster_id", storageClusterID)
 		}
 		ch <- metric
 	}

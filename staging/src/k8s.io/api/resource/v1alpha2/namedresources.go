@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// NamedResourcesResources is used in NodeResourceModel.
+// NamedResourcesResources is used in ResourceModel.
 type NamedResourcesResources struct {
 	// The list of all individual resources instances currently available.
 	//
@@ -111,7 +111,7 @@ type NamedResourcesFilter struct {
 	// resource instance is suitable. The language is as defined in
 	// https://kubernetes.io/docs/reference/using-api/cel/
 	//
-	// In addition, for each type NamedResourcesin AttributeValue there is a map that
+	// In addition, for each type in NamedResourcesAttributeValue there is a map that
 	// resolves to the corresponding value of the instance under evaluation.
 	// For example:
 	//

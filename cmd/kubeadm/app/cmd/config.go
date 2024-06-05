@@ -32,14 +32,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	utilsexec "k8s.io/utils/exec"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
-	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	outputapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -372,8 +371,8 @@ func newCmdConfigImagesPull() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.NodeRegistration.CRISocket)
-			if err != nil {
+			containerRuntime := utilruntime.NewContainerRuntime(internalcfg.NodeRegistration.CRISocket)
+			if err := containerRuntime.Connect(); err != nil {
 				return err
 			}
 			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
@@ -468,7 +467,7 @@ type imageTextPrinter struct {
 // PrintObj is an implementation of ResourcePrinter.PrintObj for plain text output
 func (itp *imageTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 	var err error
-	if imgs, ok := obj.(*outputapiv1alpha2.Images); ok {
+	if imgs, ok := obj.(*outputapiv1alpha3.Images); ok {
 		_, err = fmt.Fprintln(writer, strings.Join(imgs.Images, "\n"))
 	} else {
 		err = errors.New("unexpected object type")
@@ -491,7 +490,7 @@ func (ipf *imageTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, 
 func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
 
-	if err := printer.PrintObj(&outputapiv1alpha2.Images{Images: imgs}, out); err != nil {
+	if err := printer.PrintObj(&outputapiv1alpha3.Images{Images: imgs}, out); err != nil {
 		return errors.Wrap(err, "unable to print images")
 	}
 

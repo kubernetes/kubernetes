@@ -212,7 +212,6 @@ var _ volume.RecyclableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.DeletableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.ProvisionableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.AttachableVolumePlugin = &FakeVolumePlugin{}
-var _ volume.VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ volume.DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 var _ volume.NodeExpandableVolumePlugin = &FakeVolumePlugin{}
 
@@ -232,7 +231,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
 	}
-	volume.VolumesAttached = make(map[string]sets.String)
+	volume.VolumesAttached = make(map[string]sets.Set[string])
 	volume.DeviceMountState = make(map[string]string)
 	volume.VolumeMountState = make(map[string]string)
 	if list != nil {
@@ -289,10 +288,6 @@ func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 
 func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
 	return true
-}
-
-func (plugin *FakeVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return false
 }
 
 func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
@@ -565,10 +560,6 @@ func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return f.Plugin.RequiresRemount(spec)
 }
 
-func (f *FakeBasicVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return f.Plugin.SupportsBulkVolumeVerification()
-}
-
 func (f *FakeBasicVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return f.Plugin.SupportsSELinuxContextMount(spec)
 }
@@ -650,10 +641,6 @@ func (plugin *FakeFileVolumePlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *FakeFileVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }
@@ -680,7 +667,7 @@ type FakeVolume struct {
 	VolName string
 	Plugin  *FakeVolumePlugin
 	volume.MetricsNil
-	VolumesAttached  map[string]sets.String
+	VolumesAttached  map[string]sets.Set[string]
 	DeviceMountState map[string]string
 	VolumeMountState map[string]string
 
@@ -1022,7 +1009,7 @@ func (fv *FakeVolume) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		return "", fmt.Errorf("volume %q trying to attach to node %q is already attached to node %q", volumeName, nodeName, volumeNodes)
 	}
 
-	fv.VolumesAttached[volumeName] = sets.NewString(string(nodeName))
+	fv.VolumesAttached[volumeName] = sets.New[string](string(nodeName))
 	if nodeName == UncertainAttachNode || nodeName == TimeoutAttachNode {
 		return "", fmt.Errorf("timed out to attach volume %q to node %q", volumeName, nodeName)
 	}

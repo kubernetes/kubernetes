@@ -18,6 +18,7 @@ package options
 
 import (
 	"bytes"
+	"context"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -25,6 +26,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -44,6 +46,7 @@ import (
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -215,6 +218,10 @@ func TestServerRunWithSNI(t *testing.T) {
 		test := tests[title]
 		t.Run(title, func(t *testing.T) {
 			t.Parallel()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancelCause(ctx)
+			defer cancel(errors.New("test has completed"))
+
 			// create server cert
 			certDir := "testdata/" + specToName(test.Cert)
 			serverCertBundleFile := filepath.Join(certDir, "cert")
@@ -267,9 +274,6 @@ func TestServerRunWithSNI(t *testing.T) {
 				signatures[sig] = j
 			}
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-
 			// launch server
 			config := setUp(t)
 
@@ -286,7 +290,8 @@ func TestServerRunWithSNI(t *testing.T) {
 						KeyFile:  serverKeyFile,
 					},
 				},
-				SNICertKeys: namedCertKeys,
+				DisableHTTP2Serving: true,
+				SNICertKeys:         namedCertKeys,
 			}).WithLoopback()
 			// use a random free port
 			ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -316,7 +321,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			preparedServer := s.PrepareRun()
 			preparedServerErrors := make(chan error)
 			go func() {
-				if err := preparedServer.Run(stopCh); err != nil {
+				if err := preparedServer.RunWithContext(ctx); err != nil {
 					preparedServerErrors <- err
 				}
 			}()

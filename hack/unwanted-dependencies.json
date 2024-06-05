@@ -20,6 +20,7 @@
       "github.com/go-openapi/validate": "use k8s.io/kube-openapi/pkg/validation/validate instead",
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/gogo/protobuf": "unmaintained",
+      "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
@@ -73,26 +74,19 @@
   "status": {
     "unwantedReferences": {
       "cloud.google.com/go": [
-        "cloud.google.com/go/compute",
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/bigquery": [
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/compute": [
-        "cloud.google.com/go/compute/metadata",
         "github.com/google/cadvisor",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "golang.org/x/oauth2",
         "google.golang.org/genproto",
         "google.golang.org/grpc"
       ],
       "cloud.google.com/go/firestore": [
         "google.golang.org/genproto"
-      ],
-      "github.com/GoogleCloudPlatform/k8s-cloud-provider": [
-        "k8s.io/kubernetes",
-        "k8s.io/legacy-cloud-providers"
       ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -124,20 +118,9 @@
         "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
-      "github.com/google/s2a-go": [
-        "cloud.google.com/go/compute",
-        "google.golang.org/api"
-      ],
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
-      "github.com/googleapis/enterprise-certificate-proxy": [
-        "cloud.google.com/go/compute",
-        "google.golang.org/api"
-      ],
-      "github.com/googleapis/gax-go/v2": [
-        "cloud.google.com/go/compute"
       ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
@@ -182,57 +165,35 @@
         "sigs.k8s.io/kustomize/kustomize/v5"
       ],
       "go.opencensus.io": [
-        "cloud.google.com/go/compute",
-        "github.com/Microsoft/hcsshim",
-        "google.golang.org/api"
+        "github.com/Microsoft/hcsshim"
       ],
       "golang.org/x/exp": [
-        "github.com/antlr/antlr4/runtime/Go/antlr/v4",
+        "github.com/antlr4-go/antlr/v4",
         "github.com/google/cel-go"
       ],
-      "google.golang.org/api": [
-        "cloud.google.com/go/compute",
-        "github.com/GoogleCloudPlatform/k8s-cloud-provider",
-        "github.com/googleapis/gax-go/v2",
-        "k8s.io/kubernetes",
-        "k8s.io/legacy-cloud-providers"
-      ],
       "google.golang.org/appengine": [
-        "cloud.google.com/go/compute",
         "github.com/grpc-ecosystem/grpc-gateway/v2",
         "github.com/prometheus/client_golang",
         "github.com/prometheus/common",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "golang.org/x/oauth2",
-        "google.golang.org/api",
         "google.golang.org/grpc"
       ],
       "google.golang.org/genproto": [
-        "cloud.google.com/go/compute",
-        "github.com/container-storage-interface/spec",
         "github.com/containerd/ttrpc",
-        "github.com/googleapis/gax-go/v2",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
         "github.com/grpc-ecosystem/grpc-gateway/v2",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "google.golang.org/api",
         "google.golang.org/genproto/googleapis/api",
         "google.golang.org/genproto/googleapis/rpc",
         "google.golang.org/grpc"
       ]
     },
     "unwantedVendored": [
-      "cloud.google.com/go/compute",
-      "github.com/GoogleCloudPlatform/k8s-cloud-provider",
       "github.com/gogo/protobuf",
-      "github.com/google/s2a-go",
       "github.com/google/shlex",
-      "github.com/googleapis/enterprise-certificate-proxy",
-      "github.com/googleapis/gax-go/v2",
       "github.com/gregjones/httpcache",
       "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/grpc-ecosystem/grpc-gateway",
@@ -241,8 +202,6 @@
       "github.com/pkg/errors",
       "go.opencensus.io",
       "golang.org/x/exp",
-      "google.golang.org/api",
-      "google.golang.org/appengine",
       "google.golang.org/genproto"
     ]
   }

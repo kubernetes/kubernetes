@@ -26,13 +26,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+
 	corev1 "k8s.io/api/core/v1"
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -45,6 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
+	endpointsdiscovery "k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -244,6 +248,7 @@ type svmTest struct {
 	client                      clientset.Interface
 	clientConfig                *rest.Config
 	dynamicClient               *dynamic.DynamicClient
+	discoveryClient             *discovery.DiscoveryClient
 	storageConfig               *storagebackend.Config
 	server                      *kubeapiservertesting.TestServer
 	apiextensionsclient         *apiextensionsclientset.Clientset
@@ -349,6 +354,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		client:                      clientSet,
 		clientConfig:                server.ClientConfig,
 		dynamicClient:               dynamicClient,
+		discoveryClient:             rvDiscoveryClient,
 		policyFile:                  policyFile,
 		logFile:                     logFile,
 		filePathForEncryptionConfig: filePathForEncryptionConfig,
@@ -482,29 +488,6 @@ func (svm *svmTest) updateFile(t *testing.T, configDir, filename string, newCont
 		t.Fatal(err)
 	}
 }
-
-// func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string) (
-// 	*svmv1alpha1.StorageVersionMigration,
-// 	error,
-// ) {
-// 	t.Helper()
-// 	svmResource := &svmv1alpha1.StorageVersionMigration{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name: name,
-// 		},
-// 		Spec: svmv1alpha1.StorageVersionMigrationSpec{
-// 			Resource: svmv1alpha1.GroupVersionResource{
-// 				Group:    "",
-// 				Version:  "v1",
-// 				Resource: "secrets",
-// 			},
-// 		},
-// 	}
-//
-// 	return svm.client.StoragemigrationV1alpha1().
-// 		StorageVersionMigrations().
-// 		Create(ctx, svmResource, metav1.CreateOptions{})
-// }
 
 func (svm *svmTest) createSVMResource(ctx context.Context, t *testing.T, name string, gvr svmv1alpha1.GroupVersionResource) (
 	*svmv1alpha1.StorageVersionMigration,
@@ -756,23 +739,74 @@ func (svm *svmTest) updateCRD(
 	t *testing.T,
 	crdName string,
 	updatesCRDVersions []apiextensionsv1.CustomResourceDefinitionVersion,
-) *apiextensionsv1.CustomResourceDefinition {
+	expectedServingVersions []string,
+	expectedStorageVersion string,
+) {
 	t.Helper()
 
 	var err error
-	_, err = crdintegration.UpdateV1CustomResourceDefinitionWithRetry(svm.apiextensionsclient, crdName, func(c *apiextensionsv1.CustomResourceDefinition) {
+	crd, err := crdintegration.UpdateV1CustomResourceDefinitionWithRetry(svm.apiextensionsclient, crdName, func(c *apiextensionsv1.CustomResourceDefinition) {
 		c.Spec.Versions = updatesCRDVersions
 	})
 	if err != nil {
 		t.Fatalf("Failed to update CRD: %v", err)
 	}
 
-	crd, err := svm.apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crdName, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get CRD: %v", err)
-	}
+	svm.waitForCRDUpdate(ctx, t, crd.Spec.Names.Kind, expectedServingVersions, expectedStorageVersion)
+}
 
-	return crd
+func (svm *svmTest) waitForCRDUpdate(
+	ctx context.Context,
+	t *testing.T,
+	crdKind string,
+	expectedServingVersions []string,
+	expectedStorageVersion string,
+) {
+	t.Helper()
+
+	err := wait.PollUntilContextTimeout(
+		ctx,
+		500*time.Millisecond,
+		wait.ForeverTestTimeout,
+		true,
+		func(ctx context.Context) (bool, error) {
+			apiGroups, _, err := svm.discoveryClient.ServerGroupsAndResources()
+			if err != nil {
+				return false, fmt.Errorf("failed to get server groups and resources: %w", err)
+			}
+			for _, api := range apiGroups {
+				if api.Name == crdGroup {
+					var servingVersions []string
+					for _, apiVersion := range api.Versions {
+						servingVersions = append(servingVersions, apiVersion.Version)
+					}
+					sort.Strings(servingVersions)
+
+					// Check if the serving versions are as expected
+					if reflect.DeepEqual(expectedServingVersions, servingVersions) {
+						expectedHash := endpointsdiscovery.StorageVersionHash(crdGroup, expectedStorageVersion, crdKind)
+						resourceList, err := svm.discoveryClient.ServerResourcesForGroupVersion(crdGroup + "/" + api.PreferredVersion.Version)
+						if err != nil {
+							return false, fmt.Errorf("failed to get server resources for group version: %w", err)
+						}
+
+						// Check if the storage version is as expected
+						for _, resource := range resourceList.APIResources {
+							if resource.Kind == crdKind {
+								if resource.StorageVersionHash == expectedHash {
+									return true, nil
+								}
+							}
+						}
+					}
+				}
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Failed to update a CRD: Name: %s, Err: %v", crdName, err)
+	}
 }
 
 func (svm *svmTest) createCR(ctx context.Context, t *testing.T, crName, version string) *unstructured.Unstructured {
@@ -1002,7 +1036,7 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName 
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		wait.ForeverTestTimeout,
+		1*time.Minute,
 		true,
 		func(ctx context.Context) (bool, error) {
 			triggerCR := svm.createCR(ctx, t, "triggercr", "v1")

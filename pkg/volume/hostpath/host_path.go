@@ -18,9 +18,10 @@ package hostpath
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"os"
 	"regexp"
+
+	"k8s.io/klog/v2"
 
 	"github.com/opencontainers/selinux/go-selinux"
 
@@ -104,10 +105,6 @@ func (plugin *hostPathPlugin) RequiresRemount(spec *volume.Spec) bool {
 }
 
 func (plugin *hostPathPlugin) SupportsMountOption() bool {
-	return false
-}
-
-func (plugin *hostPathPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 

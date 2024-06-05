@@ -537,7 +537,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 		t.Run(testTitle, func(t *testing.T) {
 			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 			}
 
 			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
@@ -1572,10 +1572,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 	}
 	type dsUpdateTest struct {
-		old                             apps.DaemonSet
-		update                          apps.DaemonSet
-		expectedErrNum                  int
-		enableSkipReadOnlyValidationGCE bool
+		old            apps.DaemonSet
+		update         apps.DaemonSet
+		expectedErrNum int
 	}
 	successCases := map[string]dsUpdateTest{
 		"no change": {
@@ -1729,7 +1728,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			},
 		},
 		"Read-write volume verification": {
-			enableSkipReadOnlyValidationGCE: true,
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
@@ -1756,7 +1754,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "2"
@@ -1841,32 +1838,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
 					TemplateGeneration: 2,
 					Template:           invalidPodTemplate.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			expectedErrNum: 1,
-		},
-		"invalid read-write volume": {
-			enableSkipReadOnlyValidationGCE: false,
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 1,
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 2,
-					Template:           readWriteVolumePodTemplate.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -1977,7 +1948,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	for testName, errorCase := range errorCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			errorCase.old.ObjectMeta.ResourceVersion = "1"
 			errorCase.update.ObjectMeta.ResourceVersion = "2"
@@ -2645,10 +2615,9 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 		},
 	}
 	type depUpdateTest struct {
-		old                             apps.Deployment
-		update                          apps.Deployment
-		expectedErrNum                  int
-		enableSkipReadOnlyValidationGCE bool
+		old            apps.Deployment
+		update         apps.Deployment
+		expectedErrNum int
 	}
 	successCases := map[string]depUpdateTest{
 		"positive replicas": {
@@ -2671,7 +2640,6 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			},
 		},
 		"Read-write volume verification": {
-			enableSkipReadOnlyValidationGCE: true,
 			old: apps.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DeploymentSpec{
@@ -2693,7 +2661,6 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 	}
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "2"
@@ -2710,26 +2677,6 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			}
 		})
 		errorCases := map[string]depUpdateTest{
-			"more than one read/write": {
-				old: apps.Deployment{
-					ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-					Spec: apps.DeploymentSpec{
-						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-						Template: validPodTemplate.Template,
-						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
-					},
-				},
-				update: apps.Deployment{
-					ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-					Spec: apps.DeploymentSpec{
-						Replicas: 2,
-						Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-						Template: readWriteVolumePodTemplate.Template,
-						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
-					},
-				},
-				expectedErrNum: 2,
-			},
 			"invalid selector": {
 				old: apps.Deployment{
 					ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
@@ -2793,7 +2740,6 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 		}
 		for testName, errorCase := range errorCases {
 			t.Run(testName, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
 				// ResourceVersion is required for updates.
 				errorCase.old.ObjectMeta.ResourceVersion = "1"
 				errorCase.update.ObjectMeta.ResourceVersion = "2"
@@ -3074,10 +3020,9 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 	}
 	type rcUpdateTest struct {
-		old                             apps.ReplicaSet
-		update                          apps.ReplicaSet
-		expectedErrNum                  int
-		enableSkipReadOnlyValidationGCE bool
+		old            apps.ReplicaSet
+		update         apps.ReplicaSet
+		expectedErrNum int
 	}
 	successCases := map[string]rcUpdateTest{
 		"positive replicas": {
@@ -3098,7 +3043,6 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			},
 		},
 		"Read-write volume verification": {
-			enableSkipReadOnlyValidationGCE: true,
 			old: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.ReplicaSetSpec{
@@ -3118,7 +3062,6 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	}
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, successCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			successCase.old.ObjectMeta.ResourceVersion = "1"
 			successCase.update.ObjectMeta.ResourceVersion = "2"
@@ -3136,24 +3079,6 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		})
 	}
 	errorCases := map[string]rcUpdateTest{
-		"more than one read/write": {
-			old: apps.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: apps.ReplicaSetSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: validPodTemplate.Template,
-				},
-			},
-			update: apps.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.ReplicaSetSpec{
-					Replicas: 2,
-					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
-					Template: readWriteVolumePodTemplate.Template,
-				},
-			},
-			expectedErrNum: 2,
-		},
 		"invalid selector": {
 			old: apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
@@ -3211,7 +3136,6 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	}
 	for testName, errorCase := range errorCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SkipReadOnlyValidationGCE, errorCase.enableSkipReadOnlyValidationGCE)()
 			// ResourceVersion is required for updates.
 			errorCase.old.ObjectMeta.ResourceVersion = "1"
 			errorCase.update.ObjectMeta.ResourceVersion = "2"

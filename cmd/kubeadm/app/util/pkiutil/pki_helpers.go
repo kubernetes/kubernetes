@@ -62,7 +62,7 @@ const (
 // CertConfig is a wrapper around certutil.Config extending it with EncryptionAlgorithm.
 type CertConfig struct {
 	certutil.Config
-	NotAfter            *time.Time
+	NotAfter            time.Time
 	EncryptionAlgorithm kubeadmapi.EncryptionAlgorithmType
 }
 
@@ -72,10 +72,7 @@ func NewCertificateAuthority(config *CertConfig) (*x509.Certificate, crypto.Sign
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create private key while generating CA certificate")
 	}
-
-	// backdate CA certificate to allow small time jumps
-	config.Config.NotBefore = time.Now().Add(-kubeadmconstants.CertificateBackdate)
-	cert, err := certutil.NewSelfSignedCACert(config.Config, key)
+	cert, err := NewSelfSignedCACert(config, key)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to create self-signed CA certificate")
 	}
@@ -655,9 +652,14 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 
 	RemoveDuplicateAltNames(&cfg.AltNames)
 
-	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
-	if cfg.NotAfter != nil {
-		notAfter = *cfg.NotAfter
+	notBefore := caCert.NotBefore
+	if !cfg.NotBefore.IsZero() {
+		notBefore = cfg.NotBefore
+	}
+
+	notAfter := notBefore.Add(kubeadmconstants.CertificateValidityPeriod)
+	if !cfg.NotAfter.IsZero() {
+		notAfter = cfg.NotAfter
 	}
 
 	certTmpl := x509.Certificate{
@@ -668,7 +670,7 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		DNSNames:              cfg.AltNames.DNSNames,
 		IPAddresses:           cfg.AltNames.IPs,
 		SerialNumber:          serial,
-		NotBefore:             caCert.NotBefore,
+		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              keyUsage,
 		ExtKeyUsage:           cfg.Usages,
@@ -676,6 +678,48 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		IsCA:                  isCA,
 	}
 	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(certDERBytes)
+}
+
+// NewSelfSignedCACert creates a new self-signed CA certificate
+func NewSelfSignedCACert(cfg *CertConfig, key crypto.Signer) (*x509.Certificate, error) {
+	// returns a uniform random value in [0, max-1), then add 1 to serial to make it a uniform random value in [1, max).
+	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
+	if err != nil {
+		return nil, err
+	}
+	serial = new(big.Int).Add(serial, big.NewInt(1))
+
+	keyUsage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign
+
+	notBefore := time.Now().UTC()
+	if !cfg.NotBefore.IsZero() {
+		notBefore = cfg.NotBefore
+	}
+
+	notAfter := notBefore.Add(kubeadmconstants.CACertificateValidityPeriod)
+	if !cfg.NotAfter.IsZero() {
+		notAfter = cfg.NotAfter
+	}
+
+	tmpl := x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName:   cfg.CommonName,
+			Organization: cfg.Organization,
+		},
+		DNSNames:              []string{cfg.CommonName},
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              keyUsage,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &tmpl, &tmpl, key.Public(), key)
 	if err != nil {
 		return nil, err
 	}
@@ -707,7 +751,7 @@ func RemoveDuplicateAltNames(altNames *certutil.AltNames) {
 // (+/- offset)
 func ValidateCertPeriod(cert *x509.Certificate, offset time.Duration) error {
 	period := fmt.Sprintf("NotBefore: %v, NotAfter: %v", cert.NotBefore, cert.NotAfter)
-	now := time.Now().Add(offset)
+	now := time.Now().Add(offset).UTC()
 	if now.Before(cert.NotBefore) {
 		return errors.Errorf("the certificate is not valid yet: %s", period)
 	}

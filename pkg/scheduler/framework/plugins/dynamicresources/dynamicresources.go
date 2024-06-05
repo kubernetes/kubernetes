@@ -32,7 +32,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,14 +39,15 @@ import (
 	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
 	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/utils/ptr"
 )
 
@@ -56,6 +56,10 @@ const (
 	Name = names.DynamicResources
 
 	stateKey framework.StateKey = Name
+
+	// generatedFromIndex is the lookup name for the index function
+	// which indexes by other resource which generated the parameters object.
+	generatedFromIndex = "generated-from-index"
 )
 
 // The state is initialized in PreFilter phase. Because we save the pointer in
@@ -280,6 +284,13 @@ type dynamicResources struct {
 	resourceSliceLister        resourcev1alpha2listers.ResourceSliceLister
 	claimNameLookup            *resourceclaim.Lookup
 
+	// claimParametersIndexer has the common claimParametersGeneratedFrom indexer installed to
+	// limit iteration over claimParameters to those of interest.
+	claimParametersIndexer cache.Indexer
+	// classParametersIndexer has the common classParametersGeneratedFrom indexer installed to
+	// limit iteration over classParameters to those of interest.
+	classParametersIndexer cache.Indexer
+
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
 	// update from the apiserver has not been processed by the claim
@@ -302,7 +313,7 @@ type dynamicResources struct {
 	// When implementing cluster autoscaler support, this assume cache or
 	// something like it (see https://github.com/kubernetes/kubernetes/pull/112202)
 	// might have to be managed by the cluster autoscaler.
-	claimAssumeCache volumebinding.AssumeCache
+	claimAssumeCache *assumecache.AssumeCache
 
 	// inFlightAllocations is map from claim UUIDs to claim objects for those claims
 	// for which allocation was triggered during a scheduling cycle and the
@@ -352,13 +363,56 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		classLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
 		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingContexts().Lister(),
 		claimParametersLister:      fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaimParameters().Lister(),
+		claimParametersIndexer:     fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaimParameters().Informer().GetIndexer(),
 		classParametersLister:      fh.SharedInformerFactory().Resource().V1alpha2().ResourceClassParameters().Lister(),
+		classParametersIndexer:     fh.SharedInformerFactory().Resource().V1alpha2().ResourceClassParameters().Informer().GetIndexer(),
 		resourceSliceLister:        fh.SharedInformerFactory().Resource().V1alpha2().ResourceSlices().Lister(),
 		claimNameLookup:            resourceclaim.NewNameLookup(fh.ClientSet()),
-		claimAssumeCache:           volumebinding.NewAssumeCache(logger, fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Informer(), "claim", "", nil),
+		claimAssumeCache:           assumecache.NewAssumeCache(logger, fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Informer(), "claim", "", nil),
+	}
+
+	if err := pl.claimParametersIndexer.AddIndexers(cache.Indexers{generatedFromIndex: claimParametersGeneratedFromIndexFunc}); err != nil {
+		return nil, fmt.Errorf("add claim parameters cache indexer: %w", err)
+	}
+	if err := pl.classParametersIndexer.AddIndexers(cache.Indexers{generatedFromIndex: classParametersGeneratedFromIndexFunc}); err != nil {
+		return nil, fmt.Errorf("add class parameters cache indexer: %w", err)
 	}
 
 	return pl, nil
+}
+
+func claimParametersReferenceKeyFunc(ref *resourcev1alpha2.ResourceClaimParametersReference) string {
+	return ref.APIGroup + "/" + ref.Kind + "/" + ref.Name
+}
+
+// claimParametersGeneratedFromIndexFunc is an index function that returns other resource keys
+// (= apiGroup/kind/name) for ResourceClaimParametersReference in a given claim parameters.
+func claimParametersGeneratedFromIndexFunc(obj interface{}) ([]string, error) {
+	parameters, ok := obj.(*resourcev1alpha2.ResourceClaimParameters)
+	if !ok {
+		return nil, nil
+	}
+	if parameters.GeneratedFrom == nil {
+		return nil, nil
+	}
+	return []string{claimParametersReferenceKeyFunc(parameters.GeneratedFrom)}, nil
+}
+
+func classParametersReferenceKeyFunc(ref *resourcev1alpha2.ResourceClassParametersReference) string {
+	return ref.APIGroup + "/" + ref.Kind + "/" + ref.Namespace + "/" + ref.Name
+}
+
+// classParametersGeneratedFromIndexFunc is an index function that returns other resource keys
+// (= apiGroup/kind/namespace/name) for ResourceClassParametersReference in a given class parameters.
+func classParametersGeneratedFromIndexFunc(obj interface{}) ([]string, error) {
+	parameters, ok := obj.(*resourcev1alpha2.ResourceClassParameters)
+	if !ok {
+		return nil, nil
+	}
+	if parameters.GeneratedFrom == nil {
+		return nil, nil
+	}
+	return []string{classParametersReferenceKeyFunc(parameters.GeneratedFrom)}, nil
 }
 
 var _ framework.PreEnqueuePlugin = &dynamicResources{}
@@ -396,7 +450,16 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint 
 		{Event: framework.ClusterEvent{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodSchedulingContextChange},
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
+		//
+		// A note about UpdateNodeTaint event:
+		// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
+		// As a common problematic scenario,
+		// when a node is added but not ready, NodeAdd event is filtered out by preCheck and doesn't arrive.
+		// In such cases, this plugin may miss some events that actually make pods schedulable.
+		// As a workaround, we add UpdateNodeTaint event to catch the case.
+		// We can remove UpdateNodeTaint when we remove the preCheck feature.
+		// See: https://github.com/kubernetes/kubernetes/issues/110175
+		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: framework.ClusterEvent{Resource: framework.ResourceClass, ActionType: framework.Add | framework.Update}},
 	}
@@ -722,7 +785,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	// before moving DRA to beta.
 	if podScheduling.Spec.SelectedNode != "" {
 		for _, claimStatus := range podScheduling.Status.ResourceClaims {
-			if sliceContains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
+			if slices.Contains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
 				logger.V(5).Info("PodSchedulingContext has unsuitable selected node, schedule immediately", "pod", klog.KObj(pod), "selectedNode", podScheduling.Spec.SelectedNode, "podResourceName", claimStatus.Name)
 				return framework.Queue, nil
 			}
@@ -754,15 +817,6 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 func podSchedulingHasClaimInfo(podScheduling *resourcev1alpha2.PodSchedulingContext, podResourceName string) bool {
 	for _, claimStatus := range podScheduling.Status.ResourceClaims {
 		if claimStatus.Name == podResourceName {
-			return true
-		}
-	}
-	return false
-}
-
-func sliceContains(hay []string, needle string) bool {
-	for _, item := range hay {
-		if item == needle {
 			return true
 		}
 	}
@@ -963,13 +1017,15 @@ func (pl *dynamicResources) lookupParameters(logger klog.Logger, class *resource
 	if status != nil {
 		return
 	}
-	claimParameters, status = pl.lookupClaimParameters(logger, claim)
+	claimParameters, status = pl.lookupClaimParameters(logger, class, claim)
 	return
 }
 
 func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass) (*resourcev1alpha2.ResourceClassParameters, *framework.Status) {
+	defaultClassParameters := resourcev1alpha2.ResourceClassParameters{}
+
 	if class.ParametersRef == nil {
-		return nil, nil
+		return &defaultClassParameters, nil
 	}
 
 	if class.ParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
@@ -985,28 +1041,56 @@ func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *res
 		return parameters, nil
 	}
 
-	// TODO (https://github.com/kubernetes/kubernetes/issues/123731): use an indexer
-	allParameters, err := pl.classParametersLister.ResourceClassParameters(class.Namespace).List(labels.Everything())
+	objs, err := pl.classParametersIndexer.ByIndex(generatedFromIndex, classParametersReferenceKeyFunc(class.ParametersRef))
 	if err != nil {
 		return nil, statusError(logger, fmt.Errorf("listing class parameters failed: %v", err))
 	}
-	for _, parameters := range allParameters {
-		if parameters.GeneratedFrom == nil {
-			continue
+	switch len(objs) {
+	case 0:
+		return nil, statusUnschedulable(logger, fmt.Sprintf("generated class parameters for %s.%s %s not found", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.ParametersRef.Namespace, class.ParametersRef.Name)))
+	case 1:
+		parameters, ok := objs[0].(*resourcev1alpha2.ResourceClassParameters)
+		if !ok {
+			return nil, statusError(logger, fmt.Errorf("unexpected object in class parameters index: %T", objs[0]))
 		}
-		if parameters.GeneratedFrom.APIGroup == class.ParametersRef.APIGroup &&
-			parameters.GeneratedFrom.Kind == class.ParametersRef.Kind &&
-			parameters.GeneratedFrom.Name == class.ParametersRef.Name &&
-			parameters.GeneratedFrom.Namespace == class.ParametersRef.Namespace {
-			return parameters, nil
-		}
+		return parameters, nil
+	default:
+		sort.Slice(objs, func(i, j int) bool {
+			obj1, obj2 := objs[i].(*resourcev1alpha2.ResourceClassParameters), objs[j].(*resourcev1alpha2.ResourceClassParameters)
+			if obj1 == nil || obj2 == nil {
+				return false
+			}
+			return obj1.Name < obj2.Name
+		})
+		return nil, statusError(logger, fmt.Errorf("multiple generated class parameters for %s.%s %s found: %s", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.Namespace, class.ParametersRef.Name), klog.KObjSlice(objs)))
 	}
-	return nil, statusUnschedulable(logger, fmt.Sprintf("generated class parameters for %s.%s %s not found", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.Namespace, class.ParametersRef.Name)))
 }
 
-func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
+func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
+	defaultClaimParameters := resourcev1alpha2.ResourceClaimParameters{
+		Shareable: true,
+		DriverRequests: []resourcev1alpha2.DriverRequests{
+			{
+				DriverName: class.DriverName,
+				Requests: []resourcev1alpha2.ResourceRequest{
+					{
+						ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
+							// TODO: This only works because NamedResources is
+							// the only model currently implemented. We need to
+							// match the default to how the resources of this
+							// class are being advertized in a ResourceSlice.
+							NamedResources: &resourcev1alpha2.NamedResourcesRequest{
+								Selector: "true",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	if claim.Spec.ParametersRef == nil {
-		return nil, nil
+		return &defaultClaimParameters, nil
 	}
 	if claim.Spec.ParametersRef.APIGroup == resourcev1alpha2.SchemeGroupVersion.Group &&
 		claim.Spec.ParametersRef.Kind == "ResourceClaimParameters" {
@@ -1021,22 +1105,29 @@ func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, claim *res
 		return parameters, nil
 	}
 
-	// TODO (https://github.com/kubernetes/kubernetes/issues/123731): use an indexer
-	allParameters, err := pl.claimParametersLister.ResourceClaimParameters(claim.Namespace).List(labels.Everything())
+	objs, err := pl.claimParametersIndexer.ByIndex(generatedFromIndex, claimParametersReferenceKeyFunc(claim.Spec.ParametersRef))
 	if err != nil {
 		return nil, statusError(logger, fmt.Errorf("listing claim parameters failed: %v", err))
 	}
-	for _, parameters := range allParameters {
-		if parameters.GeneratedFrom == nil {
-			continue
+	switch len(objs) {
+	case 0:
+		return nil, statusUnschedulable(logger, fmt.Sprintf("generated claim parameters for %s.%s %s not found", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name)))
+	case 1:
+		parameters, ok := objs[0].(*resourcev1alpha2.ResourceClaimParameters)
+		if !ok {
+			return nil, statusError(logger, fmt.Errorf("unexpected object in claim parameters index: %T", objs[0]))
 		}
-		if parameters.GeneratedFrom.APIGroup == claim.Spec.ParametersRef.APIGroup &&
-			parameters.GeneratedFrom.Kind == claim.Spec.ParametersRef.Kind &&
-			parameters.GeneratedFrom.Name == claim.Spec.ParametersRef.Name {
-			return parameters, nil
-		}
+		return parameters, nil
+	default:
+		sort.Slice(objs, func(i, j int) bool {
+			obj1, obj2 := objs[i].(*resourcev1alpha2.ResourceClaimParameters), objs[j].(*resourcev1alpha2.ResourceClaimParameters)
+			if obj1 == nil || obj2 == nil {
+				return false
+			}
+			return obj1.Name < obj2.Name
+		})
+		return nil, statusError(logger, fmt.Errorf("multiple generated claim parameters for %s.%s %s found: %s", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name), klog.KObjSlice(objs)))
 	}
-	return nil, statusUnschedulable(logger, fmt.Sprintf("generated claim parameters for %s.%s %s not found", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name)))
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -1185,7 +1276,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			// Then we can simply clear the allocation. Once the
 			// claim informer catches up, the controllers will
 			// be notified about this change.
-			clearAllocation := state.informationsForClaim[index].controller != nil
+			clearAllocation := state.informationsForClaim[index].structuredParameters
 
 			// Before we tell a driver to deallocate a claim, we
 			// have to stop telling it to allocate. Otherwise,
@@ -1204,6 +1295,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim := claim.DeepCopy()
 			claim.Status.ReservedFor = nil
 			if clearAllocation {
+				claim.Status.DriverName = ""
 				claim.Status.Allocation = nil
 			} else {
 				claim.Status.DeallocationRequested = true
@@ -1296,20 +1388,11 @@ func haveAllPotentialNodes(schedulingCtx *resourcev1alpha2.PodSchedulingContext,
 		return false
 	}
 	for _, node := range nodes {
-		if !haveNode(schedulingCtx.Spec.PotentialNodes, node.Node().Name) {
+		if !slices.Contains(schedulingCtx.Spec.PotentialNodes, node.Node().Name) {
 			return false
 		}
 	}
 	return true
-}
-
-func haveNode(nodeNames []string, nodeName string) bool {
-	for _, n := range nodeNames {
-		if n == nodeName {
-			return true
-		}
-	}
-	return false
 }
 
 // Reserve reserves claims for the pod.
@@ -1368,7 +1451,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		// scheduler will pick it forever even when it cannot satisfy
 		// the claim.
 		if state.podSchedulingState.schedulingCtx == nil ||
-			!containsNode(state.podSchedulingState.schedulingCtx.Spec.PotentialNodes, nodeName) {
+			!slices.Contains(state.podSchedulingState.schedulingCtx.Spec.PotentialNodes, nodeName) {
 			potentialNodes := []string{nodeName}
 			state.podSchedulingState.potentialNodes = &potentialNodes
 			logger.V(5).Info("asking for information about single potential node", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
@@ -1386,7 +1469,11 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		}
 		state.informationsForClaim[index].allocation = allocation
 		state.informationsForClaim[index].allocationDriverName = driverName
+		// Strictly speaking, we don't need to store the full modified object.
+		// The allocation would be enough. The full object is useful for
+		// debugging and testing, so let's make it realistic.
 		claim = claim.DeepCopy()
+		claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
 		claim.Status.DriverName = driverName
 		claim.Status.Allocation = allocation
 		pl.inFlightAllocations.Store(claim.UID, claim)
@@ -1438,15 +1525,6 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	// irreversible, so it better should come last. On the other hand,
 	// triggering both in parallel might be faster.
 	return statusPending(logger, "waiting for resource driver to provide information", "pod", klog.KObj(pod))
-}
-
-func containsNode(hay []string, needle string) bool {
-	for _, node := range hay {
-		if node == needle {
-			return true
-		}
-	}
-	return false
 }
 
 // Unreserve clears the ReservedFor field for all claims.

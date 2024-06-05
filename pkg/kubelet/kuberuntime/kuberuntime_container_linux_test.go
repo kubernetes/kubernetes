@@ -698,6 +698,92 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 	}
 }
 
+var (
+	supplementalGroupsPolicyUnSupported = v1.SupplementalGroupsPolicy("UnSupported")
+	supplementalGroupsPolicyMerge       = v1.SupplementalGroupsPolicyMerge
+	supplementalGroupsPolicyStrict      = v1.SupplementalGroupsPolicyStrict
+)
+
+func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	if err != nil {
+		t.Fatalf("error creating test RuntimeManager: %v", err)
+	}
+
+	containerName := "test"
+	for _, tc := range []struct {
+		name           string
+		pod            *v1.Pod
+		expected       runtimeapi.SupplementalGroupsPolicy
+		expectErr      bool
+		expectedErrMsg string
+	}{{
+		name: "Merge SupplementalGroupsPolicy should convert to Merge",
+		pod: &v1.Pod{
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					SupplementalGroupsPolicy: &supplementalGroupsPolicyMerge,
+				},
+				Containers: []v1.Container{
+					{Name: containerName},
+				},
+			},
+		},
+		expected: runtimeapi.SupplementalGroupsPolicy_Merge,
+	}, {
+		name: "Strict SupplementalGroupsPolicy should convert to Strict",
+		pod: &v1.Pod{
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					SupplementalGroupsPolicy: &supplementalGroupsPolicyStrict,
+				},
+				Containers: []v1.Container{
+					{Name: containerName},
+				},
+			},
+		},
+		expected: runtimeapi.SupplementalGroupsPolicy_Strict,
+	}, {
+		name: "nil SupplementalGroupsPolicy should convert to Merge",
+		pod: &v1.Pod{
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{},
+				Containers: []v1.Container{
+					{Name: containerName},
+				},
+			},
+		},
+		expected: runtimeapi.SupplementalGroupsPolicy_Merge,
+	}, {
+		name: "unsupported SupplementalGroupsPolicy should raise an error",
+		pod: &v1.Pod{
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					SupplementalGroupsPolicy: &supplementalGroupsPolicyUnSupported,
+				},
+				Containers: []v1.Container{
+					{Name: containerName},
+				},
+			},
+		},
+		expectErr:      true,
+		expectedErrMsg: "unsupported supplementalGroupsPolicy: UnSupported",
+	},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false)
+			if !tc.expectErr {
+				assert.Emptyf(t, err, "Unexpected error")
+				assert.EqualValuesf(t, tc.expected, actual.SecurityContext.SupplementalGroupsPolicy, "SupplementalGroupPolicy for %s", tc.name)
+			} else {
+				assert.NotEmpty(t, err, "Unexpected success")
+				assert.Empty(t, actual, "Unexpected non empty value")
+				assert.Contains(t, err.Error(), tc.expectedErrMsg, "Error for %s", tc.name)
+			}
+		})
+	}
+}
+
 func TestGenerateLinuxContainerResources(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -848,7 +934,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer setSwapControllerAvailableDuringTest(false)()
 			if tc.scalingFg {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 			}
 
 			setCgroupVersionDuringTest(cgroupV1)
@@ -1126,7 +1212,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			setCgroupVersionDuringTest(tc.cgroupVersion)
 			defer setSwapControllerAvailableDuringTest(!tc.swapDisabledOnNode)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.nodeSwapFeatureGateEnabled)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.nodeSwapFeatureGateEnabled)
 			m.memorySwapBehavior = tc.swapBehavior
 
 			var resourceReqsC1, resourceReqsC2 v1.ResourceRequirements

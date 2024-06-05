@@ -4759,6 +4759,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -4772,6 +4773,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -4809,6 +4811,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -4827,6 +4830,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -5080,6 +5084,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ContainerState
       default: {}
+    - name: user
+      type:
+        namedType: io.k8s.api.core.v1.ContainerUser
     - name: volumeMounts
       type:
         list:
@@ -5088,6 +5095,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - mountPath
+- name: io.k8s.api.core.v1.ContainerUser
+  map:
+    fields:
+    - name: linux
+      type:
+        namedType: io.k8s.api.core.v1.LinuxContainerUser
 - name: io.k8s.api.core.v1.DaemonEndpoint
   map:
     fields:
@@ -5650,6 +5663,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: ip
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.HostIP
   map:
     fields:
@@ -5846,6 +5860,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.LimitRangeItem
           elementRelationship: atomic
+- name: io.k8s.api.core.v1.LinuxContainerUser
+  map:
+    fields:
+    - name: gid
+      type:
+        scalar: numeric
+      default: 0
+    - name: supplementalGroups
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: atomic
+    - name: uid
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.core.v1.LoadBalancerIngress
   map:
     fields:
@@ -5879,6 +5910,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     elementRelationship: atomic
 - name: io.k8s.api.core.v1.LocalVolumeSource
   map:
@@ -6073,17 +6105,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.DaemonEndpoint
       default: {}
-- name: io.k8s.api.core.v1.NodeRuntimeClass
+- name: io.k8s.api.core.v1.NodeRuntimeHandler
   map:
     fields:
     - name: features
       type:
-        namedType: io.k8s.api.core.v1.NodeRuntimeClassFeatures
+        namedType: io.k8s.api.core.v1.NodeRuntimeHandlerFeatures
     - name: name
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.core.v1.NodeRuntimeClassFeatures
+- name: io.k8s.api.core.v1.NodeRuntimeHandlerFeatures
   map:
     fields:
     - name: recursiveReadOnlyMounts
@@ -6211,11 +6243,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: phase
       type:
         scalar: string
-    - name: runtimeClasses
+    - name: runtimeHandlers
       type:
         list:
           elementType:
-            namedType: io.k8s.api.core.v1.NodeRuntimeClass
+            namedType: io.k8s.api.core.v1.NodeRuntimeHandler
           elementRelationship: atomic
     - name: volumesAttached
       type:
@@ -6816,6 +6848,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: numeric
           elementRelationship: atomic
+    - name: supplementalGroupsPolicy
+      type:
+        scalar: string
     - name: sysctls
       type:
         list:
@@ -7617,6 +7652,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -7630,6 +7666,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -7646,6 +7683,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -12413,6 +12451,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: driverName
       type:
         scalar: string
+      default: ""
     - name: structuredData
       type:
         namedType: io.k8s.api.resource.v1alpha2.StructuredResourceHandle

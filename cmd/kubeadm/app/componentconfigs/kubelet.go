@@ -28,7 +28,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 )
 
 const (
@@ -171,7 +170,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		warnDefaultComponentConfigValue(kind, "authentication.webhook.enabled", kubeletAuthenticationWebhookEnabled, *kc.config.Authentication.Webhook.Enabled)
 	}
 
-	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
+	// Serve a /healthz webserver on 127.0.0.1:10248 that kubeadm can talk to
 	if kc.config.HealthzBindAddress == "" {
 		kc.config.HealthzBindAddress = kubeletHealthzBindAddress
 	} else if kc.config.HealthzBindAddress != kubeletHealthzBindAddress {
@@ -196,27 +195,4 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
 		kc.config.CgroupDriver = constants.CgroupDriverSystemd
 	}
-
-	ok, err := isServiceActive("systemd-resolved")
-	if err != nil {
-		klog.Warningf("cannot determine if systemd-resolved is active: %v", err)
-	}
-	if ok {
-		if kc.config.ResolverConfig == nil {
-			kc.config.ResolverConfig = ptr.To(kubeletSystemdResolverConfig)
-		} else {
-			if *kc.config.ResolverConfig != kubeletSystemdResolverConfig {
-				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, *kc.config.ResolverConfig)
-			}
-		}
-	}
-}
-
-// isServiceActive checks whether the given service exists and is running
-func isServiceActive(name string) (bool, error) {
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		return false, err
-	}
-	return initSystem.ServiceIsActive(name), nil
 }

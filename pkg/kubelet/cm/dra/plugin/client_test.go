@@ -27,7 +27,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
 )
 
@@ -35,11 +34,14 @@ type fakeV1alpha3GRPCServer struct {
 	drapbv1alpha3.UnimplementedNodeServer
 }
 
-func (f *fakeV1alpha3GRPCServer) NodePrepareResource(ctx context.Context, in *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
+var _ drapbv1alpha3.NodeServer = &fakeV1alpha3GRPCServer{}
+
+func (f *fakeV1alpha3GRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1alpha3.NodePrepareResourcesRequest) (*drapbv1alpha3.NodePrepareResourcesResponse, error) {
 	return &drapbv1alpha3.NodePrepareResourcesResponse{Claims: map[string]*drapbv1alpha3.NodePrepareResourceResponse{"dummy": {CDIDevices: []string{"dummy"}}}}, nil
 }
 
-func (f *fakeV1alpha3GRPCServer) NodeUnprepareResource(ctx context.Context, in *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
+func (f *fakeV1alpha3GRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
+
 	return &drapbv1alpha3.NodeUnprepareResourcesResponse{}, nil
 }
 
@@ -51,18 +53,6 @@ func (f *fakeV1alpha3GRPCServer) NodeListAndWatchResources(req *drapbv1alpha3.No
 		return err
 	}
 	return nil
-}
-
-type fakeV1alpha2GRPCServer struct {
-	drapbv1alpha2.UnimplementedNodeServer
-}
-
-func (f *fakeV1alpha2GRPCServer) NodePrepareResource(ctx context.Context, in *drapbv1alpha2.NodePrepareResourceRequest) (*drapbv1alpha2.NodePrepareResourceResponse, error) {
-	return &drapbv1alpha2.NodePrepareResourceResponse{CdiDevices: []string{"dummy"}}, nil
-}
-
-func (f *fakeV1alpha2GRPCServer) NodeUnprepareResource(ctx context.Context, in *drapbv1alpha2.NodeUnprepareResourceRequest) (*drapbv1alpha2.NodeUnprepareResourceResponse, error) {
-	return &drapbv1alpha2.NodeUnprepareResourceResponse{}, nil
 }
 
 type tearDown func()
@@ -88,9 +78,6 @@ func setupFakeGRPCServer(version string) (string, tearDown, error) {
 
 	s := grpc.NewServer()
 	switch version {
-	case v1alpha2Version:
-		fakeGRPCServer := &fakeV1alpha2GRPCServer{}
-		drapbv1alpha2.RegisterNodeServer(s, fakeGRPCServer)
 	case v1alpha3Version:
 		fakeGRPCServer := &fakeV1alpha3GRPCServer{}
 		drapbv1alpha3.RegisterNodeServer(s, fakeGRPCServer)
@@ -120,7 +107,6 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	p := &plugin{
 		endpoint: addr,
-		version:  v1alpha3Version,
 	}
 
 	conn, err := p.getOrCreateGRPCConn()
@@ -231,7 +217,7 @@ func TestNewDRAPluginClient(t *testing.T) {
 	}
 }
 
-func TestNodeUnprepareResource(t *testing.T) {
+func TestNodeUnprepareResources(t *testing.T) {
 	for _, test := range []struct {
 		description   string
 		serverSetup   func(string) (string, tearDown, error)
@@ -244,21 +230,6 @@ func TestNodeUnprepareResource(t *testing.T) {
 			serverVersion: v1alpha3Version,
 			request:       &drapbv1alpha3.NodeUnprepareResourcesRequest{},
 		},
-		{
-			description:   "server supports v1alpha2, plugin client should fallback",
-			serverSetup:   setupFakeGRPCServer,
-			serverVersion: v1alpha2Version,
-			request: &drapbv1alpha3.NodeUnprepareResourcesRequest{
-				Claims: []*drapbv1alpha3.Claim{
-					{
-						Namespace:      "dummy-namespace",
-						Uid:            "dummy-uid",
-						Name:           "dummy-claim",
-						ResourceHandle: "dummy-resource",
-					},
-				},
-			},
-		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
@@ -268,8 +239,8 @@ func TestNodeUnprepareResource(t *testing.T) {
 			defer teardown()
 
 			p := &plugin{
-				endpoint: addr,
-				version:  v1alpha3Version,
+				endpoint:      addr,
+				clientTimeout: PluginClientTimeout,
 			}
 
 			conn, err := p.getOrCreateGRPCConn()
@@ -319,13 +290,6 @@ func TestListAndWatchResources(t *testing.T) {
 			},
 			expectError: "EOF",
 		},
-		{
-			description:   "server doesn't support NodeResources API",
-			serverSetup:   setupFakeGRPCServer,
-			serverVersion: v1alpha2Version,
-			request:       new(drapbv1alpha3.NodeListAndWatchResourcesRequest),
-			expectError:   "Unimplemented",
-		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
@@ -336,7 +300,6 @@ func TestListAndWatchResources(t *testing.T) {
 
 			p := &plugin{
 				endpoint: addr,
-				version:  v1alpha3Version,
 			}
 
 			conn, err := p.getOrCreateGRPCConn()
