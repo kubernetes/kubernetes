@@ -30,10 +30,8 @@ import (
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	crdinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericstorageversion "k8s.io/apiserver/pkg/storageversion"
-	svInformers "k8s.io/client-go/informers/apiserverinternal/v1alpha1"
 )
 
 var (
@@ -51,64 +49,72 @@ type Manager struct {
 	client genericstorageversion.Client
 	// apiserverID is the ID of the apiserver that invokes this manager.
 	apiserverID string
-	crdInformer crdinformers.CustomResourceDefinitionInformer
-	svInformer  svInformers.StorageVersionInformer
 	// workqueue to process storageversion updates for this CRD.
 	queue *workqueue.Type
-	// map from crd.Name -> number of active teardowns for this CRD.
+	// map from crd.Name -> svUpdateInfo for this CRD.
 	storageVersionUpdateInfoMap sync.Map
 }
 
-type storageVersionUpdateInfo struct {
-	crd *apiextensionsv1.CustomResourceDefinition
-	// processedCh is closed by the storage version manager after the
+type StorageVersionUpdateInfo struct {
+	Crd *apiextensionsv1.CustomResourceDefinition
+	// ProcessedCh is closed by the storage version manager after the
 	// storage version update gets processed successfully.
 	// The API server will unblock and allow CR write requests if this
 	// channel is closed.
-	processedCh chan struct{}
+	ProcessedCh chan struct{}
 
-	// teardownFinishedCh is closed when the teardown of a previous
-	// storageversion completes. This is used by the storageversion manager
-	// to unblock publishing of the latest storageversion.
+	// teardownCount is the count of ongoing teardowns of old handlers.
+	// If > 0, the storage version manager abandons the storageversion update
+	// and requeues it to be attempted later when the count drops to 0.
 	teardownCount int
 }
 
 // NewManager creates a CRD StorageVersion Manager.
-func NewManager(svClient genericstorageversion.Client, apiserverID string,
-	crdInformer crdinformers.CustomResourceDefinitionInformer, svInformer svInformers.StorageVersionInformer) *Manager {
+func NewManager(svClient genericstorageversion.Client, apiserverID string) *Manager {
 	return &Manager{
 		client:                      svClient,
 		apiserverID:                 apiserverID,
-		crdInformer:                 crdInformer,
-		svInformer:                  svInformer,
 		queue:                       workqueue.NewNamed("storageversion-updater"),
 		storageVersionUpdateInfoMap: sync.Map{},
 	}
 }
 
-// UpdateActiveTeardownsCount updates the teardown count of the CRD in sync.Map.
+func (m *Manager) GetSVUpdateInfo(crdName string) (*StorageVersionUpdateInfo, error) {
+	val, ok := m.storageVersionUpdateInfoMap.Load(crdName)
+	if !ok {
+		return nil, fmt.Errorf("error while trying to update number of teardowns. No entry found in sync.Map for %v", crdName)
+	}
+
+	return val.(*StorageVersionUpdateInfo), nil
+}
+
+func (m *Manager) CreateOrUpdateSVUpdateInfo(crd *apiextensionsv1.CustomResourceDefinition) {
+	// Do not reset the active teardown count for a CRD if it already exists.
+	svUpdateInfo := &StorageVersionUpdateInfo{
+		Crd:         crd,
+		ProcessedCh: make(chan struct{}),
+	}
+	val, ok := m.storageVersionUpdateInfoMap.Load(crd.Name)
+	if ok {
+		svUpdateInfo.teardownCount = val.(*StorageVersionUpdateInfo).teardownCount
+	}
+
+	m.storageVersionUpdateInfoMap.Store(crd.Name, svUpdateInfo)
+}
+
+// UpdateActiveTeardownsCount updates the teardown count of old handlers of the CRD in sync.Map.
 func (m *Manager) UpdateActiveTeardownsCount(crdName string, value int) error {
 	val, ok := m.storageVersionUpdateInfoMap.Load(crdName)
 	if !ok {
 		return fmt.Errorf("error while trying to update number of teardowns. No entry found in sync.Map for %v", crdName)
 	}
-	svInfo := val.(*storageVersionUpdateInfo)
+	svInfo := val.(*StorageVersionUpdateInfo)
 	svInfo.teardownCount += value
 	return nil
 }
 
-func (m *Manager) UpdateSVUpdateInfoAndEnqueue(crd *apiextensionsv1.CustomResourceDefinition, processedCh chan struct{}) {
-	val, _ := m.storageVersionUpdateInfoMap.LoadOrStore(crd.Name, &storageVersionUpdateInfo{})
-	svInfo := val.(*storageVersionUpdateInfo)
-	svInfo.crd = crd
-	if processedCh != nil {
-		svInfo.processedCh = processedCh
-	}
-	m.enqueue(crd.Name)
-}
-
-// enqueue adds the CRD name to the SV upadte queue.
-func (m *Manager) enqueue(crdName string) {
+// Enqueue adds the CRD name to the SV upadte queue.
+func (m *Manager) Enqueue(crdName string) {
 	if crdName == "" {
 		return
 	}
@@ -154,29 +160,29 @@ func (m *Manager) processLatestUpdateFor() bool {
 		klog.V(4).Infof("No pending storageversion update found for crdUID: %s, returning", key)
 		return true
 	}
-	latestSVUpdateInfo := val.(*storageVersionUpdateInfo)
+	latestSVUpdateInfo := val.(*StorageVersionUpdateInfo)
 
 	skip, reason := m.shouldSkipSVUpdate(latestSVUpdateInfo)
 	if skip {
-		klog.V(4).Infof("skipping storagversion update for crd: %s, reason: %s ", latestSVUpdateInfo.crd.Name, reason)
+		klog.V(4).Infof("skipping storagversion update for crd: %s, reason: %s ", latestSVUpdateInfo.Crd.Name, reason)
 		return true
 	}
 
-	klog.V(4).Infof("starting storageversion update for crd: %s", latestSVUpdateInfo.crd.Name)
-	err := m.updateStorageVersion(ctx, latestSVUpdateInfo.crd)
+	klog.V(4).Infof("starting storageversion update for crd: %s", latestSVUpdateInfo.Crd.Name)
+	err := m.updateStorageVersion(ctx, latestSVUpdateInfo.Crd)
 	if err == nil {
-		klog.V(4).Infof("successfully updated storage version for %s", latestSVUpdateInfo.crd.Name)
-		close(latestSVUpdateInfo.processedCh)
+		klog.V(4).Infof("successfully updated storage version for %s", latestSVUpdateInfo.Crd.Name)
+		close(latestSVUpdateInfo.ProcessedCh)
 		return true
 	}
 
 	// TODO: indefinitely requeue on error?
-	m.enqueue(latestSVUpdateInfo.crd.Name)
+	m.Enqueue(latestSVUpdateInfo.Crd.Name)
 	return true
 }
 
-func (m *Manager) shouldSkipSVUpdate(svUpdateInfo *storageVersionUpdateInfo) (bool, string) {
-	skip, teardownCount := m.teardownInProgress(svUpdateInfo.crd.Name)
+func (m *Manager) shouldSkipSVUpdate(svUpdateInfo *StorageVersionUpdateInfo) (bool, string) {
+	skip, teardownCount := m.teardownInProgress(svUpdateInfo.Crd.Name)
 	if skip {
 		return true, fmt.Sprintf("%d active teardowns", teardownCount)
 	}
@@ -188,10 +194,10 @@ func (m *Manager) shouldSkipSVUpdate(svUpdateInfo *storageVersionUpdateInfo) (bo
 	return false, ""
 }
 
-func (m *Manager) alreadyPublishedLatestSV(svUpdateInfo *storageVersionUpdateInfo) bool {
+func (m *Manager) alreadyPublishedLatestSV(svUpdateInfo *StorageVersionUpdateInfo) bool {
 	select {
-	case <-svUpdateInfo.processedCh:
-		klog.V(4).Infof("Storageversion is already updated to the latest value for crd: %s, returning", svUpdateInfo.crd.Name)
+	case <-svUpdateInfo.ProcessedCh:
+		klog.V(4).Infof("Storageversion is already updated to the latest value for crd: %s, returning", svUpdateInfo.Crd.Name)
 		return true
 	default:
 		return false
@@ -200,7 +206,7 @@ func (m *Manager) alreadyPublishedLatestSV(svUpdateInfo *storageVersionUpdateInf
 
 func (m *Manager) teardownInProgress(crdName string) (bool, int) {
 	val, _ := m.storageVersionUpdateInfoMap.LoadOrStore(crdName, 0)
-	svUpdateInfo := val.(*storageVersionUpdateInfo)
+	svUpdateInfo := val.(*StorageVersionUpdateInfo)
 	activeTeardownsCount := svUpdateInfo.teardownCount
 	if svUpdateInfo.teardownCount > 0 {
 		return true, activeTeardownsCount
@@ -209,16 +215,7 @@ func (m *Manager) teardownInProgress(crdName string) (bool, int) {
 	return false, activeTeardownsCount
 }
 
-// updateStorageVersion updates a StorageVersion for the given CRD.
 func (m *Manager) updateStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
-	if err := m.updateCRDStorageVersion(ctx, crd); err != nil {
-		return fmt.Errorf("error while updating storage version for crd %v: %w", crd, err)
-	}
-
-	return nil
-}
-
-func (m *Manager) updateCRDStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
 	gr := schema.GroupResource{
 		Group:    crd.Spec.Group,
 		Resource: crd.Spec.Names.Plural,

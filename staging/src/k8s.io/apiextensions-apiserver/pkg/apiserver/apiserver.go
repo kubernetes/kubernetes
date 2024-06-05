@@ -51,7 +51,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -117,8 +116,6 @@ type CustomResourceDefinitions struct {
 
 	// provided for easier embedding
 	Informers externalinformers.SharedInformerFactory
-
-	StorageVersionInformers informers.SharedInformerFactory
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -189,7 +186,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset for storage versions: %w", err)
 	}
-	s.StorageVersionInformers = informers.NewSharedInformerFactory(kubeclientset, time.Second)
 
 	delegateHandler := delegationTarget.UnprotectedHandler()
 	if delegateHandler == nil {
@@ -207,13 +203,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 
 	crdInformer := s.Informers.Apiextensions().V1().CustomResourceDefinitions()
-	svInformer := s.StorageVersionInformers.Internal().V1alpha1().StorageVersions()
 
 	var storageVersionManager *storageversion.Manager
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		sc := kubeclientset.InternalV1alpha1().StorageVersions()
-		storageVersionManager = storageversion.NewManager(sc, c.GenericConfig.APIServerID, crdInformer, svInformer)
+		storageVersionManager = storageversion.NewManager(sc, c.GenericConfig.APIServerID)
 	}
 
 	crdHandler, err := NewCustomResourceDefinitionHandler(
@@ -257,10 +252,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
-		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
-			utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
-			s.StorageVersionInformers.Start(context.StopCh)
-		}
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
