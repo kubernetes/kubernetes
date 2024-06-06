@@ -223,31 +223,12 @@ func TestNodeAddress(t *testing.T) {
 			shouldError:      false,
 		},
 		{
-			name:              "cloud provider is external and nodeIP specified",
+			name:              "cloud provider is external",
 			nodeIP:            netutils.ParseIPSloppy("10.0.0.1"),
 			nodeAddresses:     []v1.NodeAddress{},
 			cloudProviderType: cloudProviderExternal,
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			shouldError: false,
-		},
-		{
-			name:              "cloud provider is external and nodeIP unspecified",
-			nodeIP:            netutils.ParseIPSloppy("::"),
-			nodeAddresses:     []v1.NodeAddress{},
-			cloudProviderType: cloudProviderExternal,
-			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			shouldError: false,
-		},
-		{
-			name:              "cloud provider is external and no nodeIP",
-			nodeAddresses:     []v1.NodeAddress{},
-			cloudProviderType: cloudProviderExternal,
-			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			shouldError: false,
