@@ -1,0 +1,36 @@
+# Real driver deployments must replace all occurrences of "dra-kubelet-plugin"
+# with something specific to their driver.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dra-kubelet-plugin-service-account
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dra-kubelet-plugin-role
+rules:
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceclaims"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceslices"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dra-kubelet-plugin-role-binding
+subjects:
+- kind: ServiceAccount
+  name: dra-kubelet-plugin-service-account
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: dra-kubelet-plugin-role
+  apiGroup: rbac.authorization.k8s.io
