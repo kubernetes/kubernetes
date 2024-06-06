@@ -65,12 +65,14 @@ func TestNodeAddress(t *testing.T) {
 		cloudProviderExternal
 		cloudProviderNone
 	)
+
 	existingNodeAddress := v1.NodeAddress{Address: "10.1.1.2"}
 	cases := []struct {
 		name                           string
 		hostnameOverride               bool
 		nodeIP                         net.IP
 		secondaryNodeIP                net.IP
+		resolvedIP                     net.IP
 		cloudProviderType              cloudProviderType
 		nodeAddresses                  []v1.NodeAddress
 		expectedAddresses              []v1.NodeAddress
@@ -236,8 +238,110 @@ func TestNodeAddress(t *testing.T) {
 			shouldError: false,
 		},
 		{
-			name:              "cloud provider is external and nodeIP unspecified",
+			name:              "no cloud provider and nodeIP IPv4 unspecified",
+			nodeIP:            netutils.ParseIPSloppy("0.0.0.0"),
+			resolvedIP:        netutils.ParseIPSloppy("10.0.0.2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderNone,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:              "no cloud provider and nodeIP IPv6 unspecified",
 			nodeIP:            netutils.ParseIPSloppy("::"),
+			resolvedIP:        netutils.ParseIPSloppy("2001:db2::2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderNone,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "2001:db2::2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:              "legacy cloud provider and nodeIP IPv4 unspecified",
+			nodeIP:            netutils.ParseIPSloppy("0.0.0.0"),
+			resolvedIP:        netutils.ParseIPSloppy("10.0.0.2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderLegacy,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: true,
+		},
+		{
+			name:              "legacy cloud provider and nodeIP IPv6 unspecified",
+			nodeIP:            netutils.ParseIPSloppy("::"),
+			resolvedIP:        netutils.ParseIPSloppy("2001:db2::2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderLegacy,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: true,
+		},
+		{
+			name:              "cloud provider is external and nodeIP IPv4 unspecified",
+			nodeIP:            netutils.ParseIPSloppy("0.0.0.0"),
+			resolvedIP:        netutils.ParseIPSloppy("10.0.0.2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderExternal,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:              "cloud provider is external and nodeIP IPv6 unspecified",
+			nodeIP:            netutils.ParseIPSloppy("::"),
+			resolvedIP:        netutils.ParseIPSloppy("2001:db2::2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderExternal,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "2001:db2::2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:              "no cloud provider and no nodeIP resolve IPv4",
+			resolvedIP:        netutils.ParseIPSloppy("10.0.0.2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderNone,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:              "no cloud provider and no nodeIP resolve IPv6",
+			resolvedIP:        netutils.ParseIPSloppy("2001:db2::2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderNone,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "2001:db2::2"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
+			name:              "legacy cloud provider and no nodeIP",
+			resolvedIP:        netutils.ParseIPSloppy("10.0.0.2"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderLegacy,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: true,
+		},
+		{
+			name:              "cloud provider is external and no nodeIP resolve IPv4",
+			resolvedIP:        netutils.ParseIPSloppy("10.0.0.2"),
 			nodeAddresses:     []v1.NodeAddress{},
 			cloudProviderType: cloudProviderExternal,
 			expectedAddresses: []v1.NodeAddress{
@@ -246,7 +350,8 @@ func TestNodeAddress(t *testing.T) {
 			shouldError: false,
 		},
 		{
-			name:              "cloud provider is external and no nodeIP",
+			name:              "cloud provider is external and no nodeIP resolve IPv6",
+			resolvedIP:        netutils.ParseIPSloppy("2001:db2::2"),
 			nodeAddresses:     []v1.NodeAddress{},
 			cloudProviderType: cloudProviderExternal,
 			expectedAddresses: []v1.NodeAddress{
@@ -640,6 +745,20 @@ func TestNodeAddress(t *testing.T) {
 				return testCase.nodeAddresses, nil
 			}
 
+			net.DefaultResolver = &net.Resolver{
+				PreferGo: true,
+				Dial: func(ctx context.Context, network string, address string) (net.Conn, error) {
+					return nil, fmt.Errorf("error")
+				},
+			}
+			defer func() {
+				net.DefaultResolver = &net.Resolver{}
+			}()
+
+			resolveAddressFunc := func(net.IP) (net.IP, error) {
+				return testCase.resolvedIP, nil
+			}
+
 			// cloud provider is expected to be nil if external provider is set or there is no cloud provider
 			var cloud cloudprovider.Interface
 			if testCase.cloudProviderType == cloudProviderLegacy {
@@ -661,7 +780,9 @@ func TestNodeAddress(t *testing.T) {
 				testCase.hostnameOverride,
 				testCase.cloudProviderType == cloudProviderExternal,
 				cloud,
-				nodeAddressesFunc)
+				nodeAddressesFunc,
+				resolveAddressFunc,
+			)
 
 			// call setter on existing node
 			err := setter(ctx, existingNode)
@@ -741,6 +862,9 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
 				return nil, fmt.Errorf("not reached")
 			}
+			resolvedAddressesFunc := func(net.IP) (net.IP, error) {
+				return nil, fmt.Errorf("not reached")
+			}
 
 			// construct setter
 			setter := NodeAddress(testCase.nodeIPs,
@@ -749,7 +873,8 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 				false, // hostnameOverridden
 				false, // externalCloudProvider
 				nil,   // cloud
-				nodeAddressesFunc)
+				nodeAddressesFunc,
+				resolvedAddressesFunc)
 
 			// call setter on existing node
 			err := setter(ctx, existingNode)

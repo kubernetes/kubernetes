@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
@@ -67,6 +66,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	externalCloudProvider bool, // typically Kubelet.externalCloudProvider
 	cloud cloudprovider.Interface, // typically Kubelet.cloud
 	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
+	resolveAddressFunc func(net.IP) (net.IP, error), // typically k8s.io/apimachinery/pkg/util/net.ResolveBindAddress
 ) Setter {
 	var nodeIP, secondaryNodeIP net.IP
 	if len(nodeIPs) > 0 {
@@ -226,7 +226,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 				}
 
 				if ipAddr == nil {
-					ipAddr, err = utilnet.ResolveBindAddress(nodeIP)
+					ipAddr, err = resolveAddressFunc(nodeIP)
 				}
 			}
 
