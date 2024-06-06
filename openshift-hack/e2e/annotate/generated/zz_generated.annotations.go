@@ -3939,125 +3939,125 @@ var Annotations = map[string]string{
 
 	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (xfs)] [Slow] volumes should store data": " [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down cleans up when the kubelet returns.": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down cleans up when the kubelet returns.": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (block volmode)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if non-existent subpath is outside the volume [Slow] [LinuxOnly]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if non-existent subpath is outside the volume [Slow] [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath directory is outside the volume [Slow] [LinuxOnly]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath directory is outside the volume [Slow] [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath file is outside the volume [Slow] [LinuxOnly]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath file is outside the volume [Slow] [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath with backstepping is outside the volume [Slow] [LinuxOnly]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should fail if subpath with backstepping is outside the volume [Slow] [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support creating multiple subpath from same volumes [Slow]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support creating multiple subpath from same volumes [Slow]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support non-existent path": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support non-existent path": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support restarting containers using directory as subpath [Slow]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support restarting containers using directory as subpath [Slow]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support restarting containers using file as subpath [Slow] [LinuxOnly]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should support restarting containers using file as subpath [Slow] [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should unmount if pod is force deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should unmount if pod is force deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive] [Slow] [LinuxOnly]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should verify container cannot write to subpath readonly volumes [Slow]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] subPath should verify container cannot write to subpath readonly volumes [Slow]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext3)] volumes should allow exec of files on the volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext3)] volumes should allow exec of files on the volume": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext3)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext3)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext4)] volumes should allow exec of files on the volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext4)] volumes should allow exec of files on the volume": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ext4)] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod when kubelet returns [Feature:SELinux]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv used in a pod that is force deleted while the kubelet is down is usable by a new pod with a different SELinux context when kubelet returns [Feature:SELinux]": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] disruptive [Disruptive] [LinuxOnly] Should test that pv written before kubelet restart is readable after restart.": " [Disabled:Unsupported] [Serial] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on different node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with different volume mode and retain data across pod recreation on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on different node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should access to two volumes with the same volume mode and retain data across pod recreation on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single read-only volume from pods on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on different node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and its clone from pods on the same node [LinuxOnly] [Feature:VolumeSourceXFS]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Skipped:NoOptionalCapabilities] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] multiVolume [Slow] should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly] [Feature:VolumeSnapshotDataSource] [Feature:VolumeSourceXFS]": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)] [Feature:Windows] volumes should allow exec of files on the volume": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)] [Feature:Windows] volumes should allow exec of files on the volume": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)] [Feature:Windows] volumes should store data": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)] [Feature:Windows] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (xfs)] [Slow] volumes should allow exec of files on the volume": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (xfs)] [Slow] volumes should allow exec of files on the volume": " [Disabled:Unsupported] [Suite:k8s]",
 
-	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (xfs)] [Slow] volumes should store data": " [Suite:k8s]",
+	"[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (xfs)] [Slow] volumes should store data": " [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] In-tree Volumes [Driver: azure-file] [Testpattern: Dynamic PV (block volmode)(allowExpansion)] volume-expand Verify if offline PVC expansion works": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -13581,7 +13581,7 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Mounted volume expand [Feature:StorageProvider] Should verify mounted devices can be resized": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs": " [Disabled:Broken] [Suite:k8s]",
+	"[sig-storage] Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs": " [Disabled:Broken] [Disabled:Unsupported] [Suite:k8s]",
 
 	"[sig-storage] NFSPersistentVolumes [Disruptive] [Flaky] when kube-controller-manager restarts should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash": " [Serial] [Suite:k8s]",
 
@@ -13609,11 +13609,11 @@ var Annotations = map[string]string{
 
 	"[sig-storage] PersistentVolumes Default StorageClass [LinuxOnly] pods that use multiple volumes should be reschedulable [Slow]": " [Suite:k8s]",
 
-	"[sig-storage] PersistentVolumes GCEPD [Feature:StorageProvider] should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] PersistentVolumes GCEPD [Feature:StorageProvider] should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] PersistentVolumes GCEPD [Feature:StorageProvider] should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] PersistentVolumes GCEPD [Feature:StorageProvider] should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
-	"[sig-storage] PersistentVolumes GCEPD [Feature:StorageProvider] should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] PersistentVolumes GCEPD [Feature:StorageProvider] should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach": " [Disabled:Unsupported] [Skipped:NoOptionalCapabilities] [Suite:k8s]",
 
 	"[sig-storage] PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted.": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 

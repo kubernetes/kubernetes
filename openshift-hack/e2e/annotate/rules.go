@@ -167,7 +167,11 @@ var (
 			`\[Driver: gluster\]`,       // OpenShift 4.x does not support Gluster
 			`Volumes GlusterFS`,         // OpenShift 4.x does not support Gluster
 			`GlusterDynamicProvisioner`, // OpenShift 4.x does not support Gluster
-
+			// OCP 4.16 and newer does not support PersistentVolumeLabel admission plugin and thus
+			// the test can's create in-tree PVs.
+			`Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs`,
+			`PersistentVolumes GCEPD`,
+			`\[Driver: azure-disk\] \[Testpattern: Pre-provisioned PV`,
 			// Skip vSphere-specific storage tests. The standard in-tree storage tests for vSphere
 			// (prefixed with `In-tree Volumes [Driver: vsphere]`) are enough for testing this plugin.
 			// https://bugzilla.redhat.com/show_bug.cgi?id=2019115
