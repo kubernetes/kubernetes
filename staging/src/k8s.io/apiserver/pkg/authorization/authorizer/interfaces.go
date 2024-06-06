@@ -18,14 +18,12 @@ package authorizer
 
 import (
 	"context"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"net/http"
-	"sync"
-
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"net/http"
 )
 
 // Attributes is an interface used by an Authorizer to get information about a request
@@ -113,16 +111,11 @@ type AttributesRecord struct {
 	Name            string
 	ResourceRequest bool
 	Path            string
-	FieldSelector   string
-	LabelSelector   string
 
-	parseFieldSelectorOnce  sync.Once
-	parsedFieldSelector     fields.Selector
-	fieldSelectorParsingErr error
-
-	parseLabelSelectorOnce  sync.Once
-	parsedLabelSelector     labels.Selector
-	labelSelectorParsingErr error
+	FieldSelector           fields.Selector
+	FieldSelectorParsingErr error
+	LabelSelector           labels.Selector
+	LabelSelectorParsingErr error
 }
 
 func (a AttributesRecord) GetUser() user.Info {
@@ -174,19 +167,7 @@ func (a AttributesRecord) ParseFieldSelector() (fields.Selector, error) {
 		return nil, nil
 	}
 
-	a.parseFieldSelectorOnce.Do(func() {
-		if len(a.FieldSelector) == 0 {
-			return
-		}
-		selector, err := fields.ParseSelector(a.FieldSelector)
-		if err != nil {
-			a.fieldSelectorParsingErr = err
-			return
-		}
-		a.parsedFieldSelector = selector
-	})
-
-	return a.parsedFieldSelector, a.fieldSelectorParsingErr
+	return a.FieldSelector, a.FieldSelectorParsingErr
 }
 
 func (a AttributesRecord) ParseLabelSelector() (labels.Selector, error) {
@@ -194,14 +175,7 @@ func (a AttributesRecord) ParseLabelSelector() (labels.Selector, error) {
 		return nil, nil
 	}
 
-	a.parseLabelSelectorOnce.Do(func() {
-		if len(a.LabelSelector) == 0 {
-			return
-		}
-		a.parsedLabelSelector, a.labelSelectorParsingErr = labels.Parse(a.LabelSelector)
-	})
-
-	return a.parsedLabelSelector, a.labelSelectorParsingErr
+	return a.LabelSelector, a.LabelSelectorParsingErr
 }
 
 type Decision int

@@ -18,7 +18,10 @@ package validating
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -27,6 +30,14 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
+
+func mustParseLabelSelector(str string) labels.Selector {
+	ret, err := labels.Parse(str)
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
 
 func TestCachingAuthorizer(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
@@ -227,7 +238,7 @@ func TestCachingAuthorizer(t *testing.T) {
 				{
 					attributes: authorizer.AttributesRecord{
 						Name:          "test name",
-						FieldSelector: "foo=bar",
+						FieldSelector: fields.ParseSelectorOrDie("foo=bar"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -249,7 +260,7 @@ func TestCachingAuthorizer(t *testing.T) {
 					// now this should be cached
 					attributes: authorizer.AttributesRecord{
 						Name:          "test name",
-						FieldSelector: "foo=bar",
+						FieldSelector: fields.ParseSelectorOrDie("foo=bar"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -276,8 +287,8 @@ func TestCachingAuthorizer(t *testing.T) {
 			calls: []invocation{
 				{
 					attributes: authorizer.AttributesRecord{
-						Name:          "test name",
-						FieldSelector: "malformed",
+						Name:                    "test name",
+						FieldSelectorParsingErr: errors.New("malformed"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -322,8 +333,8 @@ func TestCachingAuthorizer(t *testing.T) {
 				{
 					// this should use the broader cached value because the selector will be ignored
 					attributes: authorizer.AttributesRecord{
-						Name:          "test name",
-						FieldSelector: "malformed",
+						Name:                    "test name",
+						FieldSelectorParsingErr: errors.New("malformed"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -347,7 +358,7 @@ func TestCachingAuthorizer(t *testing.T) {
 				{
 					attributes: authorizer.AttributesRecord{
 						Name:          "test name",
-						LabelSelector: "foo=bar",
+						LabelSelector: mustParseLabelSelector("foo=bar"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -369,7 +380,7 @@ func TestCachingAuthorizer(t *testing.T) {
 					// now this should be cached
 					attributes: authorizer.AttributesRecord{
 						Name:          "test name",
-						LabelSelector: "foo=bar",
+						LabelSelector: mustParseLabelSelector("foo=bar"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -380,7 +391,7 @@ func TestCachingAuthorizer(t *testing.T) {
 				{
 					attributes: authorizer.AttributesRecord{
 						Name:          "test name",
-						LabelSelector: "diff=zero",
+						LabelSelector: mustParseLabelSelector("diff=zero"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -412,8 +423,8 @@ func TestCachingAuthorizer(t *testing.T) {
 			calls: []invocation{
 				{
 					attributes: authorizer.AttributesRecord{
-						Name:          "test name",
-						LabelSelector: "malformed mess",
+						Name:                    "test name",
+						LabelSelectorParsingErr: errors.New("malformed mess"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,
@@ -458,8 +469,8 @@ func TestCachingAuthorizer(t *testing.T) {
 				{
 					// this should use the broader cached value because the selector will be ignored
 					attributes: authorizer.AttributesRecord{
-						Name:          "test name",
-						LabelSelector: "malformed mess",
+						Name:                    "test name",
+						LabelSelectorParsingErr: errors.New("malformed mess"),
 					},
 					expected: result{
 						decision: authorizer.DecisionAllow,

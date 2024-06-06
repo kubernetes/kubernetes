@@ -76,23 +76,31 @@ var _ user.Info = (interface {
 // Authorize returns an authorization decision by delegating to another Authorizer. If an equivalent
 // check has already been performed, a cached result is returned. Not safe for concurrent use.
 func (ca *cachingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
-	serializableAttributes := authorizer.AttributesRecord{
-		Verb:            a.GetVerb(),
-		Namespace:       a.GetNamespace(),
-		APIGroup:        a.GetAPIGroup(),
-		APIVersion:      a.GetAPIVersion(),
-		Resource:        a.GetResource(),
-		Subresource:     a.GetSubresource(),
-		Name:            a.GetName(),
-		ResourceRequest: a.IsResourceRequest(),
-		Path:            a.GetPath(),
+	type SerializableAttributes struct {
+		authorizer.AttributesRecord
+		FieldSelectorString string
+		LabelSelectorString string
+	}
+
+	serializableAttributes := SerializableAttributes{
+		AttributesRecord: authorizer.AttributesRecord{
+			Verb:            a.GetVerb(),
+			Namespace:       a.GetNamespace(),
+			APIGroup:        a.GetAPIGroup(),
+			APIVersion:      a.GetAPIVersion(),
+			Resource:        a.GetResource(),
+			Subresource:     a.GetSubresource(),
+			Name:            a.GetName(),
+			ResourceRequest: a.IsResourceRequest(),
+			Path:            a.GetPath(),
+		},
 	}
 	// in the error case, we won't honor this field selector, so the cache doesn't need it.
 	if fieldSelector, err := a.ParseFieldSelector(); err == nil && fieldSelector != nil {
-		serializableAttributes.FieldSelector = fieldSelector.String()
+		serializableAttributes.FieldSelectorString = fieldSelector.String()
 	}
 	if labelSelector, err := a.ParseLabelSelector(); err == nil && labelSelector != nil {
-		serializableAttributes.LabelSelector = labelSelector.String()
+		serializableAttributes.LabelSelectorString = labelSelector.String()
 	}
 
 	if u := a.GetUser(); u != nil {

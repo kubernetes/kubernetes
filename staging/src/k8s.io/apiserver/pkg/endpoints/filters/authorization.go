@@ -19,6 +19,8 @@ package filters
 import (
 	"context"
 	"errors"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"net/http"
@@ -120,8 +122,10 @@ func GetAuthorizerAttributes(ctx context.Context) (authorizer.Attributes, error)
 	attribs.Name = requestInfo.Name
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		attribs.FieldSelector = requestInfo.FieldSelector
-		attribs.LabelSelector = requestInfo.LabelSelector
+		// parsing here makes it easy to keep the AttributesRecord type value-only and avoids any mutex copies when
+		// doing shallow copies in other steps.
+		attribs.FieldSelector, attribs.FieldSelectorParsingErr = fields.ParseSelector(requestInfo.FieldSelector)
+		attribs.LabelSelector, attribs.LabelSelectorParsingErr = labels.Parse(requestInfo.LabelSelector)
 	}
 
 	return &attribs, nil
