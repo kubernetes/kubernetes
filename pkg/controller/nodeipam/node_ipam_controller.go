@@ -34,8 +34,7 @@ import (
 )
 
 // ipamController is an interface abstracting an interface for
-// legacy mode. It is needed to ensure correct building for
-// both provider-specific and providerless environments.
+// legacy mode.
 type ipamController interface {
 	Run(ctx context.Context)
 }
