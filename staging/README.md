@@ -19,6 +19,7 @@ Repositories currently staged here:
 - [`k8s.io/component-helpers`](https://github.com/kubernetes/component-helpers)
 - [`k8s.io/controller-manager`](https://github.com/kubernetes/controller-manager)
 - [`k8s.io/cri-api`](https://github.com/kubernetes/cri-api)
+- [`k8s.io/cri-client`](https://github.com/kubernetes/cri-client)
 - [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
 - [`k8s.io/dynamic-resource-allocation`](https://github.com/kubernetes/dynamic-resource-allocation)
 - [`k8s.io/endpointslice`](https://github.com/kubernetes/endpointslice)
