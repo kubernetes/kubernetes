@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dra-kubelet-plugin
+subjects:
+- kind: User
+  name: dra-kubelet-plugin-on-node # This has to match the user name in the credentials used by the plugin.
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: dra-kubelet-plugin
+  apiGroup: rbac.authorization.k8s.io

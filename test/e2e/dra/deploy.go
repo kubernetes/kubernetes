@@ -19,6 +19,7 @@ package dra
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"net"
@@ -38,10 +39,19 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/discovery/cached/memory"
 	resourceapiinformer "k8s.io/client-go/informers/resource/v1alpha2"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
@@ -52,6 +62,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -63,10 +74,17 @@ type Nodes struct {
 	NodeNames []string
 }
 
+//go:embed test-driver/deploy/example/plugin-rbac-cluster-role.yaml
+var pluginClusterRole string
+
+//go:embed test-driver/deploy/example/plugin-rbac-cluster-role-binding.yaml
+var pluginClusterRoleBinding string
+
 // NewNodes selects nodes to run the test on.
 func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 	nodes := &Nodes{}
 	ginkgo.BeforeEach(func(ctx context.Context) {
+
 		ginkgo.By("selecting nodes")
 		// The kubelet plugin is harder. We deploy the builtin manifest
 		// after patching in the driver name and all nodes on which we
@@ -306,14 +324,35 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
 
 	// Run registar and plugin for each of the pods.
+	content := strings.ReplaceAll(pluginClusterRole, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name)
+	d.createFromYAML(ctx, []byte(content), "")
 	for _, pod := range pods.Items {
 		// Need a local variable, not the loop variable, for the anonymous
 		// callback functions below.
 		pod := pod
 		nodename := pod.Spec.NodeName
+
+		// Authenticate the plugin so that it only has minimal permissions.
+		driverUserInfo := (&serviceaccount.ServiceAccountInfo{
+			Name:      pod.Name,
+			Namespace: d.f.Namespace.Name,
+			NodeName:  nodename,
+		}).UserInfo()
+		driverClientConfig := d.f.ClientConfig()
+		driverClientConfig.Impersonate = rest.ImpersonationConfig{
+			UserName: driverUserInfo.GetName(),
+			Groups:   driverUserInfo.GetGroups(),
+			Extra:    driverUserInfo.GetExtra(),
+		}
+		driverClient, err := kubernetes.NewForConfig(driverClientConfig)
+		content := strings.ReplaceAll(pluginClusterRoleBinding, "dra-kubelet-plugin-on-node", driverUserInfo.GetName())
+		content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name)
+		d.createFromYAML(ctx, []byte(content), "")
+
+		framework.ExpectNoError(err, "create client for driver")
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(ctx, logger)
-		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, d.f.ClientSet, nodename,
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
 					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
@@ -373,6 +412,57 @@ func (d *Driver) createFile(pod *v1.Pod, name string, content []byte) error {
 
 func (d *Driver) removeFile(pod *v1.Pod, name string) error {
 	return d.podIO(pod).RemoveAll(name)
+}
+
+func (d *Driver) createFromYAML(ctx context.Context, content []byte, namespace string) {
+	// Not caching the discovery result isn't very efficient, but good enough.
+	discoveryCache := memory.NewMemCacheClient(d.f.ClientSet.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryCache)
+
+	for _, content := range bytes.Split(content, []byte("---\n")) {
+		if len(content) == 0 {
+			continue
+		}
+
+		var obj *unstructured.Unstructured
+		framework.ExpectNoError(yaml.UnmarshalStrict(content, &obj))
+
+		gv, err := schema.ParseGroupVersion(obj.GetAPIVersion())
+		framework.ExpectNoError(err, fmt.Sprintf("extract group+version from object %q", klog.KObj(obj)))
+		gk := schema.GroupKind{Group: gv.Group, Kind: obj.GetKind()}
+
+		mapping, err := restMapper.RESTMapping(gk, gv.Version)
+		framework.ExpectNoError(err, fmt.Sprintf("map %q to resource", gk))
+
+		resourceClient := d.f.DynamicClient.Resource(mapping.Resource)
+		options := metav1.CreateOptions{
+			// If the YAML input is invalid, then we want the
+			// apiserver to tell us via an error. This can
+			// happen because decoding into an unstructured object
+			// doesn't validate.
+			FieldValidation: "Strict",
+		}
+		switch mapping.Scope.Name() {
+		case meta.RESTScopeNameRoot:
+			_, err = resourceClient.Create(ctx, obj, options)
+		case meta.RESTScopeNameNamespace:
+			if namespace == "" {
+				framework.Failf("need namespace for object type %s", gk)
+			}
+			_, err = resourceClient.Namespace(namespace).Create(ctx, obj, options)
+		}
+		framework.ExpectNoError(err, "create object")
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			del := resourceClient.Delete
+			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+				del = resourceClient.Namespace(namespace).Delete
+			}
+			err := del(ctx, obj.GetName(), metav1.DeleteOptions{})
+			if !apierrors.IsNotFound(err) {
+				framework.ExpectNoError(err, fmt.Sprintf("deleting %s.%s %s", obj.GetKind(), obj.GetAPIVersion(), klog.KObj(obj)))
+			}
+		})
+	}
 }
 
 func (d *Driver) podIO(pod *v1.Pod) proxy.PodDirIO {
