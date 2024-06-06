@@ -3228,6 +3228,7 @@ func TestSyncPodSpans(t *testing.T) {
 		*kubeCfg.MemoryThrottlingFactor,
 		kubeletutil.NewPodStartupLatencyTracker(),
 		tp,
+		kubeCfg.PullImageSecretRecheckPeriod,
 	)
 	assert.NoError(t, err)
 
