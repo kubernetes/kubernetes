@@ -29,7 +29,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
-	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -294,9 +294,9 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	implemented := false
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
-		if nodeServer, ok := nodeServer.(drapbv1alpha3.NodeServer); ok && o.nodeV1alpha3 {
+		if nodeServer, ok := nodeServer.(drapb.NodeServer); ok && o.nodeV1alpha3 {
 			logger.V(5).Info("registering drapbv1alpha3.NodeServer")
-			drapbv1alpha3.RegisterNodeServer(grpcServer, nodeServer)
+			drapb.RegisterNodeServer(grpcServer, nodeServer)
 			implemented = true
 		}
 	})
