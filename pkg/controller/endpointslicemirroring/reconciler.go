@@ -207,7 +207,11 @@ func (r *reconciler) reconcileByPortMapping(
 		totals = totalChanges(existingSlices[0], desiredSet)
 		if totals.added == 0 && totals.updated == 0 && totals.removed == 0 &&
 			apiequality.Semantic.DeepEqual(endpoints.Labels, compareLabels) &&
-			apiequality.Semantic.DeepEqual(compareAnnotations, existingSlices[0].Annotations) {
+			apiequality.Semantic.DeepEqual(compareAnnotations, existingSlices[0].Annotations) &&
+			!needRebuildExistingSlices(endpoints, existingSlices[0]) {
+			if !r.endpointSliceTracker.Has(existingSlices[0]) {
+				r.endpointSliceTracker.Update(existingSlices[0]) // Always ensure each EndpointSlice is being tracked.
+			}
 			return slices, totals
 		}
 	}
@@ -333,4 +337,14 @@ func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointsli
 	// be added.
 	totals.added = desiredSet.Len() - existingMatches
 	return totals
+}
+
+func needRebuildExistingSlices(endpoints *corev1.Endpoints, existingSlice *discovery.EndpointSlice) bool {
+	for index := range existingSlice.OwnerReferences {
+		owner := existingSlice.OwnerReferences[index]
+		if owner.Kind == "Endpoints" && owner.Name == endpoints.Name && owner.UID != endpoints.UID {
+			return true
+		}
+	}
+	return false
 }
