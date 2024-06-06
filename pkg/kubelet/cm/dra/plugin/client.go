@@ -30,7 +30,7 @@ import (
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 )
 
 const PluginClientTimeout = 45 * time.Second
