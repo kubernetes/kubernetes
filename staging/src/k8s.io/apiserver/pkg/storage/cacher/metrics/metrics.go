@@ -106,6 +106,17 @@ var (
 		[]string{"resource"},
 	)
 
+	watchCacheResourceVersion = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "resource_version",
+			Help:           "Current resource version of watch cache broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
 	watchCacheCapacityIncreaseTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      subsystem,
@@ -171,6 +182,7 @@ func Register() {
 		legacyregistry.MustRegister(EventsReceivedCounter)
 		legacyregistry.MustRegister(EventsCounter)
 		legacyregistry.MustRegister(TerminatedWatchersCounter)
+		legacyregistry.MustRegister(watchCacheResourceVersion)
 		legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
@@ -184,6 +196,11 @@ func RecordListCacheMetrics(resourcePrefix, indexName string, numFetched, numRet
 	listCacheCount.WithLabelValues(resourcePrefix, indexName).Inc()
 	listCacheNumFetched.WithLabelValues(resourcePrefix, indexName).Add(float64(numFetched))
 	listCacheNumReturned.WithLabelValues(resourcePrefix).Add(float64(numReturned))
+}
+
+// RecordResourceVersion sets the current resource version for a given resource type.
+func RecordResourceVersion(resourcePrefix string, resourceVersion uint64) {
+	watchCacheResourceVersion.WithLabelValues(resourcePrefix).Set(float64(resourceVersion))
 }
 
 // RecordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
