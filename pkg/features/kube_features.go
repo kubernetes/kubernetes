@@ -765,6 +765,7 @@ const (
 	// owner: @psch
 	// alpha: v1.26
 	// beta: v1.27
+	// stable: v1.31
 	//
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
@@ -1155,7 +1156,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StatefulSetAutoDeletePVC: {Default: true, PreRelease: featuregate.Beta},
 
-	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.Beta},
+	StatefulSetStartOrdinal: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.32
 
 	StorageVersionMigrator: {Default: false, PreRelease: featuregate.Alpha},
 

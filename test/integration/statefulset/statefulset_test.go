@@ -694,7 +694,6 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 		},
 	}
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)
 	tCtx, closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
 	cancel := runControllerAndInformers(tCtx, rm, informers)

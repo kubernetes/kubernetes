@@ -1,0 +1,63 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "flowcontrol.apiserver.k8s.io/v1beta2",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "FlowSchema",
+      "name": "flowschemas",
+      "namespaced": false,
+      "singularName": "flowschema",
+      "storageVersionHash": "GJVAJZSZBIw=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "FlowSchema",
+      "name": "flowschemas/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "PriorityLevelConfiguration",
+      "name": "prioritylevelconfigurations",
+      "namespaced": false,
+      "singularName": "prioritylevelconfiguration",
+      "storageVersionHash": "Kir5PVfvNeI=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PriorityLevelConfiguration",
+      "name": "prioritylevelconfigurations/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}
