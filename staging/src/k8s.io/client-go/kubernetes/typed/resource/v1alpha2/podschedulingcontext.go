@@ -31,6 +31,7 @@ import (
 	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // PodSchedulingContextsGetter has a method to return a PodSchedulingContextInterface.
@@ -84,6 +85,16 @@ func (c *podSchedulingContexts) Get(ctx context.Context, name string, options v1
 
 // List takes label and field selectors, and returns the list of PodSchedulingContexts that match those selectors.
 func (c *podSchedulingContexts) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.PodSchedulingContextList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for podschedulingcontexts", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of PodSchedulingContexts that match those selectors.
+func (c *podSchedulingContexts) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.PodSchedulingContextList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

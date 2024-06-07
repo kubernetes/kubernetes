@@ -31,6 +31,7 @@ import (
 	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ResourceClassesGetter has a method to return a ResourceClassInterface.
@@ -79,6 +80,16 @@ func (c *resourceClasses) Get(ctx context.Context, name string, options v1.GetOp
 
 // List takes label and field selectors, and returns the list of ResourceClasses that match those selectors.
 func (c *resourceClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClassList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for resourceclasses", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ResourceClasses that match those selectors.
+func (c *resourceClasses) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClassList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

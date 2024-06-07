@@ -31,6 +31,7 @@ import (
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // StorageClassesGetter has a method to return a StorageClassInterface.
@@ -79,6 +80,16 @@ func (c *storageClasses) Get(ctx context.Context, name string, options v1.GetOpt
 
 // List takes label and field selectors, and returns the list of StorageClasses that match those selectors.
 func (c *storageClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.StorageClassList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for storageclasses", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of StorageClasses that match those selectors.
+func (c *storageClasses) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.StorageClassList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

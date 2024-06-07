@@ -31,6 +31,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // FlowSchemasGetter has a method to return a FlowSchemaInterface.
@@ -81,6 +82,16 @@ func (c *flowSchemas) Get(ctx context.Context, name string, options v1.GetOption
 
 // List takes label and field selectors, and returns the list of FlowSchemas that match those selectors.
 func (c *flowSchemas) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.FlowSchemaList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for flowschemas", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of FlowSchemas that match those selectors.
+func (c *flowSchemas) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.FlowSchemaList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

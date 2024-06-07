@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ServiceAccountsGetter has a method to return a ServiceAccountInterface.
@@ -85,6 +86,16 @@ func (c *serviceAccounts) Get(ctx context.Context, name string, options metav1.G
 
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
 func (c *serviceAccounts) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ServiceAccountList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for serviceaccounts", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
+func (c *serviceAccounts) list(ctx context.Context, opts metav1.ListOptions) (result *v1.ServiceAccountList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

@@ -31,6 +31,7 @@ import (
 	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ResourceSlicesGetter has a method to return a ResourceSliceInterface.
@@ -79,6 +80,16 @@ func (c *resourceSlices) Get(ctx context.Context, name string, options v1.GetOpt
 
 // List takes label and field selectors, and returns the list of ResourceSlices that match those selectors.
 func (c *resourceSlices) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceSliceList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for resourceslices", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ResourceSlices that match those selectors.
+func (c *resourceSlices) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceSliceList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

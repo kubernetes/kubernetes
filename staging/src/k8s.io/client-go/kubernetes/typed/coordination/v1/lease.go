@@ -31,6 +31,7 @@ import (
 	coordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // LeasesGetter has a method to return a LeaseInterface.
@@ -82,6 +83,16 @@ func (c *leases) Get(ctx context.Context, name string, options metav1.GetOptions
 
 // List takes label and field selectors, and returns the list of Leases that match those selectors.
 func (c *leases) List(ctx context.Context, opts metav1.ListOptions) (result *v1.LeaseList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for leases", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of Leases that match those selectors.
+func (c *leases) list(ctx context.Context, opts metav1.ListOptions) (result *v1.LeaseList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

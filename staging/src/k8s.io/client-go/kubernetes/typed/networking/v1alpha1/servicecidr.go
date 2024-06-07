@@ -31,6 +31,7 @@ import (
 	networkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ServiceCIDRsGetter has a method to return a ServiceCIDRInterface.
@@ -81,6 +82,16 @@ func (c *serviceCIDRs) Get(ctx context.Context, name string, options v1.GetOptio
 
 // List takes label and field selectors, and returns the list of ServiceCIDRs that match those selectors.
 func (c *serviceCIDRs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ServiceCIDRList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for servicecidrs", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ServiceCIDRs that match those selectors.
+func (c *serviceCIDRs) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ServiceCIDRList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

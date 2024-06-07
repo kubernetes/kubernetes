@@ -31,6 +31,7 @@ import (
 	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // ResourceClaimParametersGetter has a method to return a ResourceClaimParametersInterface.
@@ -82,6 +83,16 @@ func (c *resourceClaimParameters) Get(ctx context.Context, name string, options 
 
 // List takes label and field selectors, and returns the list of ResourceClaimParameters that match those selectors.
 func (c *resourceClaimParameters) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClaimParametersList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for resourceclaimparameters", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of ResourceClaimParameters that match those selectors.
+func (c *resourceClaimParameters) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClaimParametersList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second

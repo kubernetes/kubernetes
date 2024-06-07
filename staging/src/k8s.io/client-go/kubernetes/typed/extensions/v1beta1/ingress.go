@@ -31,6 +31,7 @@ import (
 	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
 )
 
 // IngressesGetter has a method to return a IngressInterface.
@@ -84,6 +85,16 @@ func (c *ingresses) Get(ctx context.Context, name string, options v1.GetOptions)
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
 func (c *ingresses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for ingresses", c.list, opts, result)
+		}
+	}()
+	return c.list(ctx, opts)
+}
+
+// list takes label and field selectors, and returns the list of Ingresses that match those selectors.
+func (c *ingresses) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
