@@ -141,7 +141,8 @@ type validationOptions struct {
 	suppressPerExpressionCost bool
 
 	celEnvironmentSet *environment.EnvSet
-	// allowInvalidCABundle allows an invalid conversion webhook CABundle on update only if the existing CABundle is invalid
+	// allowInvalidCABundle allows an invalid conversion webhook CABundle on update only if the existing CABundle is invalid.
+	// An invalid CABundle is also permitted on create and before a CRD is in an Established=True condition.
 	allowInvalidCABundle bool
 }
 
