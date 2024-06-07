@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -34,22 +35,24 @@ func TestDataConsistencyChecker(t *testing.T) {
 	scenarios := []struct {
 		name string
 
-		listResponse   *v1.PodList
-		retrievedItems []*v1.Pod
-		requestOptions metav1.ListOptions
+		lastSyncedResourceVersion string
+		listResponse              runtime.Object
+		retrievedItems            []runtime.Object
+		requestOptions            metav1.ListOptions
 
 		expectedRequestOptions []metav1.ListOptions
 		expectedListRequests   int
 		expectPanic            bool
 	}{
 		{
-			name: "data consistency check won't panic when data is consistent",
+			name:                      "data consistency check won't panic when data is consistent",
+			lastSyncedResourceVersion: "2",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
 			},
 			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
-			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
+			retrievedItems:       []runtime.Object{makePod("p1", "1"), makePod("p2", "2")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -61,13 +64,42 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
-			name: "legacy, the limit is removed from the list options when it wasn't honored by the watch cache",
+			name:                      "data consistency check works with unstructured data (dynamic client)",
+			lastSyncedResourceVersion: "2",
+			listResponse: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "vTest",
+					"kind":       "rTestList",
+				},
+				Items: []unstructured.Unstructured{
+					*makeUnstructuredObject("vTest", "rTest", "item1"),
+					*makeUnstructuredObject("vTest", "rTest", "item2"),
+				},
+			},
+			requestOptions: metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
+			retrievedItems: []runtime.Object{
+				makeUnstructuredObject("vTest", "rTest", "item1"),
+				makeUnstructuredObject("vTest", "rTest", "item2"),
+			},
+			expectedListRequests: 1,
+			expectedRequestOptions: []metav1.ListOptions{
+				{
+					ResourceVersion:      "2",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					TimeoutSeconds:       ptr.To(int64(39)),
+				},
+			},
+		},
+
+		{
+			name:                      "legacy, the limit is removed from the list options when it wasn't honored by the watch cache",
+			lastSyncedResourceVersion: "2",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
 			},
 			requestOptions:       metav1.ListOptions{ResourceVersion: "0", Limit: 2},
-			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
+			retrievedItems:       []runtime.Object{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -78,13 +110,14 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
-			name: "the limit is NOT removed from the list options for non-legacy request",
+			name:                      "the limit is NOT removed from the list options for non-legacy request",
+			lastSyncedResourceVersion: "2",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
 			},
 			requestOptions:       metav1.ListOptions{ResourceVersion: "2", Limit: 2},
-			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
+			retrievedItems:       []runtime.Object{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -96,13 +129,14 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
-			name: "legacy, the limit is NOT removed from the list options when the watch cache is disabled",
+			name:                      "legacy, the limit is NOT removed from the list options when the watch cache is disabled",
+			lastSyncedResourceVersion: "2",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
 			},
 			requestOptions:       metav1.ListOptions{ResourceVersion: "0", Limit: 5},
-			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
+			retrievedItems:       []runtime.Object{makePod("p1", "1"), makePod("p2", "2"), makePod("p3", "3")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -114,7 +148,8 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
-			name: "data consistency check won't panic when there is no data",
+			name:                      "data consistency check won't panic when there is no data",
+			lastSyncedResourceVersion: "2",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 			},
@@ -136,7 +171,8 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
-			name: "data consistency check won't be performed when ResourceVersion was set to 0",
+			name:                      "data consistency check won't be performed when ResourceVersion was set to 0",
+			lastSyncedResourceVersion: "0",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "0"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2")},
@@ -146,13 +182,14 @@ func TestDataConsistencyChecker(t *testing.T) {
 		},
 
 		{
-			name: "data consistency panics when data is inconsistent",
+			name:                      "data consistency panics when data is inconsistent",
+			lastSyncedResourceVersion: "2",
 			listResponse: &v1.PodList{
 				ListMeta: metav1.ListMeta{ResourceVersion: "2"},
 				Items:    []v1.Pod{*makePod("p1", "1"), *makePod("p2", "2"), *makePod("p3", "3")},
 			},
 			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
-			retrievedItems:       []*v1.Pod{makePod("p1", "1"), makePod("p2", "2")},
+			retrievedItems:       []runtime.Object{makePod("p1", "1"), makePod("p2", "2")},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -172,16 +209,16 @@ func TestDataConsistencyChecker(t *testing.T) {
 				scenario.listResponse = &v1.PodList{}
 			}
 			fakeLister := &listWrapper{response: scenario.listResponse}
-			retrievedItemsFunc := func() []*v1.Pod {
+			retrievedItemsFunc := func() []runtime.Object {
 				return scenario.retrievedItems
 			}
 
 			if scenario.expectPanic {
 				require.Panics(t, func() {
-					CheckDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
+					CheckDataConsistency(ctx, "", scenario.lastSyncedResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
 				})
 			} else {
-				CheckDataConsistency(ctx, "", scenario.listResponse.ResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
+				CheckDataConsistency(ctx, "", scenario.lastSyncedResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
 			}
 
 			require.Equal(t, fakeLister.counter, scenario.expectedListRequests)
@@ -218,10 +255,10 @@ func (lw *errorLister) List(_ context.Context, _ metav1.ListOptions) (runtime.Ob
 type listWrapper struct {
 	counter        int
 	requestOptions []metav1.ListOptions
-	response       *v1.PodList
+	response       runtime.Object
 }
 
-func (lw *listWrapper) List(_ context.Context, opts metav1.ListOptions) (*v1.PodList, error) {
+func (lw *listWrapper) List(_ context.Context, opts metav1.ListOptions) (runtime.Object, error) {
 	lw.counter++
 	lw.requestOptions = append(lw.requestOptions, opts)
 	return lw.response, nil
@@ -229,4 +266,16 @@ func (lw *listWrapper) List(_ context.Context, opts metav1.ListOptions) (*v1.Pod
 
 func makePod(name, rv string) *v1.Pod {
 	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv, UID: types.UID(name)}}
+}
+
+func makeUnstructuredObject(version, kind, name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": version,
+			"kind":       kind,
+			"metadata": map[string]interface{}{
+				"name": name,
+			},
+		},
+	}
 }
