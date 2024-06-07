@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -52,6 +53,34 @@ func TestDataConsistencyChecker(t *testing.T) {
 			},
 			requestOptions:       metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
 			retrievedItems:       []runtime.Object{makePod("p1", "1"), makePod("p2", "2")},
+			expectedListRequests: 1,
+			expectedRequestOptions: []metav1.ListOptions{
+				{
+					ResourceVersion:      "2",
+					ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+					TimeoutSeconds:       ptr.To(int64(39)),
+				},
+			},
+		},
+
+		{
+			name:                      "data consistency check works with unstructured data (dynamic client)",
+			lastSyncedResourceVersion: "2",
+			listResponse: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "vTest",
+					"kind":       "rTestList",
+				},
+				Items: []unstructured.Unstructured{
+					*makeUnstructuredObject("vTest", "rTest", "item1"),
+					*makeUnstructuredObject("vTest", "rTest", "item2"),
+				},
+			},
+			requestOptions: metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
+			retrievedItems: []runtime.Object{
+				makeUnstructuredObject("vTest", "rTest", "item1"),
+				makeUnstructuredObject("vTest", "rTest", "item2"),
+			},
 			expectedListRequests: 1,
 			expectedRequestOptions: []metav1.ListOptions{
 				{
@@ -237,4 +266,16 @@ func (lw *listWrapper) List(_ context.Context, opts metav1.ListOptions) (runtime
 
 func makePod(name, rv string) *v1.Pod {
 	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv, UID: types.UID(name)}}
+}
+
+func makeUnstructuredObject(version, kind, name string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": version,
+			"kind":       kind,
+			"metadata": map[string]interface{}{
+				"name": name,
+			},
+		},
+	}
 }
