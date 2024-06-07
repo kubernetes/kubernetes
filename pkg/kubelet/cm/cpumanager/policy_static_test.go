@@ -697,7 +697,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 
 		// allocate
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			policy.Allocate(context.Background(), st, pod, &container)
+			_ = policy.Allocate(context.Background(), st, pod, &container)
 		}
 		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
@@ -705,7 +705,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 		}
 
 		// remove
-		policy.RemoveContainer(context.Background(), st, string(pod.UID), testCase.containerName)
+		_ = policy.RemoveContainer(context.Background(), st, string(pod.UID), testCase.containerName)
 
 		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterRemove) {
 			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",
@@ -829,7 +829,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 			defaultCPUSet: testCase.stDefaultCPUSet,
 		}
 
-		policy.RemoveContainer(context.Background(), st, testCase.podUID, testCase.containerName)
+		_ = policy.RemoveContainer(context.Background(), st, testCase.podUID, testCase.containerName)
 
 		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSet) {
 			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",

@@ -250,7 +250,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(p)
 
-	lh := klog.Background().WithName("allocate")
+	lh := klog.LoggerWithName(klog.Background(), "allocate")
 	ctx := klog.NewContext(context.Background(), lh)
 	// Garbage collect any stranded resources before allocating CPUs.
 	m.removeStaleState(ctx)
@@ -325,7 +325,7 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
-	lh := klog.Background().WithName("getHints")
+	lh := klog.LoggerWithName(klog.Background(), "getHints")
 	ctx := klog.NewContext(context.Background(), lh)
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(ctx)
@@ -337,7 +337,7 @@ func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
-	lh := klog.Background().WithName("getPodHints")
+	lh := klog.LoggerWithName(klog.Background(), "getPodHints")
 	ctx := klog.NewContext(context.Background(), lh)
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(ctx)
@@ -363,7 +363,7 @@ func (m *manager) removeStaleState(ctx context.Context) {
 		return
 	}
 
-	logHandle := klog.FromContext(ctx).WithName("removeStaleState")
+	logHandle := klog.LoggerWithName(klog.FromContext(ctx), "removeStaleState")
 
 	// We grab the lock to ensure that no new containers will grab CPUs while
 	// executing the code below. Without this lock, its possible that we end up
@@ -392,7 +392,7 @@ func (m *manager) removeStaleState(ctx context.Context) {
 	assignments := m.state.GetCPUAssignments()
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
-			lh := logHandle.WithValues("podUID", podUID, "containerName", containerName)
+			lh := klog.LoggerWithValues(logHandle, "podUID", podUID, "containerName", containerName)
 
 			if _, ok := activeContainers[podUID][containerName]; ok {
 				lh.V(5).Info("container still active")
@@ -408,7 +408,7 @@ func (m *manager) removeStaleState(ctx context.Context) {
 	}
 
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
-		lh := logHandle.WithValues("podUID", podUID, "containerName", containerName)
+		lh := klog.LoggerWithValues(logHandle, "podUID", podUID, "containerName", containerName)
 		if _, ok := activeContainers[podUID][containerName]; ok {
 			lh.V(5).Info("containerMap: container still active")
 			return
@@ -425,11 +425,11 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
-	logHandle := klog.FromContext(ctx).WithName("reconcileState")
+	logHandle := klog.LoggerWithName(klog.FromContext(ctx), "reconcileState")
 
 	m.removeStaleState(ctx)
 	for _, pod := range m.activePods() {
-		lh := logHandle.WithValues("pod", klog.KObj(pod))
+		lh := klog.LoggerWithValues(logHandle, "pod", klog.KObj(pod))
 
 		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 		if !ok {
@@ -441,7 +441,7 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 		allContainers := pod.Spec.InitContainers
 		allContainers = append(allContainers, pod.Spec.Containers...)
 		for _, container := range allContainers {
-			lh = lh.WithValues("containerName", container.Name)
+			lh = klog.LoggerWithValues(lh, "containerName", container.Name)
 
 			containerID, err := findContainerIDByName(&pstatus, container.Name)
 			if err != nil {
