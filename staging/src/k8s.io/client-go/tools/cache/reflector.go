@@ -346,15 +346,16 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 
 	if useWatchList {
 		w, err = r.watchList(stopCh)
-		if w == nil && err == nil {
-			// stopCh was closed
-			return nil
-		}
-		if err != nil {
+		switch {
+		case err != nil:
 			klog.Warningf("The watchlist request ended with an error, falling back to the standard LIST/WATCH semantics because making progress is better than deadlocking, err = %v", err)
 			fallbackToList = true
-			// ensure that we won't accidentally pass some garbage down the watch.
-			w = nil
+		case w == nil:
+			// stopCh was closed, so no error or watcher was returned
+			return nil
+		default:
+			// Ensure the watcher is always stopped on exit, including error or stopCh closure.
+			defer w.Stop()
 		}
 	}
 
@@ -399,6 +400,12 @@ func (r *Reflector) startResync(stopCh <-chan struct{}, cancelCh <-chan struct{}
 
 // watchWithResync runs watch with startResync in the background.
 func (r *Reflector) watchWithResync(w watch.Interface, stopCh <-chan struct{}) error {
+	// Exit, if stopped.
+	select {
+	case <-stopCh:
+		return nil
+	default:
+	}
 	resyncerrc := make(chan error, 1)
 	cancelCh := make(chan struct{})
 	defer close(cancelCh)
@@ -406,20 +413,16 @@ func (r *Reflector) watchWithResync(w watch.Interface, stopCh <-chan struct{}) e
 	return r.watch(w, stopCh, resyncerrc)
 }
 
-// watch simply starts a watch request with the server.
+// watch starts a watch request with the server and consumes watch events until
+// the caller closes stopCh or the server closes w.ResultChan (after an error).
 func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc chan error) error {
 	var err error
 	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
 
 	for {
-		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
+		// Exit, if stopped.
 		select {
 		case <-stopCh:
-			// we can only end up here when the stopCh
-			// was closed after a successful watchlist or list request
-			if w != nil {
-				w.Stop()
-			}
 			return nil
 		default:
 		}
@@ -453,12 +456,17 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 				}
 				return err
 			}
+			// TODO(karlkfi): Extract for loop contents to a function and use defer w.Stop() to handle stop on panic.
 		}
 
+		// Consume watch events until one of the following:
+		// - consumer closes the stopCh
+		// - producer closes the ResultChan (after an error)
 		err = handleWatch(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
 			r.clock, resyncerrc, stopCh)
-		// Ensure that watch will not be reused across iterations.
+		// Always stop the watcher after consuming the events.
 		w.Stop()
+		// Nil the watch var to trigger a retry, if we don't return.
 		w = nil
 		retry.After(err)
 		if err != nil {
@@ -492,6 +500,12 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 // list simply lists all items and records a resource version obtained from the server at the moment of the call.
 // the resource version can be used for further progress notification (aka. watch).
 func (r *Reflector) list(stopCh <-chan struct{}) error {
+	// Skip listing, if already stopped
+	select {
+	case <-stopCh:
+		return nil
+	default:
+	}
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
@@ -616,6 +630,9 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 // After receiving a "Bookmark" event the reflector is considered to be synchronized.
 // It replaces its internal store with the collected items and
 // reuses the current watch requests for getting further events.
+//
+// When an error is returned, watchList always returns a nil watcher.
+// When the stopCh is closed, the watcher may also be nil, unless an error happened first.
 func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 	var w watch.Interface
 	var err error
@@ -673,11 +690,13 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 			}
 			return nil, err
 		}
+		// TODO(karlkfi): Extract for loop contents to a function and use defer w.Stop() to handle stop on panic.
 		watchListBookmarkReceived, err := handleListWatch(start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
 			func(rv string) { resourceVersion = rv },
 			r.clock, make(chan error), stopCh)
 		if err != nil {
-			w.Stop() // stop and retry with clean state
+			// If there was an error, stop the watcher.
+			w.Stop()
 			if errors.Is(err, errorStopRequested) {
 				return nil, nil
 			}
@@ -687,8 +706,14 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 			return nil, err
 		}
 		if watchListBookmarkReceived {
+			// If we go the watchlist bookmark, stop consuming events,
+			// but do not stop the watcher.
 			break
 		}
+		// It's possible that the producer closed the result channel before the
+		// watchlist bookmark was received, without first sending an error
+		// event. If so, stop the watcher.
+		w.Stop()
 	}
 	// We successfully got initial state from watch-list confirmed by the
 	// "k8s.io/initial-events-end" bookmark.
@@ -720,8 +745,9 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 
 // handleListWatch consumes events from w, updates the Store, and records the
 // last seen ResourceVersion, to allow continuing from that ResourceVersion on
-// retry. If successful, the watcher will be left open after receiving the
-// initial set of objects, to allow watching for future events.
+// retry.
+//
+// The watcher will NOT be stopped.
 func handleListWatch(
 	start time.Time,
 	w watch.Interface,
@@ -742,7 +768,9 @@ func handleListWatch(
 
 // handleListWatch consumes events from w, updates the Store, and records the
 // last seen ResourceVersion, to allow continuing from that ResourceVersion on
-// retry. The watcher will always be stopped on exit.
+// retry.
+//
+// The watcher will NOT be stopped.
 func handleWatch(
 	start time.Time,
 	w watch.Interface,
@@ -768,9 +796,8 @@ func handleWatch(
 // until a bookmark event is received with the WatchList annotation present.
 // Returns true (watchListBookmarkReceived) if the WatchList bookmark was
 // received, even if exitOnWatchListBookmarkReceived is false.
-// The watcher will always be stopped, unless exitOnWatchListBookmarkReceived is
-// true and watchListBookmarkReceived is true. This allows the same watch stream
-// to be re-used by the caller to continue watching for new events.
+//
+// The watcher will NOT be stopped.
 func handleAnyWatch(start time.Time,
 	w watch.Interface,
 	store Store,
@@ -795,6 +822,7 @@ loop:
 		case <-stopCh:
 			return watchListBookmarkReceived, errorStopRequested
 		case err := <-errCh:
+			// TODO: wait until producer closes the result channel before returning
 			return watchListBookmarkReceived, err
 		case event, ok := <-w.ResultChan():
 			if !ok {
