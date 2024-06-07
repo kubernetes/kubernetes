@@ -66,12 +66,13 @@ type tokenAuth struct {
 
 // kubeConfigSpec struct holds info required to build a KubeConfig object
 type kubeConfigSpec struct {
-	CACert             *x509.Certificate
-	APIServer          string
-	ClientName         string
-	ClientCertNotAfter time.Time
-	TokenAuth          *tokenAuth      `datapolicy:"token"`
-	ClientCertAuth     *clientCertAuth `datapolicy:"security-key"`
+	CACert              *x509.Certificate
+	APIServer           string
+	ClientName          string
+	ClientCertNotAfter  time.Time
+	TokenAuth           *tokenAuth      `datapolicy:"token"`
+	ClientCertAuth      *clientCertAuth `datapolicy:"security-key"`
+	EncryptionAlgorithm kubeadmapi.EncryptionAlgorithmType
 }
 
 // CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
@@ -212,7 +213,8 @@ func newClientCertConfigFromKubeConfigSpec(spec *kubeConfigSpec) pkiutil.CertCon
 			Organization: spec.ClientCertAuth.Organizations,
 			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		},
-		NotAfter: spec.ClientCertNotAfter,
+		NotAfter:            spec.ClientCertNotAfter,
+		EncryptionAlgorithm: spec.EncryptionAlgorithm,
 	}
 }
 
@@ -324,7 +326,8 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 			CAKey:         caKey,
 			Organizations: organizations,
 		},
-		ClientCertNotAfter: notAfter,
+		ClientCertNotAfter:  notAfter,
+		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
 	}
 
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
@@ -353,7 +356,8 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		TokenAuth: &tokenAuth{
 			Token: token,
 		},
-		ClientCertNotAfter: notAfter,
+		ClientCertNotAfter:  notAfter,
+		EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
 	}
 
 	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
@@ -452,7 +456,8 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding},
 			},
-			ClientCertNotAfter: notAfter,
+			ClientCertNotAfter:  notAfter,
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
 		},
 		kubeadmconstants.SuperAdminKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -460,7 +465,8 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
-			ClientCertNotAfter: notAfter,
+			ClientCertNotAfter:  notAfter,
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			APIServer:  controlPlaneEndpoint,
@@ -468,19 +474,22 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.NodesGroup},
 			},
-			ClientCertNotAfter: notAfter,
+			ClientCertNotAfter:  notAfter,
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
-			APIServer:          localAPIEndpoint,
-			ClientName:         kubeadmconstants.ControllerManagerUser,
-			ClientCertAuth:     &clientCertAuth{},
-			ClientCertNotAfter: notAfter,
+			APIServer:           localAPIEndpoint,
+			ClientName:          kubeadmconstants.ControllerManagerUser,
+			ClientCertAuth:      &clientCertAuth{},
+			ClientCertNotAfter:  notAfter,
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
 		},
 		kubeadmconstants.SchedulerKubeConfigFileName: {
-			APIServer:          localAPIEndpoint,
-			ClientName:         kubeadmconstants.SchedulerUser,
-			ClientCertAuth:     &clientCertAuth{},
-			ClientCertNotAfter: notAfter,
+			APIServer:           localAPIEndpoint,
+			ClientName:          kubeadmconstants.SchedulerUser,
+			ClientCertAuth:      &clientCertAuth{},
+			ClientCertNotAfter:  notAfter,
+			EncryptionAlgorithm: cfg.ClusterConfiguration.EncryptionAlgorithmType(),
 		},
 	}, nil
 }
