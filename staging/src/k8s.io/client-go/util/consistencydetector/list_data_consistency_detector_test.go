@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 )
@@ -74,6 +75,43 @@ func TestCheckListFromCacheDataConsistencyIfRequestedInternalHappyPath(t *testin
 			},
 			expectedRequestOptions: metav1.ListOptions{
 				ResourceVersion:      "2",
+				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+				TimeoutSeconds:       ptr.To(int64(39)),
+			},
+		},
+		{
+			name: "list detector works with a unstructured list",
+			listResponse: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "vTest",
+					"kind":       "rTestList",
+					"metadata": map[string]interface{}{
+						"resourceVersion": "3",
+					},
+				},
+				Items: []unstructured.Unstructured{
+					*makeUnstructuredObject("vTest", "rTest", "item1"),
+					*makeUnstructuredObject("vTest", "rTest", "item2"),
+					*makeUnstructuredObject("vTest", "rTest", "item3"),
+				},
+			},
+			retrievedListOptions: metav1.ListOptions{TimeoutSeconds: ptr.To(int64(39))},
+			retrievedList: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"apiVersion": "vTest",
+					"kind":       "rTestList",
+					"metadata": map[string]interface{}{
+						"resourceVersion": "3",
+					},
+				},
+				Items: []unstructured.Unstructured{
+					*makeUnstructuredObject("vTest", "rTest", "item1"),
+					*makeUnstructuredObject("vTest", "rTest", "item2"),
+					*makeUnstructuredObject("vTest", "rTest", "item3"),
+				},
+			},
+			expectedRequestOptions: metav1.ListOptions{
+				ResourceVersion:      "3",
 				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 				TimeoutSeconds:       ptr.To(int64(39)),
 			},
