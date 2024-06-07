@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -183,7 +184,7 @@ func (p *staticPolicy) Name() string {
 	return string(PolicyStatic)
 }
 
-func (p *staticPolicy) Start(s state.State) error {
+func (p *staticPolicy) Start(_ context.Context, s state.State) error {
 	if err := p.validateState(s); err != nil {
 		klog.ErrorS(err, "Static policy invalid state, please drain node and remove policy state file")
 		return err
@@ -250,7 +251,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 }
 
 // GetAllocatableCPUs returns the total set of CPUs available for allocation.
-func (p *staticPolicy) GetAllocatableCPUs(s state.State) cpuset.CPUSet {
+func (p *staticPolicy) GetAllocatableCPUs(_ context.Context, s state.State) cpuset.CPUSet {
 	return p.topology.CPUDetails.CPUs().Difference(p.reservedCPUs)
 }
 
@@ -293,7 +294,7 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cset)
 }
 
-func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+func (p *staticPolicy) Allocate(_ context.Context, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	numCPUs := p.guaranteedCPUs(pod, container)
 	if numCPUs == 0 {
 		// container belongs in the shared pool (nothing to do; use default cpuset)
@@ -376,7 +377,7 @@ func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName strin
 	return cset
 }
 
-func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
+func (p *staticPolicy) RemoveContainer(_ context.Context, s state.State, podUID string, containerName string) error {
 	klog.InfoS("Static policy: RemoveContainer", "podUID", podUID, "containerName", containerName)
 	cpusInUse := getAssignedCPUsOfSiblings(s, podUID, containerName)
 	if toRelease, ok := s.GetCPUSet(podUID, containerName); ok {
@@ -493,7 +494,7 @@ func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) 
 	return takeByTopologyNUMAPacked(p.topology, availableCPUs, numCPUs)
 }
 
-func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetTopologyHints(_ context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Get a count of how many guaranteed CPUs have been requested.
 	requested := p.guaranteedCPUs(pod, container)
 
@@ -540,7 +541,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 	}
 }
 
-func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) GetPodTopologyHints(_ context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// Get a count of how many guaranteed CPUs have been requested by Pod.
 	requested := p.podGuaranteedCPUs(pod)
 

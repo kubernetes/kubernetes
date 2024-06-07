@@ -23,8 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-logr/logr"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -228,20 +226,22 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	}
 	m.state = stateImpl
 
-	err = m.policy.Start(m.state)
+	ctx := context.Background()
+
+	err = m.policy.Start(ctx, m.state)
 	if err != nil {
 		klog.ErrorS(err, "Policy start error")
 		return err
 	}
 
-	m.allocatableCPUs = m.policy.GetAllocatableCPUs(m.state)
+	m.allocatableCPUs = m.policy.GetAllocatableCPUs(ctx, m.state)
 
 	if m.policy.Name() == string(PolicyNone) {
 		return nil
 	}
 	// Periodically call m.reconcileState() to continue to keep the CPU sets of
 	// all pods in sync with and guaranteed CPUs handed out among them.
-	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
+	go wait.Until(func() { m.reconcileState(ctx) }, m.reconcilePeriod, wait.NeverStop)
 	return nil
 }
 
@@ -251,14 +251,15 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	m.setPodPendingAdmission(p)
 
 	lh := klog.Background().WithName("allocate")
+	ctx := klog.NewContext(context.Background(), lh)
 	// Garbage collect any stranded resources before allocating CPUs.
-	m.removeStaleState(lh)
+	m.removeStaleState(ctx)
 
 	m.Lock()
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(m.state, p, c)
+	err := m.policy.Allocate(ctx, m.state, p, c)
 	if err != nil {
 		lh.Error(err, "policy error")
 		return err
@@ -277,10 +278,12 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 }
 
 func (m *manager) RemoveContainer(containerID string) error {
+	ctx := context.Background()
+
 	m.Lock()
 	defer m.Unlock()
 
-	err := m.policyRemoveContainerByID(containerID)
+	err := m.policyRemoveContainerByID(ctx, containerID)
 	if err != nil {
 		klog.ErrorS(err, "RemoveContainer error")
 		return err
@@ -289,13 +292,13 @@ func (m *manager) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (m *manager) policyRemoveContainerByID(containerID string) error {
+func (m *manager) policyRemoveContainerByID(ctx context.Context, containerID string) error {
 	podUID, containerName, err := m.containerMap.GetContainerRef(containerID)
 	if err != nil {
 		return nil
 	}
 
-	err = m.policy.RemoveContainer(m.state, podUID, containerName)
+	err = m.policy.RemoveContainer(ctx, m.state, podUID, containerName)
 	if err == nil {
 		m.lastUpdateState.Delete(podUID, containerName)
 		m.containerMap.RemoveByContainerID(containerID)
@@ -304,8 +307,8 @@ func (m *manager) policyRemoveContainerByID(containerID string) error {
 	return err
 }
 
-func (m *manager) policyRemoveContainerByRef(podUID string, containerName string) error {
-	err := m.policy.RemoveContainer(m.state, podUID, containerName)
+func (m *manager) policyRemoveContainerByRef(ctx context.Context, podUID string, containerName string) error {
+	err := m.policy.RemoveContainer(ctx, m.state, podUID, containerName)
 	if err == nil {
 		m.lastUpdateState.Delete(podUID, containerName)
 		m.containerMap.RemoveByContainerRef(podUID, containerName)
@@ -323,10 +326,11 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
 	lh := klog.Background().WithName("getHints")
+	ctx := klog.NewContext(context.Background(), lh)
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState(lh)
+	m.removeStaleState(ctx)
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(m.state, pod, container)
+	return m.policy.GetTopologyHints(ctx, m.state, pod, container)
 }
 
 func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
@@ -334,10 +338,11 @@ func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
 	lh := klog.Background().WithName("getPodHints")
+	ctx := klog.NewContext(context.Background(), lh)
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState(lh)
+	m.removeStaleState(ctx)
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(m.state, pod)
+	return m.policy.GetPodTopologyHints(ctx, m.state, pod)
 }
 
 func (m *manager) GetAllocatableCPUs() cpuset.CPUSet {
@@ -350,7 +355,7 @@ type reconciledContainer struct {
 	containerID   string
 }
 
-func (m *manager) removeStaleState(logHandle logr.Logger) {
+func (m *manager) removeStaleState(ctx context.Context) {
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
 	// the actual active pods list.
@@ -358,7 +363,7 @@ func (m *manager) removeStaleState(logHandle logr.Logger) {
 		return
 	}
 
-	logHandle = logHandle.WithName("removeStaleState")
+	logHandle := klog.FromContext(ctx).WithName("removeStaleState")
 
 	// We grab the lock to ensure that no new containers will grab CPUs while
 	// executing the code below. Without this lock, its possible that we end up
@@ -395,7 +400,7 @@ func (m *manager) removeStaleState(logHandle logr.Logger) {
 			}
 
 			lh.V(2).Info("removing container")
-			err := m.policyRemoveContainerByRef(podUID, containerName)
+			err := m.policyRemoveContainerByRef(ctx, podUID, containerName)
 			if err != nil {
 				lh.Error(err, "failed to remove container")
 			}
@@ -409,21 +414,20 @@ func (m *manager) removeStaleState(logHandle logr.Logger) {
 			return
 		}
 		lh.V(2).Info("containerMap: removing container")
-		err := m.policyRemoveContainerByRef(podUID, containerName)
+		err := m.policyRemoveContainerByRef(ctx, podUID, containerName)
 		if err != nil {
 			lh.Error(err, "containerMap: failed to remove container")
 		}
 	})
 }
 
-func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
-	ctx := context.Background()
+func (m *manager) reconcileState(ctx context.Context) (success []reconciledContainer, failure []reconciledContainer) {
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
-	logHandle := klog.Background().WithName("reconcileState")
+	logHandle := klog.FromContext(ctx).WithName("reconcileState")
 
-	m.removeStaleState(logHandle)
+	m.removeStaleState(ctx)
 	for _, pod := range m.activePods() {
 		lh := logHandle.WithValues("pod", klog.KObj(pod))
 

@@ -100,27 +100,27 @@ func (p *mockPolicy) Name() string {
 	return "mock"
 }
 
-func (p *mockPolicy) Start(s state.State) error {
+func (p *mockPolicy) Start(_ context.Context, s state.State) error {
 	return p.err
 }
 
-func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *mockPolicy) Allocate(_ context.Context, s state.State, pod *v1.Pod, container *v1.Container) error {
 	return p.err
 }
 
-func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
+func (p *mockPolicy) RemoveContainer(_ context.Context, s state.State, podUID string, containerName string) error {
 	return p.err
 }
 
-func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetTopologyHints(_ context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *mockPolicy) GetPodTopologyHints(_ context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
+func (p *mockPolicy) GetAllocatableCPUs(_ context.Context, m state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
 
@@ -1227,7 +1227,7 @@ func TestReconcileState(t *testing.T) {
 			},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
-		success, failure := mgr.reconcileState()
+		success, failure := mgr.reconcileState(context.Background())
 
 		if !reflect.DeepEqual(testCase.expectStAssignments, mgr.state.GetCPUAssignments()) {
 			t.Errorf("%v", testCase.description)
@@ -1464,7 +1464,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 		mgr.sourcesReady = &sourcesReadyStub{}
-		mgr.allocatableCPUs = testCase.policy.GetAllocatableCPUs(mgr.state)
+		mgr.allocatableCPUs = testCase.policy.GetAllocatableCPUs(context.Background(), mgr.state)
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
