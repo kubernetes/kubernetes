@@ -1806,6 +1806,15 @@ function prepare-kube-proxy-manifest-variables {
     kube_watchlist_inconsistency_detector_env_name="- name: KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"
     kube_watchlist_inconsistency_detector_env_value="value: \"${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR}\""
   fi
+  local kube_list_from_cache_inconsistency_detector_env_name=""
+  local kube_list_from_cache_inconsistency_detector_env_value=""
+  if [[ -n "${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR:-}" ]]; then
+    if [[ -z "${container_env}" ]]; then
+      container_env="env:"
+    fi
+    kube_list_from_cache_inconsistency_detector_env_name="- name: KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR"
+    kube_list_from_cache_inconsistency_detector_env_value="value: \"${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR}\""
+  fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" "${src_file}"
@@ -1817,6 +1826,8 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" "${src_file}"
   sed -i -e "s@{{kube_watchlist_inconsistency_detector_env_name}}@${kube_watchlist_inconsistency_detector_env_name}@g" "${src_file}"
   sed -i -e "s@{{kube_watchlist_inconsistency_detector_env_value}}@${kube_watchlist_inconsistency_detector_env_value}@g" "${src_file}"
+  sed -i -e "s@{{kube_list_from_cache_inconsistency_detector_env_name}}@${kube_list_from_cache_inconsistency_detector_env_name}@g" "${src_file}"
+  sed -i -e "s@{{kube_list_from_cache_inconsistency_detector_env_value}}@${kube_list_from_cache_inconsistency_detector_env_value}@g" "${src_file}"
   sed -i -e "s@{{ cpurequest }}@${KUBE_PROXY_CPU_REQUEST:-100m}@g" "${src_file}"
   sed -i -e "s@{{ memoryrequest }}@${KUBE_PROXY_MEMORY_REQUEST:-50Mi}@g" "${src_file}"
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" "${src_file}"
@@ -2255,10 +2266,15 @@ function start-kube-controller-manager {
     fi
     container_env+="{\"name\": \"KUBE_WATCHLIST_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR}\"}"
   fi
+  if [[ -n "${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR:-}" ]]; then
+    if [[ -n "${container_env}" ]]; then
+      container_env="${container_env}, "
+    fi
+    container_env+="{\"name\": \"KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR}\"}"
+  fi
   if [[ -n "${container_env}" ]]; then
     container_env="\"env\":[${container_env}],"
   fi
-
   local paramstring
   paramstring="$(convert-manifest-params "${params[*]}")"
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
@@ -2369,6 +2385,12 @@ function start-cloud-controller-manager {
       container_env="${container_env}, "
     fi
     container_env+="{\"name\": \"KUBE_WATCHLIST_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR}\"}"
+  fi
+  if [[ -n "${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR:-}" ]]; then
+    if [[ -n "${container_env}" ]]; then
+      container_env="${container_env}, "
+    fi
+    container_env+="{\"name\": \"KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR}\"}"
   fi
   if [[ -n "${container_env}" ]]; then
     container_env="\"env\":[${container_env}],"
