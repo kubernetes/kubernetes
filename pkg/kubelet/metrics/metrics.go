@@ -788,7 +788,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           AdmissionRejectionsTotalKey,
-			Help:           "The number of admission rejections where resources could not be meet.",
+			Help:           "Cumulative number pod admission rejections by the Kubelet.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"reason"},
