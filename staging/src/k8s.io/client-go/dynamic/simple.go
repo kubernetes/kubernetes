@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/consistencydetector"
+	"k8s.io/klog/v2"
 )
 
 type DynamicClient struct {
@@ -292,7 +294,23 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
-func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (result *unstructured.UnstructuredList, err error) {
+	defer func() {
+		if err == nil {
+			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("list request for %v", c.resource), c.list, opts, result)
+		}
+	}()
+	if canFormWatchListRequest(opts) {
+		result, err = c.watchList(ctx, opts)
+		if err != nil {
+			klog.Warningf("The watchlist request ended with an error, falling back to the standard LIST semantics, err = %v", err)
+			return c.list(ctx, opts)
+		}
+	}
+	return c.list(ctx, opts)
+}
+
+func (c *dynamicResourceClient) list(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
 		return nil, err
 	}
@@ -317,6 +335,12 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 		return nil, err
 	}
 	return list, nil
+}
+
+// watchList establishes a watch stream with the server and returns the list of Examples
+func (c *dynamicResourceClient) watchList(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
+	// TODO: implement
+	return nil, nil
 }
 
 func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
@@ -434,4 +458,10 @@ func (c *dynamicResourceClient) makeURLSegments(name string) []string {
 	}
 
 	return url
+}
+
+func canFormWatchListRequest(opts metav1.ListOptions) bool {
+	// TODO: check if watchList FG is on
+	// TODO: check opts
+	return false
 }
