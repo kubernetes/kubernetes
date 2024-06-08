@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
-	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -105,7 +104,6 @@ const (
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
 func NewDualStackProxier(
 	ctx context.Context,
-	sysctl utilsysctl.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -119,7 +117,7 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol, sysctl,
+	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
 		localDetectors[v1.IPv4Protocol], hostname, nodeIPs[v1.IPv4Protocol],
 		recorder, healthzServer, nodePortAddresses, initOnly)
@@ -127,7 +125,7 @@ func NewDualStackProxier(
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol, sysctl,
+	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
 		localDetectors[v1.IPv6Protocol], hostname, nodeIPs[v1.IPv6Protocol],
 		recorder, healthzServer, nodePortAddresses, initOnly)
@@ -203,7 +201,6 @@ var _ proxy.Provider = &Proxier{}
 // call fails.
 func NewProxier(ctx context.Context,
 	ipFamily v1.IPFamily,
-	sysctl utilsysctl.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
