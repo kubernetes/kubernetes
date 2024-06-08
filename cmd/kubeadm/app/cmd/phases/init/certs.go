@@ -95,7 +95,7 @@ func newCertSubPhases() []workflow.Phase {
 		Short:        "Generate a private key for signing service account tokens along with its public key",
 		Long:         saKeyLongDesc,
 		Run:          runCertsSa,
-		InheritFlags: []string{options.CertificatesDir},
+		InheritFlags: getCertPhaseFlags("sa"),
 	}
 
 	subPhases = append(subPhases, saPhase)
