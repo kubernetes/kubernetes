@@ -20,7 +20,6 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // FakeVolumeBinderConfig holds configurations for fake volume binder.
@@ -52,11 +51,6 @@ var _ SchedulerVolumeBinder = &FakeVolumeBinder{}
 // GetPodVolumeClaims implements SchedulerVolumeBinder.GetPodVolumes.
 func (b *FakeVolumeBinder) GetPodVolumeClaims(pod *v1.Pod) (podVolumeClaims *PodVolumeClaims, err error) {
 	return &PodVolumeClaims{}, nil
-}
-
-// GetEligibleNodes implements SchedulerVolumeBinder.GetEligibleNodes.
-func (b *FakeVolumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
-	return nil
 }
 
 // FindPodVolumes implements SchedulerVolumeBinder.FindPodVolumes.
