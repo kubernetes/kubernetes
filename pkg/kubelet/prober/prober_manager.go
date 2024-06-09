@@ -276,14 +276,27 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 		return result == results.Success
 	}
 
-	// if there is a startup probe which hasn't run yet, the container is not
-	// started.
-	if _, exists := m.getWorker(pod.UID, containerStatus.Name, startup); exists {
-		return false
+	// Respect to early started pod status. pod created before kubelet start:
+	// 1. The first time, call `UpdatePodStatus`, probe worker has not created,
+	// 1.1 last status is not nil, respect to last status
+	// 1.2 last status is nil, this must not happen
+	// 2. After the first call, probe worker has been created, probe is pending, respect to last status
+	var started = false
+	if (*containerStatus.State.Running).StartedAt.Time.Before(m.start) {
+		if containerStatus.Started != nil {
+			started = *containerStatus.Started
+		} else {
+			// This must not happen
+			klog.V(3).InfoS("Early created container is running, started is nil")
+		}
+	} else {
+		// The check whether there is a probe which hasn't run yet.
+		_, exists := m.getWorker(pod.UID, containerStatus.Name, startup)
+		started = !exists
 	}
 
 	// there is no startup probe, so the container is started.
-	return true
+	return started
 }
 
 func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
@@ -292,6 +305,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 		podStatus.ContainerStatuses[i].Started = &started
 
 		if !started {
+			podStatus.ContainerStatuses[i].Ready = false
 			continue
 		}
 
