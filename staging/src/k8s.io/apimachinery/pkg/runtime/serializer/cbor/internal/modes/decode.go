@@ -135,6 +135,10 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 
 		// Reject anything other than the simple values true, false, and null.
 		SimpleValues: simpleValues,
+
+		// Disable default recognition of types implementing encoding.BinaryUnmarshaler,
+		// which is not recognized for JSON decoding.
+		BinaryUnmarshaler: cbor.BinaryUnmarshalerNone,
 	}.DecMode()
 	if err != nil {
 		panic(err)
