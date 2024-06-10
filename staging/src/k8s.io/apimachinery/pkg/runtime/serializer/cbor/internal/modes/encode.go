@@ -83,6 +83,10 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		// base64 encoding of the original bytes. No base64 encoding or decoding needs to be
 		// performed for []byte-to-CBOR-to-[]byte roundtrips.
 		ByteSliceLaterFormat: cbor.ByteSliceLaterFormatBase64,
+
+		// Marshal Go byte arrays to CBOR arrays of integers (as in JSON) instead of byte
+		// strings.
+		ByteArray: cbor.ByteArrayToArray,
 	}.EncMode()
 	if err != nil {
 		panic(err)

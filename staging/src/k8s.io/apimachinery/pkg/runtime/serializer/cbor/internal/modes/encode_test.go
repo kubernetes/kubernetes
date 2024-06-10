@@ -64,6 +64,12 @@ func TestEncode(t *testing.T) {
 				}
 			}),
 		},
+		{
+			name:          "byte arrays encode to CBOR array of integers",
+			in:            [3]byte{0x01, 0x02, 0x03},
+			want:          []byte{0x83, 0x01, 0x02, 0x03}, // [1, 2, 3]
+			assertOnError: assertNilError,
+		},
 	} {
 		encModes := tc.modes
 		if len(encModes) == 0 {
