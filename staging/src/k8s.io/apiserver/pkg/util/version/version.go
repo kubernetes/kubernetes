@@ -111,12 +111,6 @@ func (m *effectiveVersion) Validate() []error {
 	// emulationVersion can only be 1.{binaryMinor-1}...1.{binaryMinor}.
 	maxEmuVer := binaryVersion
 	minEmuVer := binaryVersion.SubtractMinor(1)
-	// TODO: remove in 1.32
-	// emulationVersion is introduced in 1.31, so it cannot be lower than that.
-	// binaryVersion could be lower than 1.31 in tests. So we are only checking 1.31.
-	if binaryVersion.EqualTo(version.MajorMinor(1, 31)) {
-		minEmuVer = version.MajorMinor(1, 31)
-	}
 	if emulationVersion.GreaterThan(maxEmuVer) || emulationVersion.LessThan(minEmuVer) {
 		errs = append(errs, fmt.Errorf("emulation version %s is not between [%s, %s]", emulationVersion.String(), minEmuVer.String(), maxEmuVer.String()))
 	}
@@ -157,8 +151,7 @@ func DefaultBuildEffectiveVersion() MutableEffectiveVersion {
 
 // DefaultKubeEffectiveVersion returns the MutableEffectiveVersion based on the
 // latest K8s release.
-// Should update for each minor release!
 func DefaultKubeEffectiveVersion() MutableEffectiveVersion {
-	binaryVersion := version.MustParse("1.31").WithInfo(baseversion.Get())
+	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion).WithInfo(baseversion.Get())
 	return newEffectiveVersion(binaryVersion)
 }

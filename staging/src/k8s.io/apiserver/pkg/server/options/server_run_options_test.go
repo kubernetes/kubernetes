@@ -23,14 +23,21 @@ import (
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	netutils "k8s.io/utils/net"
 )
 
 func TestServerRunOptionsValidate(t *testing.T) {
+	testRegistry := utilversion.NewComponentGlobalsRegistry()
 	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
 	effectiveVersion := utilversion.NewEffectiveVersion("1.30")
+	effectiveVersion.SetEmulationVersion(version.MajorMinor(1, 32))
+	testComponent := "test"
+	utilruntime.Must(testRegistry.Register(testComponent, effectiveVersion, featureGate))
+
 	testCases := []struct {
 		name        string
 		testOptions *ServerRunOptions
@@ -47,8 +54,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--max-requests-inflight can not be negative value",
 		},
@@ -63,8 +69,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--max-mutating-requests-inflight can not be negative value",
 		},
@@ -79,8 +84,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--request-timeout can not be negative value",
 		},
@@ -95,8 +99,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           -1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--min-request-timeout can not be negative value",
 		},
@@ -111,8 +114,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       -10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "ServerRunOptions.JSONPatchMaxCopyBytes can not be negative value",
 		},
@@ -127,8 +129,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         -10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "ServerRunOptions.MaxRequestBodyBytes can not be negative value",
 		},
@@ -144,8 +145,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				LivezGracePeriod:            -time.Second,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--livez-grace-period can not be a negative value",
 		},
@@ -161,8 +161,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				ShutdownDelayDuration:       -time.Second,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--shutdown-delay-duration can not be negative value",
 		},
@@ -178,10 +177,26 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 			expectErr: "--strict-transport-security-directives invalid, allowed values: max-age=expireTime, includeSubDomains, preload. see https://tools.ietf.org/html/rfc6797#section-6.1 for more information",
+		},
+		{
+			name: "Test when emulation version is invalid",
+			testOptions: &ServerRunOptions{
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				CorsAllowedOriginList:       []string{"^10.10.10.100$", "^10.10.10.200$"},
+				HSTSDirectives:              []string{"max-age=31536000", "includeSubDomains", "preload"},
+				MaxRequestsInFlight:         400,
+				MaxMutatingRequestsInFlight: 200,
+				RequestTimeout:              time.Duration(2) * time.Minute,
+				MinRequestTimeout:           1800,
+				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
+				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				ComponentName:               testComponent,
+				ComponentGlobalsRegistry:    testRegistry,
+			},
+			expectErr: "emulation version 1.32 is not between [1.29, 1.30.0]",
 		},
 		{
 			name: "Test when ServerRunOptions is valid",
@@ -195,8 +210,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				FeatureGate:                 featureGate,
-				EffectiveVersion:            effectiveVersion,
+				ComponentGlobalsRegistry:    utilversion.DefaultComponentGlobalsRegistry,
 			},
 		},
 	}
@@ -216,8 +230,6 @@ func TestServerRunOptionsValidate(t *testing.T) {
 }
 
 func TestValidateCorsAllowedOriginList(t *testing.T) {
-	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
-	effectiveVersion := utilversion.NewEffectiveVersion("1.30")
 	tests := []struct {
 		regexp           [][]string
 		errShouldContain string
@@ -265,7 +277,7 @@ func TestValidateCorsAllowedOriginList(t *testing.T) {
 	for _, test := range tests {
 		for _, regexp := range test.regexp {
 			t.Run(fmt.Sprintf("regexp/%s", regexp), func(t *testing.T) {
-				options := NewServerRunOptions(featureGate, effectiveVersion)
+				options := NewServerRunOptions()
 				if errs := options.Validate(); len(errs) != 0 {
 					t.Fatalf("wrong test setup: %#v", errs)
 				}
@@ -289,8 +301,6 @@ func TestValidateCorsAllowedOriginList(t *testing.T) {
 }
 
 func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
-	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
-	effectiveVersion := utilversion.NewEffectiveVersion("1.30")
 	tests := []struct {
 		name             string
 		optionsFn        func() *ServerRunOptions
@@ -299,13 +309,13 @@ func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
 		{
 			name: "default should be valid",
 			optionsFn: func() *ServerRunOptions {
-				return NewServerRunOptions(featureGate, effectiveVersion)
+				return NewServerRunOptions()
 			},
 		},
 		{
 			name: "negative not allowed",
 			optionsFn: func() *ServerRunOptions {
-				o := NewServerRunOptions(featureGate, effectiveVersion)
+				o := NewServerRunOptions()
 				o.ShutdownWatchTerminationGracePeriod = -time.Second
 				return o
 			},
@@ -332,7 +342,7 @@ func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
 	}
 
 	t.Run("default should be zero", func(t *testing.T) {
-		options := NewServerRunOptions(featureGate, effectiveVersion)
+		options := NewServerRunOptions()
 		if options.ShutdownWatchTerminationGracePeriod != time.Duration(0) {
 			t.Errorf("expected default of ShutdownWatchTerminationGracePeriod to be zero, but got: %s", options.ShutdownWatchTerminationGracePeriod)
 		}

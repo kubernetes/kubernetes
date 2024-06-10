@@ -31,7 +31,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
@@ -81,10 +80,7 @@ func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions)
 	}
 	cmd.SetContext(ctx)
 
-	fs := cmd.Flags()
-	utilversion.DefaultComponentGlobalsRegistry.AddFlags(fs)
-
-	o.AddFlags(fs)
+	o.AddFlags(cmd.Flags())
 	return cmd
 }
 
@@ -99,13 +95,8 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
 func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
-	// effectiveVersion is used to set what apis and feature gates the generic api server is compatible with.
-	// You can also have the flag setting the effectiveVersion of the aggregator apiserver, and
-	// having a mapping from the aggregator apiserver version to generic apiserver version.
-	effectiveVersion, featureGate := utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.DefaultKubeComponent, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 	o := &AggregatorOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(featureGate, effectiveVersion),
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			aggregatorscheme.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),

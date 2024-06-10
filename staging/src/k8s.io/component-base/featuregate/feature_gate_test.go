@@ -596,6 +596,19 @@ func TestFeatureGateOverrideDefault(t *testing.T) {
 		}
 	})
 
+	t.Run("overrides are preserved across CopyKnownFeatures", func(t *testing.T) {
+		f := NewFeatureGate()
+		require.NoError(t, f.Add(map[Feature]FeatureSpec{"TestFeature": {Default: false}}))
+		require.NoError(t, f.OverrideDefault("TestFeature", true))
+		fcopy := f.CopyKnownFeatures()
+		if !f.Enabled("TestFeature") {
+			t.Error("TestFeature should be enabled by override")
+		}
+		if !fcopy.Enabled("TestFeature") {
+			t.Error("default override was not preserved by CopyKnownFeatures")
+		}
+	})
+
 	t.Run("reflected in known features", func(t *testing.T) {
 		f := NewFeatureGate()
 		if err := f.Add(map[Feature]FeatureSpec{"TestFeature": {
@@ -1119,22 +1132,22 @@ func TestVersionedFeatureGateFlagDefaults(t *testing.T) {
 	if f.Enabled(testAlphaGate) != false {
 		t.Errorf("Expected false")
 	}
-	if fs, _ := f.FeatureSpec(testAlphaGate); fs.PreRelease != PreAlpha || fs.Version.String() != "0.0" {
+	if fs, _ := f.featureSpec(testAlphaGate); fs.PreRelease != PreAlpha || fs.Version.String() != "0.0" {
 		t.Errorf("Expected (PreAlpha, 0.0)")
 	}
 	if f.Enabled(testBetaGate) != false {
 		t.Errorf("Expected false")
 	}
-	if fs, _ := f.FeatureSpec(testBetaGate); fs.PreRelease != Beta || fs.Version.String() != "1.28" {
+	if fs, _ := f.featureSpec(testBetaGate); fs.PreRelease != Beta || fs.Version.String() != "1.28" {
 		t.Errorf("Expected (Beta, 1.28)")
 	}
 	if f.Enabled(testGAGate) != true {
 		t.Errorf("Expected true")
 	}
-	if fs, _ := f.FeatureSpec(testGAGate); fs.PreRelease != Beta || fs.Version.String() != "1.27" {
+	if fs, _ := f.featureSpec(testGAGate); fs.PreRelease != Beta || fs.Version.String() != "1.27" {
 		t.Errorf("Expected (Beta, 1.27)")
 	}
-	if _, err := f.FeatureSpec("NonExist"); err == nil {
+	if _, err := f.featureSpec("NonExist"); err == nil {
 		t.Errorf("Expected Error")
 	}
 	allFeatures := f.GetAll()
@@ -1304,7 +1317,6 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		if !f.Enabled("TestFeature2") {
 			t.Error("expected TestFeature2 to have effective default of true")
 		}
-		f.OpenForModification()
 		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.29")))
 		if !f.Enabled("TestFeature1") {
 			t.Error("expected TestFeature1 to have effective default of true")
@@ -1312,7 +1324,6 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		if f.Enabled("TestFeature2") {
 			t.Error("expected TestFeature2 to have effective default of false")
 		}
-		f.OpenForModification()
 		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.26")))
 		if f.Enabled("TestFeature1") {
 			t.Error("expected TestFeature1 to have effective default of false")
@@ -1520,32 +1531,173 @@ func TestFeatureSpecAtEmulationVersion(t *testing.T) {
 	}
 }
 
-func TestOpenForModification(t *testing.T) {
-	const testBetaGate Feature = "testBetaGate"
-	f := NewVersionedFeatureGate(version.MustParse("1.29"))
+func TestCopyKnownFeatures(t *testing.T) {
+	f := NewFeatureGate()
+	require.NoError(t, f.Add(map[Feature]FeatureSpec{"FeatureA": {Default: false}, "FeatureB": {Default: false}}))
+	require.NoError(t, f.Set("FeatureA=true"))
+	require.NoError(t, f.OverrideDefault("FeatureB", true))
+	fcopy := f.CopyKnownFeatures()
+	require.NoError(t, f.Add(map[Feature]FeatureSpec{"FeatureC": {Default: false}}))
 
+	assert.True(t, f.Enabled("FeatureA"))
+	assert.True(t, f.Enabled("FeatureB"))
+	assert.False(t, f.Enabled("FeatureC"))
+
+	assert.False(t, fcopy.Enabled("FeatureA"))
+	assert.True(t, fcopy.Enabled("FeatureB"))
+
+	require.NoError(t, fcopy.Set("FeatureB=false"))
+	assert.True(t, f.Enabled("FeatureB"))
+	assert.False(t, fcopy.Enabled("FeatureB"))
+	if err := fcopy.Set("FeatureC=true"); err == nil {
+		t.Error("expected FeatureC not registered in the copied feature gate")
+	}
+}
+
+func TestExplicitlySet(t *testing.T) {
+	// gates for testing
+	const testAlphaGate Feature = "TestAlpha"
+	const testBetaGate Feature = "TestBeta"
+
+	tests := []struct {
+		arg                   string
+		expectedFeatureValue  map[Feature]bool
+		expectedExplicitlySet map[Feature]bool
+	}{
+		{
+			arg: "",
+			expectedFeatureValue: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+			expectedExplicitlySet: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllAlpha=true,TestBeta=false",
+			expectedFeatureValue: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   false,
+				testAlphaGate: true,
+				testBetaGate:  false,
+			},
+			expectedExplicitlySet: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  true,
+			},
+		},
+		{
+			arg: "AllAlpha=true,AllBeta=false",
+			expectedFeatureValue: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   false,
+				testAlphaGate: true,
+				testBetaGate:  false,
+			},
+			expectedExplicitlySet: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+	}
+	for i, test := range tests {
+		t.Run(test.arg, func(t *testing.T) {
+			fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
+			f := NewVersionedFeatureGate(version.MustParse("1.29"))
+			err := f.AddVersioned(map[Feature]VersionedSpecs{
+				testAlphaGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+				},
+				testBetaGate: {
+					{Version: version.MustParse("1.29"), Default: false, PreRelease: Beta},
+					{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+				},
+			})
+			require.NoError(t, err)
+			f.AddFlag(fs)
+
+			var errs []error
+			err = fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})
+			if err != nil {
+				errs = append(errs, err)
+			}
+			err = utilerrors.NewAggregate(errs)
+			require.NoError(t, err)
+			for k, v := range test.expectedFeatureValue {
+				if actual := f.Enabled(k); actual != v {
+					t.Errorf("%d: expected %s=%v, Got %v", i, k, v, actual)
+				}
+			}
+			for k, v := range test.expectedExplicitlySet {
+				if actual := f.ExplicitlySet(k); actual != v {
+					t.Errorf("%d: expected ExplicitlySet(%s)=%v, Got %v", i, k, v, actual)
+				}
+			}
+		})
+	}
+}
+
+func TestResetFeatureValueToDefault(t *testing.T) {
+	// gates for testing
+	const testAlphaGate Feature = "TestAlpha"
+	const testBetaGate Feature = "TestBeta"
+
+	f := NewVersionedFeatureGate(version.MustParse("1.29"))
 	err := f.AddVersioned(map[Feature]VersionedSpecs{
+		testAlphaGate: {
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: Alpha},
+		},
 		testBetaGate: {
 			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
-			{Version: version.MustParse("1.28"), Default: false, PreRelease: Beta},
-			{Version: version.MustParse("1.26"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
 		},
 	})
 	require.NoError(t, err)
 
-	if f.Enabled(testBetaGate) != true {
-		t.Errorf("Expected true")
+	fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
+	assert.False(t, f.Enabled("AllAlpha"))
+	assert.False(t, f.Enabled("AllBeta"))
+	assert.False(t, f.Enabled("TestAlpha"))
+	assert.True(t, f.Enabled("TestBeta"))
+
+	f.AddFlag(fs)
+	var errs []error
+	err = fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, "AllAlpha=true,TestBeta=false")})
+	if err != nil {
+		errs = append(errs, err)
 	}
-	err = f.SetEmulationVersion(version.MustParse("1.28"))
-	if err == nil {
-		t.Fatalf("Expected error when SetEmulationVersion after querying features")
-	}
-	if f.Enabled(testBetaGate) != true {
-		t.Errorf("Expected true")
-	}
-	f.OpenForModification()
+	err = utilerrors.NewAggregate(errs)
+	require.NoError(t, err)
+	assert.True(t, f.Enabled("AllAlpha"))
+	assert.False(t, f.Enabled("AllBeta"))
+	assert.True(t, f.Enabled("TestAlpha"))
+	assert.False(t, f.Enabled("TestBeta"))
+
+	require.NoError(t, f.ResetFeatureValueToDefault("AllAlpha"))
+	assert.False(t, f.Enabled("AllAlpha"))
+	assert.False(t, f.Enabled("AllBeta"))
+	assert.True(t, f.Enabled("TestAlpha"))
+	assert.False(t, f.Enabled("TestBeta"))
+
+	require.NoError(t, f.ResetFeatureValueToDefault("TestBeta"))
+	assert.False(t, f.Enabled("AllAlpha"))
+	assert.False(t, f.Enabled("AllBeta"))
+	assert.True(t, f.Enabled("TestAlpha"))
+	assert.True(t, f.Enabled("TestBeta"))
+
 	require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
-	if f.Enabled(testBetaGate) != false {
-		t.Errorf("Expected false at 1.28")
-	}
+	assert.False(t, f.Enabled("AllAlpha"))
+	assert.False(t, f.Enabled("AllBeta"))
+	assert.False(t, f.Enabled("TestAlpha"))
+	assert.False(t, f.Enabled("TestBeta"))
 }

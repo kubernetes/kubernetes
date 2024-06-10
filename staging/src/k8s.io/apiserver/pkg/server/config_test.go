@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/healthz"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -308,6 +309,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		LongRunningFunc:                func(_ *http.Request, _ *request.RequestInfo) bool { return false },
 		lifecycleSignals:               newLifecycleSignals(),
 		TracerProvider:                 tracing.NewNoopTracerProvider(),
+		FeatureGate:                    utilfeature.DefaultFeatureGate,
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -27,9 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -37,9 +39,13 @@ import (
 
 // TestCrossGroupStorage tests to make sure that all objects stored in an expected location in etcd can be converted/read.
 func TestCrossGroupStorage(t *testing.T) {
+	testRegistry := utilversion.NewComponentGlobalsRegistry()
+	utilruntime.Must(testRegistry.Register("test", utilversion.NewEffectiveVersion("0.0"), utilfeature.DefaultFeatureGate.DeepCopy()))
+
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 		// force enable all resources so we can check storage.
-		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("0.0")
+		opts.GenericServerRunOptions.ComponentName = "test"
+		opts.GenericServerRunOptions.ComponentGlobalsRegistry = testRegistry
 	})
 	defer apiServer.Cleanup()
 

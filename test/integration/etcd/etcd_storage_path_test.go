@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
@@ -75,8 +76,12 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 func TestEtcdStoragePath(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
+	testRegistry := utilversion.NewComponentGlobalsRegistry()
+	utilruntime.Must(testRegistry.Register("test", utilversion.NewEffectiveVersion("0.0"), feature.DefaultFeatureGate.DeepCopy()))
+
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
-		opts.GenericServerRunOptions.EffectiveVersion = utilversion.NewEffectiveVersion("0.0")
+		opts.GenericServerRunOptions.ComponentName = "test"
+		opts.GenericServerRunOptions.ComponentGlobalsRegistry = testRegistry
 	})
 	defer apiServer.Cleanup()
 	defer dumpEtcdKVOnFailure(t, apiServer.KV)
