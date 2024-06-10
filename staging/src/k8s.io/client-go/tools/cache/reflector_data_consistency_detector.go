@@ -18,19 +18,11 @@ package cache
 
 import (
 	"context"
-	"os"
-	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/consistencydetector"
 )
-
-var dataConsistencyDetectionForWatchListEnabled = false
-
-func init() {
-	dataConsistencyDetectionForWatchListEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"))
-}
 
 // checkWatchListDataConsistencyIfRequested performs a data consistency check only when
 // the KUBE_WATCHLIST_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
@@ -42,7 +34,7 @@ func init() {
 // Note that this function will panic when data inconsistency is detected.
 // This is intentional because we want to catch it in the CI.
 func checkWatchListDataConsistencyIfRequested[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn consistencydetector.ListFunc[T], retrieveItemsFn consistencydetector.RetrieveItemsFunc[U]) {
-	if !dataConsistencyDetectionForWatchListEnabled {
+	if !consistencydetector.IsDataConsistencyDetectionForWatchListEnabled() {
 		return
 	}
 	// for informers we pass an empty ListOptions because
