@@ -282,11 +282,11 @@ func TestAppendixA(t *testing.T) {
 			},
 		},
 		{
-			example: hex("d74401020304"),
-			decoded: "\x01\x02\x03\x04",
-			encoded: hex("4401020304"),
+			example: hex("d74401020304"), // 23(h'01020304')
+			decoded: "01020304",
+			encoded: hex("483031303230333034"), // '01020304'
 			reasons: []string{
-				reasonTagIgnored,
+				"decoding a byte string enclosed in an expected later encoding tag into an interface{} value automatically converts to the specified encoding for JSON interoperability",
 			},
 		},
 		{
