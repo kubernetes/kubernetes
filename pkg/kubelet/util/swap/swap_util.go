@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/userns/inuserns"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/mount-utils"
 )
@@ -43,6 +44,14 @@ const TmpfsNoswapOption = "noswap"
 func IsTmpfsNoswapOptionSupported(mounter mount.Interface, mountPath string) bool {
 	isTmpfsNoswapOptionSupportedHelper := func() bool {
 		if sysruntime.GOOS == "windows" {
+			return false
+		}
+
+		if inuserns.RunningInUserNS() {
+			// Turning off swap in unprivileged tmpfs mounts unsupported
+			// https://github.com/torvalds/linux/blob/v6.8/mm/shmem.c#L4004-L4011
+			// https://github.com/kubernetes/kubernetes/issues/125137
+			klog.InfoS("Running under a user namespace - tmpfs noswap is not supported")
 			return false
 		}
 
