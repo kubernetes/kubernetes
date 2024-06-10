@@ -75,6 +75,10 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		// Encode struct field names to the byte string type rather than the text string
 		// type.
 		FieldName: cbor.FieldNameToByteString,
+
+		// Marshal Go byte arrays to CBOR arrays of integers (as in JSON) instead of byte
+		// strings.
+		ByteArray: cbor.ByteArrayToArray,
 	}.EncMode()
 	if err != nil {
 		panic(err)
