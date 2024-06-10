@@ -97,8 +97,12 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// Produce string concrete values when decoding a CBOR byte string into interface{}.
 		DefaultByteStringType: reflect.TypeOf(""),
 
-		// Allow CBOR byte strings to be decoded into string destination values.
-		ByteStringToString: cbor.ByteStringToStringAllowed,
+		// Allow CBOR byte strings to be decoded into string destination values. If a byte
+		// string is enclosed in an "expected later encoding" tag
+		// (https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.5.2), then the text
+		// encoding indicated by that tag (e.g. base64) will be applied to the contents of
+		// the byte string.
+		ByteStringToString: cbor.ByteStringToStringAllowedWithExpectedLaterEncoding,
 
 		// Allow CBOR byte strings to match struct fields when appearing as a map key.
 		FieldNameByteString: cbor.FieldNameByteStringAllowed,
@@ -118,6 +122,12 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// representation (RFC 8259 Section 6).
 		NaN: cbor.NaNDecodeForbidden,
 		Inf: cbor.InfDecodeForbidden,
+
+		// When unmarshaling a byte string into a []byte, assume that the byte string
+		// contains base64-encoded bytes, unless explicitly counterindicated by an "expected
+		// later encoding" tag. This is consistent with the because of unmarshaling a JSON
+		// text into a []byte.
+		ByteStringExpectedFormat: cbor.ByteStringExpectedBase64,
 
 		// Reject the arbitrary-precision integer tags because they can't be faithfully
 		// roundtripped through the allowable Unstructured types.

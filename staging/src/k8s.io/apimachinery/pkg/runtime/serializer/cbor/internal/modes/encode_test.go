@@ -70,6 +70,18 @@ func TestEncode(t *testing.T) {
 			want:          []byte{0x83, 0x01, 0x02, 0x03}, // [1, 2, 3]
 			assertOnError: assertNilError,
 		},
+		{
+			name:          "string marshalled to byte string",
+			in:            "hello",
+			want:          []byte{0x45, 'h', 'e', 'l', 'l', 'o'},
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "[]byte marshalled to byte string in expected base64 encoding tag",
+			in:            []byte("hello"),
+			want:          []byte{0xd6, 0x45, 'h', 'e', 'l', 'l', 'o'},
+			assertOnError: assertNilError,
+		},
 	} {
 		encModes := tc.modes
 		if len(encModes) == 0 {
