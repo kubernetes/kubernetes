@@ -348,6 +348,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if w.eventHandler != nil {
 		w.eventHandler(wcEvent)
 	}
+	metrics.RecordResourceVersion(w.groupResource.String(), resourceVersion)
 	return nil
 }
 
@@ -430,6 +431,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		}
 		w.eventHandler(wcEvent)
 	}
+	metrics.RecordResourceVersion(w.groupResource.String(), rv)
 }
 
 // List returns list of pointers to <storeElement> objects.
@@ -629,7 +631,9 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		w.onReplace()
 	}
 	w.cond.Broadcast()
-	klog.V(3).Infof("Replace watchCache (rev: %v) ", resourceVersion)
+
+	metrics.RecordResourceVersion(w.groupResource.String(), version)
+	klog.V(3).Infof("Replaced watchCache (rev: %v) ", resourceVersion)
 	return nil
 }
 
