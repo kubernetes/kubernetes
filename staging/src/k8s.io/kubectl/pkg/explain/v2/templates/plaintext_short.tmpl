@@ -97,7 +97,7 @@ Takes dictionary as argument with keys:
     {{- $resolved := or (resolveRef $refString $.Document) $.schema -}}
     {{- if not $.FieldPath -}}
         DESCRIPTION:{{- "\n" -}}
-        {{- or (include "description" (dict "schema" $resolved "Document" $.Document)) "<empty>" | wrap 76 | indent 4 false false -}}{{- "\n" -}}
+        {{- or (include "description" (dict "schema" $resolved "Document" $.Document)) "<empty>" | wrap 76 | indent 4 " " -}}{{- "\n" -}}
 
         {{- with include "fieldList" (dict "schema" $resolved "level" 1 "Document" $.Document "Recursive" $.Recursive) -}}
             FIELDS:{{- "\n" -}}
@@ -111,7 +111,9 @@ Takes dictionary as argument with keys:
         {{- if eq 1 (len $.FieldPath) -}}
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
             FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
-            {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1 "isGraphStyle" $.Recursive) -}}{{"\n"}}
+            {{- if $subschema.enum -}}
+                {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document) -}}{{"\n"}}
+            {{- end -}}
             {{- "\n" -}}
         {{- end -}}
 
@@ -119,7 +121,7 @@ Takes dictionary as argument with keys:
     {{- else if $resolved.items -}}
         {{- /* If the schema is an array then traverse the array item fields */ -}}
         {{- template "output" (set $nextContext "schema" $resolved.items) -}}
-    {{- else if $resolved.additionalProperties -}}
+    {{- else if and $resolved.additionalProperties (not (eq "bool" (printf "%T" $resolved.additionalProperties))) -}}
         {{- /* If the schema is a map then traverse the map item fields */ -}}
         {{- template "output" (set $nextContext "schema" $resolved.additionalProperties) -}}
     {{- else -}}
@@ -181,7 +183,9 @@ Takes dictionary as argument with keys:
             {{- template "fieldList" (set $nextContext "schema" .)}}
         {{- end -}}
         {{- if $resolved.items}}{{- template "fieldList" (set $nextContext "schema" $resolved.items)}}{{end}}
-        {{- if $resolved.additionalProperties}}{{- template "fieldList" (set $nextContext "schema" $resolved.additionalProperties)}}{{end}}
+        {{- if and $resolved.additionalProperties (not (eq "bool" (printf "%T" $resolved.additionalProperties))) -}}
+            {{- template "fieldList" (set $nextContext "schema" $resolved.additionalProperties)}}
+        {{- end -}}
     {{- end -}}
 {{- end -}}
 
@@ -201,7 +205,7 @@ Takes dictionary as argument with keys:
     {{- $level := or $.level 0 -}}
     {{- $indentAmount := mul $level 2 -}}
     {{- $fieldSchema := index $.schema.properties $.name -}}
-    {{- $.name | indent $indentAmount false false -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
+    {{- $.name | indent $indentAmount " " -}}{{"\t"}}<{{ template "typeGuess" (dict "schema" $fieldSchema "Document" $.Document) }}>
     {{- if contains $.schema.required $.name}} -required-{{- end -}}
     {{- "\n" -}}
 {{- end -}}
@@ -228,7 +232,7 @@ Takes dictionary as argument with keys:
         {{- if .items -}}
             {{- template "description" (set $ "schema" .items) -}}
         {{- end -}}
-        {{- if .additionalProperties -}}
+        {{- if and .additionalProperties (not (eq "bool" (printf "%T" .additionalProperties))) -}}
             {{- template "description" (set $ "schema" .additionalProperties) -}}
         {{- end -}}
     {{- end -}}
@@ -249,7 +253,7 @@ Takes dictionary as argument with keys:
     {{- with $.schema -}}
         {{- if .items -}}
             []{{template "typeGuess" (set $ "schema" .items)}}
-        {{- else if .additionalProperties -}}
+        {{- else if and .additionalProperties (not (eq "bool" (printf "%T" .additionalProperties))) -}}
             map[string]{{template "typeGuess" (set $ "schema" .additionalProperties)}}
         {{- else if and .allOf (not .properties) (eq (len .allOf) 1) -}}
             {{- /* If allOf has a single element and there are no direct
@@ -294,19 +298,17 @@ Takes dictionary as argument with keys:
 */ -}}
 {{- define "extractEnum" -}}
     {{- with $.schema -}}
-        {{- if .enum -}}
-            {{- "ENUM:" -}}
-            {{- range $index, $element := .enum -}}
-                {{- /* Use to reflect "" when we see empty string */ -}}
-                {{- $elementType := printf "%T" $element -}}
-                {{- /* Long view */ -}}
-                {{- "\n" -}}{{- "" | indent 4 false false -}}
-                {{- /* Convert empty string to `""` for more clarification */ -}}
-                {{- if and (eq "string" $elementType) (eq $element "") -}}
-                    {{- `""` -}}
-                {{- else -}}
-                    {{- $element -}}
-                {{- end -}}
+        {{- "ENUM:" -}}
+        {{- range $index, $element := .enum -}}
+            {{- /* Use to reflect "" when we see empty string */ -}}
+            {{- $elementType := printf "%T" $element -}}
+            {{- /* Long view */ -}}
+            {{- "\n" -}}{{- "" | indent 4 " " -}}
+            {{- /* Convert empty string to `""` for more clarification */ -}}
+            {{- if and (eq "string" $elementType) (eq $element "") -}}
+                {{- `""` -}}
+            {{- else -}}
+                {{- $element -}}
             {{- end -}}
         {{- end -}}
     {{- end -}}

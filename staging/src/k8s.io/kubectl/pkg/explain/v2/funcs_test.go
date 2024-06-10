@@ -128,30 +128,23 @@ func TestFuncs(t *testing.T) {
 		{
 			Name:     "none",
 			FuncName: "indent",
-			Source:   `{{indent 0 false false .}}`,
+			Source:   `{{indent 0 " " .}}`,
 			Context:  "this is a string",
 			Expect:   "this is a string",
 		},
 		{
 			Name:     "some",
 			FuncName: "indent",
-			Source:   `{{indent 2 false false .}}`,
+			Source:   `{{indent 2 " " .}}`,
 			Context:  "this is a string",
 			Expect:   "  this is a string",
 		},
 		{
 			Name:     "some",
 			FuncName: "indent",
-			Source:   `{{indent 4 true false .}}`,
+			Source:   `{{indent 2 "| " .}}`,
 			Context:  "this is a string",
 			Expect:   "| | this is a string",
-		},
-		{
-			Name:     "some",
-			FuncName: "indent",
-			Source:   `{{indent 2 true true .}}`,
-			Context:  "this is a string",
-			Expect:   "* this is a string",
 		},
 		{
 			Name:     "empty",

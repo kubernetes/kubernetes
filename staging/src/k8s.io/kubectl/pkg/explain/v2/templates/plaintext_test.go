@@ -610,8 +610,8 @@ func TestPlaintext(t *testing.T) {
 					},
 					"required": []string{"thefield"},
 				},
-				"name":         "thefield",
-				"isGraphStyle": false,
+				"name":        "thefield",
+				"spaceString": " ",
 			},
 			Checks: []check{
 				checkEquals("thefield\t<string> -required-\n  a description that should be printed\n\n"),
@@ -632,8 +632,9 @@ func TestPlaintext(t *testing.T) {
 					},
 					"required": []string{"thefield"},
 				},
-				"name":         "thefield",
-				"isGraphStyle": true,
+				"name":        "thefield",
+				"spaceString": "| ",
+				"level":       1,
 			},
 			Checks: []check{
 				checkEquals("* thefield\t<string> -required-\n| a description that should be printed\n| \n"),
@@ -669,21 +670,6 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
-			// show that extractEnum can skip empty enum slice
-			Name:        "extractEmptyEnum",
-			Subtemplate: "extractEnum",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":        "string",
-					"description": "a description that should not be printed",
-					"enum":        []any{},
-				},
-			},
-			Checks: []check{
-				checkEquals(""),
-			},
-		},
-		{
 			// show that extractEnum can extract any enum slice and style it uppercase
 			Name:        "extractEnumSimpleForm",
 			Subtemplate: "extractEnum",
@@ -711,7 +697,7 @@ func TestPlaintext(t *testing.T) {
 				},
 				"isLongView":   false,
 				"indentAmount": 2,
-				"isGraphStyle": false,
+				"spaceString":  " ",
 			},
 			Checks: []check{
 				checkEquals("  enum: 0, 1, 2, 3"),
@@ -730,7 +716,7 @@ func TestPlaintext(t *testing.T) {
 				"isLongView":   false,
 				"limit":        2,
 				"indentAmount": 2,
-				"isGraphStyle": false,
+				"spaceString":  " ",
 			},
 			Checks: []check{
 				checkEquals("  enum: 0, 1, ...."),
@@ -782,8 +768,8 @@ func TestPlaintext(t *testing.T) {
 				},
 				"isLongView":   false,
 				"limit":        2,
-				"indentAmount": 4,
-				"isGraphStyle": true,
+				"indentAmount": 2,
+				"spaceString":  "| ",
 			},
 			Checks: []check{
 				checkEquals("| | enum: 0, 1, ...."),

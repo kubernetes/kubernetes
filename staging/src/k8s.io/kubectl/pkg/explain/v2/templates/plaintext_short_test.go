@@ -286,6 +286,20 @@ func TestPlaintextShort(t *testing.T) {
 			},
 		},
 		{
+			// Shows that the typeguess template works with boolean additionalProperties
+			Name:        "True additionalProperties",
+			Subtemplate: "typeGuess",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":                 "string",
+					"additionalProperties": true,
+				},
+			},
+			Checks: []check{
+				checkEquals("string"),
+			},
+		},
+		{
 			// Show that a ref to a primitive type uses the referred type's type
 			Name:        "PrimitiveRef",
 			Subtemplate: "typeGuess",
@@ -517,21 +531,6 @@ func TestPlaintextShort(t *testing.T) {
 			},
 			Checks: []check{
 				checkEquals("          thefield\t<string> -required-\n"),
-			},
-		},
-		{
-			// show that extractEnum can skip empty enum slice
-			Name:        "extractEmptyEnum",
-			Subtemplate: "extractEnum",
-			Context: map[string]any{
-				"schema": map[string]any{
-					"type":        "string",
-					"description": "a description that should not be printed",
-					"enum":        []any{},
-				},
-			},
-			Checks: []check{
-				checkEquals(""),
 			},
 		},
 		{
