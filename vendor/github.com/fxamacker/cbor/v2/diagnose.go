@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"math/big"
@@ -158,7 +159,7 @@ func (dm *diagMode) Diagnose(data []byte) (string, error) {
 }
 
 // DiagnoseFirst returns extended diagnostic notation (EDN) of the first CBOR data item using the DiagMode. Any remaining bytes are returned in rest.
-func (dm *diagMode) DiagnoseFirst(data []byte) (string, []byte, error) {
+func (dm *diagMode) DiagnoseFirst(data []byte) (diagNotation string, rest []byte, err error) {
 	return newDiagnose(data, dm.decMode, dm).diagFirst()
 }
 
@@ -173,7 +174,7 @@ func Diagnose(data []byte) (string, error) {
 }
 
 // Diagnose returns extended diagnostic notation (EDN) of the first CBOR data item using the DiagMode. Any remaining bytes are returned in rest.
-func DiagnoseFirst(data []byte) (string, []byte, error) {
+func DiagnoseFirst(data []byte) (diagNotation string, rest []byte, err error) {
 	return defaultDiagMode.DiagnoseFirst(data)
 }
 
@@ -198,13 +199,11 @@ func (di *diagnose) diag(cborSequence bool) (string, error) {
 		switch err := di.wellformed(cborSequence); err {
 		case nil:
 			if !firstItem {
-				if err = di.writeString(", "); err != nil {
-					return di.w.String(), err
-				}
+				di.w.WriteString(", ")
 			}
 			firstItem = false
-			if err = di.item(); err != nil {
-				return di.w.String(), err
+			if itemErr := di.item(); itemErr != nil {
+				return di.w.String(), itemErr
 			}
 
 		case io.EOF:
@@ -219,8 +218,8 @@ func (di *diagnose) diag(cborSequence bool) (string, error) {
 	}
 }
 
-func (di *diagnose) diagFirst() (string, []byte, error) {
-	err := di.wellformed(true)
+func (di *diagnose) diagFirst() (diagNotation string, rest []byte, err error) {
+	err = di.wellformed(true)
 	if err == nil {
 		err = di.item()
 	}
@@ -235,7 +234,7 @@ func (di *diagnose) diagFirst() (string, []byte, error) {
 
 func (di *diagnose) wellformed(allowExtraData bool) error {
 	off := di.d.off
-	err := di.d.wellformed(allowExtraData)
+	err := di.d.wellformed(allowExtraData, false)
 	di.d.off = off
 	return err
 }
@@ -243,30 +242,29 @@ func (di *diagnose) wellformed(allowExtraData bool) error {
 func (di *diagnose) item() error { //nolint:gocyclo
 	initialByte := di.d.data[di.d.off]
 	switch initialByte {
-	case 0x5f, 0x7f: // indefinite-length byte/text string
+	case cborByteStringWithIndefiniteLengthHead,
+		cborTextStringWithIndefiniteLengthHead: // indefinite-length byte/text string
 		di.d.off++
-		if di.d.data[di.d.off] == 0xff {
+		if isBreakFlag(di.d.data[di.d.off]) {
 			di.d.off++
 			switch initialByte {
-			case 0x5f:
+			case cborByteStringWithIndefiniteLengthHead:
 				// indefinite-length bytes with no chunks.
-				return di.writeString(`''_`)
-			case 0x7f:
+				di.w.WriteString(`''_`)
+				return nil
+			case cborTextStringWithIndefiniteLengthHead:
 				// indefinite-length text with no chunks.
-				return di.writeString(`""_`)
+				di.w.WriteString(`""_`)
+				return nil
 			}
 		}
 
-		if err := di.writeString("(_ "); err != nil {
-			return err
-		}
+		di.w.WriteString("(_ ")
 
 		i := 0
 		for !di.d.foundBreak() {
 			if i > 0 {
-				if err := di.writeString(", "); err != nil {
-					return err
-				}
+				di.w.WriteString(", ")
 			}
 
 			i++
@@ -276,20 +274,17 @@ func (di *diagnose) item() error { //nolint:gocyclo
 			}
 		}
 
-		return di.writeByte(')')
+		di.w.WriteByte(')')
+		return nil
 
-	case 0x9f: // indefinite-length array
+	case cborArrayWithIndefiniteLengthHead: // indefinite-length array
 		di.d.off++
-		if err := di.writeString("[_ "); err != nil {
-			return err
-		}
+		di.w.WriteString("[_ ")
 
 		i := 0
 		for !di.d.foundBreak() {
 			if i > 0 {
-				if err := di.writeString(", "); err != nil {
-					return err
-				}
+				di.w.WriteString(", ")
 			}
 
 			i++
@@ -298,20 +293,17 @@ func (di *diagnose) item() error { //nolint:gocyclo
 			}
 		}
 
-		return di.writeByte(']')
+		di.w.WriteByte(']')
+		return nil
 
-	case 0xbf: // indefinite-length map
+	case cborMapWithIndefiniteLengthHead: // indefinite-length map
 		di.d.off++
-		if err := di.writeString("{_ "); err != nil {
-			return err
-		}
+		di.w.WriteString("{_ ")
 
 		i := 0
 		for !di.d.foundBreak() {
 			if i > 0 {
-				if err := di.writeString(", "); err != nil {
-					return err
-				}
+				di.w.WriteString(", ")
 			}
 
 			i++
@@ -320,9 +312,7 @@ func (di *diagnose) item() error { //nolint:gocyclo
 				return err
 			}
 
-			if err := di.writeString(": "); err != nil {
-				return err
-			}
+			di.w.WriteString(": ")
 
 			// value
 			if err := di.item(); err != nil {
@@ -330,14 +320,16 @@ func (di *diagnose) item() error { //nolint:gocyclo
 			}
 		}
 
-		return di.writeByte('}')
+		di.w.WriteByte('}')
+		return nil
 	}
 
 	t := di.d.nextCBORType()
 	switch t {
 	case cborTypePositiveInt:
 		_, _, val := di.d.getHead()
-		return di.writeString(strconv.FormatUint(val, 10))
+		di.w.WriteString(strconv.FormatUint(val, 10))
+		return nil
 
 	case cborTypeNegativeInt:
 		_, _, val := di.d.getHead()
@@ -347,11 +339,13 @@ func (di *diagnose) item() error { //nolint:gocyclo
 			bi.SetUint64(val)
 			bi.Add(bi, big.NewInt(1))
 			bi.Neg(bi)
-			return di.writeString(bi.String())
+			di.w.WriteString(bi.String())
+			return nil
 		}
 
 		nValue := int64(-1) ^ int64(val)
-		return di.writeString(strconv.FormatInt(nValue, 10))
+		di.w.WriteString(strconv.FormatInt(nValue, 10))
+		return nil
 
 	case cborTypeByteString:
 		b, _ := di.d.parseByteString()
@@ -367,135 +361,129 @@ func (di *diagnose) item() error { //nolint:gocyclo
 	case cborTypeArray:
 		_, _, val := di.d.getHead()
 		count := int(val)
-		if err := di.writeByte('['); err != nil {
-			return err
-		}
+		di.w.WriteByte('[')
 
 		for i := 0; i < count; i++ {
 			if i > 0 {
-				if err := di.writeString(", "); err != nil {
-					return err
-				}
+				di.w.WriteString(", ")
 			}
 			if err := di.item(); err != nil {
 				return err
 			}
 		}
-		return di.writeByte(']')
+		di.w.WriteByte(']')
+		return nil
 
 	case cborTypeMap:
 		_, _, val := di.d.getHead()
 		count := int(val)
-		if err := di.writeByte('{'); err != nil {
-			return err
-		}
+		di.w.WriteByte('{')
 
 		for i := 0; i < count; i++ {
 			if i > 0 {
-				if err := di.writeString(", "); err != nil {
-					return err
-				}
+				di.w.WriteString(", ")
 			}
 			// key
 			if err := di.item(); err != nil {
 				return err
 			}
-			if err := di.writeString(": "); err != nil {
-				return err
-			}
+			di.w.WriteString(": ")
 			// value
 			if err := di.item(); err != nil {
 				return err
 			}
 		}
-		return di.writeByte('}')
+		di.w.WriteByte('}')
+		return nil
 
 	case cborTypeTag:
 		_, _, tagNum := di.d.getHead()
 		switch tagNum {
-		case 2:
+		case tagNumUnsignedBignum:
 			if nt := di.d.nextCBORType(); nt != cborTypeByteString {
-				return errors.New("cbor: tag number 2 must be followed by byte string, got " + nt.String())
+				return newInadmissibleTagContentTypeError(
+					tagNumUnsignedBignum,
+					"byte string",
+					nt.String())
 			}
 
 			b, _ := di.d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
-			return di.writeString(bi.String())
+			di.w.WriteString(bi.String())
+			return nil
 
-		case 3:
+		case tagNumNegativeBignum:
 			if nt := di.d.nextCBORType(); nt != cborTypeByteString {
-				return errors.New("cbor: tag number 3 must be followed by byte string, got " + nt.String())
+				return newInadmissibleTagContentTypeError(
+					tagNumNegativeBignum,
+					"byte string",
+					nt.String(),
+				)
 			}
 
 			b, _ := di.d.parseByteString()
 			bi := new(big.Int).SetBytes(b)
 			bi.Add(bi, big.NewInt(1))
 			bi.Neg(bi)
-			return di.writeString(bi.String())
+			di.w.WriteString(bi.String())
+			return nil
 
 		default:
-			if err := di.writeString(strconv.FormatUint(tagNum, 10)); err != nil {
-				return err
-			}
-			if err := di.writeByte('('); err != nil {
-				return err
-			}
+			di.w.WriteString(strconv.FormatUint(tagNum, 10))
+			di.w.WriteByte('(')
 			if err := di.item(); err != nil {
 				return err
 			}
-			return di.writeByte(')')
+			di.w.WriteByte(')')
+			return nil
 		}
 
 	case cborTypePrimitives:
 		_, ai, val := di.d.getHead()
 		switch ai {
-		case 20:
-			return di.writeString("false")
+		case additionalInformationAsFalse:
+			di.w.WriteString("false")
+			return nil
 
-		case 21:
-			return di.writeString("true")
+		case additionalInformationAsTrue:
+			di.w.WriteString("true")
+			return nil
 
-		case 22:
-			return di.writeString("null")
+		case additionalInformationAsNull:
+			di.w.WriteString("null")
+			return nil
 
-		case 23:
-			return di.writeString("undefined")
+		case additionalInformationAsUndefined:
+			di.w.WriteString("undefined")
+			return nil
 
-		case 25, 26, 27:
+		case additionalInformationAsFloat16,
+			additionalInformationAsFloat32,
+			additionalInformationAsFloat64:
 			return di.encodeFloat(ai, val)
 
 		default:
-			if err := di.writeString("simple("); err != nil {
-				return err
-			}
-			if err := di.writeString(strconv.FormatUint(val, 10)); err != nil {
-				return err
-			}
-			return di.writeByte(')')
+			di.w.WriteString("simple(")
+			di.w.WriteString(strconv.FormatUint(val, 10))
+			di.w.WriteByte(')')
+			return nil
 		}
 	}
 
 	return nil
 }
 
-func (di *diagnose) writeByte(val byte) error {
-	return di.w.WriteByte(val)
-}
-
-func (di *diagnose) writeString(val string) error {
-	_, err := di.w.WriteString(val)
-	return err
-}
-
 // writeU16 format a rune as "\uxxxx"
-func (di *diagnose) writeU16(val rune) error {
-	if err := di.writeString("\\u"); err != nil {
-		return err
-	}
-	b := make([]byte, 2)
-	b[0] = byte(val >> 8)
-	b[1] = byte(val)
-	return di.writeString(hex.EncodeToString(b))
+func (di *diagnose) writeU16(val rune) {
+	di.w.WriteString("\\u")
+	var in [2]byte
+	in[0] = byte(val >> 8)
+	in[1] = byte(val)
+	sz := hex.EncodedLen(len(in))
+	di.w.Grow(sz)
+	dst := di.w.Bytes()[di.w.Len() : di.w.Len()+sz]
+	hex.Encode(dst, in[:])
+	di.w.Write(dst)
 }
 
 var rawBase32Encoding = base32.StdEncoding.WithPadding(base32.NoPadding)
@@ -511,95 +499,91 @@ func (di *diagnose) encodeByteString(val []byte) error {
 			di2 := newDiagnose(val, di.dm.decMode, di.dm)
 			// should always notating embedded CBOR sequence.
 			if str, err := di2.diag(true); err == nil {
-				if err := di.writeString("<<"); err != nil {
-					return err
-				}
-				if err := di.writeString(str); err != nil {
-					return err
-				}
-				return di.writeString(">>")
+				di.w.WriteString("<<")
+				di.w.WriteString(str)
+				di.w.WriteString(">>")
+				return nil
 			}
 		}
 	}
 
 	switch di.dm.byteStringEncoding {
 	case ByteStringBase16Encoding:
-		if err := di.writeString("h'"); err != nil {
-			return err
-		}
-
-		encoder := hex.NewEncoder(di.w)
+		di.w.WriteString("h'")
 		if di.dm.byteStringHexWhitespace {
-			for i, b := range val {
+			sz := hex.EncodedLen(len(val))
+			if len(val) > 0 {
+				sz += len(val) - 1
+			}
+			di.w.Grow(sz)
+
+			dst := di.w.Bytes()[di.w.Len():]
+			for i := range val {
 				if i > 0 {
-					if err := di.writeByte(' '); err != nil {
-						return err
-					}
+					dst = append(dst, ' ')
 				}
-				if _, err := encoder.Write([]byte{b}); err != nil {
-					return err
-				}
+				hex.Encode(dst[len(dst):len(dst)+2], val[i:i+1])
+				dst = dst[:len(dst)+2]
 			}
+			di.w.Write(dst)
 		} else {
-			if _, err := encoder.Write(val); err != nil {
-				return err
-			}
+			sz := hex.EncodedLen(len(val))
+			di.w.Grow(sz)
+			dst := di.w.Bytes()[di.w.Len() : di.w.Len()+sz]
+			hex.Encode(dst, val)
+			di.w.Write(dst)
 		}
-		return di.writeByte('\'')
+		di.w.WriteByte('\'')
+		return nil
 
 	case ByteStringBase32Encoding:
-		if err := di.writeString("b32'"); err != nil {
-			return err
-		}
-		encoder := base32.NewEncoder(rawBase32Encoding, di.w)
-		if _, err := encoder.Write(val); err != nil {
-			return err
-		}
-		encoder.Close()
-		return di.writeByte('\'')
+		di.w.WriteString("b32'")
+		sz := rawBase32Encoding.EncodedLen(len(val))
+		di.w.Grow(sz)
+		dst := di.w.Bytes()[di.w.Len() : di.w.Len()+sz]
+		rawBase32Encoding.Encode(dst, val)
+		di.w.Write(dst)
+		di.w.WriteByte('\'')
+		return nil
 
 	case ByteStringBase32HexEncoding:
-		if err := di.writeString("h32'"); err != nil {
-			return err
-		}
-		encoder := base32.NewEncoder(rawBase32HexEncoding, di.w)
-		if _, err := encoder.Write(val); err != nil {
-			return err
-		}
-		encoder.Close()
-		return di.writeByte('\'')
+		di.w.WriteString("h32'")
+		sz := rawBase32HexEncoding.EncodedLen(len(val))
+		di.w.Grow(sz)
+		dst := di.w.Bytes()[di.w.Len() : di.w.Len()+sz]
+		rawBase32HexEncoding.Encode(dst, val)
+		di.w.Write(dst)
+		di.w.WriteByte('\'')
+		return nil
 
 	case ByteStringBase64Encoding:
-		if err := di.writeString("b64'"); err != nil {
-			return err
-		}
-		encoder := base64.NewEncoder(base64.RawURLEncoding, di.w)
-		if _, err := encoder.Write(val); err != nil {
-			return err
-		}
-		encoder.Close()
-		return di.writeByte('\'')
+		di.w.WriteString("b64'")
+		sz := base64.RawURLEncoding.EncodedLen(len(val))
+		di.w.Grow(sz)
+		dst := di.w.Bytes()[di.w.Len() : di.w.Len()+sz]
+		base64.RawURLEncoding.Encode(dst, val)
+		di.w.Write(dst)
+		di.w.WriteByte('\'')
+		return nil
 
 	default:
-		return di.dm.byteStringEncoding.valid()
+		// It should not be possible for users to construct a *diagMode with an invalid byte
+		// string encoding.
+		panic(fmt.Sprintf("diagmode has invalid ByteStringEncoding %v", di.dm.byteStringEncoding))
 	}
 }
 
-var utf16SurrSelf = rune(0x10000)
+const utf16SurrSelf = rune(0x10000)
 
 // quote should be either `'` or `"`
 func (di *diagnose) encodeTextString(val string, quote byte) error {
-	if err := di.writeByte(quote); err != nil {
-		return err
-	}
+	di.w.WriteByte(quote)
 
 	for i := 0; i < len(val); {
 		if b := val[i]; b < utf8.RuneSelf {
 			switch {
 			case b == '\t', b == '\n', b == '\r', b == '\\', b == quote:
-				if err := di.writeByte('\\'); err != nil {
-					return err
-				}
+				di.w.WriteByte('\\')
 
 				switch b {
 				case '\t':
@@ -609,19 +593,13 @@ func (di *diagnose) encodeTextString(val string, quote byte) error {
 				case '\r':
 					b = 'r'
 				}
-				if err := di.writeByte(b); err != nil {
-					return err
-				}
+				di.w.WriteByte(b)
 
 			case b >= ' ' && b <= '~':
-				if err := di.writeByte(b); err != nil {
-					return err
-				}
+				di.w.WriteByte(b)
 
 			default:
-				if err := di.writeU16(rune(b)); err != nil {
-					return err
-				}
+				di.writeU16(rune(b))
 			}
 
 			i++
@@ -631,84 +609,86 @@ func (di *diagnose) encodeTextString(val string, quote byte) error {
 		c, size := utf8.DecodeRuneInString(val[i:])
 		switch {
 		case c == utf8.RuneError:
-			// if err := di.writeU16(rune(val[i])); err != nil {
-			// 	return err
-			// }
 			return &SemanticError{"cbor: invalid UTF-8 string"}
 
 		case c < utf16SurrSelf:
-			if err := di.writeU16(c); err != nil {
-				return err
-			}
+			di.writeU16(c)
 
 		default:
 			c1, c2 := utf16.EncodeRune(c)
-			if err := di.writeU16(c1); err != nil {
-				return err
-			}
-			if err := di.writeU16(c2); err != nil {
-				return err
-			}
+			di.writeU16(c1)
+			di.writeU16(c2)
 		}
 
 		i += size
 	}
 
-	return di.writeByte(quote)
+	di.w.WriteByte(quote)
+	return nil
 }
 
 func (di *diagnose) encodeFloat(ai byte, val uint64) error {
 	f64 := float64(0)
 	switch ai {
-	case 25:
+	case additionalInformationAsFloat16:
 		f16 := float16.Frombits(uint16(val))
 		switch {
 		case f16.IsNaN():
-			return di.writeString("NaN")
+			di.w.WriteString("NaN")
+			return nil
 		case f16.IsInf(1):
-			return di.writeString("Infinity")
+			di.w.WriteString("Infinity")
+			return nil
 		case f16.IsInf(-1):
-			return di.writeString("-Infinity")
+			di.w.WriteString("-Infinity")
+			return nil
 		default:
 			f64 = float64(f16.Float32())
 		}
 
-	case 26:
+	case additionalInformationAsFloat32:
 		f32 := math.Float32frombits(uint32(val))
 		switch {
 		case f32 != f32:
-			return di.writeString("NaN")
+			di.w.WriteString("NaN")
+			return nil
 		case f32 > math.MaxFloat32:
-			return di.writeString("Infinity")
+			di.w.WriteString("Infinity")
+			return nil
 		case f32 < -math.MaxFloat32:
-			return di.writeString("-Infinity")
+			di.w.WriteString("-Infinity")
+			return nil
 		default:
 			f64 = float64(f32)
 		}
 
-	case 27:
+	case additionalInformationAsFloat64:
 		f64 = math.Float64frombits(val)
 		switch {
 		case f64 != f64:
-			return di.writeString("NaN")
+			di.w.WriteString("NaN")
+			return nil
 		case f64 > math.MaxFloat64:
-			return di.writeString("Infinity")
+			di.w.WriteString("Infinity")
+			return nil
 		case f64 < -math.MaxFloat64:
-			return di.writeString("-Infinity")
+			di.w.WriteString("-Infinity")
+			return nil
 		}
 	}
 	// Use ES6 number to string conversion which should match most JSON generators.
 	// Inspired by https://github.com/golang/go/blob/4df10fba1687a6d4f51d7238a403f8f2298f6a16/src/encoding/json/encode.go#L585
+	const bitSize = 64
 	b := make([]byte, 0, 32)
 	if abs := math.Abs(f64); abs != 0 && (abs < 1e-6 || abs >= 1e21) {
-		b = strconv.AppendFloat(b, f64, 'e', -1, 64)
+		b = strconv.AppendFloat(b, f64, 'e', -1, bitSize)
 		// clean up e-09 to e-9
 		n := len(b)
 		if n >= 4 && string(b[n-4:n-1]) == "e-0" {
 			b = append(b[:n-2], b[n-1])
 		}
 	} else {
-		b = strconv.AppendFloat(b, f64, 'f', -1, 64)
+		b = strconv.AppendFloat(b, f64, 'f', -1, bitSize)
 	}
 
 	// add decimal point and trailing zero if needed
@@ -722,18 +702,21 @@ func (di *diagnose) encodeFloat(ai byte, val uint64) error {
 		}
 	}
 
-	if err := di.writeString(string(b)); err != nil {
-		return err
-	}
+	di.w.WriteString(string(b))
 
 	if di.dm.floatPrecisionIndicator {
 		switch ai {
-		case 25:
-			return di.writeString("_1")
-		case 26:
-			return di.writeString("_2")
-		case 27:
-			return di.writeString("_3")
+		case additionalInformationAsFloat16:
+			di.w.WriteString("_1")
+			return nil
+
+		case additionalInformationAsFloat32:
+			di.w.WriteString("_2")
+			return nil
+
+		case additionalInformationAsFloat64:
+			di.w.WriteString("_3")
+			return nil
 		}
 	}
 
