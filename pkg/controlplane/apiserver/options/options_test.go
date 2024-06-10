@@ -44,18 +44,18 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
+	componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+	t.Cleanup(func() {
+		componentGlobalsRegistry.Reset()
+	})
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
-	featureGate := featuregate.NewFeatureGate()
-	effectiveVersion := utilversion.NewEffectiveVersion("1.32")
-	componentRegistry := utilversion.NewComponentGlobalsRegistry()
-	utilruntime.Must(componentRegistry.Register("test", effectiveVersion, featureGate))
-	s := NewOptions(featureGate, effectiveVersion)
+	utilruntime.Must(componentGlobalsRegistry.Register("test", utilversion.NewEffectiveVersion("1.32"), featuregate.NewFeatureGate()))
+	s := NewOptions()
 	var fss cliflag.NamedFlagSets
 	s.AddFlags(&fss)
 	for _, f := range fss.FlagSets {
 		fs.AddFlagSet(f)
 	}
-	componentRegistry.AddFlags(fs)
 
 	args := []string{
 		"--enable-admission-plugins=AlwaysDeny",
@@ -119,7 +119,7 @@ func TestAddFlags(t *testing.T) {
 		"--emulated-version=test=1.31",
 	}
 	fs.Parse(args)
-	utilruntime.Must(componentRegistry.Set())
+	utilruntime.Must(componentGlobalsRegistry.Set())
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &Options{
@@ -132,8 +132,8 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
-			FeatureGate:                 featureGate,
-			EffectiveVersion:            effectiveVersion,
+			ComponentGlobalsRegistry:    componentGlobalsRegistry,
+			ComponentName:               utilversion.DefaultKubeComponent,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -305,7 +305,8 @@ func TestAddFlags(t *testing.T) {
 		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
 	}
 
-	if s.GenericServerRunOptions.EffectiveVersion.EmulationVersion().String() != "1.31" {
-		t.Errorf("Got emulation version %s, wanted %s", s.GenericServerRunOptions.EffectiveVersion.EmulationVersion().String(), "1.31")
+	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
+	if testEffectiveVersion.EmulationVersion().String() != "1.31" {
+		t.Errorf("Got emulation version %s, wanted %s", testEffectiveVersion.EmulationVersion().String(), "1.31")
 	}
 }

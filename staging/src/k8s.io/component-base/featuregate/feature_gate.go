@@ -114,6 +114,9 @@ type FeatureGate interface {
 	// set on the copy without mutating the original. This is useful for validating
 	// config against potential feature gate changes before committing those changes.
 	DeepCopy() MutableVersionedFeatureGate
+	// CopyKnownFeatures returns a partial copy of the FeatureGate object, with all the known features and overrides.
+	// This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
+	CopyKnownFeatures() MutableVersionedFeatureGate
 	// Validate checks if the flag gates are valid at the emulated version.
 	Validate() []error
 }
@@ -127,9 +130,6 @@ type MutableFeatureGate interface {
 	AddFlag(fs *pflag.FlagSet)
 	// Close sets closed to true, and prevents subsequent calls to Add
 	Close()
-	// OpenForModification sets closedForModification to false, and allows subsequent calls to SetEmulationVersion to change enabled features
-	// before the next Enabled is called.
-	OpenForModification()
 	// Set parses and stores flag gates for known features
 	// from a string like feature1=true,feature2=false,...
 	Set(value string) error
@@ -166,8 +166,6 @@ type MutableVersionedFeatureGate interface {
 	// SetEmulationVersion overrides the emulationVersion of the feature gate.
 	// Otherwise, the emulationVersion will be the same as the binary version.
 	// If set, the feature defaults and availability will be as if the binary is at the emulated version.
-	// Returns error if the new emulationVersion will change the enablement state of a feature that has already been queried.
-	// If you have to use featureGate.Enabled before parsing the flags, call featureGate.OpenForModification following featureGate.Enabled.
 	SetEmulationVersion(emulationVersion *version.Version) error
 	// GetAll returns a copy of the map of known feature names to versioned feature specs.
 	GetAllVersioned() map[Feature]VersionedSpecs
@@ -185,15 +183,11 @@ type MutableVersionedFeatureGate interface {
 	// overriding its default to true for a limited number of components without simultaneously
 	// changing its default for all consuming components.
 	OverrideDefaultAtVersion(name Feature, override bool, ver *version.Version) error
-}
-
-// MutableVersionedFeatureGateForTests is a feature gate interface that should only be used in tests.
-type MutableVersionedFeatureGateForTests interface {
-	MutableVersionedFeatureGate
-	// Reset sets the enabled and enabledRaw to the input map.
-	Reset(m map[string]bool)
-	// EnabledRawMap returns the raw enable map from the feature gate.
-	EnabledRawMap() map[string]bool
+	// ExplicitlySet returns true if the feature value is explicitly set instead of
+	// being derived from the default values or special features.
+	ExplicitlySet(name Feature) bool
+	// ResetFeatureValueToDefault resets the value of the feature back to the default value.
+	ResetFeatureValueToDefault(name Feature) error
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -214,12 +208,8 @@ type featureGate struct {
 	enabledRaw atomic.Value
 	// closed is set to true when AddFlag is called, and prevents subsequent calls to Add
 	closed bool
-	// closedForModification is set to true when Enabled is called, and prevents subsequent calls to SetEmulationVersion to change the enabled features.
-	// TODO: after all feature gates have migrated to versioned feature gates,
-	// closedForModification should also prevents subsequent calls to Set and SetFromMap to change the enabled features
-	closedForModification atomic.Bool
 	// queriedFeatures stores all the features that have been queried through the Enabled interface.
-	// It is reset when closedForModification is reset.
+	// It is reset when SetEmulationVersion is called.
 	queriedFeatures  atomic.Value
 	emulationVersion atomic.Pointer[version.Version]
 }
@@ -282,7 +272,7 @@ func NewVersionedFeatureGate(emulationVersion *version.Version) *featureGate {
 
 // NewFeatureGate creates a feature gate with the current binary version.
 func NewFeatureGate() *featureGate {
-	binaryVersison := version.MustParse(baseversion.Get().String())
+	binaryVersison := version.MustParse(baseversion.DefaultKubeBinaryVersion)
 	return NewVersionedFeatureGate(binaryVersison)
 }
 
@@ -311,6 +301,8 @@ func (f *featureGate) Set(value string) error {
 
 // Validate checks if the flag gates are valid at the emulated version.
 func (f *featureGate) Validate() []error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	m, ok := f.enabledRaw.Load().(map[string]bool)
 	if !ok {
 		return []error{fmt.Errorf("cannot cast enabledRaw to map[string]bool")}
@@ -497,13 +489,17 @@ func (f *featureGate) OverrideDefaultAtVersion(name Feature, override bool, ver 
 // GetAll returns a copy of the map of known feature names to feature specs for the current emulationVersion.
 func (f *featureGate) GetAll() map[Feature]FeatureSpec {
 	retval := map[Feature]FeatureSpec{}
-	for k, v := range f.GetAllVersioned() {
-		spec := f.featureSpecAtEmulationVersion(v)
+	f.lock.Lock()
+	versionedSpecs := f.GetAllVersioned()
+	emuVer := f.EmulationVersion()
+	f.lock.Unlock()
+	for k, v := range versionedSpecs {
+		spec := featureSpecAtEmulationVersion(v, emuVer)
 		if spec.PreRelease == PreAlpha {
 			// The feature is not available at the emulation version.
 			continue
 		}
-		retval[k] = *f.featureSpecAtEmulationVersion(v)
+		retval[k] = *spec
 	}
 	return retval
 }
@@ -518,6 +514,9 @@ func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 }
 
 func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) error {
+	if emulationVersion.EqualTo(f.EmulationVersion()) {
+		return nil
+	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	klog.V(1).Infof("set feature gate emulationVersion to %s", emulationVersion.String())
@@ -531,22 +530,21 @@ func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) err
 	enabled := map[Feature]bool{}
 	errs := f.unsafeSetFromMap(enabled, enabledRaw, emulationVersion)
 
-	if f.closedForModification.Load() {
-		queriedFeatures := f.queriedFeatures.Load().(map[Feature]struct{})
-		known := f.known.Load().(map[Feature]VersionedSpecs)
-		for feature := range queriedFeatures {
-			newVal := featureEnabled(feature, enabled, known, emulationVersion)
-			oldVal := f.Enabled(feature)
-			// it is ok to modify emulation version if it does not result in feature enablemennt change for features that have already been queried.
-			if newVal != oldVal {
-				errs = append(errs, fmt.Errorf("SetEmulationVersion will change already queried feature:%s from %v to %v\ncall featureGate.OpenForModification() first to override", feature, oldVal, newVal))
-			}
+	queriedFeatures := f.queriedFeatures.Load().(map[Feature]struct{})
+	known := f.known.Load().(map[Feature]VersionedSpecs)
+	for feature := range queriedFeatures {
+		newVal := featureEnabled(feature, enabled, known, emulationVersion)
+		oldVal := featureEnabled(feature, f.enabled.Load().(map[Feature]bool), known, f.EmulationVersion())
+		if newVal != oldVal {
+			klog.Warningf("SetEmulationVersion will change already queried feature:%s from %v to %v", feature, oldVal, newVal)
 		}
 	}
+
 	if len(errs) == 0 {
 		// Persist changes
 		f.enabled.Store(enabled)
 		f.emulationVersion.Store(emulationVersion)
+		f.queriedFeatures.Store(map[Feature]struct{}{})
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -555,9 +553,9 @@ func (f *featureGate) EmulationVersion() *version.Version {
 	return f.emulationVersion.Load()
 }
 
-// FeatureSpec returns the FeatureSpec at the EmulationVersion if the key exists, an error otherwise.
+// featureSpec returns the featureSpec at the EmulationVersion if the key exists, an error otherwise.
 // This is useful to keep multiple implementations of a feature based on the PreRelease or Version info.
-func (f *featureGate) FeatureSpec(key Feature) (FeatureSpec, error) {
+func (f *featureGate) featureSpec(key Feature) (FeatureSpec, error) {
 	if v, ok := f.known.Load().(map[Feature]VersionedSpecs)[key]; ok {
 		featureSpec := f.featureSpecAtEmulationVersion(v)
 		return *featureSpec, nil
@@ -565,14 +563,16 @@ func (f *featureGate) FeatureSpec(key Feature) (FeatureSpec, error) {
 	return FeatureSpec{}, fmt.Errorf("feature %q is not registered in FeatureGate %q", key, f.featureGateName)
 }
 
-func (f *featureGate) recordQueried(key Feature) {
+func (f *featureGate) unsafeRecordQueried(key Feature) {
 	queriedFeatures := map[Feature]struct{}{}
 	for k := range f.queriedFeatures.Load().(map[Feature]struct{}) {
 		queriedFeatures[k] = struct{}{}
 	}
+	if _, ok := queriedFeatures[key]; ok {
+		return
+	}
 	queriedFeatures[key] = struct{}{}
 	f.queriedFeatures.Store(queriedFeatures)
-	f.closedForModification.Store(true)
 }
 
 func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]VersionedSpecs, emulationVersion *version.Version) bool {
@@ -589,8 +589,9 @@ func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]Ver
 
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
 func (f *featureGate) Enabled(key Feature) bool {
+	// TODO: ideally we should lock the feature gate in this call to be safe, need to evaluate how much performance impact locking would have.
 	v := featureEnabled(key, f.enabled.Load().(map[Feature]bool), f.known.Load().(map[Feature]VersionedSpecs), f.EmulationVersion())
-	f.recordQueried(key)
+	f.unsafeRecordQueried(key)
 	return v
 }
 
@@ -618,18 +619,6 @@ func (f *featureGate) Close() {
 	f.lock.Lock()
 	f.closed = true
 	f.lock.Unlock()
-}
-
-// OpenForModification sets closedForModification to false, and allows subsequent calls to SetEmulationVersion to change enabled features
-// before the next Enabled is called.
-func (f *featureGate) OpenForModification() {
-	queriedFeatures := []Feature{}
-	for feature := range f.queriedFeatures.Load().(map[Feature]struct{}) {
-		queriedFeatures = append(queriedFeatures, feature)
-	}
-	klog.Warningf("open feature gate for modification after querying features: %v.", queriedFeatures)
-	f.closedForModification.Store(false)
-	f.queriedFeatures.Store(map[Feature]struct{}{})
 }
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
@@ -671,10 +660,21 @@ func (f *featureGate) KnownFeatures() []string {
 	return known
 }
 
+// CopyKnownFeatures returns a partial copy of the FeatureGate object, with all the known features and overrides.
+// This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
+func (f *featureGate) CopyKnownFeatures() MutableVersionedFeatureGate {
+	fg := NewVersionedFeatureGate(f.EmulationVersion())
+	known := f.GetAllVersioned()
+	fg.known.Store(known)
+	return fg
+}
+
 // DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
 // set on the copy without mutating the original. This is useful for validating
 // config against potential feature gate changes before committing those changes.
 func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	// Copy existing state.
 	known := map[Feature]VersionedSpecs{}
 	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
@@ -691,7 +691,7 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 
 	// Construct a new featureGate around the copied state.
 	// Note that specialFeatures is treated as immutable by convention,
-	// and we maintain the value of f.closed across the copy, but resets closedForModification.
+	// and we maintain the value of f.closed across the copy.
 	fg := &featureGate{
 		special: specialFeatures,
 		closed:  f.closed,
@@ -704,21 +704,40 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 	return fg
 }
 
-// Reset sets the enabled and enabledRaw to the input map.
-func (f *featureGate) Reset(m map[string]bool) {
-	enabled := map[Feature]bool{}
-	enabledRaw := map[string]bool{}
-	queriedFeatures := map[Feature]struct{}{}
-	f.enabled.Store(enabled)
-	f.enabledRaw.Store(enabledRaw)
-	_ = f.SetFromMap(m)
-	f.closedForModification.Store(false)
-	f.queriedFeatures.Store(queriedFeatures)
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.closed = false
+// ExplicitlySet returns true if the feature value is explicitly set instead of
+// being derived from the default values or special features.
+func (f *featureGate) ExplicitlySet(name Feature) bool {
+	enabledRaw := f.enabledRaw.Load().(map[string]bool)
+	_, ok := enabledRaw[string(name)]
+	return ok
 }
 
-func (f *featureGate) EnabledRawMap() map[string]bool {
-	return f.enabledRaw.Load().(map[string]bool)
+// ResetFeatureValueToDefault resets the value of the feature back to the default value.
+func (f *featureGate) ResetFeatureValueToDefault(name Feature) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	enabled := map[Feature]bool{}
+	for k, v := range f.enabled.Load().(map[Feature]bool) {
+		enabled[k] = v
+	}
+	enabledRaw := map[string]bool{}
+	for k, v := range f.enabledRaw.Load().(map[string]bool) {
+		enabledRaw[k] = v
+	}
+	_, inEnabled := enabled[name]
+	if inEnabled {
+		delete(enabled, name)
+	}
+	_, inEnabledRaw := enabledRaw[string(name)]
+	if inEnabledRaw {
+		delete(enabledRaw, string(name))
+	}
+	// some features could be in enabled map but not enabledRaw map,
+	// for example some Alpha feature when AllAlpha is set.
+	if inEnabledRaw && !inEnabled {
+		return fmt.Errorf("feature:%s was explicitly set, but not in enabled map", name)
+	}
+	f.enabled.Store(enabled)
+	f.enabledRaw.Store(enabledRaw)
+	return nil
 }

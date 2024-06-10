@@ -33,7 +33,6 @@ func (f fakeGroupRegistry) IsGroupRegistered(group string) bool {
 func TestAPIEnablementOptionsValidate(t *testing.T) {
 	testCases := []struct {
 		name          string
-		testOptions   *APIEnablementOptions
 		runtimeConfig cliflag.ConfigurationMap
 		expectErr     string
 	}{

@@ -101,6 +101,8 @@ type ComponentGlobalsRegistry interface {
 	AddFlags(fs *pflag.FlagSet)
 	// Set sets the flags for all global variables for all components registered.
 	Set() error
+	// SetFallback calls Set() if it has never been called.
+	SetFallback() error
 	// Validate calls the Validate() function for all the global variables for all components registered.
 	Validate() []error
 	// Reset removes all stored ComponentGlobals, configurations, and version mappings.
@@ -120,6 +122,8 @@ type componentGlobalsRegistry struct {
 	emulationVersionConfig []string
 	// map of component name to the list of feature gates set from the flag.
 	featureGatesConfig map[string][]string
+	// set stores if the Set() function for the registry is already called.
+	set bool
 }
 
 func NewComponentGlobalsRegistry() *componentGlobalsRegistry {
@@ -136,6 +140,7 @@ func (r *componentGlobalsRegistry) Reset() {
 	r.componentGlobals = make(map[string]*ComponentGlobals)
 	r.emulationVersionConfig = nil
 	r.featureGatesConfig = nil
+	r.set = false
 }
 
 func (r *componentGlobalsRegistry) EffectiveVersionFor(component string) EffectiveVersion {
@@ -330,9 +335,22 @@ func toVersionMap(versionConfig []string) (map[string]*version.Version, error) {
 	return m, nil
 }
 
+func (r *componentGlobalsRegistry) SetFallback() error {
+	r.mutex.Lock()
+	set := r.set
+	r.mutex.Unlock()
+	if set {
+		return nil
+	}
+	klog.Warning("setting componentGlobalsRegistry in SetFallback. We recommend calling componentGlobalsRegistry.Set()" +
+		" right after parsing flags to avoid using feature gates before their final values are set by the flags.")
+	return r.Set()
+}
+
 func (r *componentGlobalsRegistry) Set() error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	r.set = true
 	emulationVersionConfigMap, err := toVersionMap(r.emulationVersionConfig)
 	if err != nil {
 		return err

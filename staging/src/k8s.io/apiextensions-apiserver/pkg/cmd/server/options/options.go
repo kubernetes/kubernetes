@@ -39,11 +39,9 @@ import (
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/proxy"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/webhook"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/component-base/featuregate"
 	netutils "k8s.io/utils/net"
 )
 
@@ -60,9 +58,9 @@ type CustomResourceDefinitionsServerOptions struct {
 }
 
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
-func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer, featureGate featuregate.FeatureGate, effectiveVersion utilversion.EffectiveVersion) *CustomResourceDefinitionsServerOptions {
+func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions(featureGate, effectiveVersion),
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),

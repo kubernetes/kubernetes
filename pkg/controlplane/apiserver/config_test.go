@@ -24,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	utilversion "k8s.io/apiserver/pkg/util/version"
-	"k8s.io/component-base/featuregate"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -34,9 +32,7 @@ import (
 )
 
 func TestBuildGenericConfig(t *testing.T) {
-	featureGate := featuregate.NewFeatureGate()
-	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-	opts := options.NewOptions(featureGate, effectiveVersion)
+	opts := options.NewOptions()
 	s := (&apiserveroptions.SecureServingOptions{
 		BindAddress: netutils.ParseIPSloppy("127.0.0.1"),
 	}).WithLoopback()

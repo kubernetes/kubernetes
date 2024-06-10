@@ -55,6 +55,7 @@ import (
 	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
@@ -187,15 +188,16 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if instanceOptions.BinaryVersion != "" {
 		effectiveVersion = utilversion.NewEffectiveVersion(instanceOptions.BinaryVersion)
 	}
+	// need to call SetFeatureGateEmulationVersionDuringTest to reset the feature gate emulation version at the end of the test.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, featureGate, effectiveVersion.EmulationVersion())
 	utilversion.DefaultComponentGlobalsRegistry.Reset()
 	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 
-	s := options.NewServerRunOptions(featureGate, effectiveVersion)
+	s := options.NewServerRunOptions()
 
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
-	utilversion.DefaultComponentGlobalsRegistry.AddFlags(fs)
 
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {

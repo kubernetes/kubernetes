@@ -181,9 +181,9 @@ func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example
 	// was being served which didn't exist at all in min-compatibility-version.
 	//
 	// In the alpha case - we do not support compatibility versioning of
-	// 					   alpha types and recommend users do not mix the two.
+	// alpha types and recommend users do not mix the two.
 	// In the skip-level case - The version of apiserver we are retaining
-	//						compatibility with has no knowledge of the type,
-	//						so storing it in another type is no issue.
+	// compatibility with has no knowledge of the type,
+	// so storing it in another type is no issue.
 	return binaryVersionOfResource, nil
 }

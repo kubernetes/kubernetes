@@ -43,25 +43,6 @@ func TestValidate(t *testing.T) {
 			minCompatibilityVersion: "v1.31.0",
 		},
 		{
-			name:                    "binary version 1.31, emulation version lower than 1.31",
-			binaryVersion:           "v1.31.2",
-			emulationVersion:        "v1.30.0",
-			minCompatibilityVersion: "v1.30.0",
-			expectErrors:            true,
-		},
-		{
-			name:                    "binary version 1.31, emulation version 1.31",
-			binaryVersion:           "v1.31.2",
-			emulationVersion:        "v1.31.0",
-			minCompatibilityVersion: "v1.30.0",
-		},
-		{
-			name:                    "binary version lower than 1.31",
-			binaryVersion:           "v1.30.2",
-			emulationVersion:        "v1.29.0",
-			minCompatibilityVersion: "v1.29.0",
-		},
-		{
 			name:                    "emulation version two minor lower than binary not ok",
 			binaryVersion:           "v1.33.2",
 			emulationVersion:        "v1.31.0",
