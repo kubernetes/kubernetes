@@ -36,6 +36,12 @@ var (
 	emptyListOptions = metav1.ListOptions{}
 )
 
+func TestDriveCheckWatchListFromCacheDataConsistencyIfRequested(t *testing.T) {
+	ctx := context.TODO()
+
+	CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "", emptyListFunc, emptyListOptions, &v1.PodList{})
+}
+
 func TestDriveCheckListFromCacheDataConsistencyIfRequested(t *testing.T) {
 	ctx := context.TODO()
 
