@@ -150,30 +150,6 @@ func TestRoundtripToUnstructured(t *testing.T) {
 	// These are GVKs that whose CBOR roundtrippability is blocked by a known issue that must be
 	// resolved as a prerequisite for alpha.
 	knownFailureReasons := map[string][]schema.GroupVersionKind{
-		// Since JSON cannot directly represent arbitrary byte sequences, a byte slice
-		// encodes to a JSON string containing the base64 encoding of the slice
-		// contents. Decoding a JSON string into a byte slice assumes (and requires) that
-		// the JSON string contain base64-encoded data. The CBOR serializer must be
-		// compatible with this behavior.
-		"byte slices should be represented in unstructured as base64-encoded strings": {
-			{Version: "v1", Kind: "Secret"},
-			{Version: "v1", Kind: "SecretList"},
-			{Version: "v1", Kind: "RangeAllocation"},
-			{Version: "v1", Kind: "ConfigMap"},
-			{Version: "v1", Kind: "ConfigMapList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "MutatingWebhookConfigurationList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1beta1", Kind: "ValidatingWebhookConfigurationList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfigurationList"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfiguration"},
-			{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfigurationList"},
-			{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"},
-			{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"},
-			{Group: "certificates.k8s.io", Version: "v1", Kind: "CertificateSigningRequest"},
-			{Group: "certificates.k8s.io", Version: "v1", Kind: "CertificateSigningRequestList"},
-		},
 		// If a RawExtension's bytes are invalid JSON, its containing object can't be encoded to JSON.
 		"rawextension needs to work in programs that assume json": {
 			{Version: "v1", Kind: "List"},
