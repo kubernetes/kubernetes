@@ -93,20 +93,30 @@ func NewListAction(resource schema.GroupVersionResource, kind schema.GroupVersio
 }
 
 func NewRootCreateAction(resource schema.GroupVersionResource, object runtime.Object) CreateActionImpl {
+	return NewRootCreateActionWithOptions(resource, object, metav1.CreateOptions{})
+}
+
+func NewRootCreateActionWithOptions(resource schema.GroupVersionResource, object runtime.Object, opts metav1.CreateOptions) CreateActionImpl {
 	action := CreateActionImpl{}
 	action.Verb = "create"
 	action.Resource = resource
 	action.Object = object
+	action.CreateOptions = opts
 
 	return action
 }
 
 func NewCreateAction(resource schema.GroupVersionResource, namespace string, object runtime.Object) CreateActionImpl {
+	return NewCreateActionWithOptions(resource, namespace, object, metav1.CreateOptions{})
+}
+
+func NewCreateActionWithOptions(resource schema.GroupVersionResource, namespace string, object runtime.Object, opts metav1.CreateOptions) CreateActionImpl {
 	action := CreateActionImpl{}
 	action.Verb = "create"
 	action.Resource = resource
 	action.Namespace = namespace
 	action.Object = object
+	action.CreateOptions = opts
 
 	return action
 }
@@ -135,36 +145,55 @@ func NewCreateSubresourceAction(resource schema.GroupVersionResource, name, subr
 }
 
 func NewRootUpdateAction(resource schema.GroupVersionResource, object runtime.Object) UpdateActionImpl {
+	return NewRootUpdateActionWithOptions(resource, object, metav1.UpdateOptions{})
+}
+
+func NewRootUpdateActionWithOptions(resource schema.GroupVersionResource, object runtime.Object, opts metav1.UpdateOptions) UpdateActionImpl {
 	action := UpdateActionImpl{}
 	action.Verb = "update"
 	action.Resource = resource
 	action.Object = object
+	action.UpdateOptions = opts
 
 	return action
 }
 
 func NewUpdateAction(resource schema.GroupVersionResource, namespace string, object runtime.Object) UpdateActionImpl {
+	return NewUpdateActionWithOptions(resource, namespace, object, metav1.UpdateOptions{})
+}
+
+func NewUpdateActionWithOptions(resource schema.GroupVersionResource, namespace string, object runtime.Object, opts metav1.UpdateOptions) UpdateActionImpl {
 	action := UpdateActionImpl{}
 	action.Verb = "update"
 	action.Resource = resource
 	action.Namespace = namespace
 	action.Object = object
+	action.UpdateOptions = opts
 
 	return action
 }
 
 func NewRootPatchAction(resource schema.GroupVersionResource, name string, pt types.PatchType, patch []byte) PatchActionImpl {
+	return NewRootPatchActionWithOptions(resource, name, pt, patch, metav1.PatchOptions{})
+}
+
+func NewRootPatchActionWithOptions(resource schema.GroupVersionResource, name string, pt types.PatchType, patch []byte, opts metav1.PatchOptions) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
 	action.Name = name
 	action.PatchType = pt
 	action.Patch = patch
+	action.PatchOptions = opts
 
 	return action
 }
 
 func NewPatchAction(resource schema.GroupVersionResource, namespace string, name string, pt types.PatchType, patch []byte) PatchActionImpl {
+	return NewPatchActionWithOptions(resource, namespace, name, pt, patch, metav1.PatchOptions{})
+}
+
+func NewPatchActionWithOptions(resource schema.GroupVersionResource, namespace string, name string, pt types.PatchType, patch []byte, opts metav1.PatchOptions) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
@@ -172,6 +201,7 @@ func NewPatchAction(resource schema.GroupVersionResource, namespace string, name
 	action.Name = name
 	action.PatchType = pt
 	action.Patch = patch
+	action.PatchOptions = opts
 
 	return action
 }
@@ -530,12 +560,17 @@ func (a ListActionImpl) DeepCopy() Action {
 
 type CreateActionImpl struct {
 	ActionImpl
-	Name   string
-	Object runtime.Object
+	Name          string
+	Object        runtime.Object
+	CreateOptions metav1.CreateOptions
 }
 
 func (a CreateActionImpl) GetObject() runtime.Object {
 	return a.Object
+}
+
+func (a CreateActionImpl) GetCreateOptions() metav1.CreateOptions {
+	return a.CreateOptions
 }
 
 func (a CreateActionImpl) DeepCopy() Action {
@@ -548,11 +583,16 @@ func (a CreateActionImpl) DeepCopy() Action {
 
 type UpdateActionImpl struct {
 	ActionImpl
-	Object runtime.Object
+	Object        runtime.Object
+	UpdateOptions metav1.UpdateOptions
 }
 
 func (a UpdateActionImpl) GetObject() runtime.Object {
 	return a.Object
+}
+
+func (a UpdateActionImpl) GetUpdateOptions() metav1.UpdateOptions {
+	return a.UpdateOptions
 }
 
 func (a UpdateActionImpl) DeepCopy() Action {
@@ -564,9 +604,10 @@ func (a UpdateActionImpl) DeepCopy() Action {
 
 type PatchActionImpl struct {
 	ActionImpl
-	Name      string
-	PatchType types.PatchType
-	Patch     []byte
+	Name         string
+	PatchType    types.PatchType
+	Patch        []byte
+	PatchOptions metav1.PatchOptions
 }
 
 func (a PatchActionImpl) GetName() string {
@@ -579,6 +620,10 @@ func (a PatchActionImpl) GetPatch() []byte {
 
 func (a PatchActionImpl) GetPatchType() types.PatchType {
 	return a.PatchType
+}
+
+func (a PatchActionImpl) GetPatchOptions() metav1.PatchOptions {
+	return a.PatchOptions
 }
 
 func (a PatchActionImpl) DeepCopy() Action {

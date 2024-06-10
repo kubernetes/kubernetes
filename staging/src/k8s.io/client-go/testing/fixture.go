@@ -19,19 +19,23 @@ package testing
 import (
 	"fmt"
 	"reflect"
+	"sigs.k8s.io/yaml"
 	"sort"
 	"strings"
 	"sync"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
@@ -68,6 +72,21 @@ type ObjectTracker interface {
 	Watch(gvr schema.GroupVersionResource, ns string) (watch.Interface, error)
 }
 
+// ManagedFieldObjectTracker keeps track of objects and managed fields. It is intended to be used to
+// fake calls to a server by returning objects based on their kind, namespace and name.
+type ManagedFieldObjectTracker interface {
+	ObjectTracker
+
+	// CreateWithFieldManager adds an object to the tracker in the specified namespace using the provided fieldManager.
+	CreateWithFieldManager(gvr schema.GroupVersionResource, obj runtime.Object, ns string, fieldManager string) error
+
+	// UpdateWithFieldManager updates an existing object in the tracker in the specified namespace using the provided fieldManager.
+	UpdateWithFieldManager(gvr schema.GroupVersionResource, obj runtime.Object, ns string, fieldManager string) error
+
+	// Apply applies an object in the tracker in the specified namespace.
+	Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, fieldManager string, force bool) error
+}
+
 // ObjectScheme abstracts the implementation of common operations on objects.
 type ObjectScheme interface {
 	runtime.ObjectCreater
@@ -76,10 +95,22 @@ type ObjectScheme interface {
 
 // ObjectReaction returns a ReactionFunc that applies core.Action to
 // the given tracker.
+//
+// If tracker also implements ManagedFieldObjectTracker, then managed fields
+// will be handled by the tracker and apply patch actions will be evaluated
+// using the field manager and will take field ownership into consideration.
+// Without a ManagedFieldObjectTracker, apply patch actions do not consider
+// field ownership.
+//
+// WARNING: There is no server side defaulting, validation, or conversion handled
+// by the fake client and subresources are not handled accurately (fields in the
+// root resource are not automatically updated when a scale resource is updated, for example).
 func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {
+		fieldManager := "default-fake-field-manager"
 		ns := action.GetNamespace()
 		gvr := action.GetResource()
+
 		// Here and below we need to switch on implementation types,
 		// not on interfaces, as some interfaces are identical
 		// (e.g. UpdateAction and CreateAction), so if we use them,
@@ -95,12 +126,22 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			return true, obj, err
 
 		case CreateActionImpl:
+			if len(action.CreateOptions.FieldManager) > 0 {
+				fieldManager = action.CreateOptions.FieldManager
+			}
 			objMeta, err := meta.Accessor(action.GetObject())
 			if err != nil {
 				return true, nil, err
 			}
 			if action.GetSubresource() == "" {
-				err = tracker.Create(gvr, action.GetObject(), ns)
+				if fieldManagedTracker, ok := tracker.(ManagedFieldObjectTracker); ok {
+					err = fieldManagedTracker.CreateWithFieldManager(gvr, action.GetObject(), ns, fieldManager)
+				} else {
+					err = tracker.Create(gvr, action.GetObject(), ns)
+				}
+				if err != nil {
+					return true, nil, err
+				}
 			} else {
 				oldObj, getOldObjErr := tracker.Get(gvr, ns, objMeta.GetName())
 				if getOldObjErr != nil {
@@ -124,14 +165,26 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			return true, obj, err
 
 		case UpdateActionImpl:
+			if len(action.UpdateOptions.FieldManager) > 0 {
+				fieldManager = action.UpdateOptions.FieldManager
+			}
 			objMeta, err := meta.Accessor(action.GetObject())
 			if err != nil {
 				return true, nil, err
 			}
-			err = tracker.Update(gvr, action.GetObject(), ns)
-			if err != nil {
-				return true, nil, err
+
+			if fieldManagedTracker, ok := tracker.(ManagedFieldObjectTracker); ok {
+				err = fieldManagedTracker.UpdateWithFieldManager(gvr, action.GetObject(), ns, fieldManager)
+				if err != nil {
+					return true, nil, err
+				}
+			} else {
+				err = tracker.Update(gvr, action.GetObject(), ns)
+				if err != nil {
+					return true, nil, err
+				}
 			}
+
 			obj, err := tracker.Get(gvr, ns, objMeta.GetName())
 			return true, obj, err
 
@@ -143,6 +196,33 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			return true, nil, nil
 
 		case PatchActionImpl:
+			if len(action.PatchOptions.FieldManager) > 0 {
+				fieldManager = action.PatchOptions.FieldManager
+			}
+			force := false
+			if action.PatchOptions.Force != nil {
+				force = *action.PatchOptions.Force
+			}
+
+			fieldManagedTracker, hasManagedFieldTracker := tracker.(ManagedFieldObjectTracker)
+			if hasManagedFieldTracker && action.GetPatchType() == types.ApplyPatchType {
+				// Handle field managed apply:
+				patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+				if err := yaml.Unmarshal(action.GetPatch(), &patchObj.Object); err != nil {
+					return true, nil, err
+				}
+				err := fieldManagedTracker.Apply(gvr, patchObj, ns, fieldManager, force)
+				if err != nil {
+					return true, nil, err
+				}
+				applyConfigurationMeta, err := meta.Accessor(patchObj)
+				if err != nil {
+					return true, nil, err
+				}
+				obj, err := tracker.Get(gvr, ns, applyConfigurationMeta.GetName())
+				return true, obj, err
+			}
+
 			obj, err := tracker.Get(gvr, ns, action.GetName())
 			if err != nil {
 				return true, nil, err
@@ -182,6 +262,8 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 					return true, nil, err
 				}
 			case types.StrategicMergePatchType, types.ApplyPatchType:
+				// For backward compatibility with behavior 1.30 and earlier, continue to handle apply
+				// via strategic merge patch if a ManagedFieldObjectTracker is not used.
 				mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
 				if err != nil {
 					return true, nil, err
@@ -193,8 +275,14 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				return true, nil, fmt.Errorf("PatchType is not supported")
 			}
 
-			if err = tracker.Update(gvr, obj, ns); err != nil {
-				return true, nil, err
+			if fieldManagedTracker, ok := tracker.(ManagedFieldObjectTracker); ok {
+				if err = fieldManagedTracker.UpdateWithFieldManager(gvr, obj, ns, fieldManager); err != nil {
+					return true, nil, err
+				}
+			} else {
+				if err = tracker.Update(gvr, obj, ns); err != nil {
+					return true, nil, err
+				}
 			}
 
 			return true, obj, nil
@@ -284,7 +372,7 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string) (watch.Inter
 }
 
 func (t *tracker) Get(gvr schema.GroupVersionResource, ns, name string) (runtime.Object, error) {
-	errNotFound := errors.NewNotFound(gvr.GroupResource(), name)
+	errNotFound := apierrors.NewNotFound(gvr.GroupResource(), name)
 
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -305,7 +393,7 @@ func (t *tracker) Get(gvr schema.GroupVersionResource, ns, name string) (runtime
 	obj := matchingObj.DeepCopyObject()
 	if status, ok := obj.(*metav1.Status); ok {
 		if status.Status != metav1.StatusSuccess {
-			return nil, &errors.StatusError{ErrStatus: *status}
+			return nil, &apierrors.StatusError{ErrStatus: *status}
 		}
 	}
 
@@ -398,7 +486,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 
 	if ns != newMeta.GetNamespace() {
 		msg := fmt.Sprintf("request namespace does not match object namespace, request: %q object: %q", ns, newMeta.GetNamespace())
-		return errors.NewBadRequest(msg)
+		return apierrors.NewBadRequest(msg)
 	}
 
 	_, ok := t.objects[gvr]
@@ -416,12 +504,12 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 			t.objects[gvr][namespacedName] = obj
 			return nil
 		}
-		return errors.NewAlreadyExists(gr, newMeta.GetName())
+		return apierrors.NewAlreadyExists(gr, newMeta.GetName())
 	}
 
 	if replaceExisting {
 		// Tried to update but no matching object was found.
-		return errors.NewNotFound(gr, newMeta.GetName())
+		return apierrors.NewNotFound(gr, newMeta.GetName())
 	}
 
 	t.objects[gvr][namespacedName] = obj
@@ -457,13 +545,13 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string) error
 
 	objs, ok := t.objects[gvr]
 	if !ok {
-		return errors.NewNotFound(gvr.GroupResource(), name)
+		return apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
 	namespacedName := types.NamespacedName{Namespace: ns, Name: name}
 	obj, ok := objs[namespacedName]
 	if !ok {
-		return errors.NewNotFound(gvr.GroupResource(), name)
+		return apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
 	delete(objs, namespacedName)
@@ -471,6 +559,107 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string) error
 		w.Delete(obj.DeepCopyObject())
 	}
 	return nil
+}
+
+type managedFieldObjectTracker struct {
+	ObjectTracker
+	scheme        ObjectScheme
+	mapper        meta.RESTMapper
+	typeConverter managedfields.TypeConverter
+}
+
+var _ ManagedFieldObjectTracker = &managedFieldObjectTracker{}
+
+// NewFieldManagedObjectTracker returns an ObjectTracker that can be used to keep track
+// of objects and managed fields for the fake clientset. Mostly useful for unit tests.
+func NewFieldManagedObjectTracker(tracker ObjectTracker, scheme ObjectScheme, mapper meta.RESTMapper, typeConverter managedfields.TypeConverter) ManagedFieldObjectTracker {
+	return &managedFieldObjectTracker{ObjectTracker: tracker, scheme: scheme, mapper: mapper, typeConverter: typeConverter}
+}
+
+func (t *managedFieldObjectTracker) CreateWithFieldManager(gvr schema.GroupVersionResource, obj runtime.Object, ns string, fieldManager string) error {
+	gvk, err := t.mapper.KindFor(gvr)
+	if err != nil {
+		return err
+	}
+	mgr := managedfieldstest.NewFakeFieldManager(t.typeConverter, gvk)
+
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	oldObj, err := t.ObjectTracker.Get(gvr, ns, objMeta.GetName())
+	if apierrors.IsNotFound(err) {
+		oldObj, err = t.scheme.New(gvk)
+		if err != nil {
+			return err
+		}
+		oldObj.GetObjectKind().SetGroupVersionKind(gvk)
+	} else if err != nil {
+		return err
+	}
+	objWithManagedFields, err := mgr.Update(oldObj, obj, fieldManager)
+	if err != nil {
+		return err
+	}
+	return t.ObjectTracker.Create(gvr, objWithManagedFields, ns)
+}
+
+func (t *managedFieldObjectTracker) UpdateWithFieldManager(gvr schema.GroupVersionResource, obj runtime.Object, ns string, fieldManager string) error {
+	gvk, err := t.mapper.KindFor(gvr)
+	if err != nil {
+		return err
+	}
+	mgr := managedfieldstest.NewFakeFieldManager(t.typeConverter, gvk)
+
+	objMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	oldObj, err := t.ObjectTracker.Get(gvr, ns, objMeta.GetName())
+	if err != nil {
+		return err
+	}
+	objWithManagedFields, err := mgr.Update(oldObj, obj, fieldManager)
+	if err != nil {
+		return err
+	}
+
+	return t.ObjectTracker.Update(gvr, objWithManagedFields, ns)
+}
+
+func (t *managedFieldObjectTracker) Apply(gvr schema.GroupVersionResource, applyConfiguration runtime.Object, ns string, fieldManager string, force bool) error {
+	gvk, err := t.mapper.KindFor(gvr)
+	if err != nil {
+		return err
+	}
+	applyConfigurationMeta, err := meta.Accessor(applyConfiguration)
+	if err != nil {
+		return err
+	}
+
+	exists := true
+	liveObject, err := t.ObjectTracker.Get(gvr, ns, applyConfigurationMeta.GetName())
+	if apierrors.IsNotFound(err) {
+		exists = false
+		liveObject, err = t.scheme.New(gvk)
+		if err != nil {
+			return err
+		}
+		liveObject.GetObjectKind().SetGroupVersionKind(gvk)
+	} else if err != nil {
+		return err
+	}
+	mgr := managedfieldstest.NewFakeFieldManager(t.typeConverter, gvk)
+	objWithManagedFields, err := mgr.Apply(liveObject, applyConfiguration, fieldManager, force)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return t.ObjectTracker.Create(gvr, objWithManagedFields, ns)
+	} else {
+		return t.ObjectTracker.Update(gvr, objWithManagedFields, ns)
+	}
 }
 
 // filterByNamespace returns all objects in the collection that
