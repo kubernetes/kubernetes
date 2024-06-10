@@ -128,6 +128,10 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// later encoding" tag. This is consistent with the because of unmarshaling a JSON
 		// text into a []byte.
 		ByteStringExpectedFormat: cbor.ByteStringExpectedBase64,
+
+		// Disable default recognition of types implementing encoding.BinaryUnmarshaler,
+		// which is not recognized for JSON decoding.
+		BinaryUnmarshaler: cbor.BinaryUnmarshalerNone,
 	}.DecMode()
 	if err != nil {
 		panic(err)

@@ -87,6 +87,10 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		// Marshal Go byte arrays to CBOR arrays of integers (as in JSON) instead of byte
 		// strings.
 		ByteArray: cbor.ByteArrayToArray,
+
+		// Disable default recognition of types implementing encoding.BinaryMarshaler, which
+		// is not recognized for JSON encoding.
+		BinaryMarshaler: cbor.BinaryMarshalerNone,
 	}.EncMode()
 	if err != nil {
 		panic(err)
