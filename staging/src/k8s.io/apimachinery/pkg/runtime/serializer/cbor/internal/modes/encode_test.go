@@ -26,6 +26,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+type int64BinaryMarshaler int64
+
+func (i int64BinaryMarshaler) MarshalBinary() ([]byte, error) {
+	return []byte{}, nil
+}
+
 func TestEncode(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
@@ -34,6 +40,12 @@ func TestEncode(t *testing.T) {
 		want          []byte
 		assertOnError func(t *testing.T, e error)
 	}{
+		{
+			name:          "implementations of BinaryMarshaler are ignored",
+			in:            int64BinaryMarshaler(7),
+			want:          []byte{0x07},
+			assertOnError: assertNilError,
+		},
 		{
 			name: "all duplicate fields are ignored", // Matches behavior of JSON serializer.
 			in: struct {

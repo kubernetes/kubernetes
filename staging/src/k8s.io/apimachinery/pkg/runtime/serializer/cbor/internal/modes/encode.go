@@ -87,6 +87,10 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		// base64 encoding of the original bytes. No base64 encoding or decoding needs to be
 		// performed for []byte-to-CBOR-to-[]byte roundtrips.
 		ByteSliceLaterFormat: cbor.ByteSliceLaterFormatBase64,
+
+		// Disable default recognition of types implementing encoding.BinaryMarshaler, which
+		// is not recognized for JSON encoding.
+		BinaryMarshaler: cbor.BinaryMarshalerNone,
 	}.EncMode()
 	if err != nil {
 		panic(err)
