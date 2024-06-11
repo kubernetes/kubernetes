@@ -84,7 +84,8 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 		{
 			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				CertificatesDir: pkidir,
+				CertificatesDir:     pkidir,
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
@@ -178,6 +179,11 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 				// Assert Organizations
 				if spec.ClientCertAuth == nil || !reflect.DeepEqual(spec.ClientCertAuth.Organizations, assertion.organizations) {
 					t.Errorf("getKubeConfigSpecs for %s Organizations is %v, expected %v", assertion.kubeConfigFile, spec.ClientCertAuth.Organizations, assertion.organizations)
+				}
+
+				// Assert EncryptionAlgorithm
+				if spec.EncryptionAlgorithm != cfg.EncryptionAlgorithm {
+					t.Errorf("getKubeConfigSpecs for %s EncryptionAlgorithm is %s, expected %s", assertion.kubeConfigFile, spec.EncryptionAlgorithm, cfg.EncryptionAlgorithm)
 				}
 
 				// Asserts InitConfiguration values injected into spec
