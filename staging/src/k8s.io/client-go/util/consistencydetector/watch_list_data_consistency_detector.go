@@ -14,17 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package consistencydetector
 
 import (
 	"context"
+	"os"
+	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/consistencydetector"
 )
 
-// checkWatchListDataConsistencyIfRequested performs a data consistency check only when
+var dataConsistencyDetectionForWatchListEnabled = false
+
+func init() {
+	dataConsistencyDetectionForWatchListEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"))
+}
+
+// IsDataConsistencyDetectionForWatchListEnabled returns true when
+// the KUBE_WATCHLIST_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
+func IsDataConsistencyDetectionForWatchListEnabled() bool {
+	return dataConsistencyDetectionForWatchListEnabled
+}
+
+// CheckWatchListFromCacheDataConsistencyIfRequested performs a data consistency check only when
 // the KUBE_WATCHLIST_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
 //
 // The consistency check is meant to be enforced only in the CI, not in production.
@@ -33,11 +46,9 @@ import (
 //
 // Note that this function will panic when data inconsistency is detected.
 // This is intentional because we want to catch it in the CI.
-func checkWatchListDataConsistencyIfRequested[T runtime.Object, U any](ctx context.Context, identity string, lastSyncedResourceVersion string, listFn consistencydetector.ListFunc[T], retrieveItemsFn consistencydetector.RetrieveItemsFunc[U]) {
-	if !consistencydetector.IsDataConsistencyDetectionForWatchListEnabled() {
+func CheckWatchListFromCacheDataConsistencyIfRequested[T runtime.Object](ctx context.Context, identity string, listItemsFn ListFunc[T], optionsUsedToReceiveList metav1.ListOptions, receivedList runtime.Object) {
+	if !IsDataConsistencyDetectionForWatchListEnabled() {
 		return
 	}
-	// for informers we pass an empty ListOptions because
-	// listFn might be wrapped for filtering during informer construction.
-	consistencydetector.CheckDataConsistency(ctx, identity, lastSyncedResourceVersion, listFn, metav1.ListOptions{}, retrieveItemsFn)
+	checkListFromCacheDataConsistencyIfRequestedInternal(ctx, identity, listItemsFn, optionsUsedToReceiveList, receivedList)
 }
