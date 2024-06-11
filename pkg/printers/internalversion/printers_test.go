@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
 	"k8s.io/kubernetes/pkg/printers"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -973,7 +972,7 @@ func TestPrintIngress(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().Add(time.Duration(-10 * 365 * 24 * time.Hour))},
 		},
 		Spec: networking.IngressSpec{
-			IngressClassName: utilpointer.StringPtr("foo"),
+			IngressClassName: ptr.To("foo"),
 			DefaultBackend: &networking.IngressBackend{
 				Service: &networking.IngressServiceBackend{
 					Name: "default-backend",
@@ -1036,7 +1035,7 @@ func TestPrintIngressClass(t *testing.T) {
 			Spec: networking.IngressClassSpec{
 				Controller: "example.com/controller",
 				Parameters: &networking.IngressClassParametersReference{
-					APIGroup: utilpointer.StringPtr("example.com"),
+					APIGroup: ptr.To("example.com"),
 					Kind:     "customgroup",
 					Name:     "example",
 				},
@@ -1647,14 +1646,14 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 							Ready:                false,
 							RestartCount:         3,
 							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(false),
+							Started:              ptr.To(false),
 							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
 							Ready:   false,
 							State:   api.ContainerState{Waiting: &api.ContainerStateWaiting{}},
-							Started: utilpointer.Bool(false),
+							Started: ptr.To(false),
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
@@ -1688,14 +1687,14 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 							Ready:                false,
 							RestartCount:         3,
 							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(true),
+							Started:              ptr.To(true),
 							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
 							Ready:   false,
 							State:   api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started: utilpointer.Bool(false),
+							Started: ptr.To(false),
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
@@ -1729,14 +1728,14 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 							Ready:                false,
 							RestartCount:         3,
 							State:                api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started:              utilpointer.Bool(true),
+							Started:              ptr.To(true),
 							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
 							Ready:   false,
 							State:   api.ContainerState{Running: &api.ContainerStateRunning{}},
-							Started: utilpointer.Bool(true),
+							Started: ptr.To(true),
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
@@ -1771,14 +1770,14 @@ func TestPrintPodWithRestartableInitContainer(t *testing.T) {
 							Ready:                false,
 							RestartCount:         3,
 							State:                api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
-							Started:              utilpointer.Bool(false),
+							Started:              ptr.To(false),
 							LastTerminationState: api.ContainerState{Terminated: &api.ContainerStateTerminated{FinishedAt: metav1.NewTime(time.Now().Add(-10 * time.Second))}},
 						},
 						{
 							Name:    "restartable-init-2",
 							Ready:   false,
 							State:   api.ContainerState{Terminated: &api.ContainerStateTerminated{Reason: "Error", ExitCode: 137}},
-							Started: utilpointer.Bool(false),
+							Started: ptr.To(false),
 						},
 					},
 					ContainerStatuses: []api.ContainerStatus{
@@ -5963,8 +5962,8 @@ func TestPrintEndpointSlice(t *testing.T) {
 				},
 				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("http"),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     ptr.To("http"),
+					Port:     ptr.To[int32](80),
 					Protocol: &tcpProtocol,
 				}},
 				Endpoints: []discovery.Endpoint{{
@@ -5981,12 +5980,12 @@ func TestPrintEndpointSlice(t *testing.T) {
 				},
 				AddressType: discovery.AddressTypeIPv6,
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("http"),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     ptr.To("http"),
+					Port:     ptr.To[int32](80),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("https"),
-					Port:     utilpointer.Int32Ptr(443),
+					Name:     ptr.To("https"),
+					Port:     ptr.To[int32](443),
 					Protocol: &tcpProtocol,
 				}},
 				Endpoints: []discovery.Endpoint{{
@@ -6005,20 +6004,20 @@ func TestPrintEndpointSlice(t *testing.T) {
 				},
 				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("http"),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     ptr.To("http"),
+					Port:     ptr.To[int32](80),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("https"),
-					Port:     utilpointer.Int32Ptr(443),
+					Name:     ptr.To("https"),
+					Port:     ptr.To[int32](443),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("extra1"),
-					Port:     utilpointer.Int32Ptr(3000),
+					Name:     ptr.To("extra1"),
+					Port:     ptr.To[int32](3000),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("extra2"),
-					Port:     utilpointer.Int32Ptr(3001),
+					Name:     ptr.To("extra2"),
+					Port:     ptr.To[int32](3001),
 					Protocol: &tcpProtocol,
 				}},
 				Endpoints: []discovery.Endpoint{{
