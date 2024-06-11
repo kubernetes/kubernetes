@@ -4311,6 +4311,37 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				},
 			},
 		},
+		"when the JobSuccessPolicy is disabled, the Job never got SuccessCriteriaMet condition even if the Job has the successPolicy field": {
+			job: batch.Job{
+				TypeMeta:   validTypeMeta,
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validTemplate,
+					CompletionMode: completionModePtr(batch.IndexedCompletion),
+					Parallelism:    ptr.To[int32](3),
+					Completions:    ptr.To[int32](3),
+					BackoffLimit:   ptr.To[int32](math.MaxInt32),
+					SuccessPolicy: &batch.SuccessPolicy{
+						Rules: []batch.SuccessPolicyRule{{
+							SucceededIndexes: ptr.To("0,1"),
+							SucceededCount:   ptr.To[int32](1),
+						}},
+					},
+				},
+			},
+			pods: []v1.Pod{
+				*buildPod().uid("a2").index("0").phase(v1.PodRunning).trackingFinalizer().Pod,
+				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).trackingFinalizer().Pod,
+				*buildPod().uid("c").index("2").phase(v1.PodRunning).trackingFinalizer().Pod,
+			},
+			wantStatus: batch.JobStatus{
+				Active:                  2,
+				Succeeded:               1,
+				CompletedIndexes:        "1",
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+			},
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
