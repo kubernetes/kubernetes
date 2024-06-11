@@ -25,6 +25,7 @@ import (
 	"time"
 
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -76,6 +77,30 @@ type driverDefinition struct {
 
 		// FromExistingClassName specifies the name of a pre-installed
 		// StorageClass that will be copied and used for the tests.
+		FromExistingClassName string
+	}
+
+	// VolumeAttributesClass must be set to enable volume modification tests.
+	// The default is to not run those tests.
+	VolumeAttributesClass struct {
+		// FromName set to true enables the usage of a
+		// VolumeAttributesClass with DriverInfo.Name as
+		// provisioner and no parameters.
+		FromName bool
+
+		// FromFile is used only when FromName is false.  It
+		// loads a storage class from the given .yaml or .json
+		// file. File names are resolved by the
+		// framework.testfiles package, which typically means
+		// that they can be absolute or relative to the test
+		// suite's --repo-root parameter.
+		//
+		// This can be used when the VolumeAttributesClass
+		// is meant to have additional parameters.
+		FromFile string
+
+		// FromExistingClassName specifies the name of a pre-installed
+		// VolumeAttributesClass that will be copied and used for the tests.
 		FromExistingClassName string
 	}
 
@@ -403,6 +428,43 @@ func (d *driverDefinition) GetSnapshotClass(ctx context.Context, e2econfig *stor
 	}
 
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
+}
+
+func (d *driverDefinition) GetVolumeAttributesClass(ctx context.Context, e2econfig *storageframework.PerTestConfig) *storagev1alpha1.VolumeAttributesClass {
+	if !d.VolumeAttributesClass.FromName && d.VolumeAttributesClass.FromFile == "" && d.VolumeAttributesClass.FromExistingClassName == "" {
+		e2eskipper.Skipf("Driver %q has no configured VolumeAttributesClass - skipping", d.DriverInfo.Name)
+		return nil
+	}
+
+	var (
+		vac *storagev1alpha1.VolumeAttributesClass
+		err error
+	)
+
+	f := e2econfig.Framework
+	switch {
+	case d.VolumeAttributesClass.FromName:
+		vac = &storagev1alpha1.VolumeAttributesClass{DriverName: d.DriverInfo.Name}
+	case d.VolumeAttributesClass.FromExistingClassName != "":
+		vac, err = f.ClientSet.StorageV1alpha1().VolumeAttributesClasses().Get(ctx, d.VolumeAttributesClass.FromExistingClassName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting VolumeAttributesClass %s", d.VolumeAttributesClass.FromExistingClassName)
+	case d.VolumeAttributesClass.FromFile != "":
+		var ok bool
+		items, err := utils.LoadFromManifests(d.VolumeAttributesClass.FromFile)
+		framework.ExpectNoError(err, "load VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
+		gomega.Expect(items).To(gomega.HaveLen(1), "exactly one item from %s", d.VolumeAttributesClass.FromFile)
+		err = utils.PatchItems(f, f.Namespace, items...)
+		framework.ExpectNoError(err, "patch VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
+
+		vac, ok = items[0].(*storagev1alpha1.VolumeAttributesClass)
+		if !ok {
+			framework.Failf("cast VolumeAttributesClass from %s", d.VolumeAttributesClass.FromFile)
+		}
+	}
+
+	gomega.Expect(vac).ToNot(gomega.BeNil(), "VolumeAttributesClass is unexpectantly nil")
+
+	return storageframework.CopyVolumeAttributesClass(vac, f.Namespace.Name, "e2e-vac")
 }
 
 func (d *driverDefinition) GetVolume(e2econfig *storageframework.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {

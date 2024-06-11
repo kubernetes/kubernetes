@@ -116,7 +116,8 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				l.config,
 				pattern,
 				testVolumeSizeRange,
-				accessModes)
+				accessModes,
+				nil)
 		}
 	}
 
