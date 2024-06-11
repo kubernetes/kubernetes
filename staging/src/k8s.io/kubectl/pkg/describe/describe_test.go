@@ -67,7 +67,7 @@ func TestDescribePod(t *testing.T) {
 	gracePeriod := int64(1234)
 	condition1 := corev1.PodConditionType("condition1")
 	condition2 := corev1.PodConditionType("condition2")
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	runningPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:                       "bar",
 			Namespace:                  "foo",
@@ -85,6 +85,7 @@ func TestDescribePod(t *testing.T) {
 			},
 		},
 		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
 			Conditions: []corev1.PodCondition{
 				{
 					Type:   condition1,
@@ -92,18 +93,46 @@ func TestDescribePod(t *testing.T) {
 				},
 			},
 		},
-	})
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "Status:") {
-		t.Errorf("unexpected out: %s", out)
+	tests := []struct {
+		name       string
+		namespace  string
+		phase      corev1.PodPhase
+		wantOutput []string
+	}{
+		{
+			name: "foo", namespace: "bar", phase: "Running",
+			wantOutput: []string{"bar", "Status:", "Terminating (lasts 10y)", "Termination Grace Period", "1234s"},
+		},
+		{
+			name: "pod1", namespace: "ns1", phase: "Pending",
+			wantOutput: []string{"pod1", "ns1", "Terminating (lasts 10y)", "Termination Grace Period", "1234s"},
+		},
+		{
+			name: "pod2", namespace: "ns2", phase: "Succeeded",
+			wantOutput: []string{"pod2", "ns2", "Succeeded"},
+		},
+		{
+			name: "pod3", namespace: "ns3", phase: "Failed",
+			wantOutput: []string{"pod3", "ns3", "Failed"},
+		},
 	}
-	if !strings.Contains(out, "Terminating (lasts 10y)") || !strings.Contains(out, "1234s") {
-		t.Errorf("unexpected out: %s", out)
+
+	for i, test := range tests {
+		pod := runningPod.DeepCopy()
+		pod.Name, pod.Namespace, pod.Status.Phase = test.name, test.namespace, test.phase
+		fake := fake.NewSimpleClientset(pod)
+		c := &describeClient{T: t, Namespace: pod.Namespace, Interface: fake}
+		d := PodDescriber{c}
+		out, err := d.Describe(pod.Namespace, pod.Name, DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("case %d: unexpected error: %v", i, err)
+		}
+		for _, wantStr := range test.wantOutput {
+			if !strings.Contains(out, wantStr) {
+				t.Errorf("case %d didn't contain want(%s): unexpected out:\n%s", i, wantStr, out)
+			}
+		}
 	}
 }
 
