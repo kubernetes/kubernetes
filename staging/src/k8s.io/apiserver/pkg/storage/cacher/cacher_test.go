@@ -208,6 +208,11 @@ func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
 	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
 }
 
+func TestGetListRecursivePrefix(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
+}
+
 func checkStorageCalls(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
 	// No-op function for now, since cacher passes pagination calls to underlying storage.
 }
