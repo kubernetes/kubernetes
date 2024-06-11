@@ -189,6 +189,20 @@ type EmptyCallOption struct{}
 func (EmptyCallOption) before(*callInfo) error      { return nil }
 func (EmptyCallOption) after(*callInfo, *csAttempt) {}
 
+// StaticMethod returns a CallOption which specifies that a call is being made
+// to a method that is static, which means the method is known at compile time
+// and doesn't change at runtime. This can be used as a signal to stats plugins
+// that this method is safe to include as a key to a measurement.
+func StaticMethod() CallOption {
+	return StaticMethodCallOption{}
+}
+
+// StaticMethodCallOption is a CallOption that specifies that a call comes
+// from a static method.
+type StaticMethodCallOption struct {
+	EmptyCallOption
+}
+
 // Header returns a CallOptions that retrieves the header metadata
 // for a unary RPC.
 func Header(md *metadata.MD) CallOption {
@@ -640,12 +654,16 @@ func encode(c baseCodec, msg any) ([]byte, error) {
 	return b, nil
 }
 
-// compress returns the input bytes compressed by compressor or cp.  If both
-// compressors are nil, returns nil.
+// compress returns the input bytes compressed by compressor or cp.
+// If both compressors are nil, or if the message has zero length, returns nil,
+// indicating no compression was done.
 //
 // TODO(dfawley): eliminate cp parameter by wrapping Compressor in an encoding.Compressor.
 func compress(in []byte, cp Compressor, compressor encoding.Compressor) ([]byte, error) {
 	if compressor == nil && cp == nil {
+		return nil, nil
+	}
+	if len(in) == 0 {
 		return nil, nil
 	}
 	wrapErr := func(err error) error {
@@ -954,6 +972,7 @@ const (
 	SupportPackageIsVersion5 = true
 	SupportPackageIsVersion6 = true
 	SupportPackageIsVersion7 = true
+	SupportPackageIsVersion8 = true
 )
 
 const grpcUA = "grpc-go/" + Version

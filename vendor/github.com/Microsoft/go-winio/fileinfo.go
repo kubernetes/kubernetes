@@ -18,9 +18,18 @@ type FileBasicInfo struct {
 	_                                                       uint32 // padding
 }
 
+// alignedFileBasicInfo is a FileBasicInfo, but aligned to uint64 by containing
+// uint64 rather than windows.Filetime. Filetime contains two uint32s. uint64
+// alignment is necessary to pass this as FILE_BASIC_INFO.
+type alignedFileBasicInfo struct {
+	CreationTime, LastAccessTime, LastWriteTime, ChangeTime uint64
+	FileAttributes                                          uint32
+	_                                                       uint32 // padding
+}
+
 // GetFileBasicInfo retrieves times and attributes for a file.
 func GetFileBasicInfo(f *os.File) (*FileBasicInfo, error) {
-	bi := &FileBasicInfo{}
+	bi := &alignedFileBasicInfo{}
 	if err := windows.GetFileInformationByHandleEx(
 		windows.Handle(f.Fd()),
 		windows.FileBasicInfo,
@@ -30,16 +39,21 @@ func GetFileBasicInfo(f *os.File) (*FileBasicInfo, error) {
 		return nil, &os.PathError{Op: "GetFileInformationByHandleEx", Path: f.Name(), Err: err}
 	}
 	runtime.KeepAlive(f)
-	return bi, nil
+	// Reinterpret the alignedFileBasicInfo as a FileBasicInfo so it matches the
+	// public API of this module. The data may be unnecessarily aligned.
+	return (*FileBasicInfo)(unsafe.Pointer(bi)), nil
 }
 
 // SetFileBasicInfo sets times and attributes for a file.
 func SetFileBasicInfo(f *os.File, bi *FileBasicInfo) error {
+	// Create an alignedFileBasicInfo based on a FileBasicInfo. The copy is
+	// suitable to pass to GetFileInformationByHandleEx.
+	biAligned := *(*alignedFileBasicInfo)(unsafe.Pointer(bi))
 	if err := windows.SetFileInformationByHandle(
 		windows.Handle(f.Fd()),
 		windows.FileBasicInfo,
-		(*byte)(unsafe.Pointer(bi)),
-		uint32(unsafe.Sizeof(*bi)),
+		(*byte)(unsafe.Pointer(&biAligned)),
+		uint32(unsafe.Sizeof(biAligned)),
 	); err != nil {
 		return &os.PathError{Op: "SetFileInformationByHandle", Path: f.Name(), Err: err}
 	}

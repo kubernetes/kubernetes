@@ -157,6 +157,39 @@ func NewConnmarkAction() *ConnmarkAction {
 	}
 }
 
+type CsumUpdateFlags uint32
+
+const (
+	TCA_CSUM_UPDATE_FLAG_IPV4HDR CsumUpdateFlags = 1
+	TCA_CSUM_UPDATE_FLAG_ICMP    CsumUpdateFlags = 2
+	TCA_CSUM_UPDATE_FLAG_IGMP    CsumUpdateFlags = 4
+	TCA_CSUM_UPDATE_FLAG_TCP     CsumUpdateFlags = 8
+	TCA_CSUM_UPDATE_FLAG_UDP     CsumUpdateFlags = 16
+	TCA_CSUM_UPDATE_FLAG_UDPLITE CsumUpdateFlags = 32
+	TCA_CSUM_UPDATE_FLAG_SCTP    CsumUpdateFlags = 64
+)
+
+type CsumAction struct {
+	ActionAttrs
+	UpdateFlags CsumUpdateFlags
+}
+
+func (action *CsumAction) Type() string {
+	return "csum"
+}
+
+func (action *CsumAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewCsumAction() *CsumAction {
+	return &CsumAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
 type MirredAct uint8
 
 func (a MirredAct) String() string {
@@ -213,10 +246,11 @@ const (
 
 type TunnelKeyAction struct {
 	ActionAttrs
-	Action  TunnelKeyAct
-	SrcAddr net.IP
-	DstAddr net.IP
-	KeyID   uint32
+	Action   TunnelKeyAct
+	SrcAddr  net.IP
+	DstAddr  net.IP
+	KeyID    uint32
+	DestPort uint16
 }
 
 func (action *TunnelKeyAction) Type() string {
@@ -259,6 +293,40 @@ func NewSkbEditAction() *SkbEditAction {
 	}
 }
 
+type PoliceAction struct {
+	ActionAttrs
+	Rate            uint32 // in byte per second
+	Burst           uint32 // in byte
+	RCellLog        int
+	Mtu             uint32
+	Mpu             uint16 // in byte
+	PeakRate        uint32 // in byte per second
+	PCellLog        int
+	AvRate          uint32 // in byte per second
+	Overhead        uint16
+	LinkLayer       int
+	ExceedAction    TcPolAct
+	NotExceedAction TcPolAct
+}
+
+func (action *PoliceAction) Type() string {
+	return "police"
+}
+
+func (action *PoliceAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewPoliceAction() *PoliceAction {
+	return &PoliceAction{
+		RCellLog:        -1,
+		PCellLog:        -1,
+		LinkLayer:       1, // ETHERNET
+		ExceedAction:    TC_POLICE_RECLASSIFY,
+		NotExceedAction: TC_POLICE_OK,
+	}
+}
+
 // MatchAll filters match all packets
 type MatchAll struct {
 	FilterAttrs
@@ -274,20 +342,20 @@ func (filter *MatchAll) Type() string {
 	return "matchall"
 }
 
-type FilterFwAttrs struct {
-	ClassId   uint32
-	InDev     string
-	Mask      uint32
-	Index     uint32
-	Buffer    uint32
-	Mtu       uint32
-	Mpu       uint16
-	Rate      uint32
-	AvRate    uint32
-	PeakRate  uint32
-	Action    TcPolAct
-	Overhead  uint16
-	LinkLayer int
+type FwFilter struct {
+	FilterAttrs
+	ClassId uint32
+	InDev   string
+	Mask    uint32
+	Police  *PoliceAction
+}
+
+func (filter *FwFilter) Attrs() *FilterAttrs {
+	return &filter.FilterAttrs
+}
+
+func (filter *FwFilter) Type() string {
+	return "fw"
 }
 
 type BpfFilter struct {
