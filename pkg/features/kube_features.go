@@ -419,6 +419,7 @@ const (
 	// owner: @damemi
 	// alpha: v1.21
 	// beta: v1.22
+	// GA: v1.31
 	//
 	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
 	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
@@ -1062,7 +1063,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
-	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.Beta},
+	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	MatchLabelKeysInPodAffinity: {Default: true, PreRelease: featuregate.Beta},
 
