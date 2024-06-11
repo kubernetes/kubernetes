@@ -767,7 +767,7 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string,
 	indexerFunc := func(i int) *watchCacheEvent {
 		return w.cache[i%w.capacity]
 	}
-	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.indexValidator, &w.RWMutex)
+	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.indexValidator, w.RWMutex.RLocker())
 	return ci, nil
 }
 
