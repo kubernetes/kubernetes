@@ -131,7 +131,7 @@ func CreateSecPodWithNodeSelection(ctx context.Context, client clientset.Interfa
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
 func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, securityLevel admissionapi.Level, command string) *v1.Pod {
 	if len(command) == 0 {
-		command = "trap exit TERM; while true; do sleep 1; done"
+		command = InfiniteSleepCommand
 	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -172,7 +172,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 		return nil, fmt.Errorf("Cannot create pod with empty namespace")
 	}
 	if len(podConfig.Command) == 0 {
-		podConfig.Command = "trap exit TERM; while true; do sleep 1; done"
+		podConfig.Command = InfiniteSleepCommand
 	}
 
 	podName := "pod-" + string(uuid.NewUUID())
