@@ -82,8 +82,9 @@ func (m *qosContainerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
 func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceList, activePods ActivePodsFunc) error {
 	cm := m.cgroupManager
 	rootContainer := m.cgroupRoot
-	if !cm.Exists(rootContainer) {
-		return fmt.Errorf("root container %v doesn't exist", rootContainer)
+
+	if err := cm.Validate(rootContainer); err != nil {
+		return fmt.Errorf("error validating root container %v : %w", rootContainer, err)
 	}
 
 	// Top level for Qos containers are created only for Burstable
