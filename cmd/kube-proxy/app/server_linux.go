@@ -295,7 +295,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewDualStackProxier(
 				ctx,
-				utilsysctl.New(),
 				config.NFTables.SyncPeriod.Duration,
 				config.NFTables.MinSyncPeriod.Duration,
 				config.NFTables.MasqueradeAll,
@@ -314,7 +313,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			proxier, err = nftables.NewProxier(
 				ctx,
 				s.PrimaryIPFamily,
-				utilsysctl.New(),
 				config.NFTables.SyncPeriod.Duration,
 				config.NFTables.MinSyncPeriod.Duration,
 				config.NFTables.MasqueradeAll,
