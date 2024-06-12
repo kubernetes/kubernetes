@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type testcase struct {
@@ -459,7 +459,7 @@ func TestInstallCSIDriver(t *testing.T) {
 							NodeID:       "com.example.csi/csi-node1",
 							TopologyKeys: nil,
 							Allocatable: &storage.VolumeNodeResources{
-								Count: utilpointer.Int32Ptr(10),
+								Count: ptr.To[int32](10),
 							},
 						},
 					},
@@ -488,7 +488,7 @@ func TestInstallCSIDriver(t *testing.T) {
 							NodeID:       "com.example.csi/csi-node1",
 							TopologyKeys: nil,
 							Allocatable: &storage.VolumeNodeResources{
-								Count: utilpointer.Int32Ptr(math.MaxInt32),
+								Count: ptr.To[int32](math.MaxInt32),
 							},
 						},
 					},
@@ -517,7 +517,7 @@ func TestInstallCSIDriver(t *testing.T) {
 							NodeID:       "com.example.csi/csi-node1",
 							TopologyKeys: nil,
 							Allocatable: &storage.VolumeNodeResources{
-								Count: utilpointer.Int32Ptr(math.MaxInt32),
+								Count: ptr.To[int32](math.MaxInt32),
 							},
 						},
 					},
@@ -606,7 +606,7 @@ func TestInstallCSIDriver(t *testing.T) {
 
 func generateVolumeLimits(i int32) *storage.VolumeNodeResources {
 	return &storage.VolumeNodeResources{
-		Count: utilpointer.Int32Ptr(i),
+		Count: ptr.To[int32](i),
 	}
 }
 
