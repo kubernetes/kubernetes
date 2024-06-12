@@ -328,7 +328,6 @@ func collectHistogramVec(metric string, labels map[string]string, lvMap map[stri
 	}
 
 	if vec.GetAggregatedSampleCount() == 0 {
-		klog.InfoS("It is expected that this metric wasn't recorded. The data for this metric won't be stored in a benchmark result file", "metric", metric, "labels", labels)
 		return nil
 	}
 
