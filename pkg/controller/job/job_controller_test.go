@@ -4337,6 +4337,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 			wantStatus: batch.JobStatus{
 				Active:                  2,
+				Terminating:             ptr.To[int32](0),
 				Succeeded:               1,
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
