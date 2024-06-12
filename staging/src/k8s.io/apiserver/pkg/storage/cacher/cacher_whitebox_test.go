@@ -93,7 +93,7 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 		// The tests assume that Get/GetList/Watch calls shouldn't fail.
 		// However, 429 error can now be returned if watchcache is under initialization.
 		// To avoid rewriting all tests, we wait for watcache to initialize.
-		if err := cacher.ready.wait(context.Background()); err != nil {
+		if err := cacher.Wait(context.Background()); err != nil {
 			return nil, storage.APIObjectVersioner{}, err
 		}
 	}

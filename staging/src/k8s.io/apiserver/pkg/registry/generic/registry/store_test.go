@@ -2446,6 +2446,14 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		if err != nil {
 			t.Fatalf("Couldn't create cacher: %v", err)
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+			// The tests assume that Get/GetList/Watch calls shouldn't fail.
+			// However, 429 error can now be returned if watchcache is under initialization.
+			// To avoid rewriting all tests, we wait for watchcache to initialize.
+			if err := cacher.Wait(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+		}
 		d := destroyFunc
 		s = cacher
 		destroyFunc = func() {
