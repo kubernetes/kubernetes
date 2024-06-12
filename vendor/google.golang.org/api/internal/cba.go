@@ -91,16 +91,10 @@ func getTransportConfig(settings *DialSettings) (*transportConfig, error) {
 		s2aMTLSEndpoint:  "",
 	}
 
-	// Check the env to determine whether to use S2A.
-	if !isGoogleS2AEnabled() {
+	if !shouldUseS2A(clientCertSource, settings) {
 		return &defaultTransportConfig, nil
 	}
 
-	// If client cert is found, use that over S2A.
-	// If MTLS is not enabled for the endpoint, skip S2A.
-	if clientCertSource != nil || !mtlsEndpointEnabledForS2A() {
-		return &defaultTransportConfig, nil
-	}
 	s2aMTLSEndpoint := settings.DefaultMTLSEndpoint
 	// If there is endpoint override, honor it.
 	if settings.Endpoint != "" {
@@ -116,10 +110,6 @@ func getTransportConfig(settings *DialSettings) (*transportConfig, error) {
 		s2aAddress:       s2aAddress,
 		s2aMTLSEndpoint:  s2aMTLSEndpoint,
 	}, nil
-}
-
-func isGoogleS2AEnabled() bool {
-	return strings.ToLower(os.Getenv(googleAPIUseS2AEnv)) == "true"
 }
 
 // getClientCertificateSource returns a default client certificate source, if
@@ -275,8 +265,36 @@ func GetHTTPTransportConfigAndEndpoint(settings *DialSettings) (cert.Source, fun
 	return nil, dialTLSContextFunc, config.s2aMTLSEndpoint, nil
 }
 
+func shouldUseS2A(clientCertSource cert.Source, settings *DialSettings) bool {
+	// If client cert is found, use that over S2A.
+	if clientCertSource != nil {
+		return false
+	}
+	// If EXPERIMENTAL_GOOGLE_API_USE_S2A is not set to true, skip S2A.
+	if !isGoogleS2AEnabled() {
+		return false
+	}
+	// If DefaultMTLSEndpoint is not set and no endpoint override, skip S2A.
+	if settings.DefaultMTLSEndpoint == "" && settings.Endpoint == "" {
+		return false
+	}
+	// If MTLS is not enabled for this endpoint, skip S2A.
+	if !mtlsEndpointEnabledForS2A() {
+		return false
+	}
+	// If custom HTTP client is provided, skip S2A.
+	if settings.HTTPClient != nil {
+		return false
+	}
+	return true
+}
+
 // mtlsEndpointEnabledForS2A checks if the endpoint is indeed MTLS-enabled, so that we can use S2A for MTLS connection.
 var mtlsEndpointEnabledForS2A = func() bool {
 	// TODO(xmenxk): determine this via discovery config.
 	return true
+}
+
+func isGoogleS2AEnabled() bool {
+	return strings.ToLower(os.Getenv(googleAPIUseS2AEnv)) == "true"
 }

@@ -78,9 +78,8 @@ const (
 // met:
 //
 //	(1) At least one of the following is true:
-//	    (a) No scope is provided
-//	    (b) Scope for self-signed JWT flow is enabled
-//	    (c) Audiences are explicitly provided by users
+//	    (a) Scope for self-signed JWT flow is enabled
+//	    (b) Audiences are explicitly provided by users
 //	(2) No service account impersontation
 //
 // - Otherwise, executes standard OAuth 2.0 flow

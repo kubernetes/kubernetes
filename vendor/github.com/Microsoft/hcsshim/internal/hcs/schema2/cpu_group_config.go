@@ -14,5 +14,5 @@ type CpuGroupConfig struct {
 	Affinity        *CpuGroupAffinity  `json:"Affinity,omitempty"`
 	GroupProperties []CpuGroupProperty `json:"GroupProperties,omitempty"`
 	// Hypervisor CPU group IDs exposed to clients
-	HypervisorGroupId int32 `json:"HypervisorGroupId,omitempty"`
+	HypervisorGroupId uint64 `json:"HypervisorGroupId,omitempty"`
 }

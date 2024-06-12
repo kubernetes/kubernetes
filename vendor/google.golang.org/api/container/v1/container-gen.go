@@ -8,6 +8,17 @@
 //
 // For product documentation, see: https://cloud.google.com/container-engine/
 //
+// # Library status
+//
+// These client libraries are officially supported by Google. However, this
+// library is considered complete and is in maintenance mode. This means
+// that we will address critical bugs and security issues but will not add
+// any new features.
+//
+// When possible, we recommend using our newer
+// [Cloud Client Libraries for Go](https://pkg.go.dev/cloud.google.com/go)
+// that are still actively being worked and iterated on.
+//
 // # Creating a client
 //
 // Usage example:
@@ -17,24 +28,26 @@
 //	ctx := context.Background()
 //	containerService, err := container.NewService(ctx)
 //
-// In this example, Google Application Default Credentials are used for authentication.
-//
-// For information on how to create and obtain Application Default Credentials, see https://developers.google.com/identity/protocols/application-default-credentials.
+// In this example, Google Application Default Credentials are used for
+// authentication. For information on how to create and obtain Application
+// Default Credentials, see https://developers.google.com/identity/protocols/application-default-credentials.
 //
 // # Other authentication options
 //
-// To use an API key for authentication (note: some APIs do not support API keys), use option.WithAPIKey:
+// To use an API key for authentication (note: some APIs do not support API
+// keys), use [google.golang.org/api/option.WithAPIKey]:
 //
 //	containerService, err := container.NewService(ctx, option.WithAPIKey("AIza..."))
 //
-// To use an OAuth token (e.g., a user token obtained via a three-legged OAuth flow), use option.WithTokenSource:
+// To use an OAuth token (e.g., a user token obtained via a three-legged OAuth
+// flow, use [google.golang.org/api/option.WithTokenSource]:
 //
 //	config := &oauth2.Config{...}
 //	// ...
 //	token, err := config.Exchange(ctx, ...)
 //	containerService, err := container.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
 //
-// See https://godoc.org/google.golang.org/api/option/ for details on options.
+// See [google.golang.org/api/option.ClientOption] for details on options.
 package container // import "google.golang.org/api/container/v1"
 
 import (
@@ -291,6 +304,10 @@ type AcceleratorConfig struct {
 	// (https://cloud.google.com/compute/docs/gpus)
 	AcceleratorType string `json:"acceleratorType,omitempty"`
 
+	// GpuDriverInstallationConfig: The configuration for auto installation
+	// of GPU driver.
+	GpuDriverInstallationConfig *GPUDriverInstallationConfig `json:"gpuDriverInstallationConfig,omitempty"`
+
 	// GpuPartitionSize: Size of partitions to create on the GPU. Valid
 	// values are described in the NVIDIA mig user guide
 	// (https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#partitioning).
@@ -323,15 +340,18 @@ func (s *AcceleratorConfig) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// AdditionalPodRangesConfig: AdditionalPodRangesConfig is the
-// configuration for additional pod secondary ranges supporting the
-// ClusterUpdate message.
-type AdditionalPodRangesConfig struct {
-	// PodRangeNames: Name for pod secondary ipv4 range which has the actual
-	// range defined ahead.
-	PodRangeNames []string `json:"podRangeNames,omitempty"`
+// AdditionalNodeNetworkConfig: AdditionalNodeNetworkConfig is the
+// configuration for additional node networks within the
+// NodeNetworkConfig message
+type AdditionalNodeNetworkConfig struct {
+	// Network: Name of the VPC where the additional interface belongs
+	Network string `json:"network,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "PodRangeNames") to
+	// Subnetwork: Name of the subnetwork where the additional interface
+	// belongs
+	Subnetwork string `json:"subnetwork,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Network") to
 	// unconditionally include in API requests. By default, fields with
 	// empty or default values are omitted from API requests. However, any
 	// non-pointer, non-interface field appearing in ForceSendFields will be
@@ -339,7 +359,82 @@ type AdditionalPodRangesConfig struct {
 	// This may be used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "PodRangeNames") to include
+	// NullFields is a list of field names (e.g. "Network") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AdditionalNodeNetworkConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod AdditionalNodeNetworkConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// AdditionalPodNetworkConfig: AdditionalPodNetworkConfig is the
+// configuration for additional pod networks within the
+// NodeNetworkConfig message
+type AdditionalPodNetworkConfig struct {
+	// MaxPodsPerNode: The maximum number of pods per node which use this
+	// pod network
+	MaxPodsPerNode *MaxPodsConstraint `json:"maxPodsPerNode,omitempty"`
+
+	// SecondaryPodRange: The name of the secondary range on the subnet
+	// which provides IP address for this pod range
+	SecondaryPodRange string `json:"secondaryPodRange,omitempty"`
+
+	// Subnetwork: Name of the subnetwork where the additional pod network
+	// belongs
+	Subnetwork string `json:"subnetwork,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "MaxPodsPerNode") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "MaxPodsPerNode") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AdditionalPodNetworkConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod AdditionalPodNetworkConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// AdditionalPodRangesConfig: AdditionalPodRangesConfig is the
+// configuration for additional pod secondary ranges supporting the
+// ClusterUpdate message.
+type AdditionalPodRangesConfig struct {
+	// PodRangeInfo: Output only. [Output only] Information for additional
+	// pod range.
+	PodRangeInfo []*RangeInfo `json:"podRangeInfo,omitempty"`
+
+	// PodRangeNames: Name for pod secondary ipv4 range which has the actual
+	// range defined ahead.
+	PodRangeNames []string `json:"podRangeNames,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "PodRangeInfo") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "PodRangeInfo") to include
 	// in API requests with the JSON null value. By default, fields with
 	// empty values are omitted from API requests. However, any field with
 	// an empty value appearing in NullFields will be sent to the server as
@@ -377,6 +472,10 @@ type AddonsConfig struct {
 	// GcpFilestoreCsiDriverConfig: Configuration for the GCP Filestore CSI
 	// driver.
 	GcpFilestoreCsiDriverConfig *GcpFilestoreCsiDriverConfig `json:"gcpFilestoreCsiDriverConfig,omitempty"`
+
+	// GcsFuseCsiDriverConfig: Configuration for the Cloud Storage Fuse CSI
+	// driver.
+	GcsFuseCsiDriverConfig *GcsFuseCsiDriverConfig `json:"gcsFuseCsiDriverConfig,omitempty"`
 
 	// GkeBackupAgentConfig: Configuration for the Backup for GKE agent
 	// addon.
@@ -425,6 +524,45 @@ type AddonsConfig struct {
 
 func (s *AddonsConfig) MarshalJSON() ([]byte, error) {
 	type NoMethod AddonsConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// AdvancedDatapathObservabilityConfig:
+// AdvancedDatapathObservabilityConfig specifies configuration of
+// observability features of advanced datapath.
+type AdvancedDatapathObservabilityConfig struct {
+	// EnableMetrics: Expose flow metrics on nodes
+	EnableMetrics bool `json:"enableMetrics,omitempty"`
+
+	// RelayMode: Method used to make Relay available
+	//
+	// Possible values:
+	//   "RELAY_MODE_UNSPECIFIED" - Default value. This shouldn't be used.
+	//   "DISABLED" - disabled
+	//   "INTERNAL_VPC_LB" - exposed via internal load balancer
+	//   "EXTERNAL_LB" - exposed via external load balancer
+	RelayMode string `json:"relayMode,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "EnableMetrics") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "EnableMetrics") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AdvancedDatapathObservabilityConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod AdvancedDatapathObservabilityConfig
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -540,6 +678,9 @@ type Autopilot struct {
 	// Enabled: Enable Autopilot
 	Enabled bool `json:"enabled,omitempty"`
 
+	// WorkloadPolicyConfig: Workload policy configuration for Autopilot.
+	WorkloadPolicyConfig *WorkloadPolicyConfig `json:"workloadPolicyConfig,omitempty"`
+
 	// ForceSendFields is a list of field names (e.g. "Enabled") to
 	// unconditionally include in API requests. By default, fields with
 	// empty or default values are omitted from API requests. However, any
@@ -645,6 +786,10 @@ type AutoprovisioningNodePoolDefaults struct {
 	// https://cloud.google.com/kubernetes-engine/docs/concepts/node-images
 	// for available image types.
 	ImageType string `json:"imageType,omitempty"`
+
+	// InsecureKubeletReadonlyPortEnabled: Enable or disable Kubelet read
+	// only port.
+	InsecureKubeletReadonlyPortEnabled bool `json:"insecureKubeletReadonlyPortEnabled,omitempty"`
 
 	// Management: Specifies the node management options for NAP created
 	// node-pools.
@@ -1354,6 +1499,12 @@ type Cluster struct {
 	// NotificationConfig: Notification configuration of the cluster.
 	NotificationConfig *NotificationConfig `json:"notificationConfig,omitempty"`
 
+	// ParentProductConfig: The configuration of the parent product of the
+	// cluster. This field is used by Google internal products that are
+	// built on top of the GKE cluster and take the ownership of the
+	// cluster.
+	ParentProductConfig *ParentProductConfig `json:"parentProductConfig,omitempty"`
+
 	// PrivateClusterConfig: Configuration for private cluster.
 	PrivateClusterConfig *PrivateClusterConfig `json:"privateClusterConfig,omitempty"`
 
@@ -1373,6 +1524,10 @@ type Cluster struct {
 	// usages. Resource usage export is disabled when this config is
 	// unspecified.
 	ResourceUsageExportConfig *ResourceUsageExportConfig `json:"resourceUsageExportConfig,omitempty"`
+
+	// SecurityPostureConfig: Enable/Disable Security Posture API features
+	// for the cluster.
+	SecurityPostureConfig *SecurityPostureConfig `json:"securityPostureConfig,omitempty"`
 
 	// SelfLink: [Output only] Server-defined URL for the resource.
 	SelfLink string `json:"selfLink,omitempty"`
@@ -1520,6 +1675,42 @@ func (s *ClusterAutoscaling) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// ClusterNetworkPerformanceConfig: Configuration of network bandwidth
+// tiers
+type ClusterNetworkPerformanceConfig struct {
+	// TotalEgressBandwidthTier: Specifies the total network bandwidth tier
+	// for NodePools in the cluster.
+	//
+	// Possible values:
+	//   "TIER_UNSPECIFIED" - Default value
+	//   "TIER_1" - Higher bandwidth, actual values based on VM size.
+	TotalEgressBandwidthTier string `json:"totalEgressBandwidthTier,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g.
+	// "TotalEgressBandwidthTier") to unconditionally include in API
+	// requests. By default, fields with empty or default values are omitted
+	// from API requests. However, any non-pointer, non-interface field
+	// appearing in ForceSendFields will be sent to the server regardless of
+	// whether the field is empty or not. This may be used to include empty
+	// fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "TotalEgressBandwidthTier")
+	// to include in API requests with the JSON null value. By default,
+	// fields with empty values are omitted from API requests. However, any
+	// field with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ClusterNetworkPerformanceConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod ClusterNetworkPerformanceConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // ClusterUpdate: ClusterUpdate describes an update to the cluster.
 // Exactly one update can be applied to a cluster with each request, so
 // at most one field can be provided.
@@ -1536,6 +1727,10 @@ type ClusterUpdate struct {
 	// DesiredAuthenticatorGroupsConfig: The desired authenticator groups
 	// config for the cluster.
 	DesiredAuthenticatorGroupsConfig *AuthenticatorGroupsConfig `json:"desiredAuthenticatorGroupsConfig,omitempty"`
+
+	// DesiredAutopilotWorkloadPolicyConfig: The desired workload policy
+	// configuration for the autopilot cluster.
+	DesiredAutopilotWorkloadPolicyConfig *WorkloadPolicyConfig `json:"desiredAutopilotWorkloadPolicyConfig,omitempty"`
 
 	// DesiredBinaryAuthorization: The desired configuration options for the
 	// Binary Authorization feature.
@@ -1662,10 +1857,19 @@ type ClusterUpdate struct {
 	// versions.
 	DesiredMonitoringService string `json:"desiredMonitoringService,omitempty"`
 
+	// DesiredNetworkPerformanceConfig: The desired network performance
+	// config.
+	DesiredNetworkPerformanceConfig *ClusterNetworkPerformanceConfig `json:"desiredNetworkPerformanceConfig,omitempty"`
+
 	// DesiredNodePoolAutoConfigNetworkTags: The desired network tags that
 	// apply to all auto-provisioned node pools in autopilot clusters and
 	// node auto-provisioning enabled clusters.
 	DesiredNodePoolAutoConfigNetworkTags *NetworkTags `json:"desiredNodePoolAutoConfigNetworkTags,omitempty"`
+
+	// DesiredNodePoolAutoConfigResourceManagerTags: The desired resource
+	// manager tags that apply to all auto-provisioned node pools in
+	// autopilot clusters and node auto-provisioning enabled clusters.
+	DesiredNodePoolAutoConfigResourceManagerTags *ResourceManagerTags `json:"desiredNodePoolAutoConfigResourceManagerTags,omitempty"`
 
 	// DesiredNodePoolAutoscaling: Autoscaler configuration for the node
 	// pool specified in desired_node_pool_id. If there is only one pool in
@@ -1696,6 +1900,10 @@ type ClusterUpdate struct {
 	// DesiredNotificationConfig: The desired notification configuration.
 	DesiredNotificationConfig *NotificationConfig `json:"desiredNotificationConfig,omitempty"`
 
+	// DesiredParentProductConfig: The desired parent product config for the
+	// cluster.
+	DesiredParentProductConfig *ParentProductConfig `json:"desiredParentProductConfig,omitempty"`
+
 	// DesiredPrivateClusterConfig: The desired private cluster
 	// configuration.
 	DesiredPrivateClusterConfig *PrivateClusterConfig `json:"desiredPrivateClusterConfig,omitempty"`
@@ -1720,6 +1928,10 @@ type ClusterUpdate struct {
 	// DesiredResourceUsageExportConfig: The desired configuration for
 	// exporting resource usage.
 	DesiredResourceUsageExportConfig *ResourceUsageExportConfig `json:"desiredResourceUsageExportConfig,omitempty"`
+
+	// DesiredSecurityPostureConfig: Enable/Disable Security Posture API
+	// features for the cluster.
+	DesiredSecurityPostureConfig *SecurityPostureConfig `json:"desiredSecurityPostureConfig,omitempty"`
 
 	// DesiredServiceExternalIpsConfig: ServiceExternalIPsConfig specifies
 	// the config for the use of Services with ExternalIPs field.
@@ -2064,6 +2276,7 @@ type DNSConfig struct {
 	//   "PLATFORM_DEFAULT" - Use GKE default DNS provider(kube-dns) for DNS
 	// resolution.
 	//   "CLOUD_DNS" - Use CloudDNS for DNS resolution.
+	//   "KUBE_DNS" - Use KubeDNS for DNS resolution.
 	ClusterDns string `json:"clusterDns,omitempty"`
 
 	// ClusterDnsDomain: cluster_dns_domain is the suffix used for all
@@ -2253,15 +2466,24 @@ type Empty struct {
 
 // EphemeralStorageLocalSsdConfig: EphemeralStorageLocalSsdConfig
 // contains configuration for the node ephemeral storage using Local
-// SSD.
+// SSDs.
 type EphemeralStorageLocalSsdConfig struct {
 	// LocalSsdCount: Number of local SSDs to use to back ephemeral storage.
-	// Uses NVMe interfaces. Each local SSD is 375 GB in size. If zero, it
-	// means to disable using local SSDs as ephemeral storage. The limit for
-	// this value is dependent upon the maximum number of disks available on
-	// a machine per zone. See:
+	// Uses NVMe interfaces. A zero (or unset) value has different meanings
+	// depending on machine type being used: 1. For pre-Gen3 machines, which
+	// support flexible numbers of local ssds, zero (or unset) means to
+	// disable using local SSDs as ephemeral storage. The limit for this
+	// value is dependent upon the maximum number of disk available on a
+	// machine per zone. See:
 	// https://cloud.google.com/compute/docs/disks/local-ssd for more
-	// information.
+	// information. 2. For Gen3 machines which dictate a specific number of
+	// local ssds, zero (or unset) means to use the default number of local
+	// ssds that goes with that machine type. For example, for a
+	// c3-standard-8-lssd machine, 2 local ssds would be provisioned. For
+	// c3-standard-8 (which doesn't support local ssds), 0 will be
+	// provisioned. See
+	// https://cloud.google.com/compute/docs/disks/local-ssd#choose_number_local_ssds
+	// for more info.
 	LocalSsdCount int64 `json:"localSsdCount,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "LocalSsdCount") to
@@ -2388,6 +2610,44 @@ type Fleet struct {
 
 func (s *Fleet) MarshalJSON() ([]byte, error) {
 	type NoMethod Fleet
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GPUDriverInstallationConfig: GPUDriverInstallationConfig specifies
+// the version of GPU driver to be auto installed.
+type GPUDriverInstallationConfig struct {
+	// GpuDriverVersion: Mode for how the GPU driver is installed.
+	//
+	// Possible values:
+	//   "GPU_DRIVER_VERSION_UNSPECIFIED" - Default value is to not install
+	// any GPU driver.
+	//   "INSTALLATION_DISABLED" - Disable GPU driver auto installation and
+	// needs manual installation
+	//   "DEFAULT" - "Default" GPU driver in COS and Ubuntu.
+	//   "LATEST" - "Latest" GPU driver in COS.
+	GpuDriverVersion string `json:"gpuDriverVersion,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "GpuDriverVersion") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "GpuDriverVersion") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GPUDriverInstallationConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod GPUDriverInstallationConfig
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -2553,6 +2813,36 @@ type GcpFilestoreCsiDriverConfig struct {
 
 func (s *GcpFilestoreCsiDriverConfig) MarshalJSON() ([]byte, error) {
 	type NoMethod GcpFilestoreCsiDriverConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// GcsFuseCsiDriverConfig: Configuration for the Cloud Storage Fuse CSI
+// driver.
+type GcsFuseCsiDriverConfig struct {
+	// Enabled: Whether the Cloud Storage Fuse CSI driver is enabled for
+	// this cluster.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Enabled") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Enabled") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *GcsFuseCsiDriverConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod GcsFuseCsiDriverConfig
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -2847,6 +3137,12 @@ type IPAllocationPolicy struct {
 	// `use_ip_aliases` is true.
 	CreateSubnetwork bool `json:"createSubnetwork,omitempty"`
 
+	// DefaultPodIpv4RangeUtilization: Output only. [Output only] The
+	// utilization of the cluster default IPv4 range for the pod. The ratio
+	// is Usage/[Total number of IPs in the secondary range],
+	// Usage=numNodes*numZones*podIPsPerNode.
+	DefaultPodIpv4RangeUtilization float64 `json:"defaultPodIpv4RangeUtilization,omitempty"`
+
 	// Ipv6AccessType: The ipv6 access type (internal or external) when
 	// create_subnetwork is true
 	//
@@ -2976,6 +3272,20 @@ func (s *IPAllocationPolicy) MarshalJSON() ([]byte, error) {
 	type NoMethod IPAllocationPolicy
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *IPAllocationPolicy) UnmarshalJSON(data []byte) error {
+	type NoMethod IPAllocationPolicy
+	var s1 struct {
+		DefaultPodIpv4RangeUtilization gensupport.JSONFloat64 `json:"defaultPodIpv4RangeUtilization"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.DefaultPodIpv4RangeUtilization = float64(s1.DefaultPodIpv4RangeUtilization)
+	return nil
 }
 
 // IdentityServiceConfig: IdentityServiceConfig is configuration for
@@ -3375,15 +3685,23 @@ func (s *ListUsableSubnetworksResponse) MarshalJSON() ([]byte, error) {
 }
 
 // LocalNvmeSsdBlockConfig: LocalNvmeSsdBlockConfig contains
-// configuration for using raw-block local NVMe SSD.
+// configuration for using raw-block local NVMe SSDs
 type LocalNvmeSsdBlockConfig struct {
-	// LocalSsdCount: The number of raw-block local NVMe SSD disks to be
-	// attached to the node. Each local SSD is 375 GB in size. If zero, it
-	// means no raw-block local NVMe SSD disks to be attached to the node.
-	// The limit for this value is dependent upon the maximum number of
-	// disks available on a machine per zone. See:
+	// LocalSsdCount: Number of local NVMe SSDs to use. The limit for this
+	// value is dependent upon the maximum number of disk available on a
+	// machine per zone. See:
 	// https://cloud.google.com/compute/docs/disks/local-ssd for more
-	// information.
+	// information. A zero (or unset) value has different meanings depending
+	// on machine type being used: 1. For pre-Gen3 machines, which support
+	// flexible numbers of local ssds, zero (or unset) means to disable
+	// using local SSDs as ephemeral storage. 2. For Gen3 machines which
+	// dictate a specific number of local ssds, zero (or unset) means to use
+	// the default number of local ssds that goes with that machine type.
+	// For example, for a c3-standard-8-lssd machine, 2 local ssds would be
+	// provisioned. For c3-standard-8 (which doesn't support local ssds), 0
+	// will be provisioned. See
+	// https://cloud.google.com/compute/docs/disks/local-ssd#choose_number_local_ssds
+	// for more info.
 	LocalSsdCount int64 `json:"localSsdCount,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "LocalSsdCount") to
@@ -3893,6 +4211,12 @@ type MonitoringComponentConfig struct {
 	//   "APISERVER" - kube-apiserver
 	//   "SCHEDULER" - kube-scheduler
 	//   "CONTROLLER_MANAGER" - kube-controller-manager
+	//   "STORAGE" - Storage
+	//   "HPA" - Horizontal Pod Autoscaling
+	//   "POD" - Pod
+	//   "DAEMONSET" - DaemonSet
+	//   "DEPLOYMENT" - Deployment
+	//   "STATEFULSET" - Statefulset
 	EnableComponents []string `json:"enableComponents,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "EnableComponents") to
@@ -3922,6 +4246,10 @@ func (s *MonitoringComponentConfig) MarshalJSON() ([]byte, error) {
 // MonitoringConfig: MonitoringConfig is cluster monitoring
 // configuration.
 type MonitoringConfig struct {
+	// AdvancedDatapathObservabilityConfig: Configuration of Advanced
+	// Datapath Observability features.
+	AdvancedDatapathObservabilityConfig *AdvancedDatapathObservabilityConfig `json:"advancedDatapathObservabilityConfig,omitempty"`
+
 	// ComponentConfig: Monitoring components configuration
 	ComponentConfig *MonitoringComponentConfig `json:"componentConfig,omitempty"`
 
@@ -3929,21 +4257,22 @@ type MonitoringConfig struct {
 	// Prometheus in the cluster.
 	ManagedPrometheusConfig *ManagedPrometheusConfig `json:"managedPrometheusConfig,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "ComponentConfig") to
-	// unconditionally include in API requests. By default, fields with
-	// empty or default values are omitted from API requests. However, any
-	// non-pointer, non-interface field appearing in ForceSendFields will be
-	// sent to the server regardless of whether the field is empty or not.
-	// This may be used to include empty fields in Patch requests.
+	// ForceSendFields is a list of field names (e.g.
+	// "AdvancedDatapathObservabilityConfig") to unconditionally include in
+	// API requests. By default, fields with empty or default values are
+	// omitted from API requests. However, any non-pointer, non-interface
+	// field appearing in ForceSendFields will be sent to the server
+	// regardless of whether the field is empty or not. This may be used to
+	// include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "ComponentConfig") to
-	// include in API requests with the JSON null value. By default, fields
-	// with empty values are omitted from API requests. However, any field
-	// with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
+	// NullFields is a list of field names (e.g.
+	// "AdvancedDatapathObservabilityConfig") to include in API requests
+	// with the JSON null value. By default, fields with empty values are
+	// omitted from API requests. However, any field with an empty value
+	// appearing in NullFields will be sent to the server as null. It is an
+	// error if a field in this list has a non-empty value. This may be used
+	// to include null fields in Patch requests.
 	NullFields []string `json:"-"`
 }
 
@@ -3992,6 +4321,10 @@ type NetworkConfig struct {
 	// cluster.
 	EnableL4ilbSubsetting bool `json:"enableL4ilbSubsetting,omitempty"`
 
+	// EnableMultiNetworking: Whether multi-networking is enabled for this
+	// cluster.
+	EnableMultiNetworking bool `json:"enableMultiNetworking,omitempty"`
+
 	// GatewayApiConfig: GatewayAPIConfig contains the desired config of
 	// Gateway API on this cluster.
 	GatewayApiConfig *GatewayAPIConfig `json:"gatewayApiConfig,omitempty"`
@@ -4001,6 +4334,9 @@ type NetworkConfig struct {
 	// etworks) to which the cluster is connected. Example:
 	// projects/my-project/global/networks/my-network
 	Network string `json:"network,omitempty"`
+
+	// NetworkPerformanceConfig: Network bandwidth tier configuration.
+	NetworkPerformanceConfig *ClusterNetworkPerformanceConfig `json:"networkPerformanceConfig,omitempty"`
 
 	// PrivateIpv6GoogleAccess: The desired state of IPv6 connectivity to
 	// Google Services. By default, no private IPv6 access to or from Google
@@ -4373,6 +4709,10 @@ type NodeConfig struct {
 	// annotate any related Google Compute Engine resources.
 	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
 
+	// ResourceManagerTags: A map of resource manager tag keys and values to
+	// be attached to the nodes.
+	ResourceManagerTags *ResourceManagerTags `json:"resourceManagerTags,omitempty"`
+
 	// SandboxConfig: Sandbox configuration for this node.
 	SandboxConfig *SandboxConfig `json:"sandboxConfig,omitempty"`
 
@@ -4496,6 +4836,10 @@ type NodeKubeletConfig struct {
 	// unspecified.
 	CpuManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
 
+	// InsecureKubeletReadonlyPortEnabled: Enable or disable Kubelet read
+	// only port.
+	InsecureKubeletReadonlyPortEnabled bool `json:"insecureKubeletReadonlyPortEnabled,omitempty"`
+
 	// PodPidsLimit: Set the Pod PID limits. See
 	// https://kubernetes.io/docs/concepts/policy/pid-limiting/#pod-pid-limits
 	// Controls the maximum number of processes allowed to run in a pod. The
@@ -4597,6 +4941,16 @@ func (s *NodeManagement) MarshalJSON() ([]byte, error) {
 
 // NodeNetworkConfig: Parameters for node pool-level network config.
 type NodeNetworkConfig struct {
+	// AdditionalNodeNetworkConfigs: We specify the additional node networks
+	// for this node pool using this list. Each node network corresponds to
+	// an additional interface
+	AdditionalNodeNetworkConfigs []*AdditionalNodeNetworkConfig `json:"additionalNodeNetworkConfigs,omitempty"`
+
+	// AdditionalPodNetworkConfigs: We specify the additional pod networks
+	// for this node pool using this list. Each pod network corresponds to
+	// an additional alias IP range for the node
+	AdditionalPodNetworkConfigs []*AdditionalPodNetworkConfig `json:"additionalPodNetworkConfigs,omitempty"`
+
 	// CreatePodRange: Input only. Whether to create a new range for pod IPs
 	// in this node pool. Defaults are provided for `pod_range` and
 	// `pod_ipv4_cidr_block` if they are not specified. If neither
@@ -4635,6 +4989,11 @@ type NodeNetworkConfig struct {
 	// field cannot be changed after the node pool has been created.
 	PodIpv4CidrBlock string `json:"podIpv4CidrBlock,omitempty"`
 
+	// PodIpv4RangeUtilization: Output only. [Output only] The utilization
+	// of the IPv4 range for the pod. The ratio is Usage/[Total number of
+	// IPs in the secondary range], Usage=numNodes*numZones*podIPsPerNode.
+	PodIpv4RangeUtilization float64 `json:"podIpv4RangeUtilization,omitempty"`
+
 	// PodRange: The ID of the secondary range for pod IPs. If
 	// `create_pod_range` is true, this ID is used for the new range. If
 	// `create_pod_range` is false, uses an existing secondary range with
@@ -4643,21 +5002,22 @@ type NodeNetworkConfig struct {
 	// created.
 	PodRange string `json:"podRange,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "CreatePodRange") to
-	// unconditionally include in API requests. By default, fields with
-	// empty or default values are omitted from API requests. However, any
-	// non-pointer, non-interface field appearing in ForceSendFields will be
-	// sent to the server regardless of whether the field is empty or not.
-	// This may be used to include empty fields in Patch requests.
+	// ForceSendFields is a list of field names (e.g.
+	// "AdditionalNodeNetworkConfigs") to unconditionally include in API
+	// requests. By default, fields with empty or default values are omitted
+	// from API requests. However, any non-pointer, non-interface field
+	// appearing in ForceSendFields will be sent to the server regardless of
+	// whether the field is empty or not. This may be used to include empty
+	// fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "CreatePodRange") to
-	// include in API requests with the JSON null value. By default, fields
-	// with empty values are omitted from API requests. However, any field
-	// with an empty value appearing in NullFields will be sent to the
-	// server as null. It is an error if a field in this list has a
-	// non-empty value. This may be used to include null fields in Patch
-	// requests.
+	// NullFields is a list of field names (e.g.
+	// "AdditionalNodeNetworkConfigs") to include in API requests with the
+	// JSON null value. By default, fields with empty values are omitted
+	// from API requests. However, any field with an empty value appearing
+	// in NullFields will be sent to the server as null. It is an error if a
+	// field in this list has a non-empty value. This may be used to include
+	// null fields in Patch requests.
 	NullFields []string `json:"-"`
 }
 
@@ -4665,6 +5025,20 @@ func (s *NodeNetworkConfig) MarshalJSON() ([]byte, error) {
 	type NoMethod NodeNetworkConfig
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *NodeNetworkConfig) UnmarshalJSON(data []byte) error {
+	type NoMethod NodeNetworkConfig
+	var s1 struct {
+		PodIpv4RangeUtilization gensupport.JSONFloat64 `json:"podIpv4RangeUtilization"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.PodIpv4RangeUtilization = float64(s1.PodIpv4RangeUtilization)
+	return nil
 }
 
 // NodePool: NodePool contains the name and configuration for a
@@ -4814,6 +5188,11 @@ type NodePoolAutoConfig struct {
 	// are specified by the client during cluster creation. Each tag within
 	// the list must comply with RFC1035.
 	NetworkTags *NetworkTags `json:"networkTags,omitempty"`
+
+	// ResourceManagerTags: Resource manager tag keys and values to be
+	// attached to the nodes for managing Compute Engine firewalls using
+	// Network Firewall Policies.
+	ResourceManagerTags *ResourceManagerTags `json:"resourceManagerTags,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "NetworkTags") to
 	// unconditionally include in API requests. By default, fields with
@@ -5178,6 +5557,9 @@ type Operation struct {
 	// For more details, see [documentation on
 	// resizes](https://cloud.google.com/kubernetes-engine/docs/concepts/main
 	// tenance-windows-and-exclusions#repairs).
+	//   "FLEET_FEATURE_UPGRADE" - Fleet features of GKE Enterprise are
+	// being upgraded. The cluster should be assumed to be blocked for other
+	// upgrades until the operation finishes.
 	OperationType string `json:"operationType,omitempty"`
 
 	// Progress: Output only. [Output only] Progress information for an
@@ -5304,9 +5686,54 @@ func (s *OperationProgress) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// ParentProductConfig: ParentProductConfig is the configuration of the
+// parent product of the cluster. This field is used by Google internal
+// products that are built on top of a GKE cluster and take the
+// ownership of the cluster.
+type ParentProductConfig struct {
+	// Labels: Labels contain the configuration of the parent product.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// ProductName: Name of the parent product associated with the cluster.
+	ProductName string `json:"productName,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Labels") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Labels") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ParentProductConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod ParentProductConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // PlacementPolicy: PlacementPolicy defines the placement policy used by
 // the node pool.
 type PlacementPolicy struct {
+	// PolicyName: If set, refers to the name of a custom resource policy
+	// supplied by the user. The resource policy must be in the same project
+	// and region as the node pool. If not found, InvalidArgument error is
+	// returned.
+	PolicyName string `json:"policyName,omitempty"`
+
+	// TpuTopology: Optional. TPU placement topology for pod slice node
+	// pool.
+	// https://cloud.google.com/tpu/docs/types-topologies#tpu_topologies
+	TpuTopology string `json:"tpuTopology,omitempty"`
+
 	// Type: The type of placement.
 	//
 	// Possible values:
@@ -5316,7 +5743,7 @@ type PlacementPolicy struct {
 	// availability domain to ensure low communication latency.
 	Type string `json:"type,omitempty"`
 
-	// ForceSendFields is a list of field names (e.g. "Type") to
+	// ForceSendFields is a list of field names (e.g. "PolicyName") to
 	// unconditionally include in API requests. By default, fields with
 	// empty or default values are omitted from API requests. However, any
 	// non-pointer, non-interface field appearing in ForceSendFields will be
@@ -5324,8 +5751,8 @@ type PlacementPolicy struct {
 	// This may be used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Type") to include in API
-	// requests with the JSON null value. By default, fields with empty
+	// NullFields is a list of field names (e.g. "PolicyName") to include in
+	// API requests with the JSON null value. By default, fields with empty
 	// values are omitted from API requests. However, any field with an
 	// empty value appearing in NullFields will be sent to the server as
 	// null. It is an error if a field in this list has a non-empty value.
@@ -5496,6 +5923,52 @@ func (s *PubSub) MarshalJSON() ([]byte, error) {
 	type NoMethod PubSub
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// RangeInfo: RangeInfo contains the range name and the range
+// utilization by this cluster.
+type RangeInfo struct {
+	// RangeName: Output only. [Output only] Name of a range.
+	RangeName string `json:"rangeName,omitempty"`
+
+	// Utilization: Output only. [Output only] The utilization of the range.
+	Utilization float64 `json:"utilization,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "RangeName") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "RangeName") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *RangeInfo) MarshalJSON() ([]byte, error) {
+	type NoMethod RangeInfo
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+func (s *RangeInfo) UnmarshalJSON(data []byte) error {
+	type NoMethod RangeInfo
+	var s1 struct {
+		Utilization gensupport.JSONFloat64 `json:"utilization"`
+		*NoMethod
+	}
+	s1.NoMethod = (*NoMethod)(s)
+	if err := json.Unmarshal(data, &s1); err != nil {
+		return err
+	}
+	s.Utilization = float64(s1.Utilization)
+	return nil
 }
 
 // RecurringTimeWindow: Represents an arbitrary window of time that
@@ -5755,6 +6228,43 @@ func (s *ResourceLimit) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// ResourceManagerTags: A map of resource manager tag keys and values to
+// be attached to the nodes for managing Compute Engine firewalls using
+// Network Firewall Policies. Tags must be according to specifications
+// in
+// https://cloud.google.com/vpc/docs/tags-firewalls-overview#specifications.
+// A maximum of 5 tag key-value pairs can be specified. Existing tags
+// will be replaced with new values.
+type ResourceManagerTags struct {
+	// Tags: TagKeyValue must be in one of the following formats
+	// ([KEY]=[VALUE]) 1. `tagKeys/{tag_key_id}=tagValues/{tag_value_id}` 2.
+	// `{org_id}/{tag_key_name}={tag_value_name}` 3.
+	// `{project_id}/{tag_key_name}={tag_value_name}`
+	Tags map[string]string `json:"tags,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Tags") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Tags") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ResourceManagerTags) MarshalJSON() ([]byte, error) {
+	type NoMethod ResourceManagerTags
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // ResourceUsageExportConfig: Configuration for exporting cluster
 // resource usages.
 type ResourceUsageExportConfig struct {
@@ -5954,6 +6464,50 @@ type SecurityBulletinEvent struct {
 
 func (s *SecurityBulletinEvent) MarshalJSON() ([]byte, error) {
 	type NoMethod SecurityBulletinEvent
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// SecurityPostureConfig: SecurityPostureConfig defines the flags needed
+// to enable/disable features for the Security Posture API.
+type SecurityPostureConfig struct {
+	// Mode: Sets which mode to use for Security Posture features.
+	//
+	// Possible values:
+	//   "MODE_UNSPECIFIED" - Default value not specified.
+	//   "DISABLED" - Disables Security Posture features on the cluster.
+	//   "BASIC" - Applies Security Posture features on the cluster.
+	Mode string `json:"mode,omitempty"`
+
+	// VulnerabilityMode: Sets which mode to use for vulnerability scanning.
+	//
+	// Possible values:
+	//   "VULNERABILITY_MODE_UNSPECIFIED" - Default value not specified.
+	//   "VULNERABILITY_DISABLED" - Disables vulnerability scanning on the
+	// cluster.
+	//   "VULNERABILITY_BASIC" - Applies basic vulnerability scanning on the
+	// cluster.
+	VulnerabilityMode string `json:"vulnerabilityMode,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Mode") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Mode") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SecurityPostureConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod SecurityPostureConfig
 	raw := NoMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -7257,6 +7811,18 @@ type UpdateNodePoolRequest struct {
 	// node pool will be Confidential VM once enabled.
 	ConfidentialNodes *ConfidentialNodes `json:"confidentialNodes,omitempty"`
 
+	// DiskSizeGb: Optional. The desired disk size for nodes in the node
+	// pool specified in GB. The smallest allowed disk size is 10GB.
+	// Initiates an upgrade operation that migrates the nodes in the node
+	// pool to the specified disk size.
+	DiskSizeGb int64 `json:"diskSizeGb,omitempty,string"`
+
+	// DiskType: Optional. The desired disk type (e.g. 'pd-standard',
+	// 'pd-ssd' or 'pd-balanced') for nodes in the node pool. Initiates an
+	// upgrade operation that migrates the nodes in the node pool to the
+	// specified disk type.
+	DiskType string `json:"diskType,omitempty"`
+
 	// Etag: The current etag of the node pool. If an etag is provided and
 	// does not match the current etag of the node pool, update will be
 	// blocked and an ABORTED error will be returned.
@@ -7300,6 +7866,12 @@ type UpdateNodePoolRequest struct {
 	// LoggingConfig: Logging configuration.
 	LoggingConfig *NodePoolLoggingConfig `json:"loggingConfig,omitempty"`
 
+	// MachineType: Optional. The desired Google Compute Engine machine type
+	// (https://cloud.google.com/compute/docs/machine-types) for nodes in
+	// the node pool. Initiates an upgrade operation that migrates the nodes
+	// in the node pool to the specified machine type.
+	MachineType string `json:"machineType,omitempty"`
+
 	// Name: The name (project, location, cluster, node pool) of the node
 	// pool to update. Specified in the format
 	// `projects/*/locations/*/clusters/*/nodePools/*`.
@@ -7331,6 +7903,12 @@ type UpdateNodePoolRequest struct {
 	// ResourceLabels: The resource labels for the node pool to use to
 	// annotate any related Google Compute Engine resources.
 	ResourceLabels *ResourceLabels `json:"resourceLabels,omitempty"`
+
+	// ResourceManagerTags: Desired resource manager tag keys and values to
+	// be attached to the nodes for managing Compute Engine firewalls using
+	// Network Firewall Policies. Existing tags will be replaced with new
+	// values.
+	ResourceManagerTags *ResourceManagerTags `json:"resourceManagerTags,omitempty"`
 
 	// Tags: The desired network tags to be applied to all nodes in the node
 	// pool. If this field is not present, the tags will not be changed.
@@ -7836,6 +8414,35 @@ func (s *WorkloadMetadataConfig) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// WorkloadPolicyConfig: WorkloadPolicyConfig is the configuration of
+// workload policy for autopilot clusters.
+type WorkloadPolicyConfig struct {
+	// AllowNetAdmin: If true, workloads can use NET_ADMIN capability.
+	AllowNetAdmin bool `json:"allowNetAdmin,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AllowNetAdmin") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AllowNetAdmin") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *WorkloadPolicyConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod WorkloadPolicyConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // method id "container.projects.aggregated.usableSubnetworks.list":
 
 type ProjectsAggregatedUsableSubnetworksListCall struct {
@@ -8205,11 +8812,13 @@ func (c *ProjectsLocationsGetServerConfigCall) Do(opts ...googleapi.CallOption) 
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) to return operations for. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -8819,6 +9428,7 @@ func (c *ProjectsLocationsClustersDeleteCall) Do(opts ...googleapi.CallOption) (
 	//   ],
 	//   "parameters": {
 	//     "clusterId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the cluster to delete. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -8831,11 +9441,13 @@ func (c *ProjectsLocationsClustersDeleteCall) Do(opts ...googleapi.CallOption) (
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -9009,6 +9621,7 @@ func (c *ProjectsLocationsClustersGetCall) Do(opts ...googleapi.CallOption) (*Cl
 	//   ],
 	//   "parameters": {
 	//     "clusterId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the cluster to retrieve. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -9021,11 +9634,13 @@ func (c *ProjectsLocationsClustersGetCall) Do(opts ...googleapi.CallOption) (*Cl
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -9345,11 +9960,13 @@ func (c *ProjectsLocationsClustersListCall) Do(opts ...googleapi.CallOption) (*L
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the parent field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides, or \"-\" for all zones. This field has been deprecated and replaced by the parent field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -11540,6 +12157,7 @@ func (c *ProjectsLocationsClustersNodePoolsDeleteCall) Do(opts ...googleapi.Call
 	//   ],
 	//   "parameters": {
 	//     "clusterId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the cluster. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -11552,16 +12170,19 @@ func (c *ProjectsLocationsClustersNodePoolsDeleteCall) Do(opts ...googleapi.Call
 	//       "type": "string"
 	//     },
 	//     "nodePoolId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the node pool to delete. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -11743,6 +12364,7 @@ func (c *ProjectsLocationsClustersNodePoolsGetCall) Do(opts ...googleapi.CallOpt
 	//   ],
 	//   "parameters": {
 	//     "clusterId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the cluster. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -11755,16 +12377,19 @@ func (c *ProjectsLocationsClustersNodePoolsGetCall) Do(opts ...googleapi.CallOpt
 	//       "type": "string"
 	//     },
 	//     "nodePoolId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the node pool. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -11938,6 +12563,7 @@ func (c *ProjectsLocationsClustersNodePoolsListCall) Do(opts ...googleapi.CallOp
 	//   ],
 	//   "parameters": {
 	//     "clusterId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the cluster. This field has been deprecated and replaced by the parent field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -11950,11 +12576,13 @@ func (c *ProjectsLocationsClustersNodePoolsListCall) Do(opts ...googleapi.CallOp
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the parent field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides. This field has been deprecated and replaced by the parent field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -13153,16 +13781,19 @@ func (c *ProjectsLocationsOperationsGetCall) Do(opts ...googleapi.CallOption) (*
 	//       "type": "string"
 	//     },
 	//     "operationId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The server-assigned `name` of the operation. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) in which the cluster resides. This field has been deprecated and replaced by the name field.",
 	//       "location": "query",
 	//       "type": "string"
@@ -13336,11 +13967,13 @@ func (c *ProjectsLocationsOperationsListCall) Do(opts ...googleapi.CallOption) (
 	//       "type": "string"
 	//     },
 	//     "projectId": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The Google Developers Console [project ID or project number](https://cloud.google.com/resource-manager/docs/creating-managing-projects). This field has been deprecated and replaced by the parent field.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "zone": {
+	//       "deprecated": true,
 	//       "description": "Deprecated. The name of the Google Compute Engine [zone](https://cloud.google.com/compute/docs/zones#available) to return operations for, or `-` for all zones. This field has been deprecated and replaced by the parent field.",
 	//       "location": "query",
 	//       "type": "string"

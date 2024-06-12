@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.12.0](https://github.com/googleapis/gax-go/compare/v2.11.0...v2.12.0) (2023-06-26)
+
+
+### Features
+
+* **v2/callctx:** add new callctx package ([#291](https://github.com/googleapis/gax-go/issues/291)) ([11503ed](https://github.com/googleapis/gax-go/commit/11503ed98df4ae1bbdedf91ff64d47e63f187d68))
+* **v2:** add BuildHeaders and InsertMetadataIntoOutgoingContext to header  ([#290](https://github.com/googleapis/gax-go/issues/290)) ([6a4b89f](https://github.com/googleapis/gax-go/commit/6a4b89f5551a40262e7c3caf2e1bdc7321b76ea1))
+
 ## [2.11.0](https://github.com/googleapis/gax-go/compare/v2.10.0...v2.11.0) (2023-06-13)
 
 

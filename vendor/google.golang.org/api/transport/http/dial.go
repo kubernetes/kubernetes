@@ -145,22 +145,13 @@ func (t *parameterTransport) RoundTrip(req *http.Request) (*http.Response, error
 	return rt.RoundTrip(&newReq)
 }
 
-// Set at init time by dial_appengine.go. If nil, we're not on App Engine.
-var appengineUrlfetchHook func(context.Context) http.RoundTripper
-
-// defaultBaseTransport returns the base HTTP transport.
-// On App Engine, this is urlfetch.Transport.
-// Otherwise, use a default transport, taking most defaults from
-// http.DefaultTransport.
+// defaultBaseTransport returns the base HTTP transport. It uses a default
+// transport, taking most defaults from http.DefaultTransport.
 // If TLSCertificate is available, set TLSClientConfig as well.
 func defaultBaseTransport(ctx context.Context, clientCertSource cert.Source, dialTLSContext func(context.Context, string, string) (net.Conn, error)) http.RoundTripper {
-	if appengineUrlfetchHook != nil {
-		return appengineUrlfetchHook(ctx)
-	}
-
 	// Copy http.DefaultTransport except for MaxIdleConnsPerHost setting,
-	// which is increased due to reported performance issues under load in the GCS
-	// client. Transport.Clone is only available in Go 1.13 and up.
+	// which is increased due to reported performance issues under load in the
+	// GCS client. Transport.Clone is only available in Go 1.13 and up.
 	trans := clonedTransport(http.DefaultTransport)
 	if trans == nil {
 		trans = fallbackBaseTransport()

@@ -150,6 +150,19 @@ func (w *withCreds) Apply(o *internal.DialSettings) {
 	o.InternalCredentials = (*google.Credentials)(w)
 }
 
+// EnableNewAuthLibrary returns a ClientOption that specifies if libraries in this
+// module to delegate auth to our new library. This option will be removed in
+// the future once all clients have been moved to the new auth layer.
+func EnableNewAuthLibrary() option.ClientOption {
+	return enableNewAuthLibrary(true)
+}
+
+type enableNewAuthLibrary bool
+
+func (w enableNewAuthLibrary) Apply(o *internal.DialSettings) {
+	o.EnableNewAuthLibrary = bool(w)
+}
+
 // EmbeddableAdapter is a no-op option.ClientOption that allow libraries to
 // create their own client options by embedding this type into their own
 // client-specific option wrapper. See example for usage.

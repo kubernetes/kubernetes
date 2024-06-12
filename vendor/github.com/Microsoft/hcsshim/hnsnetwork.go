@@ -1,14 +1,16 @@
+//go:build windows
+
 package hcsshim
 
 import (
 	"github.com/Microsoft/hcsshim/internal/hns"
 )
 
-// Subnet is assoicated with a network and represents a list
+// Subnet is associated with a network and represents a list
 // of subnets available to the network
 type Subnet = hns.Subnet
 
-// MacPool is assoicated with a network and represents a list
+// MacPool is associated with a network and represents a list
 // of macaddresses available to the network
 type MacPool = hns.MacPool
 

@@ -1788,7 +1788,7 @@
         "timeSeries": {
           "methods": {
             "create": {
-              "description": "Creates or adds data to one or more time series. The response is empty if all time series in the request were written. If any time series could not be written, a corresponding failure message is included in the error response.",
+              "description": "Creates or adds data to one or more time series. The response is empty if all time series in the request were written. If any time series could not be written, a corresponding failure message is included in the error response. This method does not support resource locations constraint of an organization policy (https://cloud.google.com/resource-manager/docs/organization-policy/defining-locations#setting_the_organization_policy).",
               "flatPath": "v3/projects/{projectsId}/timeSeries",
               "httpMethod": "POST",
               "id": "monitoring.projects.timeSeries.create",
@@ -2498,7 +2498,7 @@
                   "type": "string"
                 },
                 "serviceLevelObjectiveId": {
-                  "description": "Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern [a-z0-9\\-]+",
+                  "description": "Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern ^[a-zA-Z0-9-_:.]+$",
                   "location": "query",
                   "type": "string"
                 }
@@ -2714,7 +2714,7 @@
       }
     }
   },
-  "revision": "20230531",
+  "revision": "20231023",
   "rootUrl": "https://monitoring.googleapis.com/",
   "schemas": {
     "Aggregation": {
@@ -2854,7 +2854,7 @@
           "description": "A read-only record of the creation of the alerting policy. If provided in a call to create or update, this field will be ignored."
         },
         "displayName": {
-          "description": "A short name or phrase used to identify the policy in dashboards, notifications, and incidents. To avoid confusion, don't use the same display name for multiple policies in the same project. The name is limited to 512 Unicode characters.The convention for the display_name of a PrometheusQueryLanguageCondition is \"/\", where the and should be taken from the corresponding Prometheus configuration file. This convention is not enforced. In any case the display_name is not a unique key of the AlertPolicy.",
+          "description": "A short name or phrase used to identify the policy in dashboards, notifications, and incidents. To avoid confusion, don't use the same display name for multiple policies in the same project. The name is limited to 512 Unicode characters.The convention for the display_name of a PrometheusQueryLanguageCondition is \"{rule group name}/{alert name}\", where the {rule group name} and {alert name} should be taken from the corresponding Prometheus configuration file. This convention is not enforced. In any case the display_name is not a unique key of the AlertPolicy.",
           "type": "string"
         },
         "documentation": {
@@ -2884,7 +2884,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "User-supplied key/value data to be used for organizing and identifying the AlertPolicy objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.Note that Prometheus and are valid Prometheus label names (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels). This means that they cannot be stored as is in user labels, because Prometheus labels may contain upper-case letters.",
+          "description": "User-supplied key/value data to be used for organizing and identifying the AlertPolicy objects.The field can contain up to 64 entries. Each key and value is limited to 63 Unicode characters or 128 bytes, whichever is smaller. Labels and values can contain only lowercase letters, numerals, underscores, and dashes. Keys must begin with a letter.Note that Prometheus {alert name} is a valid Prometheus label names (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels), whereas Prometheus {rule group} is an unrestricted UTF-8 string. This means that they cannot be stored as-is in user labels, because they may contain characters that are not allowed in user-label values.",
           "type": "object"
         },
         "validity": {
@@ -3028,6 +3028,22 @@
       "properties": {
         "service": {
           "description": "The name of the Cloud Endpoints service underlying this service. Corresponds to the service resource label in the api monitored resource (https://cloud.google.com/monitoring/api/resources#tag_api).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CloudFunctionV2Target": {
+      "description": "A Synthetic Monitor deployed to a Cloud Functions V2 instance.",
+      "id": "CloudFunctionV2Target",
+      "properties": {
+        "cloudRunRevision": {
+          "$ref": "MonitoredResource",
+          "description": "Output only. The cloud_run_revision Monitored Resource associated with the GCFv2. The Synthetic Monitor execution results (metrics, logs, and spans) are reported against this Monitored Resource. This field is output only.",
+          "readOnly": true
+        },
+        "name": {
+          "description": "Required. Fully qualified GCFv2 resource name i.e. projects/{project}/locations/{location}/functions/{function} Required.",
           "type": "string"
         }
       },
@@ -3205,6 +3221,10 @@
         "conditionMonitoringQueryLanguage": {
           "$ref": "MonitoringQueryLanguageCondition",
           "description": "A condition that uses the Monitoring Query Language to define alerts."
+        },
+        "conditionPrometheusQueryLanguage": {
+          "$ref": "PrometheusQueryLanguageCondition",
+          "description": "A condition that uses the Prometheus query language to define alerts."
         },
         "conditionThreshold": {
           "$ref": "MetricThreshold",
@@ -3427,6 +3447,10 @@
         "mimeType": {
           "description": "The format of the content field. Presently, only the value \"text/markdown\" is supported. See Markdown (https://en.wikipedia.org/wiki/Markdown) for more information.",
           "type": "string"
+        },
+        "subject": {
+          "description": "Optional. The subject line of the notification. The subject line may not exceed 10,240 bytes. In notifications generated by this policy, the contents of the subject line after variable expansion will be truncated to 255 bytes or shorter at the latest UTF-8 character boundary. The 255-byte limit is recommended by this thread (https://stackoverflow.com/questions/1592291/what-is-the-email-subject-length-limit). It is both the limit imposed by some third-party ticketing products and it is common to define textual fields in databases as VARCHAR(255).The contents of the subject line can be templatized by using variables (https://cloud.google.com/monitoring/alerts/doc-variables). If this field is missing or empty, a default subject line will be generated.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -3643,7 +3667,7 @@
       "id": "ForecastOptions",
       "properties": {
         "forecastHorizon": {
-          "description": "Required. The length of time into the future to forecast whether a time series will violate the threshold. If the predicted value is found to violate the threshold, and the violation is observed in all forecasts made for the configured duration, then the time series is considered to be failing.",
+          "description": "Required. The length of time into the future to forecast whether a time series will violate the threshold. If the predicted value is found to violate the threshold, and the violation is observed in all forecasts made for the configured duration, then the time series is considered to be failing. The forecast horizon can range from 1 hour to 60 hours.",
           "format": "google-duration",
           "type": "string"
         }
@@ -3894,6 +3918,7 @@
       "type": "object"
     },
     "InternalChecker": {
+      "deprecated": true,
       "description": "An internal checker allows Uptime checks to run on private/internal GCP resources.",
       "id": "InternalChecker",
       "properties": {
@@ -4525,6 +4550,7 @@
           "type": "string"
         },
         "launchStage": {
+          "deprecated": true,
           "description": "Deprecated. Must use the MetricDescriptor.launch_stage instead.",
           "enum": [
             "LAUNCH_STAGE_UNSPECIFIED",
@@ -4916,6 +4942,7 @@
           "type": "string"
         },
         "supportedTiers": {
+          "deprecated": true,
           "description": "The tiers that support this notification channel; the project service tier must be one of the supported_tiers.",
           "items": {
             "enum": [
@@ -5085,6 +5112,42 @@
             "$ref": "TypedValue"
           },
           "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "PrometheusQueryLanguageCondition": {
+      "description": "A condition type that allows alert policies to be defined using Prometheus Query Language (PromQL) (https://prometheus.io/docs/prometheus/latest/querying/basics/).The PrometheusQueryLanguageCondition message contains information from a Prometheus alerting rule and its associated rule group.A Prometheus alerting rule is described here (https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/). The semantics of a Prometheus alerting rule is described here (https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/#rule).A Prometheus rule group is described here (https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/). The semantics of a Prometheus rule group is described here (https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/#rule_group).Because Cloud Alerting has no representation of a Prometheus rule group resource, we must embed the information of the parent rule group inside each of the conditions that refer to it. We must also update the contents of all Prometheus alerts in case the information of their rule group changes.The PrometheusQueryLanguageCondition protocol buffer combines the information of the corresponding rule group and alerting rule. The structure of the PrometheusQueryLanguageCondition protocol buffer does NOT mimic the structure of the Prometheus rule group and alerting rule YAML declarations. The PrometheusQueryLanguageCondition protocol buffer may change in the future to support future rule group and/or alerting rule features. There are no new such features at the present time (2023-06-26).",
+      "id": "PrometheusQueryLanguageCondition",
+      "properties": {
+        "alertRule": {
+          "description": "Optional. The alerting rule name of this alert in the corresponding Prometheus configuration file.Some external tools may require this field to be populated correctly in order to refer to the original Prometheus configuration file. The rule group name and the alert name are necessary to update the relevant AlertPolicies in case the definition of the rule group changes in the future.This field is optional. If this field is not empty, then it must be a valid Prometheus label name (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels). This field may not exceed 2048 Unicode characters in length.",
+          "type": "string"
+        },
+        "duration": {
+          "description": "Optional. Alerts are considered firing once their PromQL expression was evaluated to be \"true\" for this long. Alerts whose PromQL expression was not evaluated to be \"true\" for long enough are considered pending. Must be a non-negative duration or missing. This field is optional. Its default value is zero.",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "evaluationInterval": {
+          "description": "Optional. How often this rule should be evaluated. Must be a positive multiple of 30 seconds or missing. This field is optional. Its default value is 30 seconds. If this PrometheusQueryLanguageCondition was generated from a Prometheus alerting rule, then this value should be taken from the enclosing rule group.",
+          "format": "google-duration",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional. Labels to add to or overwrite in the PromQL query result. Label names must be valid (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels). Label values can be templatized by using variables (https://cloud.google.com/monitoring/alerts/doc-variables). The only available variable names are the names of the labels in the PromQL result, including \"__name__\" and \"value\". \"labels\" may be empty.",
+          "type": "object"
+        },
+        "query": {
+          "description": "Required. The PromQL expression to evaluate. Every evaluation cycle this expression is evaluated at the current time, and all resultant time series become pending/firing alerts. This field must not be empty.",
+          "type": "string"
+        },
+        "ruleGroup": {
+          "description": "Optional. The rule group name of this alert in the corresponding Prometheus configuration file.Some external tools may require this field to be populated correctly in order to refer to the original Prometheus configuration file. The rule group name and the alert name are necessary to update the relevant AlertPolicies in case the definition of the rule group changes in the future.This field is optional. If this field is not empty, then it must contain a valid UTF-8 string. This field may not exceed 2048 Unicode characters in length.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -5456,6 +5519,17 @@
       },
       "type": "object"
     },
+    "SyntheticMonitorTarget": {
+      "description": "Describes a Synthetic Monitor to be invoked by Uptime.",
+      "id": "SyntheticMonitorTarget",
+      "properties": {
+        "cloudFunctionV2": {
+          "$ref": "CloudFunctionV2Target",
+          "description": "Target a Synthetic Monitor GCFv2 instance."
+        }
+      },
+      "type": "object"
+    },
     "TcpCheck": {
       "description": "Information required for a TCP Uptime check request.",
       "id": "TcpCheck",
@@ -5763,6 +5837,7 @@
           "description": "Contains information needed to make an HTTP or HTTPS check."
         },
         "internalCheckers": {
+          "deprecated": true,
           "description": "The internal checkers that this check will egress from. If is_internal is true and this list is empty, the check will egress from all the InternalCheckers configured for the project that owns this UptimeCheckConfig.",
           "items": {
             "$ref": "InternalChecker"
@@ -5770,6 +5845,7 @@
           "type": "array"
         },
         "isInternal": {
+          "deprecated": true,
           "description": "If this is true, then checks are made only from the 'internal_checkers'. If it is false, then checks are made only from the 'selected_regions'. It is an error to provide 'selected_regions' when is_internal is true, or to provide 'internal_checkers' when is_internal is false.",
           "type": "boolean"
         },
@@ -5816,6 +5892,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "syntheticMonitor": {
+          "$ref": "SyntheticMonitorTarget",
+          "description": "Specifies a Synthetic Monitor to invoke."
         },
         "tcpCheck": {
           "$ref": "TcpCheck",

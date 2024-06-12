@@ -101,6 +101,8 @@
 // executable-sourced credentials), please check out:
 // https://cloud.google.com/iam/docs/workforce-obtaining-short-lived-credentials#generate_a_configuration_file_for_non-interactive_sign-in
 //
+// # Security considerations
+//
 // Note that this library does not perform any validation on the token_url, token_info_url,
 // or service_account_impersonation_url fields of the credential configuration.
 // It is not recommended to use a credential configuration that you did not generate with

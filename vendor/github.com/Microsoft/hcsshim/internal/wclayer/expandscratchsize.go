@@ -1,3 +1,5 @@
+//go:build windows
+
 package wclayer
 
 import (
@@ -9,14 +11,13 @@ import (
 
 	"github.com/Microsoft/hcsshim/internal/hcserror"
 	"github.com/Microsoft/hcsshim/internal/oc"
-	"github.com/Microsoft/hcsshim/osversion"
 	"go.opencensus.io/trace"
 )
 
 // ExpandScratchSize expands the size of a layer to at least size bytes.
 func ExpandScratchSize(ctx context.Context, path string, size uint64) (err error) {
 	title := "hcsshim::ExpandScratchSize"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := oc.StartSpan(ctx, title)
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(
@@ -25,17 +26,20 @@ func ExpandScratchSize(ctx context.Context, path string, size uint64) (err error
 
 	err = expandSandboxSize(&stdDriverInfo, path, size)
 	if err != nil {
-		return hcserror.New(err, title+" - failed", "")
+		return hcserror.New(err, title, "")
 	}
 
-	// Manually expand the volume now in order to work around bugs in 19H1 and
-	// prerelease versions of Vb. Remove once this is fixed in Windows.
-	if build := osversion.Build(); build >= osversion.V19H1 && build < 19020 {
-		err = expandSandboxVolume(ctx, path)
-		if err != nil {
-			return err
-		}
+	// Always expand the volume too. In case of legacy layers not expanding the volume here works because
+	// the PrepareLayer call internally handles the expansion. However, in other cases (like CimFS) we
+	// don't call PrepareLayer and so the volume will never be expanded.  This also means in case of
+	// legacy layers, we might have a small perf hit because the VHD is mounted twice for expansion (once
+	// here and once during the PrepareLayer call). But as long as the perf hit is minimal, we should be
+	// okay.
+	err = expandSandboxVolume(ctx, path)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
 

@@ -25,11 +25,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	binlogpb "google.golang.org/grpc/binarylog/grpc_binarylog_v1"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type callIDGenerator struct {
@@ -88,7 +89,7 @@ func NewTruncatingMethodLogger(h, m uint64) *TruncatingMethodLogger {
 // in TruncatingMethodLogger as possible.
 func (ml *TruncatingMethodLogger) Build(c LogEntryConfig) *binlogpb.GrpcLogEntry {
 	m := c.toProto()
-	timestamp, _ := ptypes.TimestampProto(time.Now())
+	timestamp := timestamppb.Now()
 	m.Timestamp = timestamp
 	m.CallId = ml.callID
 	m.SequenceIdWithinCall = ml.idWithinCallGen.next()
@@ -178,7 +179,7 @@ func (c *ClientHeader) toProto() *binlogpb.GrpcLogEntry {
 		Authority:  c.Authority,
 	}
 	if c.Timeout > 0 {
-		clientHeader.Timeout = ptypes.DurationProto(c.Timeout)
+		clientHeader.Timeout = durationpb.New(c.Timeout)
 	}
 	ret := &binlogpb.GrpcLogEntry{
 		Type: binlogpb.GrpcLogEntry_EVENT_TYPE_CLIENT_HEADER,

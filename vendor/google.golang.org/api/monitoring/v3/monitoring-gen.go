@@ -10,6 +10,17 @@
 //
 // For product documentation, see: https://cloud.google.com/monitoring/api/
 //
+// # Library status
+//
+// These client libraries are officially supported by Google. However, this
+// library is considered complete and is in maintenance mode. This means
+// that we will address critical bugs and security issues but will not add
+// any new features.
+//
+// When possible, we recommend using our newer
+// [Cloud Client Libraries for Go](https://pkg.go.dev/cloud.google.com/go)
+// that are still actively being worked and iterated on.
+//
 // # Creating a client
 //
 // Usage example:
@@ -19,28 +30,31 @@
 //	ctx := context.Background()
 //	monitoringService, err := monitoring.NewService(ctx)
 //
-// In this example, Google Application Default Credentials are used for authentication.
-//
-// For information on how to create and obtain Application Default Credentials, see https://developers.google.com/identity/protocols/application-default-credentials.
+// In this example, Google Application Default Credentials are used for
+// authentication. For information on how to create and obtain Application
+// Default Credentials, see https://developers.google.com/identity/protocols/application-default-credentials.
 //
 // # Other authentication options
 //
-// By default, all available scopes (see "Constants") are used to authenticate. To restrict scopes, use option.WithScopes:
+// By default, all available scopes (see "Constants") are used to authenticate.
+// To restrict scopes, use [google.golang.org/api/option.WithScopes]:
 //
 //	monitoringService, err := monitoring.NewService(ctx, option.WithScopes(monitoring.MonitoringWriteScope))
 //
-// To use an API key for authentication (note: some APIs do not support API keys), use option.WithAPIKey:
+// To use an API key for authentication (note: some APIs do not support API
+// keys), use [google.golang.org/api/option.WithAPIKey]:
 //
 //	monitoringService, err := monitoring.NewService(ctx, option.WithAPIKey("AIza..."))
 //
-// To use an OAuth token (e.g., a user token obtained via a three-legged OAuth flow), use option.WithTokenSource:
+// To use an OAuth token (e.g., a user token obtained via a three-legged OAuth
+// flow, use [google.golang.org/api/option.WithTokenSource]:
 //
 //	config := &oauth2.Config{...}
 //	// ...
 //	token, err := config.Exchange(ctx, ...)
 //	monitoringService, err := monitoring.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
 //
-// See https://godoc.org/google.golang.org/api/option/ for details on options.
+// See [google.golang.org/api/option.ClientOption] for details on options.
 package monitoring // import "google.golang.org/api/monitoring/v3"
 
 import (
@@ -702,10 +716,11 @@ type AlertPolicy struct {
 	// dashboards, notifications, and incidents. To avoid confusion, don't
 	// use the same display name for multiple policies in the same project.
 	// The name is limited to 512 Unicode characters.The convention for the
-	// display_name of a PrometheusQueryLanguageCondition is "/", where the
-	// and should be taken from the corresponding Prometheus configuration
-	// file. This convention is not enforced. In any case the display_name
-	// is not a unique key of the AlertPolicy.
+	// display_name of a PrometheusQueryLanguageCondition is "{rule group
+	// name}/{alert name}", where the {rule group name} and {alert name}
+	// should be taken from the corresponding Prometheus configuration file.
+	// This convention is not enforced. In any case the display_name is not
+	// a unique key of the AlertPolicy.
 	DisplayName string `json:"displayName,omitempty"`
 
 	// Documentation: Documentation that is included with notifications and
@@ -752,11 +767,12 @@ type AlertPolicy struct {
 	// 64 entries. Each key and value is limited to 63 Unicode characters or
 	// 128 bytes, whichever is smaller. Labels and values can contain only
 	// lowercase letters, numerals, underscores, and dashes. Keys must begin
-	// with a letter.Note that Prometheus and are valid Prometheus label
-	// names
-	// (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels).
-	// This means that they cannot be stored as is in user labels, because
-	// Prometheus labels may contain upper-case letters.
+	// with a letter.Note that Prometheus {alert name} is a valid Prometheus
+	// label names
+	// (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels),
+	// whereas Prometheus {rule group} is an unrestricted UTF-8 string. This
+	// means that they cannot be stored as-is in user labels, because they
+	// may contain characters that are not allowed in user-label values.
 	UserLabels map[string]string `json:"userLabels,omitempty"`
 
 	// Validity: Read-only description of how the alert policy is invalid.
@@ -1081,6 +1097,44 @@ func (s *CloudEndpoints) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// CloudFunctionV2Target: A Synthetic Monitor deployed to a Cloud
+// Functions V2 instance.
+type CloudFunctionV2Target struct {
+	// CloudRunRevision: Output only. The cloud_run_revision Monitored
+	// Resource associated with the GCFv2. The Synthetic Monitor execution
+	// results (metrics, logs, and spans) are reported against this
+	// Monitored Resource. This field is output only.
+	CloudRunRevision *MonitoredResource `json:"cloudRunRevision,omitempty"`
+
+	// Name: Required. Fully qualified GCFv2 resource name i.e.
+	// projects/{project}/locations/{location}/functions/{function}
+	// Required.
+	Name string `json:"name,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "CloudRunRevision") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "CloudRunRevision") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *CloudFunctionV2Target) MarshalJSON() ([]byte, error) {
+	type NoMethod CloudFunctionV2Target
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // CloudRun: Cloud Run service. Learn more at
 // https://cloud.google.com/run.
 type CloudRun struct {
@@ -1354,6 +1408,10 @@ type Condition struct {
 	// ConditionMonitoringQueryLanguage: A condition that uses the
 	// Monitoring Query Language to define alerts.
 	ConditionMonitoringQueryLanguage *MonitoringQueryLanguageCondition `json:"conditionMonitoringQueryLanguage,omitempty"`
+
+	// ConditionPrometheusQueryLanguage: A condition that uses the
+	// Prometheus query language to define alerts.
+	ConditionPrometheusQueryLanguage *PrometheusQueryLanguageCondition `json:"conditionPrometheusQueryLanguage,omitempty"`
 
 	// ConditionThreshold: A condition that compares a time series against a
 	// threshold.
@@ -1815,6 +1873,20 @@ type Documentation struct {
 	// (https://en.wikipedia.org/wiki/Markdown) for more information.
 	MimeType string `json:"mimeType,omitempty"`
 
+	// Subject: Optional. The subject line of the notification. The subject
+	// line may not exceed 10,240 bytes. In notifications generated by this
+	// policy, the contents of the subject line after variable expansion
+	// will be truncated to 255 bytes or shorter at the latest UTF-8
+	// character boundary. The 255-byte limit is recommended by this thread
+	// (https://stackoverflow.com/questions/1592291/what-is-the-email-subject-length-limit).
+	// It is both the limit imposed by some third-party ticketing products
+	// and it is common to define textual fields in databases as
+	// VARCHAR(255).The contents of the subject line can be templatized by
+	// using variables
+	// (https://cloud.google.com/monitoring/alerts/doc-variables). If this
+	// field is missing or empty, a default subject line will be generated.
+	Subject string `json:"subject,omitempty"`
+
 	// ForceSendFields is a list of field names (e.g. "Content") to
 	// unconditionally include in API requests. By default, fields with
 	// empty or default values are omitted from API requests. However, any
@@ -2186,7 +2258,8 @@ type ForecastOptions struct {
 	// forecast whether a time series will violate the threshold. If the
 	// predicted value is found to violate the threshold, and the violation
 	// is observed in all forecasts made for the configured duration, then
-	// the time series is considered to be failing.
+	// the time series is considered to be failing. The forecast horizon can
+	// range from 1 hour to 60 hours.
 	ForecastHorizon string `json:"forecastHorizon,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ForecastHorizon") to
@@ -5016,6 +5089,109 @@ func (s *PointData) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// PrometheusQueryLanguageCondition: A condition type that allows alert
+// policies to be defined using Prometheus Query Language (PromQL)
+// (https://prometheus.io/docs/prometheus/latest/querying/basics/).The
+// PrometheusQueryLanguageCondition message contains information from a
+// Prometheus alerting rule and its associated rule group.A Prometheus
+// alerting rule is described here
+// (https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/).
+// The semantics of a Prometheus alerting rule is described here
+// (https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/#rule).A
+// Prometheus rule group is described here
+// (https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/).
+// The semantics of a Prometheus rule group is described here
+// (https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/#rule_group).Because
+// Cloud Alerting has no representation of a Prometheus rule group
+// resource, we must embed the information of the parent rule group
+// inside each of the conditions that refer to it. We must also update
+// the contents of all Prometheus alerts in case the information of
+// their rule group changes.The PrometheusQueryLanguageCondition
+// protocol buffer combines the information of the corresponding rule
+// group and alerting rule. The structure of the
+// PrometheusQueryLanguageCondition protocol buffer does NOT mimic the
+// structure of the Prometheus rule group and alerting rule YAML
+// declarations. The PrometheusQueryLanguageCondition protocol buffer
+// may change in the future to support future rule group and/or alerting
+// rule features. There are no new such features at the present time
+// (2023-06-26).
+type PrometheusQueryLanguageCondition struct {
+	// AlertRule: Optional. The alerting rule name of this alert in the
+	// corresponding Prometheus configuration file.Some external tools may
+	// require this field to be populated correctly in order to refer to the
+	// original Prometheus configuration file. The rule group name and the
+	// alert name are necessary to update the relevant AlertPolicies in case
+	// the definition of the rule group changes in the future.This field is
+	// optional. If this field is not empty, then it must be a valid
+	// Prometheus label name
+	// (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels).
+	// This field may not exceed 2048 Unicode characters in length.
+	AlertRule string `json:"alertRule,omitempty"`
+
+	// Duration: Optional. Alerts are considered firing once their PromQL
+	// expression was evaluated to be "true" for this long. Alerts whose
+	// PromQL expression was not evaluated to be "true" for long enough are
+	// considered pending. Must be a non-negative duration or missing. This
+	// field is optional. Its default value is zero.
+	Duration string `json:"duration,omitempty"`
+
+	// EvaluationInterval: Optional. How often this rule should be
+	// evaluated. Must be a positive multiple of 30 seconds or missing. This
+	// field is optional. Its default value is 30 seconds. If this
+	// PrometheusQueryLanguageCondition was generated from a Prometheus
+	// alerting rule, then this value should be taken from the enclosing
+	// rule group.
+	EvaluationInterval string `json:"evaluationInterval,omitempty"`
+
+	// Labels: Optional. Labels to add to or overwrite in the PromQL query
+	// result. Label names must be valid
+	// (https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels).
+	// Label values can be templatized by using variables
+	// (https://cloud.google.com/monitoring/alerts/doc-variables). The only
+	// available variable names are the names of the labels in the PromQL
+	// result, including "__name__" and "value". "labels" may be empty.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Query: Required. The PromQL expression to evaluate. Every evaluation
+	// cycle this expression is evaluated at the current time, and all
+	// resultant time series become pending/firing alerts. This field must
+	// not be empty.
+	Query string `json:"query,omitempty"`
+
+	// RuleGroup: Optional. The rule group name of this alert in the
+	// corresponding Prometheus configuration file.Some external tools may
+	// require this field to be populated correctly in order to refer to the
+	// original Prometheus configuration file. The rule group name and the
+	// alert name are necessary to update the relevant AlertPolicies in case
+	// the definition of the rule group changes in the future.This field is
+	// optional. If this field is not empty, then it must contain a valid
+	// UTF-8 string. This field may not exceed 2048 Unicode characters in
+	// length.
+	RuleGroup string `json:"ruleGroup,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AlertRule") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AlertRule") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *PrometheusQueryLanguageCondition) MarshalJSON() ([]byte, error) {
+	type NoMethod PrometheusQueryLanguageCondition
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // QueryTimeSeriesRequest: The QueryTimeSeries request.
 type QueryTimeSeriesRequest struct {
 	// PageSize: A positive number that is the maximum number of
@@ -5676,6 +5852,36 @@ func (s *Status) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// SyntheticMonitorTarget: Describes a Synthetic Monitor to be invoked
+// by Uptime.
+type SyntheticMonitorTarget struct {
+	// CloudFunctionV2: Target a Synthetic Monitor GCFv2 instance.
+	CloudFunctionV2 *CloudFunctionV2Target `json:"cloudFunctionV2,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "CloudFunctionV2") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "CloudFunctionV2") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *SyntheticMonitorTarget) MarshalJSON() ([]byte, error) {
+	type NoMethod SyntheticMonitorTarget
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // TcpCheck: Information required for a TCP Uptime check request.
 type TcpCheck struct {
 	// PingConfig: Contains information needed to add pings to a TCP check.
@@ -6284,6 +6490,9 @@ type UptimeCheckConfig struct {
 	//   "USA_VIRGINIA" - Allows checks to run from locations within the
 	// eastern United States of America
 	SelectedRegions []string `json:"selectedRegions,omitempty"`
+
+	// SyntheticMonitor: Specifies a Synthetic Monitor to invoke.
+	SyntheticMonitor *SyntheticMonitorTarget `json:"syntheticMonitor,omitempty"`
 
 	// TcpCheck: Contains information needed to make a TCP check.
 	TcpCheck *TcpCheck `json:"tcpCheck,omitempty"`
@@ -14242,7 +14451,9 @@ type ProjectsTimeSeriesCreateCall struct {
 // Create: Creates or adds data to one or more time series. The response
 // is empty if all time series in the request were written. If any time
 // series could not be written, a corresponding failure message is
-// included in the error response.
+// included in the error response. This method does not support resource
+// locations constraint of an organization policy
+// (https://cloud.google.com/resource-manager/docs/organization-policy/defining-locations#setting_the_organization_policy).
 //
 //   - name: The project
 //     (https://cloud.google.com/monitoring/api/v3#project_name) on which
@@ -14346,7 +14557,7 @@ func (c *ProjectsTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) (*Empty,
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates or adds data to one or more time series. The response is empty if all time series in the request were written. If any time series could not be written, a corresponding failure message is included in the error response.",
+	//   "description": "Creates or adds data to one or more time series. The response is empty if all time series in the request were written. If any time series could not be written, a corresponding failure message is included in the error response. This method does not support resource locations constraint of an organization policy (https://cloud.google.com/resource-manager/docs/organization-policy/defining-locations#setting_the_organization_policy).",
 	//   "flatPath": "v3/projects/{projectsId}/timeSeries",
 	//   "httpMethod": "POST",
 	//   "id": "monitoring.projects.timeSeries.create",
@@ -17464,7 +17675,7 @@ func (r *ServicesServiceLevelObjectivesService) Create(parent string, servicelev
 // ServiceLevelObjectiveId sets the optional parameter
 // "serviceLevelObjectiveId": The ServiceLevelObjective id to use for
 // this ServiceLevelObjective. If omitted, an id will be generated
-// instead. Must match the pattern [a-z0-9\-]+
+// instead. Must match the pattern ^[a-zA-Z0-9-_:.]+$
 func (c *ServicesServiceLevelObjectivesCreateCall) ServiceLevelObjectiveId(serviceLevelObjectiveId string) *ServicesServiceLevelObjectivesCreateCall {
 	c.urlParams_.Set("serviceLevelObjectiveId", serviceLevelObjectiveId)
 	return c
@@ -17577,7 +17788,7 @@ func (c *ServicesServiceLevelObjectivesCreateCall) Do(opts ...googleapi.CallOpti
 	//       "type": "string"
 	//     },
 	//     "serviceLevelObjectiveId": {
-	//       "description": "Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern [a-z0-9\\-]+",
+	//       "description": "Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern ^[a-zA-Z0-9-_:.]+$",
 	//       "location": "query",
 	//       "type": "string"
 	//     }

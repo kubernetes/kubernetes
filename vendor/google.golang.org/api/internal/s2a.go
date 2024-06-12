@@ -13,7 +13,7 @@ import (
 	"cloud.google.com/go/compute/metadata"
 )
 
-const configEndpointSuffix = "googleAutoMtlsConfiguration"
+const configEndpointSuffix = "instance/platform-security/auto-mtls-configuration"
 
 // The period an MTLS config can be reused before needing refresh.
 var configExpiry = time.Hour

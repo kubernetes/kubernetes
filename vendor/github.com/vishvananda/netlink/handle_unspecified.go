@@ -23,6 +23,8 @@ func NewHandleAtFrom(newNs, curNs netns.NsHandle) (*Handle, error) {
 	return nil, ErrNotImplemented
 }
 
+func (h *Handle) Close() {}
+
 func (h *Handle) Delete() {}
 
 func (h *Handle) SupportsNetlinkFamily(nlFamily int) bool {
@@ -85,7 +87,7 @@ func (h *Handle) LinkSetVfRate(link Link, vf, minRate, maxRate int) error {
 	return ErrNotImplemented
 }
 
-func (h *Handle) LinkSetMaster(link Link, master *Bridge) error {
+func (h *Handle) LinkSetMaster(link Link, master Link) error {
 	return ErrNotImplemented
 }
 
@@ -234,6 +236,10 @@ func (h *Handle) NeighProxyList(linkIndex, family int) ([]Neigh, error) {
 }
 
 func (h *Handle) RouteAdd(route *Route) error {
+	return ErrNotImplemented
+}
+
+func (h *Handle) RouteAppend(route *Route) error {
 	return ErrNotImplemented
 }
 
