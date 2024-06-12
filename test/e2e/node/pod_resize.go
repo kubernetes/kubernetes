@@ -174,7 +174,6 @@ func initDefaultResizePolicy(containers []TestContainerInfo) {
 }
 
 func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStatus) {
-	cmd := "trap exit TERM; while true; do sleep 1; done"
 	res, alloc, resizePol := getTestResourceInfo(tcInfo)
 	bTrue := true
 	bFalse := false
@@ -209,7 +208,7 @@ func makeTestContainer(tcInfo TestContainerInfo) (v1.Container, v1.ContainerStat
 		Name:            tcInfo.Name,
 		Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 		Command:         []string{"/bin/sh"},
-		Args:            []string{"-c", cmd},
+		Args:            []string{"-c", e2epod.InfiniteSleepCommand},
 		Resources:       res,
 		ResizePolicy:    resizePol,
 		SecurityContext: securityContext,

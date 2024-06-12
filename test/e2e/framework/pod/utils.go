@@ -43,11 +43,11 @@ func NodeOSDistroIs(distro string) bool {
 	return false
 }
 
+const InfiniteSleepCommand = "trap exit TERM; while true; do sleep 1; done"
+
 // GenerateScriptCmd generates the corresponding command lines to execute a command.
 func GenerateScriptCmd(command string) []string {
-	var commands []string
-	commands = []string{"/bin/sh", "-c", command}
-	return commands
+	return []string{"/bin/sh", "-c", command}
 }
 
 // GetDefaultTestImage returns the default test image based on OS.
