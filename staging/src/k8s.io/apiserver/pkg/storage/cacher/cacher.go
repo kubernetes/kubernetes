@@ -1358,6 +1358,11 @@ func (c *Cacher) waitUntilWatchCacheFreshAndForceAllEvents(ctx context.Context, 
 	return nil
 }
 
+// Wait blocks until the cacher is Ready or Stopped, it returns an error if Stopped.
+func (c *Cacher) Wait(ctx context.Context) error {
+	return c.ready.wait(ctx)
+}
+
 // errWatcher implements watch.Interface to return a single error
 type errWatcher struct {
 	result chan watch.Event

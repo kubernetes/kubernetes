@@ -472,8 +472,8 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		// The tests assume that Get/GetList/Watch calls shouldn't fail.
 		// However, 429 error can now be returned if watchcache is under initialization.
-		// To avoid rewriting all tests, we wait for watcache to initialize.
-		if err := cacher.ready.wait(ctx); err != nil {
+		// To avoid rewriting all tests, we wait for watchcache to initialize.
+		if err := cacher.Wait(ctx); err != nil {
 			t.Fatal(err)
 		}
 	}
