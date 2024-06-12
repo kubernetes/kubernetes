@@ -399,9 +399,9 @@ func (cfgCtlr *configController) updateBorrowing() {
 func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plStates map[string]*priorityLevelState) {
 	items := make([]allocProblemItem, 0, len(plStates))
 	nonExemptPLNames := make([]string, 0, len(plStates))
-	idxOfNonExempt := map[string]int{}
-	cclOfExempt := map[string]int{}
-	var minCLSum, minCurrentCLSum int
+	idxOfNonExempt := map[string]int{} // items index of non-exempt classes
+	cclOfExempt := map[string]int{}    // minCurrentCL of exempt classes
+	var minCLSum, minCurrentCLSum int  // sums over non-exempt classes
 	remainingServerCL := cfgCtlr.nominalCLSum
 	for plName, plState := range plStates {
 		obs := plState.seatDemandIntegrator.Reset()
@@ -425,9 +425,9 @@ func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plSta
 				upperBound: float64(plState.maxCL),
 				target:     math.Max(float64(minCurrentCL), plState.seatDemandStats.smoothed),
 			})
+			minCLSum += plState.minCL
+			minCurrentCLSum += minCurrentCL
 		}
-		minCLSum += plState.minCL
-		minCurrentCLSum += minCurrentCL
 	}
 	if len(items) == 0 && cfgCtlr.nominalCLSum > 0 {
 		klog.ErrorS(nil, "Impossible: no priority levels", "plStates", cfgCtlr.priorityLevelStates)
