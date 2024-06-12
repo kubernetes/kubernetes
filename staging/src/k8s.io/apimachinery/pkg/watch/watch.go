@@ -27,13 +27,25 @@ import (
 
 // Interface can be implemented by anything that knows how to watch and report changes.
 type Interface interface {
-	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
-	// any resources used by the watch.
+	// Stop tells the producer that the consumer is done watching, so the
+	// producer should stop sending events and close the result channel. The
+	// consumer should keep watching for events until the result channel is
+	// closed.
+	//
+	// Because some implementations may create channels when constructed, Stop
+	// must always be called, even if the consumer has not yet called
+	// ResultChan().
+	//
+	// Only the consumer should call Stop(), not the producer. If the producer
+	// errors and needs to stop the watch prematurely, it should instead send
+	// an error event and close the result channel.
 	Stop()
 
-	// ResultChan returns a chan which will receive all the events. If an error occurs
-	// or Stop() is called, the implementation will close this channel and
-	// release any resources used by the watch.
+	// ResultChan returns a channel which will receive events from the event
+	// producer. If an error occurs or Stop() is called, the producer must
+	// close this channel and release any resources used by the watch.
+	// Closing the result channel tells the consumer that no more events will be
+	// sent.
 	ResultChan() <-chan Event
 }
 
