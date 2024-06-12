@@ -36,6 +36,10 @@ type Lister interface {
 // Watcher is any object that knows how to start a watch on a resource.
 type Watcher interface {
 	// Watch should begin a watch at the specified version.
+	//
+	// If Watch returns an error, it should handle its own cleanup, including
+	// but not limited to calling Stop() on the watch, if one was constructed.
+	// This allows the caller to ignore the watch, if the error is non-nil.
 	Watch(options metav1.ListOptions) (watch.Interface, error)
 }
 
