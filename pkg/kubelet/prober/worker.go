@@ -252,7 +252,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 			w.resultsManager.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		w.resultsManager.Set(w.containerID, probeResult, w.pod)
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}

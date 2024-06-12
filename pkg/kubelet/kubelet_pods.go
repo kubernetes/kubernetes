@@ -2006,8 +2006,24 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
-			status.Started = oldStatus.Started
-			status.Ready = oldStatus.Ready
+			// After kubelet restarted, respect to the last status.
+
+			if oldStatus != nil {
+				status.Started = oldStatus.Started
+			}
+
+			// If node became notready, kube-controller-manager will mark this pod as notready.
+			// But pod container status still is ready. Don't respect to the last status.
+			podIsReady := false
+			for _, c := range pod.Status.Conditions {
+				if c.Type == v1.PodReady && c.Status == v1.ConditionTrue {
+					podIsReady = true
+					break
+				}
+			}
+			if podIsReady && oldStatus != nil {
+				status.Ready = oldStatus.Ready
+			}
 		case cs.State == kubecontainer.ContainerStateCreated:
 			// containers that are created but not running are "waiting to be running"
 			status.State.Waiting = &v1.ContainerStateWaiting{}
