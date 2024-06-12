@@ -171,7 +171,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			if reqClaim == nil {
 				return fmt.Errorf("NodePrepareResources returned result for unknown claim UID %s", claimUID)
 			}
-			if result.Error != "" {
+			if result.GetError() != "" {
 				return fmt.Errorf("NodePrepareResources failed for claim %s/%s: %s", reqClaim.Namespace, reqClaim.Name, result.Error)
 			}
 
@@ -179,11 +179,11 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 
 			// Add the CDI Devices returned by NodePrepareResources to
 			// the claimInfo object.
-			err = claimInfo.addCDIDevices(pluginName, result.CDIDevices)
+			err = claimInfo.addCDIDevices(pluginName, result.GetCDIDevices())
 			if err != nil {
 				return fmt.Errorf("failed to add CDIDevices to claimInfo %+v: %+v", claimInfo, err)
 			}
-			// mark claim as (successfully) prepared by manager, so next time we dont prepare it.
+			// mark claim as (successfully) prepared by manager, so next time we don't prepare it.
 			claimInfo.prepared = true
 
 			// TODO: We (re)add the claimInfo object to the cache and
@@ -379,7 +379,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			if reqClaim == nil {
 				return fmt.Errorf("NodeUnprepareResources returned result for unknown claim UID %s", claimUID)
 			}
-			if result.Error != "" {
+			if result.GetError() != "" {
 				return fmt.Errorf("NodeUnprepareResources failed for claim %s/%s: %s", reqClaim.Namespace, reqClaim.Name, result.Error)
 			}
 
