@@ -25,7 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -155,7 +155,7 @@ func TestAddFlags(t *testing.T) {
 						KeyFile:        "/var/run/kubernetes/etcd.key",
 						TrustedCAFile:  "/var/run/kubernetes/etcdca.crt",
 						CertFile:       "/var/run/kubernetes/etcdce.crt",
-						TracerProvider: oteltrace.NewNoopTracerProvider(),
+						TracerProvider: noopoteltrace.NewTracerProvider(),
 					},
 					Prefix:                "/registry",
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
