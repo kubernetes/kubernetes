@@ -299,7 +299,7 @@ func (in instrumentedImageManagerService) ImageStatus(ctx context.Context, image
 	return out, err
 }
 
-func (in instrumentedImageManagerService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (in instrumentedImageManagerService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (*runtimeapi.PullImageResponse, error) {
 	const operation = "pull_image"
 	defer recordOperation(operation, time.Now())
 

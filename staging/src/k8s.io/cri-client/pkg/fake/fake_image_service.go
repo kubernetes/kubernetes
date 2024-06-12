@@ -54,7 +54,7 @@ func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 	}
 
 	return &kubeapi.PullImageResponse{
-		ImageRef: image,
+		ImageRef: image.GetImageRef(),
 	}, nil
 }
 

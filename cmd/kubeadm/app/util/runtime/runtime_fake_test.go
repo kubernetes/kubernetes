@@ -42,7 +42,7 @@ type fakeImpl struct {
 		err error
 	}
 	pullImageReturns struct {
-		res string
+		res *v1.PullImageResponse
 		err error
 	}
 	removePodSandboxReturns struct {
@@ -105,14 +105,14 @@ func (fake *fakeImpl) NewRemoteRuntimeServiceReturns(res cri.RuntimeService, err
 	}{res, err}
 }
 
-func (fake *fakeImpl) PullImage(context.Context, cri.ImageManagerService, *v1.ImageSpec, *v1.AuthConfig, *v1.PodSandboxConfig) (string, error) {
+func (fake *fakeImpl) PullImage(context.Context, cri.ImageManagerService, *v1.ImageSpec, *v1.AuthConfig, *v1.PodSandboxConfig) (*v1.PullImageResponse, error) {
 	fakeReturns := fake.pullImageReturns
 	return fakeReturns.res, fakeReturns.err
 }
 
-func (fake *fakeImpl) PullImageReturns(res string, err error) {
+func (fake *fakeImpl) PullImageReturns(res *v1.PullImageResponse, err error) {
 	fake.pullImageReturns = struct {
-		res string
+		res *v1.PullImageResponse
 		err error
 	}{res, err}
 }

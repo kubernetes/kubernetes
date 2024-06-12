@@ -292,7 +292,7 @@ func TestPullImage(t *testing.T) {
 		{
 			name: "invalid: pull image fails",
 			prepare: func(mock *fakeImpl) {
-				mock.PullImageReturns("", errTest)
+				mock.PullImageReturns(nil, errTest)
 			},
 			shouldError: true,
 		},
@@ -478,7 +478,7 @@ func TestPullImagesInParallel(t *testing.T) {
 		{
 			name: "invalid: pull fails",
 			prepare: func(mock *fakeImpl) {
-				mock.PullImageReturns("", errTest)
+				mock.PullImageReturns(nil, errTest)
 			},
 			shouldError: true,
 		},

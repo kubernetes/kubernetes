@@ -50,13 +50,13 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	if !withCredentials {
 		klog.V(3).InfoS("Pulling image without credentials", "image", img)
 
-		imageRef, err := m.imageService.PullImage(ctx, imgSpec, nil, podSandboxConfig)
+		resp, err := m.imageService.PullImage(ctx, imgSpec, nil, podSandboxConfig)
 		if err != nil {
 			klog.ErrorS(err, "Failed to pull image", "image", img)
 			return "", err
 		}
 
-		return imageRef, nil
+		return resp.GetImageRef(), nil
 	}
 
 	var pullErrs []error
@@ -70,10 +70,10 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 			RegistryToken: currentCreds.RegistryToken,
 		}
 
-		imageRef, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
+		resp, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
 		// If there was no error, return success
 		if err == nil {
-			return imageRef, nil
+			return resp.GetImageRef(), nil
 		}
 
 		pullErrs = append(pullErrs, err)
