@@ -819,7 +819,9 @@ func TestAddConditionAndDelete(t *testing.T) {
 					}
 					t.Cleanup(func() {
 						zero := int64(0)
-						storage.Delete(testContext, newPod.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{GracePeriodSeconds: &zero})
+						if _, _, err := storage.Delete(testContext, newPod.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{GracePeriodSeconds: &zero}); err != nil && !apierrors.IsNotFound(err) {
+							t.Fatal(err)
+						}
 					})
 					deleteOptions = tc.makeDeleteOptions(createdObj.(*api.Pod))
 				} else {
