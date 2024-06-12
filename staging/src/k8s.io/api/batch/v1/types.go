@@ -338,8 +338,6 @@ type JobSpec struct {
 	// checked against the backoffLimit. This field cannot be used in combination
 	// with restartPolicy=OnFailure.
 	//
-	// This field is beta-level. It can be used when the `JobPodFailurePolicy`
-	// feature gate is enabled (enabled by default).
 	// +optional
 	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty" protobuf:"bytes,11,opt,name=podFailurePolicy"`
 
@@ -636,7 +634,6 @@ const (
 	// JobReasonPodFailurePolicy reason indicates a job failure condition is added due to
 	// a failed pod matching a pod failure policy rule
 	// https://kep.k8s.io/3329
-	// This is currently a beta field.
 	JobReasonPodFailurePolicy string = "PodFailurePolicy"
 	// JobReasonBackOffLimitExceeded reason indicates that pods within a job have failed a number of
 	// times higher than backOffLimit times.
