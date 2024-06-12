@@ -47,11 +47,11 @@ func TestWebhookLoopback(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Avoid resolvable kubernetes service
-			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
+			config.Extra.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 
 			// Hook into audit to watch requests
-			config.GenericConfig.AuditBackend = auditSinkFunc(func(events ...*auditinternal.Event) {})
-			config.GenericConfig.AuditPolicyRuleEvaluator = auditPolicyRuleEvaluator(func(attrs authorizer.Attributes) audit.RequestAuditConfig {
+			config.ControlPlane.Generic.AuditBackend = auditSinkFunc(func(events ...*auditinternal.Event) {})
+			config.ControlPlane.Generic.AuditPolicyRuleEvaluator = auditPolicyRuleEvaluator(func(attrs authorizer.Attributes) audit.RequestAuditConfig {
 				if attrs.GetPath() == webhookPath {
 					if attrs.GetUser().GetName() != "system:apiserver" {
 						t.Errorf("expected user %q, got %q", "system:apiserver", attrs.GetUser().GetName())

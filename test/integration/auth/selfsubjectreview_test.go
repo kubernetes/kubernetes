@@ -101,8 +101,8 @@ func TestGetsSelfAttributes(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
-			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
-			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 				respMu.RLock()
 				defer respMu.RUnlock()
 				return &authenticator.Response{User: response}, true, nil
@@ -215,8 +215,8 @@ func TestGetsSelfAttributesError(t *testing.T) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
-			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
-			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 				if toggle.Load().(bool) {
 					return &authenticator.Response{
 						User: &user.DefaultInfo{

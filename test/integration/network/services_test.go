@@ -50,7 +50,7 @@ func TestServicesFinalizersRepairLoop(t *testing.T) {
 			opts.ServiceClusterIPRanges = serviceCIDR
 		},
 		ModifyServerConfig: func(cfg *controlplane.Config) {
-			cfg.ExtraConfig.RepairServicesInterval = interval
+			cfg.Extra.RepairServicesInterval = interval
 		},
 	})
 	defer tearDownFn()
