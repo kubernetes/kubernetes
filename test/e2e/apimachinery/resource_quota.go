@@ -1274,7 +1274,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	})
 })
 
-var _ = SIGDescribe("ResourceQuota", feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func() {
+var _ = SIGDescribe("ResourceQuota", framework.WithFeatureGate(features.VolumeAttributesClass), func() {
 	f := framework.NewDefaultFramework("resourcequota-volumeattributesclass")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
