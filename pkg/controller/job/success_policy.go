@@ -27,7 +27,7 @@ import (
 )
 
 func matchSuccessPolicy(logger klog.Logger, successPolicy *batch.SuccessPolicy, completions int32, succeededIndexes orderedIntervals) (string, bool) {
-	if successPolicy == nil || len(succeededIndexes) == 0 {
+	if !feature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) || successPolicy == nil || len(succeededIndexes) == 0 {
 		return "", false
 	}
 
