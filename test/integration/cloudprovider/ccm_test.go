@@ -150,8 +150,13 @@ func Test_ExternalCloudProviderNodeAddresses(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	defaultTestServerFlags := []string{
+		"--endpoint-reconciler-type=none",            // Disable Endpoints Reconciler so it does not keep failing trying to use 127.0.0.1 as a valid Endpoint.
+		"--disable-admission-plugins=ServiceAccount", // Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	}
+
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, defaultTestServerFlags, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(server.ClientConfig)
