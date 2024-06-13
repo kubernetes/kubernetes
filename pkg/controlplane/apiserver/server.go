@@ -190,6 +190,10 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 			c.Extra.PeerEndpointLeaseReconciler,
 			c.Extra.PeerEndpointReconcileInterval,
 			client.Cluster(LocalAdminCluster.Path()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create peer endpoint lease controller: %w", err)
+		}
+
 		s.GenericAPIServer.AddPostStartHookOrDie("peer-endpoint-reconciler-controller",
 			func(hookContext genericapiserver.PostStartHookContext) error {
 				peerEndpointCtrl.Start(hookContext.Done())
@@ -210,6 +214,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(s.ClusterAuthenticationInfo, client.Cluster(LocalAdminCluster.Path()))
+
 		// prime values and start listeners
 		if s.ClusterAuthenticationInfo.ClientCA != nil {
 			s.ClusterAuthenticationInfo.ClientCA.AddListener(controller)

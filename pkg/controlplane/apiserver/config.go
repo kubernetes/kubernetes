@@ -50,7 +50,6 @@ import (
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	clientgoinformers "k8s.io/client-go/informers"
-	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -147,9 +146,11 @@ func BuildGenericConfig(
 		lastErr = fmt.Errorf("failed to create cluster clientset: %v", err)
 		return
 	}
-	versionedInformers = kcpinformers.NewSharedInformerFactory(clusterClient, 10*time.Minute)
 
-	if lastErr = s.Features.ApplyTo(genericConfig, clusterClient, versionedInformers); lastErr != nil {
+	versionedInformers = kcpinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+
+	// TODO(embik): this creates flowcontrol for system:admin, but that's probably wrong.
+	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient.Cluster(LocalAdminCluster.Path()), clientgoinformers.NewSharedInformerFactory(clientgoExternalClient.Cluster(LocalAdminCluster.Path()), 10*time.Minute)); lastErr != nil {
 		return
 	}
 	if lastErr = s.APIEnablement.ApplyTo(genericConfig, resourceConfig, legacyscheme.Scheme); lastErr != nil {
@@ -226,10 +227,6 @@ func BuildGenericConfig(
 	lastErr = s.Audit.ApplyTo(genericConfig)
 	if lastErr != nil {
 		return
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
-		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(s, clusterClient.Cluster(LocalAdminCluster.Path()), informerfactoryhack.Wrap(versionedInformers))
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
@@ -350,7 +347,7 @@ func CreateConfig(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
 	}
-	clientgoExternalClient, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	clientgoExternalClient, err := kcpclient.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
 	}
