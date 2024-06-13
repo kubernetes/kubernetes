@@ -52,12 +52,16 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 
 // Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration converts a private JoinConfiguration to public JoinConfiguration.
 func Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	// Migrate the discovery timeout.
+	out.Discovery.Timeout = in.Timeouts.Discovery.DeepCopy()
 	return autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in, out, s)
 }
 
 // Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration converts a public JoinConfiguration to a private JoinConfiguration.
 func Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	kubeadm.SetDefaultTimeouts(&out.Timeouts)
+	// Migrate the discovery timeout.
+	out.Timeouts.Discovery = in.Discovery.Timeout.DeepCopy()
 	return autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 }
 
