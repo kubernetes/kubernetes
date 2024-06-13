@@ -86,7 +86,8 @@ func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
 	opts := options.NewOptions()
 
 	cmd := &cobra.Command{
-		Use: "kube-scheduler",
+		Use:   "kube-scheduler",
+		Short: "Controls performance, capacity and availability through policies and topology awareness",
 		Long: `The Kubernetes scheduler is a control plane process which assigns
 Pods to Nodes. The scheduler determines which Nodes are valid placements for
 each Pod in the scheduling queue according to constraints and available
