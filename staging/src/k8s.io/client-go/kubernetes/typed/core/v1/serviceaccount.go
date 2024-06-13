@@ -33,6 +33,8 @@ import (
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // ServiceAccountsGetter has a method to return a ServiceAccountInterface.
@@ -85,13 +87,22 @@ func (c *serviceAccounts) Get(ctx context.Context, name string, options metav1.G
 }
 
 // List takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
-func (c *serviceAccounts) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ServiceAccountList, err error) {
-	defer func() {
+func (c *serviceAccounts) List(ctx context.Context, opts metav1.ListOptions) (*v1.ServiceAccountList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for serviceaccounts, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
 		if err == nil {
-			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for serviceaccounts", c.list, opts, result)
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for serviceaccounts", c.list, opts, result)
+			return result, nil
 		}
-	}()
-	return c.list(ctx, opts)
+		klog.Warningf("The watchlist request for serviceaccounts ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for serviceaccounts", c.list, opts, result)
+	}
+	return result, err
 }
 
 // list takes label and field selectors, and returns the list of ServiceAccounts that match those selectors.
@@ -107,6 +118,23 @@ func (c *serviceAccounts) list(ctx context.Context, opts metav1.ListOptions) (re
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ServiceAccounts
+func (c *serviceAccounts) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.ServiceAccountList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.ServiceAccountList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("serviceaccounts").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }

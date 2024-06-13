@@ -30,9 +30,11 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
 	v1 "k8s.io/code-generator/examples/HyphenGroup/apis/example/v1"
 	examplev1 "k8s.io/code-generator/examples/HyphenGroup/applyconfiguration/example/v1"
 	scheme "k8s.io/code-generator/examples/HyphenGroup/clientset/versioned/scheme"
+	"k8s.io/klog/v2"
 )
 
 // ClusterTestTypesGetter has a method to return a ClusterTestTypeInterface.
@@ -85,13 +87,22 @@ func (c *clusterTestTypes) Get(ctx context.Context, name string, options metav1.
 }
 
 // List takes label and field selectors, and returns the list of ClusterTestTypes that match those selectors.
-func (c *clusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
-	defer func() {
+func (c *clusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterTestTypeList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for clustertesttypes, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
 		if err == nil {
-			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for clustertesttypes", c.list, opts, result)
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for clustertesttypes", c.list, opts, result)
+			return result, nil
 		}
-	}()
-	return c.list(ctx, opts)
+		klog.Warningf("The watchlist request for clustertesttypes ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for clustertesttypes", c.list, opts, result)
+	}
+	return result, err
 }
 
 // list takes label and field selectors, and returns the list of ClusterTestTypes that match those selectors.
@@ -106,6 +117,22 @@ func (c *clusterTestTypes) list(ctx context.Context, opts metav1.ListOptions) (r
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ClusterTestTypes
+func (c *clusterTestTypes) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.ClusterTestTypeList{}
+	err = c.client.Get().
+		Resource("clustertesttypes").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
