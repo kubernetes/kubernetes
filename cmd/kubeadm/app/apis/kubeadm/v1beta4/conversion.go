@@ -53,6 +53,7 @@ func Convert_v1beta4_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *Cl
 // Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration converts a public JoinConfiguration to a private JoinConfiguration.
 func Convert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	err := autoConvert_v1beta4_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
+	out.Discovery.Timeout = in.Timeouts.Discovery.DeepCopy()
 	return err
 }
 
