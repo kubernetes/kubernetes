@@ -17,6 +17,8 @@ limitations under the License.
 package metrics
 
 import (
+	"fmt"
+
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -24,8 +26,11 @@ import (
 type KubeProxyMetrics testutil.Metrics
 
 // GetCounterMetricValue returns value for metric type counter.
-func (m *KubeProxyMetrics) GetCounterMetricValue(metricName string) float64 {
-	return float64(testutil.Metrics(*m)[metricName][0].Value)
+func (m *KubeProxyMetrics) GetCounterMetricValue(metricName string) (float64, error) {
+	if len(testutil.Metrics(*m)[metricName]) == 0 {
+		return 0, fmt.Errorf("metric '%s' not found", metricName)
+	}
+	return float64(testutil.Metrics(*m)[metricName][0].Value), nil
 }
 
 func newKubeProxyMetricsMetrics() KubeProxyMetrics {
