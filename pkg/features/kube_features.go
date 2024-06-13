@@ -1044,7 +1044,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobManagedBy: {Default: false, PreRelease: featuregate.Alpha},
 
-	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
+	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.GA}, // remove in 1.33
 
 	JobPodReplacementPolicy: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1102,7 +1102,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodDeletionCost: {Default: true, PreRelease: featuregate.Beta},
 
-	PodDisruptionConditions: {Default: true, PreRelease: featuregate.Beta},
+	PodDisruptionConditions: {Default: true, PreRelease: featuregate.GA}, // remove in 1.33
 
 	PodReadyToStartContainersCondition: {Default: true, PreRelease: featuregate.Beta},
 
