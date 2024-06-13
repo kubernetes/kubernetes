@@ -21,6 +21,7 @@
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/gogo/protobuf": "unmaintained",
       "github.com/golang/mock": "unmaintained, archive mode",
+      "github.com/google/gofuzz": "unmaintained, archive mode",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
@@ -118,6 +119,20 @@
         "k8s.io/kubernetes",
         "k8s.io/metrics"
       ],
+      "github.com/google/gofuzz": [
+        "github.com/json-iterator/go",
+        "k8s.io/apiextensions-apiserver",
+        "k8s.io/apimachinery",
+        "k8s.io/apiserver",
+        "k8s.io/client-go",
+        "k8s.io/code-generator",
+        "k8s.io/kube-aggregator",
+        "k8s.io/kube-openapi",
+        "k8s.io/kubernetes",
+        "k8s.io/sample-apiserver",
+        "sigs.k8s.io/kustomize/kyaml",
+        "sigs.k8s.io/structured-merge-diff/v4"
+      ],
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
@@ -193,6 +208,7 @@
     },
     "unwantedVendored": [
       "github.com/gogo/protobuf",
+      "github.com/google/gofuzz",
       "github.com/google/shlex",
       "github.com/gregjones/httpcache",
       "github.com/grpc-ecosystem/go-grpc-prometheus",
