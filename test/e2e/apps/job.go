@@ -99,7 +99,14 @@ var _ = SIGDescribe("Job", func() {
 		gomega.Expect(successes).To(gomega.Equal(completions), "expected %d successful job pods, but got  %d", completions, successes)
 	})
 
-	ginkgo.It("should allow to use the pod failure policy on exit code to fail the job early", func(ctx context.Context) {
+	/*
+		Release: v1.31
+		Testname: Verify Pod Failure policy allows to fail job early on exit code.
+		Description: Create a job with pod failure policy, and exactly one
+		pod failing. The exit code of the failed pod matches the pod failure
+		policy triggering the Job failure.
+	*/
+	framework.ConformanceIt("should allow to use the pod failure policy on exit code to fail the job early", func(ctx context.Context) {
 
 		// We fail the Job's pod only once to ensure the backoffLimit is not
 		// reached and thus the job is failed due to the pod failure policy
@@ -135,7 +142,15 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to ensure job failure in namespace: %s", f.Namespace.Name)
 	})
 
-	ginkgo.It("should allow to use the pod failure policy to not count the failure towards the backoffLimit", func(ctx context.Context) {
+	/*
+		Release: v1.31
+		Testname: Verify Pod Failure policy allows to do not count failed pods towards backoffLimit.
+		Description: Create a job with pod failure policy, and exactly one
+		pod failing. The exit code of the failed pod matches the pod failure
+		policy. The pod failure is ignored and backoffLimit is not exceeded.
+		The Job succeeds.
+	*/
+	framework.ConformanceIt("should allow to use the pod failure policy to not count the failure towards the backoffLimit", func(ctx context.Context) {
 
 		// We set the backoffLimit to 0 so that any pod failure would trigger
 		// job failure if not for the pod failure policy to ignore the failed
@@ -174,6 +189,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
+		Release: v1.31
 		Testname: Ensure pod failure policy allows to ignore failure for an evicted pod; matching on the exit code
 		Description: This test is using an indexed job. The pod corresponding to the 0th index
 		creates a marker file on the host and runs 'forever' until evicted. We use
@@ -191,7 +207,7 @@ var _ = SIGDescribe("Job", func() {
 		5. Evict the 0-indexed pod, the failure is ignored as it matches the pod failure policy
 		6. Await for the job to successfully complete
 	*/
-	ginkgo.It("should allow to use a pod failure policy to ignore failure for an evicted pod; matching on the exit code", func(ctx context.Context) {
+	framework.ConformanceIt("should allow to use a pod failure policy to ignore failure for an evicted pod; matching on the exit code", func(ctx context.Context) {
 		// We set the backoffLimit to 0 so that any pod failure would trigger
 		// job failure if not for the pod failure policy to ignore the failed
 		// pods from counting them towards the backoffLimit.
@@ -254,6 +270,7 @@ var _ = SIGDescribe("Job", func() {
 	})
 
 	/*
+		Release: v1.31
 		Testname: Ensure pod failure policy allows to ignore failure for an evicted pod; matching on the DisruptionTarget condition
 		Description: This test is using an indexed job. The pod corresponding to the 0th index
 		creates a marker file on the host and runs 'forever' until evicted. We use
@@ -271,7 +288,7 @@ var _ = SIGDescribe("Job", func() {
 		5. Evict the 0-indexed pod, the failure is ignored as it matches the pod failure policy
 		6. Await for the job to successfully complete
 	*/
-	ginkgo.It("should allow to use a pod failure policy to ignore failure for an evicted pod; matching on the DisruptionTarget condition", func(ctx context.Context) {
+	framework.ConformanceIt("should allow to use a pod failure policy to ignore failure for an evicted pod; matching on the DisruptionTarget condition", func(ctx context.Context) {
 		// We set the backoffLimit to 0 so that any pod failure would trigger
 		// job failure if not for the pod failure policy to ignore the failed
 		// pods from counting them towards the backoffLimit.
