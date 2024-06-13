@@ -140,6 +140,15 @@ var (
 			APIGroup: "example.com",
 		}).
 		Obj()
+	claimParametersOtherNamespace = st.MakeClaimParameters().Name(claimName).Namespace(namespace+"-2").
+					NamedResourcesRequests("some-driver", "true").
+					Shareable(true).
+					GeneratedFrom(&resourcev1alpha2.ResourceClaimParametersReference{
+			Name:     claimName,
+			Kind:     "ResourceClaimParameters",
+			APIGroup: "example.com",
+		}).
+		Obj()
 	classParameters = st.MakeClassParameters().Name(className).Namespace(namespace).
 			NamedResourcesFilters("some-driver", "true").
 			GeneratedFrom(&resourcev1alpha2.ResourceClassParametersReference{
@@ -631,7 +640,7 @@ func TestPlugin(t *testing.T) {
 			pod:     podWithClaimName,
 			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
 			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
-			objs:    []apiruntime.Object{claimParameters, classParameters, workerNodeSlice},
+			objs:    []apiruntime.Object{claimParameters, claimParametersOtherNamespace /* must be ignored */, classParameters, workerNodeSlice},
 			want: want{
 				reserve: result{
 					inFlightClaim: claimWithCRD(structuredAllocatedClaimWithParams),
