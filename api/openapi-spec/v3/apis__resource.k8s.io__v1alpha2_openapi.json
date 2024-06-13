@@ -762,10 +762,6 @@
       "io.k8s.api.resource.v1alpha2.ResourceClaimSpec": {
         "description": "ResourceClaimSpec defines how a resource is to be allocated.",
         "properties": {
-          "allocationMode": {
-            "description": "Allocation can start immediately or when a Pod wants to use the resource. \"WaitForFirstConsumer\" is the default.",
-            "type": "string"
-          },
           "parametersRef": {
             "allOf": [
               {

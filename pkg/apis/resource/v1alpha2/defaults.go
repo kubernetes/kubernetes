@@ -17,16 +17,9 @@ limitations under the License.
 package v1alpha2
 
 import (
-	"k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
-}
-
-func SetDefaults_ResourceClaimSpec(obj *v1alpha2.ResourceClaimSpec) {
-	if obj.AllocationMode == "" {
-		obj.AllocationMode = v1alpha2.AllocationModeWaitForFirstConsumer
-	}
 }

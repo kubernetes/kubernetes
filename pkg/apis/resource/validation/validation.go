@@ -46,13 +46,8 @@ func validateResourceClaimSpec(spec *resource.ResourceClaimSpec, fldPath *field.
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClassName"), spec.ResourceClassName, msg))
 	}
 	allErrs = append(allErrs, validateResourceClaimParametersRef(spec.ParametersRef, fldPath.Child("parametersRef"))...)
-	if !supportedAllocationModes.Has(string(spec.AllocationMode)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("allocationMode"), spec.AllocationMode, supportedAllocationModes.List()))
-	}
 	return allErrs
 }
-
-var supportedAllocationModes = sets.NewString(string(resource.AllocationModeImmediate), string(resource.AllocationModeWaitForFirstConsumer))
 
 // It would have been nice to use Go generics to reuse the same validation
 // function for Kind and Name in both types, but generics cannot be used to

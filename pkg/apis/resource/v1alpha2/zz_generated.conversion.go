@@ -1159,7 +1159,6 @@ func Convert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSch
 func autoConvert_v1alpha2_ResourceClaimSpec_To_resource_ResourceClaimSpec(in *v1alpha2.ResourceClaimSpec, out *resource.ResourceClaimSpec, s conversion.Scope) error {
 	out.ResourceClassName = in.ResourceClassName
 	out.ParametersRef = (*resource.ResourceClaimParametersReference)(unsafe.Pointer(in.ParametersRef))
-	out.AllocationMode = resource.AllocationMode(in.AllocationMode)
 	return nil
 }
 
@@ -1171,7 +1170,6 @@ func Convert_v1alpha2_ResourceClaimSpec_To_resource_ResourceClaimSpec(in *v1alph
 func autoConvert_resource_ResourceClaimSpec_To_v1alpha2_ResourceClaimSpec(in *resource.ResourceClaimSpec, out *v1alpha2.ResourceClaimSpec, s conversion.Scope) error {
 	out.ResourceClassName = in.ResourceClassName
 	out.ParametersRef = (*v1alpha2.ResourceClaimParametersReference)(unsafe.Pointer(in.ParametersRef))
-	out.AllocationMode = v1alpha2.AllocationMode(in.AllocationMode)
 	return nil
 }
 

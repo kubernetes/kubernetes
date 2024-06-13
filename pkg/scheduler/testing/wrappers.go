@@ -946,12 +946,6 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 	return wrapper
 }
 
-// AllocationMode sets the allocation mode of the inner object.
-func (wrapper *ResourceClaimWrapper) AllocationMode(a resourcev1alpha2.AllocationMode) *ResourceClaimWrapper {
-	wrapper.ResourceClaim.Spec.AllocationMode = a
-	return wrapper
-}
-
 // ParametersRef sets a reference to a ResourceClaimParameters.resource.k8s.io.
 func (wrapper *ResourceClaimWrapper) ParametersRef(name string) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Spec.ParametersRef = &resourcev1alpha2.ResourceClaimParametersReference{

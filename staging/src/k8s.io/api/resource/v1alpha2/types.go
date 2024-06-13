@@ -72,33 +72,7 @@ type ResourceClaimSpec struct {
 	// The object must be in the same namespace as the ResourceClaim.
 	// +optional
 	ParametersRef *ResourceClaimParametersReference `json:"parametersRef,omitempty" protobuf:"bytes,2,opt,name=parametersRef"`
-
-	// Allocation can start immediately or when a Pod wants to use the
-	// resource. "WaitForFirstConsumer" is the default.
-	// +optional
-	AllocationMode AllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode"`
 }
-
-// AllocationMode describes whether a ResourceClaim gets allocated immediately
-// when it gets created (AllocationModeImmediate) or whether allocation is
-// delayed until it is needed for a Pod
-// (AllocationModeWaitForFirstConsumer). Other modes might get added in the
-// future.
-type AllocationMode string
-
-const (
-	// When a ResourceClaim has AllocationModeWaitForFirstConsumer, allocation is
-	// delayed until a Pod gets scheduled that needs the ResourceClaim. The
-	// scheduler will consider all resource requirements of that Pod and
-	// trigger allocation for a node that fits the Pod.
-	AllocationModeWaitForFirstConsumer AllocationMode = "WaitForFirstConsumer"
-
-	// When a ResourceClaim has AllocationModeImmediate, allocation starts
-	// as soon as the ResourceClaim gets created. This is done without
-	// considering the needs of Pods that will use the ResourceClaim
-	// because those Pods are not known yet.
-	AllocationModeImmediate AllocationMode = "Immediate"
-)
 
 // ResourceClaimStatus tracks whether the resource has been allocated and what
 // the resulting attributes are.

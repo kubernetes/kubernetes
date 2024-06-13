@@ -57,47 +57,7 @@
       "resourceHandles": [
         {
           "driverName": "driverNameValue",
-          "data": "dataValue",
-          "structuredData": {
-            "vendorClassParameters": {
-              "apiVersion": "example.com/v1",
-              "kind": "CustomType",
-              "spec": {
-                "replicas": 1
-              },
-              "status": {
-                "available": 1
-              }
-            },
-            "vendorClaimParameters": {
-              "apiVersion": "example.com/v1",
-              "kind": "CustomType",
-              "spec": {
-                "replicas": 1
-              },
-              "status": {
-                "available": 1
-              }
-            },
-            "nodeName": "nodeNameValue",
-            "results": [
-              {
-                "vendorRequestParameters": {
-                  "apiVersion": "example.com/v1",
-                  "kind": "CustomType",
-                  "spec": {
-                    "replicas": 1
-                  },
-                  "status": {
-                    "available": 1
-                  }
-                },
-                "namedResources": {
-                  "name": "nameValue"
-                }
-              }
-            ]
-          }
+          "data": "dataValue"
         }
       ],
       "availableOnNodes": {

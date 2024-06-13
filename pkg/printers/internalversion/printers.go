@@ -634,7 +634,6 @@ func AddHandlers(h printers.PrintHandler) {
 	resourceClaimColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
-		{Name: "AllocationMode", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["allocationMode"]},
 		{Name: "State", Type: "string", Description: "A summary of the current state (allocated, pending, reserved, etc.)."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
@@ -644,7 +643,6 @@ func AddHandlers(h printers.PrintHandler) {
 	resourceClaimTemplateColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
-		{Name: "AllocationMode", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["allocationMode"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceClaimTemplateColumnDefinitions, printResourceClaimTemplate)
@@ -3002,7 +3000,7 @@ func printResourceClaim(obj *resource.ResourceClaim, options printers.GenerateOp
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.ResourceClassName, string(obj.Spec.AllocationMode), resourceClaimState(obj), translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.ResourceClassName, resourceClaimState(obj), translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1.TableRow{row}, nil
 }
@@ -3043,7 +3041,7 @@ func printResourceClaimTemplate(obj *resource.ResourceClaimTemplate, options pri
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Spec.ResourceClassName, string(obj.Spec.Spec.AllocationMode), translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Spec.ResourceClassName, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1.TableRow{row}, nil
 }

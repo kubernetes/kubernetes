@@ -31,7 +31,6 @@ var resourceClaim = &resource.ResourceClaim{
 	},
 	Spec: resource.ResourceClaimSpec{
 		ResourceClassName: "valid-class",
-		AllocationMode:    resource.AllocationModeImmediate,
 	},
 }
 

@@ -515,48 +515,7 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 		logger.V(5).Info("ResourceClaim is allocated")
 		return nil
 	}
-	if claim.Spec.AllocationMode != resourcev1alpha2.AllocationModeImmediate {
-		logger.V(5).Info("ResourceClaim waiting for first consumer")
-		return nil
-	}
-
-	// We need the ResourceClass to determine whether we should allocate it.
-	class, err := ctrl.rcLister.Get(claim.Spec.ResourceClassName)
-	if err != nil {
-		return err
-	}
-	if class.DriverName != ctrl.name {
-		// Not ours *at the moment*. This can change, so requeue and
-		// check again. We could trigger a faster check when the
-		// ResourceClass changes, but that shouldn't occur much in
-		// practice and thus isn't worth the effort.
-		//
-		// We use exponential backoff because it is unlikely that
-		// the ResourceClass changes much.
-		logger.V(5).Info("ResourceClaim is handled by other driver", "driver", class.DriverName)
-		return errRequeue
-	}
-
-	// Check parameters. Do not record event to Claim if its parameters are invalid,
-	// syncKey will record the error.
-	claimParameters, classParameters, err := ctrl.getParameters(ctx, claim, class, false)
-	if err != nil {
-		return err
-	}
-
-	claimAllocations := claimAllocations{&ClaimAllocation{
-		Claim:           claim,
-		ClaimParameters: claimParameters,
-		Class:           class,
-		ClassParameters: classParameters,
-	}}
-
-	ctrl.allocateClaims(ctx, claimAllocations, "", nil)
-
-	if claimAllocations[0].Error != nil {
-		return fmt.Errorf("allocate: %v", claimAllocations[0].Error)
-	}
-
+	logger.V(5).Info("ResourceClaim waiting for first consumer")
 	return nil
 }
 
@@ -677,10 +636,6 @@ func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim
 		if err := resourceclaim.IsForPod(pod, claim); err != nil {
 			return nil, err
 		}
-	}
-	if claim.Spec.AllocationMode != resourcev1alpha2.AllocationModeWaitForFirstConsumer {
-		// Nothing to do for it as part of pod scheduling.
-		return nil, nil
 	}
 	if claim.Status.Allocation != nil {
 		// Already allocated, class and parameter are not needed and nothing

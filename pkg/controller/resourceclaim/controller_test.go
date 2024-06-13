@@ -281,7 +281,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name:   "clear-reserved-delayed-allocation",
+			name:   "clear-reserved",
 			pods:   []*v1.Pod{},
 			key:    claimKey(testClaimReserved),
 			claims: []*resourcev1alpha2.ResourceClaim{testClaimReserved},
@@ -293,7 +293,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name:   "clear-reserved-delayed-allocation-structured",
+			name:   "clear-reserved-structured",
 			pods:   []*v1.Pod{},
 			key:    claimKey(testClaimReserved),
 			claims: []*resourcev1alpha2.ResourceClaim{structuredParameters(testClaimReserved)},
@@ -306,7 +306,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name: "dont-clear-reserved-delayed-allocation-structured",
+			name: "dont-clear-reserved-structured",
 			pods: []*v1.Pod{testPodWithResource},
 			key:  claimKey(testClaimReserved),
 			claims: func() []*resourcev1alpha2.ResourceClaim {
@@ -318,50 +318,16 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name: "clear-reserved-immediate-allocation",
-			pods: []*v1.Pod{},
-			key:  claimKey(testClaimReserved),
-			claims: func() []*resourcev1alpha2.ResourceClaim {
-				claim := testClaimReserved.DeepCopy()
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
-				return []*resourcev1alpha2.ResourceClaim{claim}
-			}(),
-			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
-				claim := testClaimAllocated.DeepCopy()
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
-				return []resourcev1alpha2.ResourceClaim{*claim}
-			}(),
-			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
-			name: "clear-reserved-immediate-allocation-structured",
+			name: "clear-reserved-structured-deleted",
 			pods: []*v1.Pod{},
 			key:  claimKey(testClaimReserved),
 			claims: func() []*resourcev1alpha2.ResourceClaim {
 				claim := structuredParameters(testClaimReserved.DeepCopy())
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
-				return []*resourcev1alpha2.ResourceClaim{claim}
-			}(),
-			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
-				claim := structuredParameters(testClaimAllocated.DeepCopy())
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
-				return []resourcev1alpha2.ResourceClaim{*claim}
-			}(),
-			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
-			name: "clear-reserved-immediate-allocation-structured-deleted",
-			pods: []*v1.Pod{},
-			key:  claimKey(testClaimReserved),
-			claims: func() []*resourcev1alpha2.ResourceClaim {
-				claim := structuredParameters(testClaimReserved.DeepCopy())
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
 				claim.DeletionTimestamp = &metav1.Time{}
 				return []*resourcev1alpha2.ResourceClaim{claim}
 			}(),
 			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
 				claim := structuredParameters(testClaimAllocated.DeepCopy())
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
 				claim.DeletionTimestamp = &metav1.Time{}
 				claim.Finalizers = []string{}
 				claim.Status.Allocation = nil
@@ -370,18 +336,16 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name: "immediate-allocation-structured-deleted",
+			name: "structured-deleted",
 			pods: []*v1.Pod{},
 			key:  claimKey(testClaimReserved),
 			claims: func() []*resourcev1alpha2.ResourceClaim {
 				claim := structuredParameters(testClaimAllocated.DeepCopy())
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
 				claim.DeletionTimestamp = &metav1.Time{}
 				return []*resourcev1alpha2.ResourceClaim{claim}
 			}(),
 			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
 				claim := structuredParameters(testClaimAllocated.DeepCopy())
-				claim.Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
 				claim.DeletionTimestamp = &metav1.Time{}
 				claim.Finalizers = []string{}
 				claim.Status.Allocation = nil
@@ -390,7 +354,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedMetrics: expectedMetrics{0, 0},
 		},
 		{
-			name: "clear-reserved-when-done-delayed-allocation",
+			name: "clear-reserved-when-done",
 			pods: func() []*v1.Pod {
 				pods := []*v1.Pod{testPodWithResource.DeepCopy()}
 				pods[0].Status.Phase = v1.PodSucceeded
@@ -406,28 +370,6 @@ func TestSyncHandler(t *testing.T) {
 				claims := []resourcev1alpha2.ResourceClaim{*testClaimAllocated.DeepCopy()}
 				claims[0].OwnerReferences = nil
 				claims[0].Status.DeallocationRequested = true
-				return claims
-			}(),
-			expectedMetrics: expectedMetrics{0, 0},
-		},
-		{
-			name: "clear-reserved-when-done-immediate-allocation",
-			pods: func() []*v1.Pod {
-				pods := []*v1.Pod{testPodWithResource.DeepCopy()}
-				pods[0].Status.Phase = v1.PodSucceeded
-				return pods
-			}(),
-			key: claimKey(testClaimReserved),
-			claims: func() []*resourcev1alpha2.ResourceClaim {
-				claims := []*resourcev1alpha2.ResourceClaim{testClaimReserved.DeepCopy()}
-				claims[0].OwnerReferences = nil
-				claims[0].Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
-				return claims
-			}(),
-			expectedClaims: func() []resourcev1alpha2.ResourceClaim {
-				claims := []resourcev1alpha2.ResourceClaim{*testClaimAllocated.DeepCopy()}
-				claims[0].OwnerReferences = nil
-				claims[0].Spec.AllocationMode = resourcev1alpha2.AllocationModeImmediate
 				return claims
 			}(),
 			expectedMetrics: expectedMetrics{0, 0},
@@ -587,7 +529,6 @@ func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) 
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: resourcev1alpha2.ResourceClaimSpec{
 			ResourceClassName: classname,
-			AllocationMode:    resourcev1alpha2.AllocationModeWaitForFirstConsumer,
 		},
 	}
 	if owner != nil {
@@ -607,7 +548,6 @@ func makeGeneratedClaim(podClaimName, generateName, namespace, classname string,
 		},
 		Spec: resourcev1alpha2.ResourceClaimSpec{
 			ResourceClassName: classname,
-			AllocationMode:    resourcev1alpha2.AllocationModeWaitForFirstConsumer,
 		},
 	}
 	if owner != nil {
@@ -708,10 +648,6 @@ func normalizeClaims(claims []resourcev1alpha2.ResourceClaim) []resourcev1alpha2
 	for i := range claims {
 		if len(claims[i].Status.ReservedFor) == 0 {
 			claims[i].Status.ReservedFor = nil
-		}
-		if claims[i].Spec.AllocationMode == "" {
-			// This emulates defaulting.
-			claims[i].Spec.AllocationMode = resourcev1alpha2.AllocationModeWaitForFirstConsumer
 		}
 	}
 	return claims

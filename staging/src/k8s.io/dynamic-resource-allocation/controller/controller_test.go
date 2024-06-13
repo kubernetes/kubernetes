@@ -53,8 +53,6 @@ func TestController(t *testing.T) {
 	}
 	claim := createClaim(claimName, claimNamespace, className)
 	otherClaim := createClaim(claimName, claimNamespace, otherClassName)
-	delayedClaim := claim.DeepCopy()
-	delayedClaim.Spec.AllocationMode = resourcev1alpha2.AllocationModeWaitForFirstConsumer
 	podName := "pod"
 	podKey := "schedulingCtx:default/pod"
 	pod := createPod(podName, claimNamespace, nil)
@@ -148,94 +146,6 @@ func TestController(t *testing.T) {
 			classes:       classes,
 			claim:         otherClaim,
 			expectedClaim: otherClaim,
-			expectedError: errRequeue.Error(), // class might change
-		},
-		// Immediate allocation:
-		// deletion time stamp set, our finalizer set, not allocated  -> remove finalizer
-		"immediate-deleted-finalizer-removal": {
-			key:           claimKey,
-			classes:       classes,
-			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
-			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(claim),
-		},
-		// deletion time stamp set, our finalizer set, not allocated, stopping fails  -> requeue
-		"immediate-deleted-finalizer-stop-failure": {
-			key:           claimKey,
-			classes:       classes,
-			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
-			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
-			expectedClaim: withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
-			expectedError: "stop allocation: fake error",
-		},
-		// deletion time stamp set, other finalizer set, not allocated  -> do nothing
-		"immediate-deleted-finalizer-no-removal": {
-			key:           claimKey,
-			classes:       classes,
-			claim:         withFinalizer(withDeletionTimestamp(claim), otherFinalizer),
-			expectedClaim: withFinalizer(withDeletionTimestamp(claim), otherFinalizer),
-		},
-		// deletion time stamp set, finalizer set, allocated  -> deallocate
-		"immediate-deleted-allocated": {
-			key:           claimKey,
-			classes:       classes,
-			claim:         withAllocate(withDeletionTimestamp(claim)),
-			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(claim),
-		},
-		// deletion time stamp set, finalizer set, allocated, deallocation fails  -> requeue
-		"immediate-deleted-deallocate-failure": {
-			key:           claimKey,
-			classes:       classes,
-			claim:         withAllocate(withDeletionTimestamp(claim)),
-			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
-			expectedClaim: withAllocate(withDeletionTimestamp(claim)),
-			expectedError: "deallocate: fake error",
-		},
-		// deletion time stamp set, finalizer not set -> do nothing
-		"immediate-deleted-no-finalizer": {
-			key:           claimKey,
-			classes:       classes,
-			claim:         withDeletionTimestamp(claim),
-			expectedClaim: withDeletionTimestamp(claim),
-		},
-		// not deleted, not allocated, no finalizer -> add finalizer, allocate
-		"immediate-do-allocation": {
-			key:     claimKey,
-			classes: classes,
-			claim:   claim,
-			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
-				expectClaimParameters(map[string]interface{}{claimName: 2}).
-				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, allocErr: nil}}),
-			expectedClaim: withAllocate(claim),
-		},
-		// not deleted, not allocated, finalizer -> allocate
-		"immediate-continue-allocation": {
-			key:     claimKey,
-			classes: classes,
-			claim:   withFinalizer(claim, ourFinalizer),
-			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
-				expectClaimParameters(map[string]interface{}{claimName: 2}).
-				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, allocErr: nil}}),
-			expectedClaim: withAllocate(claim),
-		},
-		// not deleted, not allocated, finalizer, fail allocation -> requeue
-		"immediate-fail-allocation": {
-			key:     claimKey,
-			classes: classes,
-			claim:   withFinalizer(claim, ourFinalizer),
-			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
-				expectClaimParameters(map[string]interface{}{claimName: 2}).
-				expectAllocate(map[string]allocate{claimName: {allocErr: errors.New("fake error")}}),
-			expectedClaim: withFinalizer(claim, ourFinalizer),
-			expectedError: "allocate: fake error",
-		},
-		// not deleted, allocated -> do nothing
-		"immediate-allocated-nop": {
-			key:           claimKey,
-			classes:       classes,
-			claim:         withAllocate(claim),
-			expectedClaim: withAllocate(claim),
 		},
 
 		// not deleted, reallocate -> deallocate
@@ -257,62 +167,60 @@ func TestController(t *testing.T) {
 			expectedError: "deallocate: fake error",
 		},
 
-		// Delayed allocation is similar in some cases, but not quite
-		// the same.
 		// deletion time stamp set, our finalizer set, not allocated  -> remove finalizer
-		"delayed-deleted-finalizer-removal": {
+		"deleted-finalizer-removal": {
 			key:           claimKey,
 			classes:       classes,
-			claim:         withFinalizer(withDeletionTimestamp(delayedClaim), ourFinalizer),
+			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(delayedClaim),
+			expectedClaim: withDeletionTimestamp(claim),
 		},
 		// deletion time stamp set, our finalizer set, not allocated, stopping fails  -> requeue
-		"delayed-deleted-finalizer-stop-failure": {
+		"deleted-finalizer-stop-failure": {
 			key:           claimKey,
 			classes:       classes,
-			claim:         withFinalizer(withDeletionTimestamp(delayedClaim), ourFinalizer),
+			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
-			expectedClaim: withFinalizer(withDeletionTimestamp(delayedClaim), ourFinalizer),
+			expectedClaim: withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
 			expectedError: "stop allocation: fake error",
 		},
 		// deletion time stamp set, other finalizer set, not allocated  -> do nothing
-		"delayed-deleted-finalizer-no-removal": {
+		"deleted-finalizer-no-removal": {
 			key:           claimKey,
 			classes:       classes,
-			claim:         withFinalizer(withDeletionTimestamp(delayedClaim), otherFinalizer),
-			expectedClaim: withFinalizer(withDeletionTimestamp(delayedClaim), otherFinalizer),
+			claim:         withFinalizer(withDeletionTimestamp(claim), otherFinalizer),
+			expectedClaim: withFinalizer(withDeletionTimestamp(claim), otherFinalizer),
 		},
 		// deletion time stamp set, finalizer set, allocated  -> deallocate
-		"delayed-deleted-allocated": {
+		"deleted-allocated": {
 			key:           claimKey,
 			classes:       classes,
-			claim:         withAllocate(withDeletionTimestamp(delayedClaim)),
+			claim:         withAllocate(withDeletionTimestamp(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
-			expectedClaim: withDeletionTimestamp(delayedClaim),
+			expectedClaim: withDeletionTimestamp(claim),
 		},
 		// deletion time stamp set, finalizer set, allocated, deallocation fails  -> requeue
-		"delayed-deleted-deallocate-failure": {
+		"deleted-deallocate-failure": {
 			key:           claimKey,
 			classes:       classes,
-			claim:         withAllocate(withDeletionTimestamp(delayedClaim)),
+			claim:         withAllocate(withDeletionTimestamp(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
-			expectedClaim: withAllocate(withDeletionTimestamp(delayedClaim)),
+			expectedClaim: withAllocate(withDeletionTimestamp(claim)),
 			expectedError: "deallocate: fake error",
 		},
 		// deletion time stamp set, finalizer not set -> do nothing
-		"delayed-deleted-no-finalizer": {
+		"deleted-no-finalizer": {
 			key:           claimKey,
 			classes:       classes,
-			claim:         withDeletionTimestamp(delayedClaim),
-			expectedClaim: withDeletionTimestamp(delayedClaim),
+			claim:         withDeletionTimestamp(claim),
+			expectedClaim: withDeletionTimestamp(claim),
 		},
 		// waiting for first consumer -> do nothing
-		"delayed-pending": {
+		"pending": {
 			key:           claimKey,
 			classes:       classes,
-			claim:         delayedClaim,
-			expectedClaim: delayedClaim,
+			claim:         claim,
+			expectedClaim: claim,
 		},
 
 		// pod with no claims -> shouldn't occur, check again anyway
@@ -324,34 +232,23 @@ func TestController(t *testing.T) {
 			expectedError:         errPeriodic.Error(),
 		},
 
-		// pod with immediate allocation and selected node -> shouldn't occur, check again in case that claim changes
-		"pod-immediate": {
-			key:                   podKey,
-			claim:                 claim,
-			expectedClaim:         claim,
-			pod:                   podWithClaim,
-			schedulingCtx:         withSelectedNode(podSchedulingCtx),
-			expectedSchedulingCtx: withSelectedNode(podSchedulingCtx),
-			expectedError:         errPeriodic.Error(),
-		},
-
-		// pod with delayed allocation, no potential nodes -> shouldn't occur
-		"pod-delayed-no-nodes": {
+		// no potential nodes -> shouldn't occur
+		"no-nodes": {
 			key:                   podKey,
 			classes:               classes,
-			claim:                 delayedClaim,
-			expectedClaim:         delayedClaim,
+			claim:                 claim,
+			expectedClaim:         claim,
 			pod:                   podWithClaim,
 			schedulingCtx:         podSchedulingCtx,
 			expectedSchedulingCtx: podSchedulingCtx,
 		},
 
-		// pod with delayed allocation, potential nodes -> provide unsuitable nodes
-		"pod-delayed-info": {
+		// potential nodes -> provide unsuitable nodes
+		"info": {
 			key:           podKey,
 			classes:       classes,
-			claim:         delayedClaim,
-			expectedClaim: delayedClaim,
+			claim:         claim,
+			expectedClaim: claim,
 			pod:           podWithClaim,
 			schedulingCtx: withPotentialNodes(podSchedulingCtx),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
@@ -361,23 +258,23 @@ func TestController(t *testing.T) {
 			expectedError:         errPeriodic.Error(),
 		},
 
-		// pod with delayed allocation, potential nodes, selected node, missing class -> failure
-		"pod-delayed-missing-class": {
+		// potential nodes, selected node, missing class -> failure
+		"missing-class": {
 			key:                   podKey,
-			claim:                 delayedClaim,
-			expectedClaim:         delayedClaim,
+			claim:                 claim,
+			expectedClaim:         claim,
 			pod:                   podWithClaim,
 			schedulingCtx:         withSelectedNode(withPotentialNodes(podSchedulingCtx)),
 			expectedSchedulingCtx: withSelectedNode(withPotentialNodes(podSchedulingCtx)),
 			expectedError:         `pod claim my-pod-claim: resourceclass.resource.k8s.io "mock-class" not found`,
 		},
 
-		// pod with delayed allocation, potential nodes, selected node -> allocate
-		"pod-delayed-allocate": {
+		// potential nodes, selected node -> allocate
+		"allocate": {
 			key:           podKey,
 			classes:       classes,
-			claim:         delayedClaim,
-			expectedClaim: withReservedFor(withAllocate(delayedClaim), pod),
+			claim:         claim,
+			expectedClaim: withReservedFor(withAllocate(claim), pod),
 			pod:           podWithClaim,
 			schedulingCtx: withSelectedNode(withPotentialNodes(podSchedulingCtx)),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
@@ -387,12 +284,12 @@ func TestController(t *testing.T) {
 			expectedSchedulingCtx: withUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx))),
 			expectedError:         errPeriodic.Error(),
 		},
-		// pod with delayed allocation, potential nodes, selected node, all unsuitable -> update unsuitable nodes
-		"pod-selected-is-potential-node": {
+		// potential nodes, selected node, all unsuitable -> update unsuitable nodes
+		"is-potential-node": {
 			key:           podKey,
 			classes:       classes,
-			claim:         delayedClaim,
-			expectedClaim: delayedClaim,
+			claim:         claim,
+			expectedClaim: claim,
 			pod:           podWithClaim,
 			schedulingCtx: withPotentialNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx))),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
@@ -401,12 +298,12 @@ func TestController(t *testing.T) {
 			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx)), potentialNodes),
 			expectedError:         errPeriodic.Error(),
 		},
-		// pod with delayed allocation, max potential nodes, other selected node, all unsuitable -> update unsuitable nodes with truncation at start
-		"pod-selected-is-potential-node-truncate-first": {
+		// max potential nodes, other selected node, all unsuitable -> update unsuitable nodes with truncation at start
+		"is-potential-node-truncate-first": {
 			key:           podKey,
 			classes:       classes,
-			claim:         delayedClaim,
-			expectedClaim: delayedClaim,
+			claim:         claim,
+			expectedClaim: claim,
 			pod:           podWithClaim,
 			schedulingCtx: withSpecificPotentialNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), maxNodes),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
@@ -415,12 +312,12 @@ func TestController(t *testing.T) {
 			expectedSchedulingCtx: withSpecificUnsuitableNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), append(maxNodes[1:], nodeName)),
 			expectedError:         errPeriodic.Error(),
 		},
-		// pod with delayed allocation, max potential nodes, other selected node, all unsuitable (but in reverse order) -> update unsuitable nodes with truncation at end
+		// max potential nodes, other selected node, all unsuitable (but in reverse order) -> update unsuitable nodes with truncation at end
 		"pod-selected-is-potential-node-truncate-last": {
 			key:           podKey,
 			classes:       classes,
-			claim:         delayedClaim,
-			expectedClaim: delayedClaim,
+			claim:         claim,
+			expectedClaim: claim,
 			pod:           podWithClaim,
 			schedulingCtx: withSpecificPotentialNodes(withSelectedNode(withSpecificPotentialNodes(podSchedulingCtx, maxNodes)), maxNodes),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
@@ -652,7 +549,6 @@ func createClaim(claimName, claimNamespace, className string) *resourcev1alpha2.
 		},
 		Spec: resourcev1alpha2.ResourceClaimSpec{
 			ResourceClassName: className,
-			AllocationMode:    resourcev1alpha2.AllocationModeImmediate,
 		},
 	}
 }

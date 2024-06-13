@@ -329,8 +329,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 		// - a user created a pod with spec.nodeName set, perhaps for testing
 		// - some scheduler was used which is unaware of DRA
 		// - DRA was not enabled in kube-scheduler (version skew, configuration)
-		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer &&
-			claim.Status.Allocation == nil {
+		if claim.Status.Allocation == nil {
 			scheduling, err := ec.podSchedulingLister.PodSchedulingContexts(pod.Namespace).Get(pod.Name)
 			if apierrors.IsNotFound(err) {
 				return true, "need to create PodSchedulingContext for scheduled pod"
@@ -533,8 +532,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 				return err
 			}
 		}
-		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer &&
-			claim.Status.Allocation == nil {
+		if claim.Status.Allocation == nil {
 			logger.V(5).Info("create PodSchedulingContext because claim needs to be allocated", "resourceClaim", klog.KObj(claim))
 			return ec.ensurePodSchedulingContext(ctx, pod)
 		}
@@ -864,19 +862,14 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		// for such claims and not checking for them keeps this code simpler.
 		if len(valid) == 0 {
 			if builtinControllerFinalizer >= 0 {
-				if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer ||
-					claim.DeletionTimestamp != nil {
-					// Allocated by scheduler with structured parameters. We can "deallocate"
-					// by clearing the allocation.
-					claim.Status.Allocation = nil
-				}
-			} else if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
+				// Allocated by scheduler with structured parameters. We can "deallocate"
+				// by clearing the allocation.
+				claim.Status.Allocation = nil
+			} else {
 				// DRA driver controller in the control plane
 				// needs to do the deallocation.
 				claim.Status.DeallocationRequested = true
 			}
-			// In all other cases, we keep the claim allocated, in particular for immediate allocation
-			// with a control plane controller.
 		}
 
 		claim, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})

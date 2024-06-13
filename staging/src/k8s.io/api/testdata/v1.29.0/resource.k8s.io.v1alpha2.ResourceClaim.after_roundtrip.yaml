@@ -55,32 +55,6 @@ status:
     resourceHandles:
     - data: dataValue
       driverName: driverNameValue
-      structuredData:
-        nodeName: nodeNameValue
-        results:
-        - namedResources:
-            name: nameValue
-          vendorRequestParameters:
-            apiVersion: example.com/v1
-            kind: CustomType
-            spec:
-              replicas: 1
-            status:
-              available: 1
-        vendorClaimParameters:
-          apiVersion: example.com/v1
-          kind: CustomType
-          spec:
-            replicas: 1
-          status:
-            available: 1
-        vendorClassParameters:
-          apiVersion: example.com/v1
-          kind: CustomType
-          spec:
-            replicas: 1
-          status:
-            available: 1
     shareable: true
   deallocationRequested: true
   driverName: driverNameValue

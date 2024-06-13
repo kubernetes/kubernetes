@@ -22,7 +22,6 @@ limitations under the License.
 package v1alpha2
 
 import (
-	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,33 +29,5 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1alpha2.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*v1alpha2.ResourceClaim)) })
-	scheme.AddTypeDefaultingFunc(&v1alpha2.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*v1alpha2.ResourceClaimList)) })
-	scheme.AddTypeDefaultingFunc(&v1alpha2.ResourceClaimTemplate{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimTemplate(obj.(*v1alpha2.ResourceClaimTemplate)) })
-	scheme.AddTypeDefaultingFunc(&v1alpha2.ResourceClaimTemplateList{}, func(obj interface{}) {
-		SetObjectDefaults_ResourceClaimTemplateList(obj.(*v1alpha2.ResourceClaimTemplateList))
-	})
 	return nil
-}
-
-func SetObjectDefaults_ResourceClaim(in *v1alpha2.ResourceClaim) {
-	SetDefaults_ResourceClaimSpec(&in.Spec)
-}
-
-func SetObjectDefaults_ResourceClaimList(in *v1alpha2.ResourceClaimList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_ResourceClaim(a)
-	}
-}
-
-func SetObjectDefaults_ResourceClaimTemplate(in *v1alpha2.ResourceClaimTemplate) {
-	SetDefaults_ResourceClaimSpec(&in.Spec.Spec)
-}
-
-func SetObjectDefaults_ResourceClaimTemplateList(in *v1alpha2.ResourceClaimTemplateList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_ResourceClaimTemplate(a)
-	}
 }
