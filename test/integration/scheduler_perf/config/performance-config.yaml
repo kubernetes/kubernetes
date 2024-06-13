@@ -1044,3 +1044,34 @@
       measurePods: 2500
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
+
+# This test case simulates the scheduling when many pods are gated and others are gradually deleted.
+# https://github.com/kubernetes/kubernetes/issues/124384
+- name: SchedulingWhileGated
+  defaultPodTemplatePath: config/templates/light-pod.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: config/templates/node-with-name.yaml
+    # Create pods that will stay gated to the end of the test.
+  - opcode: createPods
+    countParam: $gatedPods
+    podTemplatePath: config/templates/gated-pod.yaml
+    skipWaitToCompletion: true
+    # Wait to make sure gated pods are enqueued in scheduler.
+  - opcode: sleep
+    duration: 5s
+    # Create pods that will be gradually deleted after being scheduled.
+  - opcode: createPods
+    countParam: $deletingPods
+    deletePodsPerSecond: 50
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 1Node
+    labels: [performance, fast]
+    params:
+      gatedPods: 10000
+      deletingPods: 20000
+      measurePods: 20000
