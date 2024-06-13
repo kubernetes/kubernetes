@@ -58,7 +58,6 @@ func validNewClaim(name, ns string) *resource.ResourceClaim {
 		},
 		Spec: resource.ResourceClaimSpec{
 			ResourceClassName: "example",
-			AllocationMode:    resource.AllocationModeImmediate,
 		},
 		Status: resource.ResourceClaimStatus{},
 	}

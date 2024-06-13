@@ -42,14 +42,11 @@ func testClaim(name, namespace string, spec resource.ResourceClaimSpec) *resourc
 }
 
 func TestValidateClaim(t *testing.T) {
-	validMode := resource.AllocationModeImmediate
-	invalidMode := resource.AllocationMode("invalid")
 	goodName := "foo"
 	badName := "!@#$%^"
 	goodNS := "ns"
 	goodClaimSpec := resource.ResourceClaimSpec{
 		ResourceClassName: goodName,
-		AllocationMode:    validMode,
 	}
 	now := metav1.Now()
 	badValue := "spaces not allowed"
@@ -200,14 +197,6 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
-		"bad-mode": {
-			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "allocationMode"), invalidMode, supportedAllocationModes.List())},
-			claim: func() *resource.ResourceClaim {
-				claim := testClaim(goodName, goodNS, goodClaimSpec)
-				claim.Spec.AllocationMode = invalidMode
-				return claim
-			}(),
-		},
 		"good-parameters": {
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, goodClaimSpec)
@@ -279,7 +268,6 @@ func TestValidateClaimUpdate(t *testing.T) {
 	}
 	validClaim := testClaim("foo", "ns", resource.ResourceClaimSpec{
 		ResourceClassName: name,
-		AllocationMode:    resource.AllocationModeImmediate,
 		ParametersRef:     parameters,
 	})
 
@@ -316,18 +304,6 @@ func TestValidateClaimUpdate(t *testing.T) {
 				return claim
 			},
 		},
-		"invalid-update-mode": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimSpec {
-				spec := validClaim.Spec.DeepCopy()
-				spec.AllocationMode = resource.AllocationModeWaitForFirstConsumer
-				return *spec
-			}(), "field is immutable")},
-			oldClaim: validClaim,
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Spec.AllocationMode = resource.AllocationModeWaitForFirstConsumer
-				return claim
-			},
-		},
 	}
 
 	for name, scenario := range scenarios {
@@ -343,7 +319,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 	invalidName := "!@#$%^"
 	validClaim := testClaim("foo", "ns", resource.ResourceClaimSpec{
 		ResourceClassName: "valid",
-		AllocationMode:    resource.AllocationModeImmediate,
 	})
 
 	validAllocatedClaim := validClaim.DeepCopy()

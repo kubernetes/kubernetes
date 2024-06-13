@@ -15589,10 +15589,6 @@
     "io.k8s.api.resource.v1alpha3.ResourceClaimSpec": {
       "description": "ResourceClaimSpec defines how a resource is to be allocated.",
       "properties": {
-        "allocationMode": {
-          "description": "Allocation can start immediately or when a Pod wants to use the resource. \"WaitForFirstConsumer\" is the default.",
-          "type": "string"
-        },
         "parametersRef": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParametersReference",
           "description": "ParametersRef references a separate object with arbitrary parameters that will be used by the driver when allocating a resource for the claim.\n\nThe object must be in the same namespace as the ResourceClaim."

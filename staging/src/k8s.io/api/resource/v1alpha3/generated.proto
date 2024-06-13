@@ -411,11 +411,6 @@ message ResourceClaimSpec {
   // The object must be in the same namespace as the ResourceClaim.
   // +optional
   optional ResourceClaimParametersReference parametersRef = 2;
-
-  // Allocation can start immediately or when a Pod wants to use the
-  // resource. "WaitForFirstConsumer" is the default.
-  // +optional
-  optional string allocationMode = 3;
 }
 
 // ResourceClaimStatus tracks whether the resource has been allocated and what

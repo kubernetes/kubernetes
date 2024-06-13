@@ -33,7 +33,6 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  allocationMode: allocationModeValue
   parametersRef:
     apiGroup: apiGroupValue
     kind: kindValue

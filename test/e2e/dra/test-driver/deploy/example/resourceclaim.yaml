@@ -12,7 +12,6 @@ metadata:
   name: example
   namespace: default
 spec:
-  allocationMode: Immediate
   resourceClassName: example
   parametersRef:
     kind: ConfigMap

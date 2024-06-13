@@ -409,11 +409,11 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/resourceclasses/class1name",
 		},
 		gvr("resource.k8s.io", "v1alpha3", "resourceclaims"): {
-			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}`,
+			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"resourceClassName": "class1name"}}`,
 			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim1name",
 		},
 		gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"): {
-			Stub:             `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}}`,
+			Stub:             `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"resourceClassName": "class1name"}}}`,
 			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
 		},
 		gvr("resource.k8s.io", "v1alpha3", "podschedulingcontexts"): {

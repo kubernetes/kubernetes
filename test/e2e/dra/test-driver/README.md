@@ -78,8 +78,8 @@ configmap/pause-claim-parameters created
 pod/pause created
 
 $ kubectl get resourceclaims
-NAME             CLASSNAME   ALLOCATIONMODE         STATE                AGE
-pause-resource   example     WaitForFirstConsumer   allocated,reserved   19s
+NAME             CLASSNAME   STATE                AGE
+pause-resource   example     allocated,reserved   19s
 
 $ kubectl get pods
 NAME    READY   STATUS    RESTARTS   AGE

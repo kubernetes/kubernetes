@@ -49,8 +49,7 @@
       "apiGroup": "apiGroupValue",
       "kind": "kindValue",
       "name": "nameValue"
-    },
-    "allocationMode": "allocationModeValue"
+    }
   },
   "status": {
     "driverName": "driverNameValue",

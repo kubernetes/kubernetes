@@ -713,8 +713,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	// we allow backoff.
 	pendingDelayedClaims := 0
 	if err := pl.foreachPodResourceClaim(pod, func(podResourceName string, claim *resourceapi.ResourceClaim) {
-		if claim.Spec.AllocationMode == resourceapi.AllocationModeWaitForFirstConsumer &&
-			claim.Status.Allocation == nil &&
+		if claim.Status.Allocation == nil &&
 			!podSchedulingHasClaimInfo(podScheduling, podResourceName) {
 			pendingDelayedClaims++
 		}
@@ -970,9 +969,6 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 				}
 				s.informationsForClaim[index].controller = controller
 				needResourceInformation = true
-			} else if claim.Spec.AllocationMode == resourceapi.AllocationModeImmediate {
-				// This will get resolved by the resource driver.
-				return nil, statusUnschedulable(logger, "unallocated immediate resourceclaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 			}
 		}
 	}
@@ -1161,74 +1157,63 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 	var unavailableClaims []int
 	for index, claim := range state.claims {
 		logger.V(10).Info("filtering based on resource claims of the pod", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
-		switch {
-		case claim.Status.Allocation != nil:
+
+		if claim.Status.Allocation != nil {
 			if nodeSelector := state.informationsForClaim[index].availableOnNode; nodeSelector != nil {
 				if !nodeSelector.Match(node) {
 					logger.V(5).Info("AvailableOnNodes does not match", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 					unavailableClaims = append(unavailableClaims, index)
 				}
 			}
-		case claim.Status.DeallocationRequested:
+			continue
+		}
+
+		if claim.Status.DeallocationRequested {
 			// We shouldn't get here. PreFilter already checked this.
 			return statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
-		case claim.Spec.AllocationMode == resourceapi.AllocationModeWaitForFirstConsumer ||
-			state.informationsForClaim[index].structuredParameters:
-			if selector := state.informationsForClaim[index].availableOnNode; selector != nil {
-				if matches := selector.Match(node); !matches {
-					return statusUnschedulable(logger, "excluded by resource class node filter", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclassName", claim.Spec.ResourceClassName)
-				}
+		}
+
+		if selector := state.informationsForClaim[index].availableOnNode; selector != nil {
+			if matches := selector.Match(node); !matches {
+				return statusUnschedulable(logger, "excluded by resource class node filter", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclassName", claim.Spec.ResourceClassName)
 			}
-			// Can the builtin controller tell us whether the node is suitable?
-			if state.informationsForClaim[index].structuredParameters {
-				suitable, err := state.informationsForClaim[index].controller.nodeIsSuitable(ctx, node.Name, state.resources)
-				if err != nil {
-					// An error indicates that something wasn't configured correctly, for example
-					// writing a CEL expression which doesn't handle a map lookup error. Normally
-					// this should never fail. We could return an error here, but then the pod
-					// would get retried. Instead we ignore the node.
-					return statusUnschedulable(logger, fmt.Sprintf("checking structured parameters failed: %v", err), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
-				}
-				if !suitable {
-					return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
-				}
-			} else {
-				if status := state.informationsForClaim[index].status; status != nil {
-					for _, unsuitableNode := range status.UnsuitableNodes {
-						if node.Name == unsuitableNode {
-							return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "unsuitablenodes", status.UnsuitableNodes)
-						}
+		}
+		// Can the builtin controller tell us whether the node is suitable?
+		if state.informationsForClaim[index].structuredParameters {
+			suitable, err := state.informationsForClaim[index].controller.nodeIsSuitable(ctx, node.Name, state.resources)
+			if err != nil {
+				// An error indicates that something wasn't configured correctly, for example
+				// writing a CEL expression which doesn't handle a map lookup error. Normally
+				// this should never fail. We could return an error here, but then the pod
+				// would get retried. Instead we ignore the node.
+				return statusUnschedulable(logger, fmt.Sprintf("checking structured parameters failed: %v", err), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+			}
+			if !suitable {
+				return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+			}
+		} else {
+			if status := state.informationsForClaim[index].status; status != nil {
+				for _, unsuitableNode := range status.UnsuitableNodes {
+					if node.Name == unsuitableNode {
+						return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "unsuitablenodes", status.UnsuitableNodes)
 					}
 				}
 			}
-		default:
-			// This claim should have been handled above.
-			// Immediate allocation with control plane controller
-			// was already checked for in PreFilter.
-			return statusError(logger, fmt.Errorf("internal error, unexpected allocation mode %v", claim.Spec.AllocationMode))
 		}
 	}
 
 	if len(unavailableClaims) > 0 {
+		// Remember all unavailable claims. This might be observed
+		// concurrently, so we have to lock the state before writing.
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
+
 		if state.unavailableClaims == nil {
 			state.unavailableClaims = sets.New[int]()
 		}
 
 		for _, index := range unavailableClaims {
-			claim := state.claims[index]
-			// Deallocation makes more sense for claims with
-			// delayed allocation. Claims with immediate allocation
-			// would just get allocated again for a random node,
-			// which is unlikely to help the pod.
-			//
-			// Claims with builtin controller are handled like
-			// claims with delayed allocation.
-			if claim.Spec.AllocationMode == resourceapi.AllocationModeWaitForFirstConsumer ||
-				state.informationsForClaim[index].controller != nil {
-				state.unavailableClaims.Insert(index)
-			}
+			state.unavailableClaims.Insert(index)
 		}
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}

@@ -46572,13 +46572,6 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaimSpec(ref common.ReferenceCa
 							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimParametersReference"),
 						},
 					},
-					"allocationMode": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Allocation can start immediately or when a Pod wants to use the resource. \"WaitForFirstConsumer\" is the default.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 				},
 				Required: []string{"resourceClassName"},
 			},
