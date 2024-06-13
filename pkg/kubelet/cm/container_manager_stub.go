@@ -181,6 +181,10 @@ func (cm *containerManagerStub) PodMightNeedToUnprepareResources(UID types.UID) 
 	return false
 }
 
+func (cm *containerManagerStub) PodContainsPinnedCpus(pod *v1.Pod) bool {
+	return false
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }

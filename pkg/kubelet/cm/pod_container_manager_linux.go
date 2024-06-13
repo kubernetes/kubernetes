@@ -297,6 +297,31 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 	return foundPods, nil
 }
 
+func (m *podContainerManagerImpl) DoNotEnforceCPULimits() {
+	m.enforceCPULimits = false
+}
+
+func (m *podContainerManagerImpl) SetUnlimitedCPUQuota(pod *v1.Pod) {
+	if !m.enforceCPULimits {
+		klog.InfoS("cpu quota for pod already disabled", "podName", pod.Name, "podUID", pod.UID)
+		return
+	}
+
+	klog.InfoS("Removing cpu quota for pod", "podName", pod.Name, "podUID", pod.UID)
+
+	// Make sure the limits will stay disabled
+	m.enforceCPULimits = false
+
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	containerConfig, _ := m.cgroupManager.GetCgroupConfig(podCgroupName, v1.ResourceCPU)
+
+	var quota int64 = -1
+	containerConfig.CPUQuota = &quota
+	if err := m.cgroupManager.SetCgroupConfig(podCgroupName, v1.ResourceCPU, containerConfig); err != nil {
+		klog.ErrorS(err, "could not disable cpu quota for pod", "podName", pod.Name, "podUID", pod.UID)
+	}
+}
+
 // podContainerManagerNoop implements podContainerManager interface.
 // It is a no-op implementation and basically does nothing
 // podContainerManagerNoop is used in case the QoS cgroup Hierarchy is not
@@ -352,4 +377,10 @@ func (m *podContainerManagerNoop) GetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNam
 
 func (m *podContainerManagerNoop) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceName, _ *ResourceConfig) error {
 	return nil
+}
+
+func (m *podContainerManagerNoop) DoNotEnforceCPULimits() {
+}
+
+func (m *podContainerManagerNoop) SetUnlimitedCPUQuota(*v1.Pod) {
 }

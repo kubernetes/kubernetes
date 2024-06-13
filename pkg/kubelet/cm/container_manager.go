@@ -127,6 +127,9 @@ type ContainerManager interface {
 	// might need to unprepare resources.
 	PodMightNeedToUnprepareResources(UID types.UID) bool
 
+	// Check whether a Pod contains any containers with exclusively assigned cpus
+	PodContainsPinnedCpus(pod *v1.Pod) bool
+
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider

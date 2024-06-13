@@ -347,6 +347,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	return cm, nil
 }
 
+func (cm *containerManagerImpl) PodContainsPinnedCpus(pod *v1.Pod) bool {
+	return cm.cpuManager.PodContainsPinnedCpus(pod)
+}
+
 // NewPodContainerManager is a factory method returns a PodContainerManager object
 // If qosCgroups are enabled then it returns the general pod container manager
 // otherwise it returns a no-op manager which essentially does nothing

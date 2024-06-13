@@ -93,6 +93,9 @@ type Manager interface {
 	// GetCPUAffinity returns cpuset which includes cpus from shared pools
 	// as well as exclusively allocated cpus
 	GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
+
+	// Check whether any container within a pod uses exclusive cpus
+	PodContainsPinnedCpus(pod *v1.Pod) bool
 }
 
 type manager struct {
@@ -399,6 +402,19 @@ func (m *manager) removeStaleState() {
 			}
 		}
 	})
+}
+
+func (m *manager) PodContainsPinnedCpus(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		exclusiveCPUs := m.GetExclusiveCPUs(string(pod.UID), container.Name)
+		if !exclusiveCPUs.IsEmpty() {
+			klog.V(4).InfoS("Pod contains container with pinned cpus", "podName", pod.Name, "containerName", container.Name)
+			return true
+		}
+	}
+
+	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
+	return false
 }
 
 func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {

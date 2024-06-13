@@ -132,4 +132,14 @@ type PodContainerManager interface {
 
 	// Set resource config values for the specified resource type on the pod cgroup
 	SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error
+
+	// Disable enforcement of cpu limits for this pod
+	// This is used when a container with guaranteed and dedicated cpus is started when
+	// the sandbox is yet to be created
+	DoNotEnforceCPULimits()
+
+	// Clear cpu limits for this pod
+	// This is used when a container with guaranteed and dedicated cpus is started and the
+	// sandbox cgroup already exists.
+	SetUnlimitedCPUQuota(pod *v1.Pod)
 }

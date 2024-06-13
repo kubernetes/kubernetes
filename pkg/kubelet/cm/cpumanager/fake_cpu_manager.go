@@ -85,6 +85,10 @@ func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
 	return cpuset.CPUSet{}
 }
 
+func (m *fakeManager) PodContainsPinnedCpus(pod *v1.Pod) bool {
+	return false
+}
+
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager() Manager {
 	return &fakeManager{
