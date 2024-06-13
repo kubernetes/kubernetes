@@ -233,6 +233,10 @@ type GenericAPIServer struct {
 	// APIServerID is the ID of this API server
 	APIServerID string
 
+	// StorageReadinessHook implements post-start-hook functionality for checking readiness
+	// of underlying storage for registered resources.
+	StorageReadinessHook *StorageReadinessHook
+
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
 
@@ -844,6 +848,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	} else {
 		s.Handler.GoRestfulContainer.Add(legacyRootAPIHandler.WebService())
 	}
+	s.registerStorageReadinessCheck("", apiGroupInfo)
 
 	return nil
 }
@@ -902,8 +907,26 @@ func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) erro
 
 		s.DiscoveryGroupManager.AddGroup(apiGroup)
 		s.Handler.GoRestfulContainer.Add(discovery.NewAPIGroupHandler(s.Serializer, apiGroup).WebService())
+		s.registerStorageReadinessCheck(apiGroupInfo.PrioritizedVersions[0].Group, apiGroupInfo)
 	}
 	return nil
+}
+
+// registerStorageReadinessCheck registers the readiness checks for all underlying storages
+// for a given APIGroup.
+func (s *GenericAPIServer) registerStorageReadinessCheck(groupName string, apiGroupInfo *APIGroupInfo) {
+	for version, storageMap := range apiGroupInfo.VersionedResourcesStorageMap {
+		for resource, storage := range storageMap {
+			if withReadiness, ok := storage.(rest.StorageWithReadiness); ok {
+				gvr := metav1.GroupVersionResource{
+					Group:    groupName,
+					Version:  version,
+					Resource: resource,
+				}
+				s.StorageReadinessHook.RegisterStorage(gvr, withReadiness)
+			}
+		}
+	}
 }
 
 // InstallAPIGroup exposes the given api group in the API.

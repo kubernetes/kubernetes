@@ -245,6 +245,10 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.WatchCacheInitializationPostStartHook) {
+		s.GenericAPIServer.AddPostStartHookOrDie("storage-readiness", s.GenericAPIServer.StorageReadinessHook.Hook)
+	}
+
 	s.GenericAPIServer.AddPostStartHookOrDie("start-legacy-token-tracking-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		go legacytokentracking.NewController(client).Run(hookContext.StopCh)
 		return nil

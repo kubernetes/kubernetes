@@ -123,16 +123,17 @@ func TestAddFlags(t *testing.T) {
 	// This is a snapshot of expected options parsed by args.
 	expected := &Options{
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
-			AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
-			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
-			MaxRequestsInFlight:         400,
-			MaxMutatingRequestsInFlight: 200,
-			RequestTimeout:              time.Duration(2) * time.Minute,
-			MinRequestTimeout:           1800,
-			JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
-			MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
-			ComponentGlobalsRegistry:    componentGlobalsRegistry,
-			ComponentName:               utilversion.DefaultKubeComponent,
+			AdvertiseAddress:             netutils.ParseIPSloppy("192.168.10.10"),
+			CorsAllowedOriginList:        []string{"10.10.10.100", "10.10.10.200"},
+			MaxRequestsInFlight:          400,
+			MaxMutatingRequestsInFlight:  200,
+			RequestTimeout:               time.Duration(2) * time.Minute,
+			MinRequestTimeout:            1800,
+			StorageInitializationTimeout: time.Minute,
+			JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
+			MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
+			ComponentGlobalsRegistry:     componentGlobalsRegistry,
+			ComponentName:                utilversion.DefaultKubeComponent,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{

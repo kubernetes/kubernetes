@@ -962,6 +962,14 @@ func (c *Cacher) Count(pathPrefix string) (int64, error) {
 	return c.storage.Count(pathPrefix)
 }
 
+// ReadinessCheck implements storage.Interface.
+func (c *Cacher) ReadinessCheck() error {
+	if !c.ready.check() {
+		return storage.ErrStorageNotReady
+	}
+	return nil
+}
+
 // baseObjectThreadUnsafe omits locking for cachingObject.
 func baseObjectThreadUnsafe(object runtime.Object) runtime.Object {
 	if co, ok := object.(*cachingObject); ok {

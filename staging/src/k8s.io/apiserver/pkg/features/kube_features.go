@@ -290,6 +290,12 @@ const (
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
 
+	// owner: @wojtek-t
+	// beta: v1.31
+	//
+	// Enables post-start-hook for storage readiness
+	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
+
 	// owner: @serathius
 	// beta: 1.30
 	// Enables watches without resourceVersion to be served from storage.
@@ -406,6 +412,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	UnauthenticatedHTTP2DOSMitigation: {Default: true, PreRelease: featuregate.Beta},
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	WatchCacheInitializationPostStartHook: {Default: false, PreRelease: featuregate.Beta},
 
 	WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
 
