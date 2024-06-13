@@ -19,6 +19,7 @@ package benchmark
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -464,6 +466,9 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	// Number of pods to be deleted per second after they were scheduled. If set to 0, pods are not deleted.
+	// Optional
+	DeletePodsPerSecond int
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
@@ -478,6 +483,9 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 		// complexity is not worth it, especially given that we don't have any
 		// use-cases right now.
 		return fmt.Errorf("collectMetrics and skipWaitToCompletion cannot be true at the same time")
+	}
+	if cpo.DeletePodsPerSecond < 0 {
+		return fmt.Errorf("invalid DeletePodsPerSecond=%d; should be non-negative", cpo.DeletePodsPerSecond)
 	}
 	return nil
 }
@@ -1028,6 +1036,34 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 					dataItems = append(dataItems, collector.collect()...)
 				}
 				mu.Unlock()
+			}
+
+			if concreteOp.DeletePodsPerSecond > 0 {
+				pods, err := podInformer.Lister().Pods(namespace).List(labels.Everything())
+				if err != nil {
+					tCtx.Fatalf("op %d: error in listing scheduled pods in the namespace: %v", opIndex, err)
+				}
+
+				ticker := time.NewTicker(time.Second / time.Duration(concreteOp.DeletePodsPerSecond))
+				defer ticker.Stop()
+
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for i := 0; i < len(pods); i++ {
+						select {
+						case <-ticker.C:
+							if err := tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pods[i].Name, metav1.DeleteOptions{}); err != nil {
+								if errors.Is(err, context.Canceled) {
+									return
+								}
+								tCtx.Errorf("op %d: unable to delete pod %v: %v", opIndex, pods[i].Name, err)
+							}
+						case <-tCtx.Done():
+							return
+						}
+					}
+				}()
 			}
 
 			if !concreteOp.SkipWaitToCompletion {
