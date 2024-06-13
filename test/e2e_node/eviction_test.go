@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -513,16 +512,13 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 	})
 
-	f.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; PodDisruptionConditions enabled", nodefeature.PodDisruptionConditions, func() {
+	f.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; baseline scenario to verify DisruptionTarget is added", nodefeature.PodDisruptionConditions, func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			pidsConsumed := int64(10000)
 			summary := eventuallyGetSummary(ctx)
 			availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.PodDisruptionConditions): true,
-			}
 		})
 		disruptionTarget := v1.DisruptionTarget
 		specs := []podEvictSpec{

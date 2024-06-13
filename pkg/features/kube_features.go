@@ -566,6 +566,7 @@ const (
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
 	// beta: v1.26
+	// stable: v1.31
 	//
 	// Enables support for appending a dedicated pod condition indicating that
 	// the pod is being deleted due to a disruption.
@@ -1115,7 +1116,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodDeletionCost: {Default: true, PreRelease: featuregate.Beta},
 
-	PodDisruptionConditions: {Default: true, PreRelease: featuregate.Beta},
+	PodDisruptionConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	PodReadyToStartContainersCondition: {Default: true, PreRelease: featuregate.Beta},
 

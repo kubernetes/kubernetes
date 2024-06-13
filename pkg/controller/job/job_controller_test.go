@@ -2709,7 +2709,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 
 	testCases := map[string]struct {
 		enableJobPodFailurePolicy     bool
-		enablePodDisruptionConditions bool
 		enableJobPodReplacementPolicy bool
 		job                           batch.Job
 		pods                          []v1.Pod
@@ -3736,8 +3735,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			},
 		},
 		"terminating Pod not considered failed when PodDisruptionConditions is enabled": {
-			enableJobPodFailurePolicy:     true,
-			enablePodDisruptionConditions: true,
+			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3776,7 +3774,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
 
 			if tc.job.Spec.PodReplacementPolicy == nil {

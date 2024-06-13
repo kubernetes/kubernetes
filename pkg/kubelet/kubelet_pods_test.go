@@ -3267,13 +3267,12 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		unreadyContainer                           []string
 		previousStatus                             v1.PodStatus
 		isPodTerminal                              bool
-		enablePodDisruptionConditions              bool
 		expected                                   v1.PodStatus
-		expectedPodDisruptionCondition             v1.PodCondition
+		expectedPodDisruptionCondition             *v1.PodCondition
 		expectedPodReadyToStartContainersCondition v1.PodCondition
 	}{
 		{
-			name: "pod disruption condition is copied over and the phase is set to failed when deleted; PodDisruptionConditions enabled",
+			name: "pod disruption condition is copied over and the phase is set to failed when deleted",
 			pod: &v1.Pod{
 				Spec: desiredState,
 				Status: v1.PodStatus{
@@ -3301,8 +3300,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					LastTransitionTime: normalized_now,
 				}},
 			},
-			isPodTerminal:                 true,
-			enablePodDisruptionConditions: true,
+			isPodTerminal: true,
 			expected: v1.PodStatus{
 				Phase:    v1.PodFailed,
 				HostIP:   "127.0.0.1",
@@ -3319,7 +3317,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
 				},
 			},
-			expectedPodDisruptionCondition: v1.PodCondition{
+			expectedPodDisruptionCondition: &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
 				Status:             v1.ConditionTrue,
 				LastTransitionTime: normalized_now,
@@ -3705,7 +3703,6 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		for _, enablePodReadyToStartContainersCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodReadyToStartContainersCondition, enablePodReadyToStartContainersCondition)
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
@@ -3719,8 +3716,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				if enablePodReadyToStartContainersCondition {
 					expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
 				}
-				if test.enablePodDisruptionConditions {
-					expected.Conditions = append([]v1.PodCondition{test.expectedPodDisruptionCondition}, expected.Conditions...)
+				if test.expectedPodDisruptionCondition != nil {
+					expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
 				}
 				if !apiequality.Semantic.DeepEqual(*expected, actual) {
 					t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
