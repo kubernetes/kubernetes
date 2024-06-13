@@ -246,7 +246,19 @@ Usage:
 ### liveness
 
 Starts a simple server that is alive for 10 seconds, then reports unhealthy for the rest
-of its (hopefully) short existence.
+of its (hopefully) short existence. Failures can be emulated with flags, which take effect
+after the server gets unhealthy.
+
+- `--healthspan` - Duration (in seconds) that the server is alive after startup. The
+- `--init-disconnect` - If true, forcibly disconnects before sending a header.
+- `--disconnect` - If true, forcibly disconnects after sending a body.
+  default is `10`.
+- `--init-sleep` - Duration (in seconds) that the server sleeps before sending a header.
+- `--sleep` - Duration (in seconds) that the server sleeps after sending a body.
+- `--body-size` - Size (in KB) of a response body that consists of random characters (0-9
+  and a-f) and whietespaces. If not set, a few words are sent.
+- `--response-code` - Response code after `healthspan` passed. The default is `500`.
+- `--write-interval` - Interval (in seconds) between sending 1KB chunk. The default is `0`.
 
 Usage:
 
