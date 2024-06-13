@@ -54,9 +54,7 @@ const (
 
 // networkResources can be passed to NewDriver directly.
 func networkResources() app.Resources {
-	return app.Resources{
-		Shareable: true,
-	}
+	return app.Resources{}
 }
 
 // perNode returns a function which can be passed to NewDriver. The nodes
@@ -120,47 +118,15 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				}
 			})
 
-			ginkgo.It("must not run a pod if a claim is not reserved for it", func(ctx context.Context) {
-				// Pretend that the resource is allocated and reserved for some other entity.
-				// Until the resourceclaim controller learns to remove reservations for
-				// arbitrary types we can simply fake somthing here.
+			ginkgo.It("must not run a pod if a claim is not ready", func(ctx context.Context) {
 				claim := b.externalClaim()
 				b.create(ctx, claim)
-
-				claim, err := f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err, "get claim")
-
-				claim.Finalizers = append(claim.Finalizers, "e2e.test/delete-protection")
-				claim, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Update(ctx, claim, metav1.UpdateOptions{})
-				framework.ExpectNoError(err, "add claim finalizer")
-
-				ginkgo.DeferCleanup(func(ctx context.Context) {
-					claim.Status.Allocation = nil
-					claim.Status.ReservedFor = nil
-					claim, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
-					framework.ExpectNoError(err, "update claim")
-
-					claim.Finalizers = nil
-					_, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).Update(ctx, claim, metav1.UpdateOptions{})
-					framework.ExpectNoError(err, "remove claim finalizer")
-				})
-
-				claim.Status.Allocation = &resourcev1alpha2.AllocationResult{}
-				claim.Status.DriverName = driver.Name
-				claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{
-					APIGroup: "example.com",
-					Resource: "some",
-					Name:     "thing",
-					UID:      "12345",
-				})
-				claim, err = f.ClientSet.ResourceV1alpha2().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
-				framework.ExpectNoError(err, "update claim")
-
 				pod := b.podExternal()
 
 				// This bypasses scheduling and therefore the pod gets
-				// to run on the node although it never gets added to
-				// the `ReservedFor` field of the claim.
+				// to run on the node although the claim is not ready.
+				// Because the parameters are missing, the claim
+				// also cannot be allocated later.
 				pod.Spec.NodeName = nodes.NodeNames[0]
 				b.create(ctx, pod)
 
@@ -368,7 +334,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		numPods := 10
 		generateResources := func() app.Resources {
 			resources := perNode(maxAllocations, nodes)()
-			resources.Shareable = true
 			return resources
 		}
 		driver := NewDriver(f, nodes, generateResources) // All tests get their own driver instance.
@@ -411,7 +376,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
 					err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "delete pod")
-					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow))
+					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Duration(numPods)*f.Timeouts.PodStartSlow))
 				}()
 			}
 			wg.Wait()
@@ -447,18 +412,13 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		f.It("supports sharing a claim sequentially", f.WithSlow(), func(ctx context.Context) {
 			objects, expectedEnv := b.flexibleParameters()
-			numPods := numPods / 2
-
-			// Change from "shareable" to "not shareable", if possible.
-			switch parameterMode {
-			case parameterModeConfigMap:
-				ginkgo.Skip("cannot change the driver's controller behavior on-the-fly")
-			case parameterModeTranslated, parameterModeStructured:
-				objects[len(objects)-1].(*resourcev1alpha2.ResourceClaimParameters).Shareable = false
-			}
-
 			objects = append(objects, b.externalClaim())
 
+			// This test used to test usage of the claim by one pod
+			// at a time. After removing the "not sharable"
+			// feature, we have to create more pods than supported
+			// at the same time to get the same effect.
+			numPods := resourcev1alpha2.ResourceClaimReservedForMaxSize + 10
 			pods := make([]*v1.Pod, numPods)
 			for i := 0; i < numPods; i++ {
 				pod := b.podExternal()
@@ -1194,8 +1154,6 @@ func (b *builder) claimParameters(generatedFrom string, claimKV, requestKV []str
 			Namespace: b.f.Namespace.Name,
 			Name:      b.parametersName(),
 		},
-
-		Shareable: true,
 
 		// Without any request, nothing gets allocated and vendor
 		// parameters are also not passed down because they get

@@ -14963,10 +14963,6 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
-        },
-        "shareable": {
-          "description": "Shareable determines whether the resource supports more than one consumer at a time.",
-          "type": "boolean"
         }
       },
       "type": "object"
@@ -15391,10 +15387,6 @@
         "metadata": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
           "description": "Standard object metadata"
-        },
-        "shareable": {
-          "description": "Shareable indicates whether the allocated claim is meant to be shareable by multiple consumers at the same time.",
-          "type": "boolean"
         }
       },
       "type": "object",

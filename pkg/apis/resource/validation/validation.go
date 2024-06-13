@@ -170,9 +170,6 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 		if resourceClaim.Status.Allocation == nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "may not be specified when `allocated` is not set"))
 		} else {
-			if !resourceClaim.Status.Allocation.Shareable && len(resourceClaim.Status.ReservedFor) > 1 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "may not be reserved more than once"))
-			}
 			// Items may be removed from ReservedFor while the claim is meant to be deallocated,
 			// but not added.
 			if resourceClaim.DeletionTimestamp != nil || resourceClaim.Status.DeallocationRequested {

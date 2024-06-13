@@ -145,11 +145,6 @@ type AllocationResult struct {
 	// everywhere.
 	// +optional
 	AvailableOnNodes *v1.NodeSelector `json:"availableOnNodes,omitempty" protobuf:"bytes,2,opt,name=availableOnNodes"`
-
-	// Shareable determines whether the resource supports more
-	// than one consumer at a time.
-	// +optional
-	Shareable bool `json:"shareable,omitempty" protobuf:"varint,3,opt,name=shareable"`
 }
 
 // AllocationResultResourceHandlesMaxSize represents the maximum number of
@@ -572,11 +567,6 @@ type ResourceClaimParameters struct {
 	// to some unknown type.
 	// +optional
 	GeneratedFrom *ResourceClaimParametersReference `json:"generatedFrom,omitempty" protobuf:"bytes,2,opt,name=generatedFrom"`
-
-	// Shareable indicates whether the allocated claim is meant to be shareable
-	// by multiple consumers at the same time.
-	// +optional
-	Shareable bool `json:"shareable,omitempty" protobuf:"bytes,3,opt,name=shareable"`
 
 	// DriverRequests describes all resources that are needed for the
 	// allocated claim. A single claim may use resources coming from

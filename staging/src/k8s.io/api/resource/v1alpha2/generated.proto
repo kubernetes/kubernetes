@@ -57,11 +57,6 @@ message AllocationResult {
   // everywhere.
   // +optional
   optional .k8s.io.api.core.v1.NodeSelector availableOnNodes = 2;
-
-  // Shareable determines whether the resource supports more
-  // than one consumer at a time.
-  // +optional
-  optional bool shareable = 3;
 }
 
 // AllocationResultModel must have one and only one field set.
@@ -333,11 +328,6 @@ message ResourceClaimParameters {
   // to some unknown type.
   // +optional
   optional ResourceClaimParametersReference generatedFrom = 2;
-
-  // Shareable indicates whether the allocated claim is meant to be shareable
-  // by multiple consumers at the same time.
-  // +optional
-  optional bool shareable = 3;
 
   // DriverRequests describes all resources that are needed for the
   // allocated claim. A single claim may use resources coming from

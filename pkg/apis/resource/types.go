@@ -130,11 +130,6 @@ type AllocationResult struct {
 	// everywhere.
 	// +optional
 	AvailableOnNodes *core.NodeSelector
-
-	// Shareable determines whether the resource supports more
-	// than one consumer at a time.
-	// +optional
-	Shareable bool
 }
 
 // AllocationResultResourceHandlesMaxSize represents the maximum number of
@@ -508,10 +503,6 @@ type ResourceClaimParameters struct {
 	// of the claim parameters when the parameter reference of the claim refers
 	// to some unknown type.
 	GeneratedFrom *ResourceClaimParametersReference
-
-	// Shareable indicates whether the allocated claim is meant to be shareable
-	// by multiple consumers at the same time.
-	Shareable bool
 
 	// DriverRequests describes all resources that are needed for the
 	// allocated claim. A single claim may use resources coming from

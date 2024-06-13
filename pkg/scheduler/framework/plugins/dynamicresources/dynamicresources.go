@@ -1051,7 +1051,6 @@ func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *res
 
 func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
 	defaultClaimParameters := resourcev1alpha2.ResourceClaimParameters{
-		Shareable: true,
 		DriverRequests: []resourcev1alpha2.DriverRequests{
 			{
 				DriverName: class.DriverName,

@@ -336,7 +336,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				}
 				return handles
 			}(),
-			Shareable: true,
 		},
 	}
 
@@ -579,25 +578,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 							Resource: "pods",
 							Name:     "foo",
 							UID:      "1",
-						})
-				}
-				return claim
-			},
-		},
-		"invalid-reserved-for-not-shared": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "may not be reserved more than once")},
-			oldClaim: func() *resource.ResourceClaim {
-				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.Allocation.Shareable = false
-				return claim
-			}(),
-			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				for i := 0; i < 2; i++ {
-					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-						resource.ResourceClaimConsumerReference{
-							Resource: "pods",
-							Name:     fmt.Sprintf("foo-%d", i),
-							UID:      types.UID(fmt.Sprintf("%d", i)),
 						})
 				}
 				return claim

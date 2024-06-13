@@ -45373,13 +45373,6 @@ func schema_k8sio_api_resource_v1alpha2_AllocationResult(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
-					"shareable": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Shareable determines whether the resource supports more than one consumer at a time.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
 				},
 			},
 		},
@@ -46184,13 +46177,6 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimParameters(ref common.Refer
 						SchemaProps: spec.SchemaProps{
 							Description: "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the claim parameters when the parameter reference of the claim refers to some unknown type.",
 							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference"),
-						},
-					},
-					"shareable": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Shareable indicates whether the allocated claim is meant to be shareable by multiple consumers at the same time.",
-							Type:        []string{"boolean"},
-							Format:      "",
 						},
 					},
 					"driverRequests": {

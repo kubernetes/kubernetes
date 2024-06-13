@@ -180,8 +180,8 @@ func IsReservedForPod(pod *v1.Pod, claim *resourcev1alpha2.ResourceClaim) bool {
 
 // CanBeReserved checks whether the claim could be reserved for another object.
 func CanBeReserved(claim *resourcev1alpha2.ResourceClaim) bool {
-	return claim.Status.Allocation.Shareable ||
-		len(claim.Status.ReservedFor) == 0
+	// Currently no restrictions on sharing...
+	return true
 }
 
 // IsAllocatedWithStructuredParameters checks whether the claim is allocated
