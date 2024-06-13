@@ -23983,15 +23983,15 @@ func TestCrossNamespaceSource(t *testing.T) {
 		expectedFail: true,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(nil, "UnsupportedKind", &goodNS, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with invalid namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with invalid namespace specified",
 		expectedFail: true,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, &badNS, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with nil namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with nil namespace specified",
 		expectedFail: false,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, nil, goodName, false),
 	}, {
-		testName:     "Feature gate enabled and xns DataSourceRef with empty namspace specified",
+		testName:     "Feature gate enabled and xns DataSourceRef with empty namespace specified",
 		expectedFail: false,
 		claimSpec:    pvcSpecWithCrossNamespaceSource(&snapAPIGroup, snapKind, &emptyNS, goodName, false),
 	}, {
