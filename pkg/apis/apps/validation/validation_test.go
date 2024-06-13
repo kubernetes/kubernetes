@@ -17,12 +17,14 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -969,7 +971,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 }
 
 func TestValidateControllerRevision(t *testing.T) {
-	newControllerRevision := func(name, namespace string, data runtime.Object, revision int64) apps.ControllerRevision {
+	newControllerRevision := func(name, namespace string, data runtime.RawExtension, revision int64) apps.ControllerRevision {
 		return apps.ControllerRevision{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -993,15 +995,17 @@ func TestValidateControllerRevision(t *testing.T) {
 	}
 
 	ss := mkStatefulSet(&podTemplate)
+	ssJSON, _ := json.Marshal(ss)
+	raw := runtime.RawExtension{Raw: ssJSON}
 
 	var (
-		valid       = newControllerRevision("validname", "validns", &ss, 0)
-		badRevision = newControllerRevision("validname", "validns", &ss, -1)
-		emptyName   = newControllerRevision("", "validns", &ss, 0)
-		invalidName = newControllerRevision("NoUppercaseOrSpecialCharsLike=Equals", "validns", &ss, 0)
-		emptyNs     = newControllerRevision("validname", "", &ss, 100)
-		invalidNs   = newControllerRevision("validname", "NoUppercaseOrSpecialCharsLike=Equals", &ss, 100)
-		nilData     = newControllerRevision("validname", "NoUppercaseOrSpecialCharsLike=Equals", nil, 100)
+		valid       = newControllerRevision("validname", "validns", raw, 0)
+		badRevision = newControllerRevision("validname", "validns", raw, -1)
+		emptyName   = newControllerRevision("", "validns", raw, 0)
+		invalidName = newControllerRevision("NoUppercaseOrSpecialCharsLike=Equals", "validns", raw, 0)
+		emptyNs     = newControllerRevision("validname", "", raw, 100)
+		invalidNs   = newControllerRevision("validname", "NoUppercaseOrSpecialCharsLike=Equals", raw, 100)
+		nilData     = newControllerRevision("validname", "NoUppercaseOrSpecialCharsLike=Equals", runtime.RawExtension{}, 100)
 	)
 
 	tests := map[string]struct {
@@ -1015,11 +1019,19 @@ func TestValidateControllerRevision(t *testing.T) {
 		"empty namespace":   {emptyNs, false},
 		"invalid namespace": {invalidNs, false},
 		"nil data":          {nilData, false},
+		"json error":        {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`{`)}, 0), false},
+		"json bool":         {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`true`)}, 0), false},
+		"json int":          {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`0`)}, 0), false},
+		"json float":        {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`0.5`)}, 0), false},
+		"json null":         {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`null`)}, 0), false},
+		"json array":        {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`[]`)}, 0), false},
+		"json string":       {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`"test"`)}, 0), false},
+		"json object":       {newControllerRevision("validname", "validns", runtime.RawExtension{Raw: []byte(`{}`)}, 0), true},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateControllerRevision(&tc.history)
+			errs := ValidateControllerRevisionCreate(&tc.history)
 			if tc.isValid && len(errs) > 0 {
 				t.Errorf("%v: unexpected error: %v", name, errs)
 			}
@@ -1031,7 +1043,7 @@ func TestValidateControllerRevision(t *testing.T) {
 }
 
 func TestValidateControllerRevisionUpdate(t *testing.T) {
-	newControllerRevision := func(version, name, namespace string, data runtime.Object, revision int64) apps.ControllerRevision {
+	newControllerRevision := func(version, name, namespace string, data runtime.RawExtension, revision int64) apps.ControllerRevision {
 		return apps.ControllerRevision{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            name,
@@ -1058,11 +1070,16 @@ func TestValidateControllerRevisionUpdate(t *testing.T) {
 	ss := mkStatefulSet(&podTemplate, tweakName("abc"))
 	modifiedss := mkStatefulSet(&podTemplate, tweakName("cdf"))
 
+	ssJSON, _ := json.Marshal(ss)
+	modifiedSSJSON, _ := json.Marshal(modifiedss)
+	raw := runtime.RawExtension{Raw: ssJSON}
+	modifiedRaw := runtime.RawExtension{Raw: modifiedSSJSON}
+
 	var (
-		valid           = newControllerRevision("1", "validname", "validns", &ss, 0)
-		noVersion       = newControllerRevision("", "validname", "validns", &ss, 0)
-		changedData     = newControllerRevision("1", "validname", "validns", &modifiedss, 0)
-		changedRevision = newControllerRevision("1", "validname", "validns", &ss, 1)
+		valid           = newControllerRevision("1", "validname", "validns", raw, 0)
+		noVersion       = newControllerRevision("", "validname", "validns", raw, 0)
+		changedData     = newControllerRevision("1", "validname", "validns", modifiedRaw, 0)
+		changedRevision = newControllerRevision("1", "validname", "validns", raw, 1)
 	)
 
 	cases := []struct {

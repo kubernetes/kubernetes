@@ -331,7 +331,7 @@ type ControllerRevision struct {
 	metav1.ObjectMeta
 
 	// Data is the Object representing the state.
-	Data runtime.Object
+	Data runtime.RawExtension
 
 	// Revision indicates the revision of the state represented by Data.
 	Revision int64
