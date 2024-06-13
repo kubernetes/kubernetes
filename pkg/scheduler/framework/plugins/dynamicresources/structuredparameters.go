@@ -188,7 +188,6 @@ func (c claimController) nodeIsSuitable(ctx context.Context, nodeName string, re
 
 func (c claimController) allocate(ctx context.Context, nodeName string, resources resources) (string, *resourceapi.AllocationResult, error) {
 	allocation := &resourceapi.AllocationResult{
-		Shareable: c.claimParameters.Shareable,
 		AvailableOnNodes: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{

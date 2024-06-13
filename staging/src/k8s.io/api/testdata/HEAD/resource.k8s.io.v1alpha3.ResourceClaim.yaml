@@ -81,7 +81,6 @@ status:
             replicas: 1
           status:
             available: 1
-    shareable: true
   deallocationRequested: true
   driverName: driverNameValue
   reservedFor:

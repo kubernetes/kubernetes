@@ -1003,7 +1003,6 @@ func (wrapper *ResourceClaimWrapper) Structured(nodeName string, namedResourcesI
 				resourceHandle.StructuredData.Results = append(resourceHandle.StructuredData.Results, result)
 			}
 		}
-		wrapper.ResourceClaim.Status.Allocation.Shareable = true
 		wrapper.ResourceClaim.Status.Allocation.AvailableOnNodes = &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{{
 				MatchExpressions: []v1.NodeSelectorRequirement{{
@@ -1169,11 +1168,6 @@ func (wrapper *ClaimParametersWrapper) UID(s string) *ClaimParametersWrapper {
 
 func (wrapper *ClaimParametersWrapper) Namespace(s string) *ClaimParametersWrapper {
 	wrapper.SetNamespace(s)
-	return wrapper
-}
-
-func (wrapper *ClaimParametersWrapper) Shareable(value bool) *ClaimParametersWrapper {
-	wrapper.ResourceClaimParameters.Shareable = value
 	return wrapper
 }
 

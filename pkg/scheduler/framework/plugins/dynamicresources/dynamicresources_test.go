@@ -105,10 +105,6 @@ var (
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
-	otherPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID + "-II").
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-				Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
@@ -134,7 +130,6 @@ var (
 
 	claimParameters = st.MakeClaimParameters().Name(claimName).Namespace(namespace).
 			NamedResourcesRequests("some-driver", "true").
-			Shareable(true).
 			GeneratedFrom(&resourceapi.ResourceClaimParametersReference{
 			Name:     claimName,
 			Kind:     "ResourceClaimParameters",
@@ -143,7 +138,6 @@ var (
 		Obj()
 	claimParametersOtherNamespace = st.MakeClaimParameters().Name(claimName).Namespace(namespace+"-2").
 					NamedResourcesRequests("some-driver", "true").
-					Shareable(true).
 					GeneratedFrom(&resourceapi.ResourceClaimParametersReference{
 			Name:     claimName,
 			Kind:     "ResourceClaimParameters",
@@ -943,22 +937,6 @@ func TestPlugin(t *testing.T) {
 				},
 				postbind: result{
 					removed: []metav1.Object{schedulingInfo},
-				},
-			},
-		},
-		"in-use-by-other": {
-			nodes:       []*v1.Node{},
-			pod:         otherPodWithClaimName,
-			claims:      []*resourceapi.ResourceClaim{inUseClaim},
-			classes:     []*resourceapi.ResourceClass{},
-			schedulings: []*resourceapi.PodSchedulingContext{},
-			prepare:     prepare{},
-			want: want{
-				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
-				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
 				},
 			},
 		},

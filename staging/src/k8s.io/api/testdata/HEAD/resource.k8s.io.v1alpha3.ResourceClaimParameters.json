@@ -48,7 +48,6 @@
     "kind": "kindValue",
     "name": "nameValue"
   },
-  "shareable": true,
   "driverRequests": [
     {
       "driverName": "driverNameValue",

@@ -33,7 +33,6 @@ type ResourceClaimParametersApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	GeneratedFrom                    *ResourceClaimParametersReferenceApplyConfiguration `json:"generatedFrom,omitempty"`
-	Shareable                        *bool                                               `json:"shareable,omitempty"`
 	DriverRequests                   []DriverRequestsApplyConfiguration                  `json:"driverRequests,omitempty"`
 }
 
@@ -247,14 +246,6 @@ func (b *ResourceClaimParametersApplyConfiguration) ensureObjectMetaApplyConfigu
 // If called multiple times, the GeneratedFrom field is set to the value of the last call.
 func (b *ResourceClaimParametersApplyConfiguration) WithGeneratedFrom(value *ResourceClaimParametersReferenceApplyConfiguration) *ResourceClaimParametersApplyConfiguration {
 	b.GeneratedFrom = value
-	return b
-}
-
-// WithShareable sets the Shareable field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Shareable field is set to the value of the last call.
-func (b *ResourceClaimParametersApplyConfiguration) WithShareable(value bool) *ResourceClaimParametersApplyConfiguration {
-	b.Shareable = &value
 	return b
 }
 

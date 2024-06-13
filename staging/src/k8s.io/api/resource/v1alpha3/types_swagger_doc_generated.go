@@ -31,7 +31,6 @@ var map_AllocationResult = map[string]string{
 	"":                 "AllocationResult contains attributes of an allocated resource.",
 	"resourceHandles":  "ResourceHandles contain the state associated with an allocation that should be maintained throughout the lifetime of a claim. Each ResourceHandle contains data that should be passed to a specific kubelet plugin once it lands on a node. This data is returned by the driver after a successful allocation and is opaque to Kubernetes. Driver documentation may explain to users how to interpret this data if needed.\n\nSetting this field is optional. It has a maximum size of 32 entries. If null (or empty), it is assumed this allocation will be processed by a single kubelet plugin with no ResourceHandle data attached. The name of the kubelet plugin invoked will match the DriverName set in the ResourceClaimStatus this AllocationResult is embedded in.",
 	"availableOnNodes": "This field will get set by the resource driver after it has allocated the resource to inform the scheduler where it can schedule Pods using the ResourceClaim.\n\nSetting this field is optional. If null, the resource is available everywhere.",
-	"shareable":        "Shareable determines whether the resource supports more than one consumer at a time.",
 }
 
 func (AllocationResult) SwaggerDoc() map[string]string {
@@ -144,7 +143,6 @@ var map_ResourceClaimParameters = map[string]string{
 	"":               "ResourceClaimParameters defines resource requests for a ResourceClaim in an in-tree format understood by Kubernetes.",
 	"metadata":       "Standard object metadata",
 	"generatedFrom":  "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the claim parameters when the parameter reference of the claim refers to some unknown type.",
-	"shareable":      "Shareable indicates whether the allocated claim is meant to be shareable by multiple consumers at the same time.",
 	"driverRequests": "DriverRequests describes all resources that are needed for the allocated claim. A single claim may use resources coming from different drivers. For each driver, this array has at most one entry which then may have one or more per-driver requests.\n\nMay be empty, in which case the claim can always be allocated.",
 }
 

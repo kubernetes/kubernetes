@@ -497,7 +497,6 @@ func autoConvert_v1alpha3_AllocationResult_To_resource_AllocationResult(in *v1al
 		out.ResourceHandles = nil
 	}
 	out.AvailableOnNodes = (*core.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
-	out.Shareable = in.Shareable
 	return nil
 }
 
@@ -519,7 +518,6 @@ func autoConvert_resource_AllocationResult_To_v1alpha3_AllocationResult(in *reso
 		out.ResourceHandles = nil
 	}
 	out.AvailableOnNodes = (*v1.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
-	out.Shareable = in.Shareable
 	return nil
 }
 
@@ -1025,7 +1023,6 @@ func Convert_resource_ResourceClaimList_To_v1alpha3_ResourceClaimList(in *resour
 func autoConvert_v1alpha3_ResourceClaimParameters_To_resource_ResourceClaimParameters(in *v1alpha3.ResourceClaimParameters, out *resource.ResourceClaimParameters, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.GeneratedFrom = (*resource.ResourceClaimParametersReference)(unsafe.Pointer(in.GeneratedFrom))
-	out.Shareable = in.Shareable
 	if in.DriverRequests != nil {
 		in, out := &in.DriverRequests, &out.DriverRequests
 		*out = make([]resource.DriverRequests, len(*in))
@@ -1048,7 +1045,6 @@ func Convert_v1alpha3_ResourceClaimParameters_To_resource_ResourceClaimParameter
 func autoConvert_resource_ResourceClaimParameters_To_v1alpha3_ResourceClaimParameters(in *resource.ResourceClaimParameters, out *v1alpha3.ResourceClaimParameters, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.GeneratedFrom = (*v1alpha3.ResourceClaimParametersReference)(unsafe.Pointer(in.GeneratedFrom))
-	out.Shareable = in.Shareable
 	if in.DriverRequests != nil {
 		in, out := &in.DriverRequests, &out.DriverRequests
 		*out = make([]v1alpha3.DriverRequests, len(*in))

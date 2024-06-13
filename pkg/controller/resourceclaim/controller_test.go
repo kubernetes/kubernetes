@@ -559,9 +559,7 @@ func makeGeneratedClaim(podClaimName, generateName, namespace, classname string,
 
 func allocateClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
-	claim.Status.Allocation = &resourceapi.AllocationResult{
-		Shareable: true,
-	}
+	claim.Status.Allocation = &resourceapi.AllocationResult{}
 	return claim
 }
 

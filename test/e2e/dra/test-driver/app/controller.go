@@ -50,7 +50,6 @@ type Resources struct {
 	// available. Mutually exclusive with Nodes.
 	NodeLabels     labels.Set
 	MaxAllocations int
-	Shareable      bool
 
 	// AllocateWrapper, if set, gets called for each Allocate call.
 	AllocateWrapper AllocateWrapperType
@@ -70,9 +69,7 @@ func (r Resources) AllNodes(nodeLister listersv1.NodeLister) []string {
 }
 
 func (r Resources) NewAllocation(node string, data []byte) *resourceapi.AllocationResult {
-	allocation := &resourceapi.AllocationResult{
-		Shareable: r.Shareable,
-	}
+	allocation := &resourceapi.AllocationResult{}
 	allocation.ResourceHandles = []resourceapi.ResourceHandle{
 		{
 			DriverName: r.DriverName,
