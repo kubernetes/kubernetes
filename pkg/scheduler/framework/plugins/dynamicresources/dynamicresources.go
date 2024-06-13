@@ -381,12 +381,12 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	return pl, nil
 }
 
-func claimParametersReferenceKeyFunc(ref *resourcev1alpha2.ResourceClaimParametersReference) string {
-	return ref.APIGroup + "/" + ref.Kind + "/" + ref.Name
+func claimParametersReferenceKeyFunc(namespace string, ref *resourcev1alpha2.ResourceClaimParametersReference) string {
+	return ref.APIGroup + "/" + ref.Kind + "/" + namespace + "/" + ref.Name
 }
 
 // claimParametersGeneratedFromIndexFunc is an index function that returns other resource keys
-// (= apiGroup/kind/name) for ResourceClaimParametersReference in a given claim parameters.
+// (= apiGroup/kind/namespace/name) for ResourceClaimParametersReference in a given claim parameters.
 func claimParametersGeneratedFromIndexFunc(obj interface{}) ([]string, error) {
 	parameters, ok := obj.(*resourcev1alpha2.ResourceClaimParameters)
 	if !ok {
@@ -395,7 +395,7 @@ func claimParametersGeneratedFromIndexFunc(obj interface{}) ([]string, error) {
 	if parameters.GeneratedFrom == nil {
 		return nil, nil
 	}
-	return []string{claimParametersReferenceKeyFunc(parameters.GeneratedFrom)}, nil
+	return []string{claimParametersReferenceKeyFunc(parameters.Namespace, parameters.GeneratedFrom)}, nil
 }
 
 func classParametersReferenceKeyFunc(ref *resourcev1alpha2.ResourceClassParametersReference) string {
@@ -1105,7 +1105,7 @@ func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *res
 		return parameters, nil
 	}
 
-	objs, err := pl.claimParametersIndexer.ByIndex(generatedFromIndex, claimParametersReferenceKeyFunc(claim.Spec.ParametersRef))
+	objs, err := pl.claimParametersIndexer.ByIndex(generatedFromIndex, claimParametersReferenceKeyFunc(claim.Namespace, claim.Spec.ParametersRef))
 	if err != nil {
 		return nil, statusError(logger, fmt.Errorf("listing claim parameters failed: %v", err))
 	}
