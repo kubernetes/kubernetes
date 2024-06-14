@@ -17,6 +17,7 @@ limitations under the License.
 package json
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -118,4 +119,21 @@ func convertNumber(n json.Number) (interface{}, error) {
 	// Return a float64 (default json.Decode() behavior)
 	// An overflow will return an error
 	return n.Float64()
+}
+
+// Sniff does a constant-time inspection of the provided bytes and returns whether or not they may
+// contain JSON. If unknown is true, the determination could be wrong.
+func Sniff(src []byte) (json bool, unknown bool) {
+	if len(src) > 32 {
+		src = src[:32]
+	}
+	if tail := bytes.TrimLeft(src, " \t\r\n"); len(tail) > 0 {
+		switch tail[0] {
+		case '{', '[', '"', 't', 'f', 'n', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			return true, true
+		default:
+			return false, false
+		}
+	}
+	return false, true
 }
