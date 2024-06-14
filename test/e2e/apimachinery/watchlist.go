@@ -64,9 +64,11 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 		)
 
 		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
+		var expectedSecrets []v1.Secret
 		for i := 1; i <= 5; i++ {
-			_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
+			secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(ctx, newSecret(fmt.Sprintf("secret-%d", i)), metav1.CreateOptions{})
 			framework.ExpectNoError(err)
+			expectedSecrets = append(expectedSecrets, *secret)
 		}
 
 		ginkgo.By("Starting the secret informer")
@@ -79,15 +81,17 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fe
 		framework.ExpectNoError(err, "Failed waiting for the secret informer in %s namespace to be synced", f.Namespace.Namespace)
 
 		ginkgo.By("Verifying if the secret informer was properly synchronised")
-		verifyStore(ctx, f, secretInformer.GetStore())
+		verifyStore(ctx, expectedSecrets, secretInformer.GetStore())
 
 		ginkgo.By("Modifying a secret and checking if the update was picked up by the secret informer")
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, "secret-1", metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		secret.StringData = map[string]string{"foo": "bar"}
-		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(ctx, secret, metav1.UpdateOptions{})
+		secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(ctx, secret, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		verifyStore(ctx, f, secretInformer.GetStore())
+
+		expectedSecrets[0] = *secret
+		verifyStore(ctx, expectedSecrets, secretInformer.GetStore())
 	})
 	ginkgo.It("should be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
@@ -139,13 +143,8 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
-func verifyStore(ctx context.Context, f *framework.Framework, store cache.Store) {
-	ginkgo.By(fmt.Sprintf("Listing secrets directly from the server from %s namespace", f.Namespace.Name))
-	expectedSecretsList, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
-	expectedSecrets := expectedSecretsList.Items
-
-	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
+func verifyStore(ctx context.Context, expectedSecrets []v1.Secret, store cache.Store) {
+	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		ginkgo.By("Comparing secrets retrieved directly from the server with the ones that have been streamed to the secret informer")
 		rawStreamedSecrets := store.List()
 		streamedSecrets := make([]v1.Secret, 0, len(rawStreamedSecrets))
