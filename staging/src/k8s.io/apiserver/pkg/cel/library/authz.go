@@ -19,6 +19,10 @@ package library
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"reflect"
 	"strings"
 
@@ -222,6 +226,12 @@ var authzLibraryDecls = map[string][]cel.FunctionOpt{
 	"subresource": {
 		cel.MemberOverload("resourcecheck_subresource", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
 			cel.BinaryBinding(resourceCheckSubresource))},
+	"fieldSelector": {
+		cel.MemberOverload("authorizer_fieldselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
+			cel.BinaryBinding(resourceCheckFieldSelector))},
+	"labelSelector": {
+		cel.MemberOverload("authorizer_labelselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
+			cel.BinaryBinding(resourceCheckLabelSelector))},
 	"namespace": {
 		cel.MemberOverload("resourcecheck_namespace", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
 			cel.BinaryBinding(resourceCheckNamespace))},
@@ -351,6 +361,38 @@ func resourceCheckSubresource(arg1, arg2 ref.Val) ref.Val {
 
 	result := resourceCheck
 	result.subresource = subresource
+	return result
+}
+
+func resourceCheckFieldSelector(arg1, arg2 ref.Val) ref.Val {
+	resourceCheck, ok := arg1.(resourceCheckVal)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg1)
+	}
+
+	fieldSelector, ok := arg2.Value().(string)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg1)
+	}
+
+	result := resourceCheck
+	result.fieldSelector = fieldSelector
+	return result
+}
+
+func resourceCheckLabelSelector(arg1, arg2 ref.Val) ref.Val {
+	resourceCheck, ok := arg1.(resourceCheckVal)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg1)
+	}
+
+	labelSelector, ok := arg2.Value().(string)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg1)
+	}
+
+	result := resourceCheck
+	result.labelSelector = labelSelector
 	return result
 }
 
@@ -544,11 +586,13 @@ func (g groupCheckVal) resourceCheck(resource string) resourceCheckVal {
 
 type resourceCheckVal struct {
 	receiverOnlyObjectVal
-	groupCheck  groupCheckVal
-	resource    string
-	subresource string
-	namespace   string
-	name        string
+	groupCheck    groupCheckVal
+	resource      string
+	subresource   string
+	namespace     string
+	name          string
+	fieldSelector string
+	labelSelector string
 }
 
 func (a resourceCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
@@ -563,6 +607,26 @@ func (a resourceCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 		Verb:            verb,
 		User:            a.groupCheck.authorizer.userInfo,
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		if len(a.fieldSelector) > 0 {
+			selector, err := fields.ParseSelector(a.fieldSelector)
+			if err != nil {
+				attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = nil, err
+			} else {
+				attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = selector.Requirements(), nil
+			}
+		}
+		if len(a.labelSelector) > 0 {
+			requirements, err := labels.ParseToRequirements(a.labelSelector)
+			if err != nil {
+				attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = nil, err
+			} else {
+				attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = requirements, nil
+			}
+		}
+	}
+
 	decision, reason, err := a.groupCheck.authorizer.authAuthorizer.Authorize(ctx, attr)
 	return newDecision(decision, err, reason)
 }

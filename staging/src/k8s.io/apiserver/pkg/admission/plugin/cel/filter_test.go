@@ -20,6 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"reflect"
 	"strings"
 	"testing"
@@ -125,6 +131,11 @@ func TestCompile(t *testing.T) {
 }
 
 func TestFilter(t *testing.T) {
+	simpleLabelSelector, err := labels.NewRequirement("apple", selection.Equals, []string{"banana"})
+	if err != nil {
+		panic(err)
+	}
+
 	configMapParams := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -183,6 +194,7 @@ func TestFilter(t *testing.T) {
 		testPerCallLimit uint64
 		namespaceObject  *corev1.Namespace
 		strictCost       bool
+		enableSelectors  bool
 	}{
 		{
 			name: "valid syntax for object",
@@ -486,7 +498,65 @@ func TestFilter(t *testing.T) {
 			name: "test authorizer allow resource check with all fields",
 			validations: []ExpressionAccessor{
 				&condition{
-					Expression: "authorizer.group('apps').resource('deployments').subresource('status').namespace('test').name('backend').check('create').allowed()",
+					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest: true,
+				APIGroup:        "apps",
+				Resource:        "deployments",
+				Subresource:     "status",
+				Namespace:       "test",
+				Name:            "backend",
+				Verb:            "create",
+				APIVersion:      "*",
+				FieldSelectorRequirements: fields.Requirements{
+					{Operator: "=", Field: "foo", Value: "bar"},
+				},
+				LabelSelectorRequirements: labels.Requirements{
+					*simpleLabelSelector,
+				},
+			}),
+			enableSelectors: true,
+		},
+		{
+			name: "test authorizer allow resource check with parse failures",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo badoperator bar').labelSelector('apple badoperator banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest:         true,
+				APIGroup:                "apps",
+				Resource:                "deployments",
+				Subresource:             "status",
+				Namespace:               "test",
+				Name:                    "backend",
+				Verb:                    "create",
+				APIVersion:              "*",
+				FieldSelectorParsingErr: errors.New("invalid selector: 'foo badoperator bar'; can't understand 'foo badoperator bar'"),
+				LabelSelectorParsingErr: errors.New("unable to parse requirement: found 'badoperator', expected: in, notin, =, ==, !=, gt, lt"),
+			}),
+			enableSelectors: true,
+		},
+		{
+			name: "test authorizer allow resource check with all fields, without gate",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
 				},
 			},
 			attributes: newValidAttribute(&podObject, false),
@@ -760,6 +830,10 @@ func TestFilter(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.enableSelectors {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
+			}
+
 			if tc.testPerCallLimit == 0 {
 				tc.testPerCallLimit = celconfig.PerCallLimit
 			}
@@ -1400,6 +1474,7 @@ func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) 
 		if !ok {
 			panic(fmt.Sprintf("unsupported type: %T", a))
 		}
+
 		if reflect.DeepEqual(f.match.match, *other) {
 			return f.match.decision, f.match.reason, f.match.err
 		}
