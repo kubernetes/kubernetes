@@ -109,7 +109,9 @@ func (s *server) Start() error {
 	api.RegisterRegistrationServer(s.grpc, s)
 	go func() {
 		defer s.wg.Done()
-		s.grpc.Serve(ln)
+		if err = s.grpc.Serve(ln); err != nil {
+			klog.ErrorS(err, "Error while serving device plugin registration grpc server")
+		}
 	}()
 
 	return nil
