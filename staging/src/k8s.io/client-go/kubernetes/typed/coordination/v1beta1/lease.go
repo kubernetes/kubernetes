@@ -32,6 +32,8 @@ import (
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // LeasesGetter has a method to return a LeaseInterface.
@@ -82,13 +84,22 @@ func (c *leases) Get(ctx context.Context, name string, options v1.GetOptions) (r
 }
 
 // List takes label and field selectors, and returns the list of Leases that match those selectors.
-func (c *leases) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.LeaseList, err error) {
-	defer func() {
+func (c *leases) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.LeaseList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for leases, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
 		if err == nil {
-			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for leases", c.list, opts, result)
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for leases", c.list, opts, result)
+			return result, nil
 		}
-	}()
-	return c.list(ctx, opts)
+		klog.Warningf("The watchlist request for leases ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for leases", c.list, opts, result)
+	}
+	return result, err
 }
 
 // list takes label and field selectors, and returns the list of Leases that match those selectors.
@@ -104,6 +115,23 @@ func (c *leases) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Leases
+func (c *leases) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.LeaseList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.LeaseList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("leases").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }

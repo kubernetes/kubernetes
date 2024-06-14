@@ -32,6 +32,8 @@ import (
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // IngressClassesGetter has a method to return a IngressClassInterface.
@@ -79,13 +81,22 @@ func (c *ingressClasses) Get(ctx context.Context, name string, options metav1.Ge
 }
 
 // List takes label and field selectors, and returns the list of IngressClasses that match those selectors.
-func (c *ingressClasses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.IngressClassList, err error) {
-	defer func() {
+func (c *ingressClasses) List(ctx context.Context, opts metav1.ListOptions) (*v1.IngressClassList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for ingressclasses, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
 		if err == nil {
-			consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for ingressclasses", c.list, opts, result)
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for ingressclasses", c.list, opts, result)
+			return result, nil
 		}
-	}()
-	return c.list(ctx, opts)
+		klog.Warningf("The watchlist request for ingressclasses ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for ingressclasses", c.list, opts, result)
+	}
+	return result, err
 }
 
 // list takes label and field selectors, and returns the list of IngressClasses that match those selectors.
@@ -100,6 +111,22 @@ func (c *ingressClasses) list(ctx context.Context, opts metav1.ListOptions) (res
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of IngressClasses
+func (c *ingressClasses) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.IngressClassList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.IngressClassList{}
+	err = c.client.Get().
+		Resource("ingressclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
