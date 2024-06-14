@@ -210,6 +210,18 @@ type SharedInformer interface {
 	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
+	// The StoreTransformFunc is called for each object which is about to be stored.
+	// However, it's not applied to objects passed to event handlers.
+	//
+	// This function is useful for cases where the event handlers (except old object
+	// in Update event handler) require full objects whereas objects in store can be
+	// stripped off with unused fields to save on RAM cost.
+	//
+	// Must be set before starting the informer.
+	//
+	// Please see the comment on TransformFunc for more details.
+	SetStoreTransform(handler TransformFunc) error
+
 	// IsStopped reports whether the informer has already been stopped.
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
@@ -391,7 +403,8 @@ type sharedIndexInformer struct {
 	// Called whenever the ListAndWatch drops the connection with an error.
 	watchErrorHandler WatchErrorHandler
 
-	transform TransformFunc
+	transform      TransformFunc
+	storeTransform TransformFunc
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -453,6 +466,18 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 	}
 
 	s.transform = handler
+	return nil
+}
+
+func (s *sharedIndexInformer) SetStoreTransform(handler TransformFunc) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.started {
+		return fmt.Errorf("informer has already started")
+	}
+
+	s.storeTransform = handler
 	return nil
 }
 
@@ -640,7 +665,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool
 	defer s.blockDeltas.Unlock()
 
 	if deltas, ok := obj.(Deltas); ok {
-		return processDeltas(s, s.indexer, deltas, isInInitialList)
+		return processDeltas(s, s.indexer, deltas, isInInitialList, s.storeTransform)
 	}
 	return errors.New("object given as Process argument is not Deltas")
 }
