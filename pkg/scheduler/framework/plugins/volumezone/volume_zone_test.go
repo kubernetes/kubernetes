@@ -560,13 +560,13 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 		expectedHint   framework.QueueingHint
 		expectedErr    bool
 	}{
-		"backoff-wrong-new-object": {
+		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-pv",
 			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
-		"backoff-wrong-old-object": {
+		"error-wrong-old-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			oldObj:       "not-a-pv",
 			newObj:       st.MakePersistentVolume().Name("Vol_1").Obj(),
@@ -583,7 +583,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"new-pv-was-added-and-bound-to-pod's-pvc": {
+		"new-pv-was-added": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			newObj: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -593,7 +593,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"pv-was-updated-and-changed-key": {
+		"pv-was-updated-and-changed-topology": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			oldObj: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -609,7 +609,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"pv-was-updated-and-added-label": {
+		"pv-was-updated-and-added-topology-label": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			oldObj: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -626,7 +626,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"pv-was-updated-but-labels-are-same": {
+		"pv-was-updated-but-no-topology-is-changed": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			oldObj: &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{

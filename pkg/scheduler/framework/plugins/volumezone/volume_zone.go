@@ -163,7 +163,7 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
 			return nil, s
 		}
-		podPVTopologies = append(podPVTopologies, pl.getPVTopologiesFromPV(logger, pv)...)
+		podPVTopologies = append(podPVTopologies, pl.getPVTopologies(logger, pv)...)
 	}
 	return podPVTopologies, nil
 }
@@ -296,11 +296,11 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logge
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
 	}
 	if originalPV == nil {
-		logger.V(5).Info("PV is newly created, which might make the pod schedulable.")
+		logger.V(5).Info("PV is newly created, which might make the pod schedulable")
 		return framework.Queue, nil
 	}
-	originalPVTopologies := pl.getPVTopologiesFromPV(logger, originalPV)
-	modifiedPVTopologies := pl.getPVTopologiesFromPV(logger, modifiedPV)
+	originalPVTopologies := pl.getPVTopologies(logger, originalPV)
+	modifiedPVTopologies := pl.getPVTopologies(logger, modifiedPV)
 	if !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
 		logger.V(5).Info("PV's topology was updated, which might make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
 		return framework.Queue, nil
@@ -310,8 +310,8 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logge
 	return framework.QueueSkip, nil
 }
 
-// getPVTopologiesFromPV retrieves pvTopology from a given PV and returns the array
-func (pl *VolumeZone) getPVTopologiesFromPV(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
+// getPVTopologies retrieves pvTopology from a given PV and returns the array
+func (pl *VolumeZone) getPVTopologies(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
 	podPVTopologies := make([]pvTopology, 0)
 	for _, key := range topologyLabels {
 		if value, ok := pv.ObjectMeta.Labels[key]; ok {
