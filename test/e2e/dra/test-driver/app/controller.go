@@ -28,7 +28,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -68,9 +68,9 @@ func (r Resources) AllNodes(nodeLister listersv1.NodeLister) []string {
 	return r.Nodes
 }
 
-func (r Resources) NewAllocation(node string, data []byte) *resourcev1alpha2.AllocationResult {
-	allocation := &resourcev1alpha2.AllocationResult{}
-	allocation.ResourceHandles = []resourcev1alpha2.ResourceHandle{
+func (r Resources) NewAllocation(node string, data []byte) *resourceapi.AllocationResult {
+	allocation := &resourceapi.AllocationResult{}
+	allocation.ResourceHandles = []resourceapi.ResourceHandle{
 		{
 			DriverName: r.DriverName,
 			Data:       string(data),
@@ -193,7 +193,7 @@ func (c *ExampleController) GetNumDeallocations() int64 {
 	return c.numDeallocations
 }
 
-func (c *ExampleController) GetClassParameters(ctx context.Context, class *resourcev1alpha2.ResourceClass) (interface{}, error) {
+func (c *ExampleController) GetClassParameters(ctx context.Context, class *resourceapi.ResourceClass) (interface{}, error) {
 	if class.ParametersRef != nil {
 		if class.ParametersRef.APIGroup != "" ||
 			class.ParametersRef.Kind != "ConfigMap" {
@@ -204,7 +204,7 @@ func (c *ExampleController) GetClassParameters(ctx context.Context, class *resou
 	return nil, nil
 }
 
-func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error) {
+func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resourceapi.ResourceClaim, class *resourceapi.ResourceClass, classParameters interface{}) (interface{}, error) {
 	if claim.Spec.ParametersRef != nil {
 		if claim.Spec.ParametersRef.APIGroup != "" ||
 			claim.Spec.ParametersRef.Kind != "ConfigMap" {
@@ -246,7 +246,7 @@ func (c *ExampleController) allocateOneByOne(ctx context.Context, claimAllocatio
 }
 
 // allocate simply copies parameters as JSON map into a ResourceHandle.
-func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, claimParameters interface{}, class *resourcev1alpha2.ResourceClass, classParameters interface{}, selectedNode string) (result *resourcev1alpha2.AllocationResult, err error) {
+func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.ResourceClaim, claimParameters interface{}, class *resourceapi.ResourceClass, classParameters interface{}, selectedNode string) (result *resourceapi.AllocationResult, err error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Allocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	defer func() {
 		logger.V(3).Info("done", "result", result, "err", err)
@@ -316,7 +316,7 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1al
 	return allocation, nil
 }
 
-func (c *ExampleController) Deallocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error {
+func (c *ExampleController) Deallocate(ctx context.Context, claim *resourceapi.ResourceClaim) error {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Deallocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()

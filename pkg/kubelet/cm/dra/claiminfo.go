@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -47,14 +47,14 @@ type claimInfoCache struct {
 }
 
 // newClaimInfoFromClaim creates a new claim info from a resource claim.
-func newClaimInfoFromClaim(claim *resourcev1alpha2.ResourceClaim) *ClaimInfo {
+func newClaimInfoFromClaim(claim *resourceapi.ResourceClaim) *ClaimInfo {
 	// Grab the allocation.resourceHandles. If there are no
 	// allocation.resourceHandles, create a single resourceHandle with no
 	// content. This will trigger processing of this claim by a single
 	// kubelet plugin whose name matches resourceClaim.Status.DriverName.
 	resourceHandles := claim.Status.Allocation.ResourceHandles
 	if len(resourceHandles) == 0 {
-		resourceHandles = make([]resourcev1alpha2.ResourceHandle, 1)
+		resourceHandles = make([]resourceapi.ResourceHandle, 1)
 	}
 	claimInfoState := state.ClaimInfoState{
 		DriverName:      claim.Status.DriverName,

@@ -113,8 +113,8 @@ import (
 	fakerbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1/fake"
 	rbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
 	fakerbacv1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1/fake"
-	resourcev1alpha2 "k8s.io/client-go/kubernetes/typed/resource/v1alpha2"
-	fakeresourcev1alpha2 "k8s.io/client-go/kubernetes/typed/resource/v1alpha2/fake"
+	resourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
+	fakeresourcev1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3/fake"
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	fakeschedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1/fake"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
@@ -438,9 +438,9 @@ func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
 	return &fakerbacv1alpha1.FakeRbacV1alpha1{Fake: &c.Fake}
 }
 
-// ResourceV1alpha2 retrieves the ResourceV1alpha2Client
-func (c *Clientset) ResourceV1alpha2() resourcev1alpha2.ResourceV1alpha2Interface {
-	return &fakeresourcev1alpha2.FakeResourceV1alpha2{Fake: &c.Fake}
+// ResourceV1alpha3 retrieves the ResourceV1alpha3Client
+func (c *Clientset) ResourceV1alpha3() resourcev1alpha3.ResourceV1alpha3Interface {
+	return &fakeresourcev1alpha3.FakeResourceV1alpha3{Fake: &c.Fake}
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client

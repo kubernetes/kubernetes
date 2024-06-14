@@ -300,13 +300,13 @@
     {
       "name": "resource.k8s.io",
       "preferredVersion": {
-        "groupVersion": "resource.k8s.io/v1alpha2",
-        "version": "v1alpha2"
+        "groupVersion": "resource.k8s.io/v1alpha3",
+        "version": "v1alpha3"
       },
       "versions": [
         {
-          "groupVersion": "resource.k8s.io/v1alpha2",
-          "version": "v1alpha2"
+          "groupVersion": "resource.k8s.io/v1alpha3",
+          "version": "v1alpha3"
         }
       ]
     },

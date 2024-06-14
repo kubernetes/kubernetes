@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -39,10 +39,10 @@ type ResourceModels struct {
 	NamedResources namedresourcesmodel.Model
 }
 
-// resourceSliceLister is the subset of resourcev1alpha2listers.ResourceSliceLister needed by
+// resourceSliceLister is the subset of resourcelisters.ResourceSliceLister needed by
 // newResourceModel.
 type resourceSliceLister interface {
-	List(selector labels.Selector) (ret []*resourcev1alpha2.ResourceSlice, err error)
+	List(selector labels.Selector) (ret []*resourceapi.ResourceSlice, err error)
 }
 
 // assumeCacheLister is the subset of volumebinding.AssumeCache needed by newResourceModel.
@@ -72,14 +72,14 @@ func newResourceModel(logger klog.Logger, resourceSliceLister resourceSliceListe
 
 	objs := claimAssumeCache.List(nil)
 	for _, obj := range objs {
-		claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
+		claim, ok := obj.(*resourceapi.ResourceClaim)
 		if !ok {
 			return nil, fmt.Errorf("got unexpected object of type %T from claim assume cache", obj)
 		}
 		if obj, ok := inFlightAllocations.Load(claim.UID); ok {
 			// If the allocation is in-flight, then we have to use the allocation
 			// from that claim.
-			claim = obj.(*resourcev1alpha2.ResourceClaim)
+			claim = obj.(*resourceapi.ResourceClaim)
 		}
 		if claim.Status.Allocation == nil {
 			continue
@@ -103,13 +103,13 @@ func newResourceModel(logger klog.Logger, resourceSliceLister resourceSliceListe
 	return model, nil
 }
 
-func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClass, classParameters *resourcev1alpha2.ResourceClassParameters, claimParameters *resourcev1alpha2.ResourceClaimParameters) (*claimController, error) {
+func newClaimController(logger klog.Logger, class *resourceapi.ResourceClass, classParameters *resourceapi.ResourceClassParameters, claimParameters *resourceapi.ResourceClaimParameters) (*claimController, error) {
 	// Each node driver is separate from the others. Each driver may have
 	// multiple requests which need to be allocated together, so here
 	// we have to collect them per model.
 	type perDriverRequests struct {
 		parameters []runtime.RawExtension
-		requests   []*resourcev1alpha2.NamedResourcesRequest
+		requests   []*resourceapi.NamedResourcesRequest
 	}
 	namedresourcesRequests := make(map[string]perDriverRequests)
 	for i, request := range claimParameters.DriverRequests {
@@ -136,7 +136,7 @@ func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClas
 		namedresources:  make(map[string]perDriverController, len(namedresourcesRequests)),
 	}
 	for driverName, perDriver := range namedresourcesRequests {
-		var filter *resourcev1alpha2.NamedResourcesFilter
+		var filter *resourceapi.NamedResourcesFilter
 		for _, f := range classParameters.Filters {
 			if f.DriverName == driverName && f.ResourceFilterModel.NamedResources != nil {
 				filter = f.ResourceFilterModel.NamedResources
@@ -158,9 +158,9 @@ func newClaimController(logger klog.Logger, class *resourcev1alpha2.ResourceClas
 // claimController currently wraps exactly one structured parameter model.
 
 type claimController struct {
-	class           *resourcev1alpha2.ResourceClass
-	classParameters *resourcev1alpha2.ResourceClassParameters
-	claimParameters *resourcev1alpha2.ResourceClaimParameters
+	class           *resourceapi.ResourceClass
+	classParameters *resourceapi.ResourceClassParameters
+	claimParameters *resourceapi.ResourceClaimParameters
 	namedresources  map[string]perDriverController
 }
 
@@ -186,8 +186,8 @@ func (c claimController) nodeIsSuitable(ctx context.Context, nodeName string, re
 	return true, nil
 }
 
-func (c claimController) allocate(ctx context.Context, nodeName string, resources resources) (string, *resourcev1alpha2.AllocationResult, error) {
-	allocation := &resourcev1alpha2.AllocationResult{
+func (c claimController) allocate(ctx context.Context, nodeName string, resources resources) (string, *resourceapi.AllocationResult, error) {
+	allocation := &resourceapi.AllocationResult{
 		AvailableOnNodes: &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
@@ -207,9 +207,9 @@ func (c claimController) allocate(ctx context.Context, nodeName string, resource
 		if err != nil {
 			return "", nil, fmt.Errorf("allocating via named resources structured model: %w", err)
 		}
-		handle := resourcev1alpha2.ResourceHandle{
+		handle := resourceapi.ResourceHandle{
 			DriverName: driverName,
-			StructuredData: &resourcev1alpha2.StructuredResourceHandle{
+			StructuredData: &resourceapi.StructuredResourceHandle{
 				NodeName: nodeName,
 			},
 		}
@@ -218,9 +218,9 @@ func (c claimController) allocate(ctx context.Context, nodeName string, resource
 				continue
 			}
 			handle.StructuredData.Results = append(handle.StructuredData.Results,
-				resourcev1alpha2.DriverAllocationResult{
+				resourceapi.DriverAllocationResult{
 					VendorRequestParameters: perDriver.parameters[i],
-					AllocationResultModel: resourcev1alpha2.AllocationResultModel{
+					AllocationResultModel: resourceapi.AllocationResultModel{
 						NamedResources: result,
 					},
 				},

@@ -40,7 +40,7 @@ import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -625,7 +625,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClassColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "DriverName", Type: "string", Description: resourcev1alpha2.ResourceClass{}.SwaggerDoc()["driverName"]},
+		{Name: "DriverName", Type: "string", Description: resourceapi.ResourceClass{}.SwaggerDoc()["driverName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceClassColumnDefinitions, printResourceClass)
@@ -633,7 +633,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClaimColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
+		{Name: "ResourceClassName", Type: "string", Description: resourceapi.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
 		{Name: "State", Type: "string", Description: "A summary of the current state (allocated, pending, reserved, etc.)."},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
@@ -642,7 +642,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClaimTemplateColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "ResourceClassName", Type: "string", Description: resourcev1alpha2.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
+		{Name: "ResourceClassName", Type: "string", Description: resourceapi.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceClaimTemplateColumnDefinitions, printResourceClaimTemplate)
@@ -650,7 +650,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podSchedulingCtxColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "SelectedNode", Type: "string", Description: resourcev1alpha2.PodSchedulingContextSpec{}.SwaggerDoc()["selectedNode"]},
+		{Name: "SelectedNode", Type: "string", Description: resourceapi.PodSchedulingContextSpec{}.SwaggerDoc()["selectedNode"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)
@@ -658,7 +658,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClaimParametersColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "GeneratedFrom", Type: "string", Description: resourcev1alpha2.ResourceClaimParameters{}.SwaggerDoc()["generatedFrom"]},
+		{Name: "GeneratedFrom", Type: "string", Description: resourceapi.ResourceClaimParameters{}.SwaggerDoc()["generatedFrom"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceClaimParametersColumnDefinitions, printResourceClaimParameters)
@@ -666,7 +666,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceClassParametersColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "GeneratedFrom", Type: "string", Description: resourcev1alpha2.ResourceClassParameters{}.SwaggerDoc()["generatedFrom"]},
+		{Name: "GeneratedFrom", Type: "string", Description: resourceapi.ResourceClassParameters{}.SwaggerDoc()["generatedFrom"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceClassParametersColumnDefinitions, printResourceClassParameters)
@@ -674,8 +674,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	nodeResourceCapacityColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Node", Type: "string", Description: resourcev1alpha2.ResourceSlice{}.SwaggerDoc()["nodeName"]},
-		{Name: "Driver", Type: "string", Description: resourcev1alpha2.ResourceSlice{}.SwaggerDoc()["driverName"]},
+		{Name: "Node", Type: "string", Description: resourceapi.ResourceSlice{}.SwaggerDoc()["nodeName"]},
+		{Name: "Driver", Type: "string", Description: resourceapi.ResourceSlice{}.SwaggerDoc()["driverName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printResourceSlice)

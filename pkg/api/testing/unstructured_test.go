@@ -161,12 +161,12 @@ func TestRoundtripToUnstructured(t *testing.T) {
 			{Group: "apps", Version: "v1", Kind: "ControllerRevisionList"},
 			{Group: "admission.k8s.io", Version: "v1beta1", Kind: "AdmissionReview"},
 			{Group: "admission.k8s.io", Version: "v1", Kind: "AdmissionReview"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaim"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParametersList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParametersList"},
+			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaim"},
+			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimList"},
+			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimParameters"},
+			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimParametersList"},
+			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClassParameters"},
+			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClassParametersList"},
 		},
 	}
 

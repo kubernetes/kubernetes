@@ -38,7 +38,7 @@ import (
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -469,8 +469,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	})
 
 	f.Context("ResourceSlice", f.WithSerial(), func() {
-		listResources := func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
-			slices, err := f.ClientSet.ResourceV1alpha2().ResourceSlices().List(ctx, metav1.ListOptions{})
+		listResources := func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
+			slices, err := f.ClientSet.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return nil, err
 			}
@@ -562,7 +562,7 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// kubelet should do this eventually, but better make sure.
 		// A separate test checks this explicitly.
-		framework.ExpectNoError(clientSet.ResourceV1alpha2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "driverName=" + driverName}))
+		framework.ExpectNoError(clientSet.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "driverName=" + driverName}))
 	})
 	ginkgo.DeferCleanup(plugin.Stop)
 
@@ -575,31 +575,31 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 // and placed on the node without involving the scheduler and the DRA controller
 func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, deferPodDeletion bool, pluginNames []string) *v1.Pod {
 	// ResourceClass
-	class := &resourcev1alpha2.ResourceClass{
+	class := &resourceapi.ResourceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
 		},
 		DriverName: "controller",
 	}
-	_, err := clientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, class, metav1.CreateOptions{})
+	_, err := clientSet.ResourceV1alpha3().ResourceClasses().Create(ctx, class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1alpha2().ResourceClasses().Delete, className, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().ResourceClasses().Delete, className, metav1.DeleteOptions{})
 
 	// ResourceClaim
 	podClaimName := "resource-claim"
-	claim := &resourcev1alpha2.ResourceClaim{
+	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: claimName,
 		},
-		Spec: resourcev1alpha2.ResourceClaimSpec{
+		Spec: resourceapi.ResourceClaimSpec{
 			ResourceClassName: className,
 		},
 	}
-	createdClaim, err := clientSet.ResourceV1alpha2().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
+	createdClaim, err := clientSet.ResourceV1alpha3().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1alpha2().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
 
 	// Pod
 	containerName := "testcontainer"
@@ -638,46 +638,46 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 
 	// Update claim status: set ReservedFor and AllocationResult
 	// NOTE: This is usually done by the DRA controller
-	resourceHandlers := make([]resourcev1alpha2.ResourceHandle, len(pluginNames))
+	resourceHandlers := make([]resourceapi.ResourceHandle, len(pluginNames))
 	for i, pluginName := range pluginNames {
-		resourceHandlers[i] = resourcev1alpha2.ResourceHandle{
+		resourceHandlers[i] = resourceapi.ResourceHandle{
 			DriverName: pluginName,
 			Data:       "{\"EnvVars\":{\"DRA_PARAM1\":\"PARAM1_VALUE\"},\"NodeName\":\"\"}",
 		}
 	}
-	createdClaim.Status = resourcev1alpha2.ResourceClaimStatus{
+	createdClaim.Status = resourceapi.ResourceClaimStatus{
 		DriverName: "controller",
-		ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+		ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 			{Resource: "pods", Name: podName, UID: createdPod.UID},
 		},
-		Allocation: &resourcev1alpha2.AllocationResult{
+		Allocation: &resourceapi.AllocationResult{
 			ResourceHandles: resourceHandlers,
 		},
 	}
-	_, err = clientSet.ResourceV1alpha2().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
+	_, err = clientSet.ResourceV1alpha3().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
 	framework.ExpectNoError(err)
 
 	return pod
 }
 
 func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) {
-	slice := &resourcev1alpha2.ResourceSlice{
+	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 		},
 		NodeName:   nodeName,
 		DriverName: driverName,
-		ResourceModel: resourcev1alpha2.ResourceModel{
-			NamedResources: &resourcev1alpha2.NamedResourcesResources{},
+		ResourceModel: resourceapi.ResourceModel{
+			NamedResources: &resourceapi.NamedResourcesResources{},
 		},
 	}
 
 	ginkgo.By(fmt.Sprintf("Creating ResourceSlice %s", nodeName))
-	slice, err := clientSet.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+	slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "create ResourceSlice")
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Deleting ResourceSlice %s", nodeName))
-		err := clientSet.ResourceV1alpha2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+		err := clientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "delete ResourceSlice")
 		}

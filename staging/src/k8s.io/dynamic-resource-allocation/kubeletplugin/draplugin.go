@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	resourceapi "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"

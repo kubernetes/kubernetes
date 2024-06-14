@@ -28,7 +28,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	resourceapi "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -256,7 +256,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 	// that it understands.
 	var resourceHandle string
 	var structuredResourceHandle *resourceapi.StructuredResourceHandle
-	claim, err := ex.kubeClient.ResourceV1alpha2().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
+	claim, err := ex.kubeClient.ResourceV1alpha3().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("retrieve claim %s/%s: %v", claimReq.Namespace, claimReq.Name, err)
 	}

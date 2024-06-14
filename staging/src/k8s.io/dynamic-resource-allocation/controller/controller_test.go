@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
@@ -47,7 +47,7 @@ func TestController(t *testing.T) {
 	otherClassName := "other-class"
 	ourFinalizer := driverName + "/deletion-protection"
 	otherFinalizer := otherDriverName + "/deletion-protection"
-	classes := []*resourcev1alpha2.ResourceClass{
+	classes := []*resourceapi.ResourceClass{
 		createClass(className, driverName),
 		createClass(otherClassName, otherDriverName),
 	}
@@ -63,63 +63,63 @@ func TestController(t *testing.T) {
 	otherNodeName := "worker-2"
 	unsuitableNodes := []string{otherNodeName}
 	potentialNodes := []string{nodeName, otherNodeName}
-	maxNodes := make([]string, resourcev1alpha2.PodSchedulingNodeListMaxSize)
+	maxNodes := make([]string, resourceapi.PodSchedulingNodeListMaxSize)
 	for i := range maxNodes {
 		maxNodes[i] = fmt.Sprintf("node-%d", i)
 	}
-	withDeletionTimestamp := func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+	withDeletionTimestamp := func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 		var deleted metav1.Time
 		claim = claim.DeepCopy()
 		claim.DeletionTimestamp = &deleted
 		return claim
 	}
-	withReservedFor := func(claim *resourcev1alpha2.ResourceClaim, pod *corev1.Pod) *resourcev1alpha2.ResourceClaim {
+	withReservedFor := func(claim *resourceapi.ResourceClaim, pod *corev1.Pod) *resourceapi.ResourceClaim {
 		claim = claim.DeepCopy()
-		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{
+		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{
 			Resource: "pods",
 			Name:     pod.Name,
 			UID:      pod.UID,
 		})
 		return claim
 	}
-	withFinalizer := func(claim *resourcev1alpha2.ResourceClaim, finalizer string) *resourcev1alpha2.ResourceClaim {
+	withFinalizer := func(claim *resourceapi.ResourceClaim, finalizer string) *resourceapi.ResourceClaim {
 		claim = claim.DeepCopy()
 		claim.Finalizers = append(claim.Finalizers, finalizer)
 		return claim
 	}
-	allocation := resourcev1alpha2.AllocationResult{}
-	withAllocate := func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+	allocation := resourceapi.AllocationResult{}
+	withAllocate := func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 		// Any allocated claim must have our finalizer.
 		claim = withFinalizer(claim, ourFinalizer)
 		claim.Status.Allocation = &allocation
 		claim.Status.DriverName = driverName
 		return claim
 	}
-	withDeallocate := func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+	withDeallocate := func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 		claim.Status.DeallocationRequested = true
 		return claim
 	}
-	withSelectedNode := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+	withSelectedNode := func(podSchedulingCtx *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Spec.SelectedNode = nodeName
 		return podSchedulingCtx
 	}
-	withSpecificUnsuitableNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext, unsuitableNodes []string) *resourcev1alpha2.PodSchedulingContext {
+	withSpecificUnsuitableNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext, unsuitableNodes []string) *resourceapi.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Status.ResourceClaims = append(podSchedulingCtx.Status.ResourceClaims,
-			resourcev1alpha2.ResourceClaimSchedulingStatus{Name: podClaimName, UnsuitableNodes: unsuitableNodes},
+			resourceapi.ResourceClaimSchedulingStatus{Name: podClaimName, UnsuitableNodes: unsuitableNodes},
 		)
 		return podSchedulingCtx
 	}
-	withUnsuitableNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+	withUnsuitableNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
 		return withSpecificUnsuitableNodes(podSchedulingCtx, unsuitableNodes)
 	}
-	withSpecificPotentialNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext, potentialNodes []string) *resourcev1alpha2.PodSchedulingContext {
+	withSpecificPotentialNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext, potentialNodes []string) *resourceapi.PodSchedulingContext {
 		podSchedulingCtx = podSchedulingCtx.DeepCopy()
 		podSchedulingCtx.Spec.PotentialNodes = potentialNodes
 		return podSchedulingCtx
 	}
-	withPotentialNodes := func(podSchedulingCtx *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+	withPotentialNodes := func(podSchedulingCtx *resourceapi.PodSchedulingContext) *resourceapi.PodSchedulingContext {
 		return withSpecificPotentialNodes(podSchedulingCtx, potentialNodes)
 	}
 
@@ -128,10 +128,10 @@ func TestController(t *testing.T) {
 	for name, test := range map[string]struct {
 		key                                  string
 		driver                               mockDriver
-		classes                              []*resourcev1alpha2.ResourceClass
+		classes                              []*resourceapi.ResourceClass
 		pod                                  *corev1.Pod
-		schedulingCtx, expectedSchedulingCtx *resourcev1alpha2.PodSchedulingContext
-		claim, expectedClaim                 *resourcev1alpha2.ResourceClaim
+		schedulingCtx, expectedSchedulingCtx *resourceapi.PodSchedulingContext
+		claim, expectedClaim                 *resourceapi.ResourceClaim
 		expectedError                        string
 	}{
 		"invalid-key": {
@@ -345,10 +345,10 @@ func TestController(t *testing.T) {
 				initialObjects = append(initialObjects, test.claim)
 			}
 			kubeClient, informerFactory := fakeK8s(initialObjects)
-			rcInformer := informerFactory.Resource().V1alpha2().ResourceClasses()
-			claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
+			rcInformer := informerFactory.Resource().V1alpha3().ResourceClasses()
+			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 			podInformer := informerFactory.Core().V1().Pods()
-			podSchedulingInformer := informerFactory.Resource().V1alpha2().PodSchedulingContexts()
+			podSchedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
 			// Order is important: on function exit, we first must
 			// cancel, then wait (last-in-first-out).
 			defer informerFactory.Shutdown()
@@ -356,13 +356,13 @@ func TestController(t *testing.T) {
 
 			for _, obj := range initialObjects {
 				switch obj.(type) {
-				case *resourcev1alpha2.ResourceClass:
+				case *resourceapi.ResourceClass:
 					require.NoError(t, rcInformer.Informer().GetStore().Add(obj), "add resource class")
-				case *resourcev1alpha2.ResourceClaim:
+				case *resourceapi.ResourceClaim:
 					require.NoError(t, claimInformer.Informer().GetStore().Add(obj), "add resource claim")
 				case *corev1.Pod:
 					require.NoError(t, podInformer.Informer().GetStore().Add(obj), "add pod")
-				case *resourcev1alpha2.PodSchedulingContext:
+				case *resourceapi.PodSchedulingContext:
 					require.NoError(t, podSchedulingInformer.Informer().GetStore().Add(obj), "add pod scheduling")
 				default:
 					t.Fatalf("unknown initialObject type: %+v", obj)
@@ -375,9 +375,9 @@ func TestController(t *testing.T) {
 			ctrl := New(ctx, driverName, driver, kubeClient, informerFactory)
 			informerFactory.Start(ctx.Done())
 			if !cache.WaitForCacheSync(ctx.Done(),
-				informerFactory.Resource().V1alpha2().ResourceClasses().Informer().HasSynced,
-				informerFactory.Resource().V1alpha2().ResourceClaims().Informer().HasSynced,
-				informerFactory.Resource().V1alpha2().PodSchedulingContexts().Informer().HasSynced,
+				informerFactory.Resource().V1alpha3().ResourceClasses().Informer().HasSynced,
+				informerFactory.Resource().V1alpha3().ResourceClaims().Informer().HasSynced,
+				informerFactory.Resource().V1alpha3().PodSchedulingContexts().Informer().HasSynced,
 			) {
 				t.Fatal("could not sync caches")
 			}
@@ -391,17 +391,17 @@ func TestController(t *testing.T) {
 			if err != nil && err.Error() != test.expectedError {
 				t.Fatalf("expected error %q, got %q", test.expectedError, err.Error())
 			}
-			claims, err := kubeClient.ResourceV1alpha2().ResourceClaims("").List(ctx, metav1.ListOptions{})
+			claims, err := kubeClient.ResourceV1alpha3().ResourceClaims("").List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list claims")
-			var expectedClaims []resourcev1alpha2.ResourceClaim
+			var expectedClaims []resourceapi.ResourceClaim
 			if test.expectedClaim != nil {
 				expectedClaims = append(expectedClaims, *test.expectedClaim)
 			}
 			assert.Equal(t, expectedClaims, claims.Items)
 
-			podSchedulings, err := kubeClient.ResourceV1alpha2().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
+			podSchedulings, err := kubeClient.ResourceV1alpha3().PodSchedulingContexts("").List(ctx, metav1.ListOptions{})
 			require.NoError(t, err, "list pod schedulings")
-			var expectedPodSchedulings []resourcev1alpha2.PodSchedulingContext
+			var expectedPodSchedulings []resourceapi.PodSchedulingContext
 			if test.expectedSchedulingCtx != nil {
 				expectedPodSchedulings = append(expectedPodSchedulings, *test.expectedSchedulingCtx)
 			}
@@ -429,7 +429,7 @@ type mockDriver struct {
 
 type allocate struct {
 	selectedNode string
-	allocResult  *resourcev1alpha2.AllocationResult
+	allocResult  *resourceapi.AllocationResult
 	allocErr     error
 }
 
@@ -459,7 +459,7 @@ func (m mockDriver) expectUnsuitableNodes(expected map[string][]string, err erro
 	return m
 }
 
-func (m mockDriver) GetClassParameters(ctx context.Context, class *resourcev1alpha2.ResourceClass) (interface{}, error) {
+func (m mockDriver) GetClassParameters(ctx context.Context, class *resourceapi.ResourceClass) (interface{}, error) {
 	m.t.Logf("GetClassParameters(%s)", class)
 	result, ok := m.classParameters[class.Name]
 	if !ok {
@@ -471,7 +471,7 @@ func (m mockDriver) GetClassParameters(ctx context.Context, class *resourcev1alp
 	return result, nil
 }
 
-func (m mockDriver) GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error) {
+func (m mockDriver) GetClaimParameters(ctx context.Context, claim *resourceapi.ResourceClaim, class *resourceapi.ResourceClass, classParameters interface{}) (interface{}, error) {
 	m.t.Logf("GetClaimParameters(%s)", claim)
 	result, ok := m.claimParameters[claim.Name]
 	if !ok {
@@ -498,7 +498,7 @@ func (m mockDriver) Allocate(ctx context.Context, claims []*ClaimAllocation, sel
 	return
 }
 
-func (m mockDriver) Deallocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error {
+func (m mockDriver) Deallocate(ctx context.Context, claim *resourceapi.ResourceClaim) error {
 	m.t.Logf("Deallocate(%s)", claim)
 	err, ok := m.deallocate[claim.Name]
 	if !ok {
@@ -532,8 +532,8 @@ func (m mockDriver) UnsuitableNodes(ctx context.Context, pod *corev1.Pod, claims
 	return nil
 }
 
-func createClass(className, driverName string) *resourcev1alpha2.ResourceClass {
-	return &resourcev1alpha2.ResourceClass{
+func createClass(className, driverName string) *resourceapi.ResourceClass {
+	return &resourceapi.ResourceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
 		},
@@ -541,13 +541,13 @@ func createClass(className, driverName string) *resourcev1alpha2.ResourceClass {
 	}
 }
 
-func createClaim(claimName, claimNamespace, className string) *resourcev1alpha2.ResourceClaim {
-	return &resourcev1alpha2.ResourceClaim{
+func createClaim(claimName, claimNamespace, className string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      claimName,
 			Namespace: claimNamespace,
 		},
-		Spec: resourcev1alpha2.ResourceClaimSpec{
+		Spec: resourceapi.ResourceClaimSpec{
 			ResourceClassName: className,
 		},
 	}
@@ -572,9 +572,9 @@ func createPod(podName, podNamespace string, claims map[string]string) *corev1.P
 	return pod
 }
 
-func createPodSchedulingContexts(pod *corev1.Pod) *resourcev1alpha2.PodSchedulingContext {
+func createPodSchedulingContexts(pod *corev1.Pod) *resourceapi.PodSchedulingContext {
 	controller := true
-	return &resourcev1alpha2.PodSchedulingContext{
+	return &resourceapi.PodSchedulingContext{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pod.Name,
 			Namespace: pod.Namespace,

@@ -25,14 +25,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	resourceapi "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	resourceinformers "k8s.io/client-go/informers/resource/v1alpha2"
+	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -338,7 +338,7 @@ func (c *Controller) sync(ctx context.Context) error {
 			slice = slice.DeepCopy()
 			slice.ResourceModel = *resource
 			logger.V(5).Info("Reusing existing resource slice", "slice", klog.KObj(slice))
-			if _, err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
+			if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("update resource slice: %w", err)
 			}
 			continue
@@ -365,7 +365,7 @@ func (c *Controller) sync(ctx context.Context) error {
 			slice.NodeName = c.owner.Name
 		}
 		logger.V(5).Info("Creating new resource slice", "slice", klog.KObj(slice))
-		if _, err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
+		if _, err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("create resource slice: %w", err)
 		}
 	}
@@ -374,7 +374,7 @@ func (c *Controller) sync(ctx context.Context) error {
 	for i := 0; i < numObsoleteSlices; i++ {
 		slice := obsoleteSlices[i]
 		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice))
-		if err := c.kubeClient.ResourceV1alpha2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil {
+		if err := c.kubeClient.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("delete resource slice: %w", err)
 		}
 	}
