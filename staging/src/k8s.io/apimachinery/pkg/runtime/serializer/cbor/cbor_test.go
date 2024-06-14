@@ -121,6 +121,18 @@ func (p *anyObject) UnmarshalCBOR(in []byte) error {
 	return modes.Decode.Unmarshal(in, &p.Value)
 }
 
+type structWithRawExtensionField struct {
+	Extension runtime.RawExtension `json:"extension"`
+}
+
+func (p structWithRawExtensionField) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (structWithRawExtensionField) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
 func TestEncode(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
@@ -257,6 +269,21 @@ func TestDecode(t *testing.T) {
 			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
 			into:        &anyObject{},
 			expectedObj: &anyObject{},
+			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "rawextension transcoded",
+			data:        []byte{0xa1, 0x49, 'e', 'x', 't', 'e', 'n', 's', 'i', 'o', 'n', 0xa1, 0x41, 'a', 0x01},
+			gvk:         &schema.GroupVersionKind{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
+			into:        &structWithRawExtensionField{},
+			expectedObj: &structWithRawExtensionField{Extension: runtime.RawExtension{Raw: []byte(`{"a":1}`)}},
 			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
 			assertOnError: func(t *testing.T, err error) {
 				if err != nil {

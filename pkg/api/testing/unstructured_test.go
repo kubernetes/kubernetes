@@ -137,25 +137,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestRoundtripToUnstructured(t *testing.T) {
-	skipped := sets.New(
-		// TODO: Support cross-protocol RawExtension roundtrips.
-		schema.GroupVersionKind{Version: "v1", Kind: "List"},
-		schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"},
-		schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "ControllerRevisionList"},
-		schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"},
-		schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ControllerRevisionList"},
-		schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "ControllerRevision"},
-		schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "ControllerRevisionList"},
-		schema.GroupVersionKind{Group: "admission.k8s.io", Version: "v1beta1", Kind: "AdmissionReview"},
-		schema.GroupVersionKind{Group: "admission.k8s.io", Version: "v1", Kind: "AdmissionReview"},
-		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaim"},
-		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimList"},
-		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParameters"},
-		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParametersList"},
-		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParameters"},
-		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParametersList"},
-	)
-
+	skipped := sets.New[schema.GroupVersionKind]()
 	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
 		if nonRoundTrippableTypes.Has(gvk.Kind) {
 			skipped.Insert(gvk)
