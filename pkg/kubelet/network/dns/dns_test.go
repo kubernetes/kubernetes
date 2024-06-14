@@ -104,7 +104,7 @@ func TestParseResolvConf(t *testing.T) {
 			require.NoError(t, err)
 			assert.EqualValues(t, tc.nameservers, ns, "test case [%d]: name servers", i)
 			assert.EqualValues(t, tc.searches, srch, "test case [%d] searches", i)
-			assert.EqualValues(t, sets.NewString(tc.options...), sets.NewString(opts...), "test case [%d] options", i)
+			assert.EqualValues(t, sets.New[string](tc.options...), sets.New[string](opts...), "test case [%d] options", i)
 		} else {
 			require.Error(t, err, "tc.searches %v", tc.searches)
 		}
@@ -334,7 +334,7 @@ func TestMergeDNSOptions(t *testing.T) {
 	for _, tc := range testCases {
 		options := mergeDNSOptions(tc.existingDNSConfigOptions, tc.dnsConfigOptions)
 		// Options order may be changed after conversion.
-		if !sets.NewString(options...).Equal(sets.NewString(tc.expectedOptions...)) {
+		if !sets.New[string](options...).Equal(sets.New[string](tc.expectedOptions...)) {
 			t.Errorf("%s: mergeDNSOptions(%v, %v)=%v, want %v", tc.desc, tc.existingDNSConfigOptions, tc.dnsConfigOptions, options, tc.expectedOptions)
 		}
 	}
@@ -697,7 +697,7 @@ func dnsConfigsAreEqual(resConfig, expectedConfig *runtimeapi.DNSConfig) bool {
 		}
 	}
 	// Options order may be changed after conversion.
-	return sets.NewString(resConfig.Options...).Equal(sets.NewString(expectedConfig.Options...))
+	return sets.New[string](resConfig.Options...).Equal(sets.New[string](expectedConfig.Options...))
 }
 
 func newTestPods(count int) []*v1.Pod {

@@ -164,7 +164,7 @@ func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVa
 func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, error) {
 
 	envmap := envVarsToMap(envs)
-	missingKeys := sets.NewString()
+	missingKeys := sets.New[string]()
 	expanded := expansion.Expand(mount.SubPathExpr, func(key string) string {
 		value, ok := envmap[key]
 		if !ok || len(value) == 0 {
@@ -174,7 +174,7 @@ func ExpandContainerVolumeMounts(mount v1.VolumeMount, envs []EnvVar) (string, e
 	})
 
 	if len(missingKeys) > 0 {
-		return "", fmt.Errorf("missing value for %s", strings.Join(missingKeys.List(), ", "))
+		return "", fmt.Errorf("missing value for %s", strings.Join(sets.List(missingKeys), ", "))
 	}
 	return expanded, nil
 }

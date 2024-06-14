@@ -312,8 +312,8 @@ func setupPluginManager(t *testing.T, pluginSocketName string, m Manager) plugin
 }
 
 func runPluginManager(pluginManager pluginmanager.PluginManager) {
-	// FIXME: Replace sets.String with sets.Set[string]
-	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	// FIXME: Replace sets.Set[string] with sets.Set[string]
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go pluginManager.Run(sourcesReady, wait.NeverStop)
 }
 
