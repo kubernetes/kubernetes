@@ -571,13 +571,13 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 		expectedHint   framework.QueueingHint
 		expectedErr    bool
 	}{
-		"backoff-wrong-new-object": {
+		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-pvc",
 			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
-		"pvc-was-added-but-pod-was-not-bound-to-pvc": {
+		"pvc-was-added-but-pod-refers-no-pvc": {
 			pod: st.MakePod().Name("pod_1").Namespace("default").Obj(),
 			newObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
@@ -601,7 +601,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 			},
 			expectedHint: framework.QueueSkip,
 		},
-		"pvc-was-added-and-pod-was-bound-to-added-pvc": {
+		"pvc-was-added-and-pod-was-bound-to-the-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			newObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
@@ -609,7 +609,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"pvc-was-updated-and-pod-was-bound-to-pvc": {
+		"pvc-was-updated-and-pod-was-bound-to-the-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			oldObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
@@ -621,8 +621,8 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 			},
 			expectedHint: framework.Queue,
 		},
-		"pvc-was-updated-but-pod-was-not-bound-to-pvc": {
-			pod: createPodWithVolume("pod_1", ""),
+		"pvc-was-updated-but-pod-refers-no-pvc": {
+			pod: st.MakePod().Name("pod_1").Namespace(metav1.NamespaceDefault).Obj(),
 			oldObj: &v1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: ""},

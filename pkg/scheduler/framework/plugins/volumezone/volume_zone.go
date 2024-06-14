@@ -317,8 +317,8 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.
 	if err != nil {
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
 	}
-	if pl.IsPVCRequestedFromPod(logger, modifiedPVC, pod) {
-		logger.V(5).Info("PVC was created or updated and it might make this pod schedulable. PVC is binding to the pod.", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+	if pl.isPVCRequestedFromPod(logger, modifiedPVC, pod) {
+		logger.V(5).Info("PVC that is referred from the pod was created or updated, which might make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
 		return framework.Queue, nil
 	}
 
@@ -326,19 +326,19 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.
 	return framework.QueueSkip, nil
 }
 
-// IsPVCRequestedFromPod verifies if the PVC is requested from a given Pod.
-func (pl *VolumeZone) IsPVCRequestedFromPod(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
+// isPVCRequestedFromPod verifies if the PVC is requested from a given Pod.
+func (pl *VolumeZone) isPVCRequestedFromPod(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
 	if (pvc == nil) || (pod.Namespace != pvc.Namespace) {
 		return false
 	}
 	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
 	for _, pvcName := range pvcNames {
 		if pvc.Name == pvcName {
-			logger.V(5).Info("PVC matches the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+			logger.V(5).Info("PVC is referred from the pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 			return true
 		}
 	}
-	logger.V(5).Info("PVC doesn't match the pod's PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+	logger.V(5).Info("PVC is not referred from the pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 	return false
 }
 
