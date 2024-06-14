@@ -1713,7 +1713,7 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Body}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Body, ContentType: runtime.ContentTypeJSON}},
 				},
 			},
 		},
@@ -1728,7 +1728,7 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body, ContentType: runtime.ContentTypeJSON}},
 				},
 			},
 		},
@@ -1746,7 +1746,7 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body, ContentType: runtime.ContentTypeJSON}},
 				},
 			},
 		},
@@ -1762,7 +1762,7 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body, ContentType: runtime.ContentTypeJSON}},
 				},
 			},
 		},
@@ -1777,7 +1777,7 @@ func TestGetTable(t *testing.T) {
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1.TableRow{
-					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body}},
+					{Cells: []interface{}{"foo1", now.Time.UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedV1Beta1Body, ContentType: runtime.ContentTypeJSON}},
 				},
 			},
 		},
@@ -1904,6 +1904,7 @@ func TestWatchTable(t *testing.T) {
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
+						ContentType: runtime.ContentTypeJSON,
 					},
 				},
 			},
@@ -1929,6 +1930,7 @@ func TestWatchTable(t *testing.T) {
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
+						ContentType: runtime.ContentTypeJSON,
 					},
 				},
 				{
@@ -1941,6 +1943,7 @@ func TestWatchTable(t *testing.T) {
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBody}},
 							},
 						}))),
+						ContentType: runtime.ContentTypeJSON,
 					},
 				},
 			},
@@ -1966,6 +1969,7 @@ func TestWatchTable(t *testing.T) {
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBodyV1}},
 							},
 						}))),
+						ContentType: runtime.ContentTypeJSON,
 					},
 				},
 				{
@@ -1978,6 +1982,7 @@ func TestWatchTable(t *testing.T) {
 								{Cells: []interface{}{"foo1", time.Unix(1, 0).UTC().Format(time.RFC3339)}, Object: runtime.RawExtension{Raw: encodedBodyV1}},
 							},
 						}))),
+						ContentType: runtime.ContentTypeJSON,
 					},
 				},
 			},

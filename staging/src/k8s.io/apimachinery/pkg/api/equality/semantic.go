@@ -17,11 +17,14 @@ limitations under the License.
 package equality
 
 import (
+	"bytes"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Semantic can do semantic deep equality checks for api objects.
@@ -45,5 +48,15 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 	func(a, b fields.Selector) bool {
 		return a.String() == b.String()
+	},
+	func(a, b runtime.RawExtension) bool {
+		rawa, rawb := a.Raw, b.Raw
+		if jsona, err := a.MarshalJSON(); err == nil {
+			rawa = jsona
+		}
+		if jsonb, err := b.MarshalJSON(); err == nil {
+			rawb = jsonb
+		}
+		return bytes.Equal(rawa, rawb)
 	},
 )

@@ -48,7 +48,7 @@ func TestEmbeddedRawExtensionUnmarshal(t *testing.T) {
 		orig test
 	}{
 		"non-empty object": {
-			orig: test{Ext: runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)}},
+			orig: test{Ext: runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`), ContentType: runtime.ContentTypeJSON}},
 		},
 		"empty object": {
 			orig: test{Ext: runtime.RawExtension{}},
@@ -76,7 +76,7 @@ func TestEmbeddedRawExtensionRoundTrip(t *testing.T) {
 		orig test
 	}{
 		"non-empty object": {
-			orig: test{Ext: runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)}},
+			orig: test{Ext: runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`), ContentType: runtime.ContentTypeJSON}},
 		},
 		"empty object": {
 			orig: test{Ext: runtime.RawExtension{}},

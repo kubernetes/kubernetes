@@ -100,12 +100,14 @@ const (
 // +k8s:openapi-gen=true
 type RawExtension struct {
 	// Raw is the underlying serialization of this object.
-	//
-	// TODO: Determine how to detect ContentType and ContentEncoding of 'Raw' data.
 	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=raw"`
 	// Object can hold a representation of this extension - useful for working with versioned
 	// structs.
 	Object Object `json:"-"`
+
+	// ContentType is the IANA Media Type of the bytes in Raw. If empty, the content type is not
+	// known.
+	ContentType string `json:"-"`
 }
 
 // Unknown allows api objects with unknown types to be passed-through. This can be used
