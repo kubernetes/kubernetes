@@ -1,4 +1,4 @@
-apiVersion: resource.k8s.io/v1alpha2
+apiVersion: resource.k8s.io/v1alpha3
 kind: ResourceClaimParameters
 metadata:
   name: test-claim-parameters

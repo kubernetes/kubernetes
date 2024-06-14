@@ -17,7 +17,7 @@ limitations under the License.
 package rest
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -40,19 +40,19 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if storageMap, err := p.v1alpha2Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+	if storageMap, err := p.v1alpha3Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
-		apiGroupInfo.VersionedResourcesStorageMap[resourcev1alpha2.SchemeGroupVersion.Version] = storageMap
+		apiGroupInfo.VersionedResourcesStorageMap[resourcev1alpha3.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, nil
 }
 
-func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
-	if resource := "resourceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "resourceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		resourceClassStorage, err := resourceclassstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
@@ -60,7 +60,7 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		storage[resource] = resourceClassStorage
 	}
 
-	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
@@ -69,7 +69,7 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		storage[resource+"/status"] = resourceClaimStatusStorage
 	}
 
-	if resource := "resourceclaimtemplates"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "resourceclaimtemplates"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
@@ -77,7 +77,7 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		storage[resource] = resourceClaimTemplateStorage
 	}
 
-	if resource := "podschedulingcontexts"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "podschedulingcontexts"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingcontextsstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
@@ -86,7 +86,7 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		storage[resource+"/status"] = podSchedulingStatusStorage
 	}
 
-	if resource := "resourceclaimparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "resourceclaimparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		resourceClaimParametersStorage, err := resourceclaimparametersstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
@@ -94,7 +94,7 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		storage[resource] = resourceClaimParametersStorage
 	}
 
-	if resource := "resourceclassparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "resourceclassparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		resourceClassParametersStorage, err := resourceclassparametersstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
@@ -102,7 +102,7 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		storage[resource] = resourceClassParametersStorage
 	}
 
-	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err

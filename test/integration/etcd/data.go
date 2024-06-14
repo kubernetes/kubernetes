@@ -403,32 +403,32 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/resource/v1alpha2
-		gvr("resource.k8s.io", "v1alpha2", "resourceclasses"): {
+		// k8s.io/kubernetes/pkg/apis/resource/v1alpha3
+		gvr("resource.k8s.io", "v1alpha3", "resourceclasses"): {
 			Stub:             `{"metadata": {"name": "class1name"}, "driverName": "example.com"}`,
 			ExpectedEtcdPath: "/registry/resourceclasses/class1name",
 		},
-		gvr("resource.k8s.io", "v1alpha2", "resourceclaims"): {
+		gvr("resource.k8s.io", "v1alpha3", "resourceclaims"): {
 			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}`,
 			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim1name",
 		},
-		gvr("resource.k8s.io", "v1alpha2", "resourceclaimtemplates"): {
+		gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"): {
 			Stub:             `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}}`,
 			ExpectedEtcdPath: "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
 		},
-		gvr("resource.k8s.io", "v1alpha2", "podschedulingcontexts"): {
+		gvr("resource.k8s.io", "v1alpha3", "podschedulingcontexts"): {
 			Stub:             `{"metadata": {"name": "pod1name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
 			ExpectedEtcdPath: "/registry/podschedulingcontexts/" + namespace + "/pod1name",
 		},
-		gvr("resource.k8s.io", "v1alpha2", "resourceclassparameters"): {
+		gvr("resource.k8s.io", "v1alpha3", "resourceclassparameters"): {
 			Stub:             `{"metadata": {"name": "class1parameters"}}`,
 			ExpectedEtcdPath: "/registry/resourceclassparameters/" + namespace + "/class1parameters",
 		},
-		gvr("resource.k8s.io", "v1alpha2", "resourceclaimparameters"): {
+		gvr("resource.k8s.io", "v1alpha3", "resourceclaimparameters"): {
 			Stub:             `{"metadata": {"name": "claim1parameters"}}`,
 			ExpectedEtcdPath: "/registry/resourceclaimparameters/" + namespace + "/claim1parameters",
 		},
-		gvr("resource.k8s.io", "v1alpha2", "resourceslices"): {
+		gvr("resource.k8s.io", "v1alpha3", "resourceslices"): {
 			Stub:             `{"metadata": {"name": "node1slice"}, "nodeName": "worker1", "driverName": "dra.example.com", "namedResources": {}}`,
 			ExpectedEtcdPath: "/registry/resourceslices/node1slice",
 		},

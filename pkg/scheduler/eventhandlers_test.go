@@ -26,7 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -259,11 +259,11 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Pod{}):                                   true,
 				reflect.TypeOf(&v1.Node{}):                                  true,
 				reflect.TypeOf(&v1.Namespace{}):                             true,
-				reflect.TypeOf(&resourcev1alpha2.PodSchedulingContext{}):    true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClaim{}):           true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClaimParameters{}): true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClass{}):           true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClassParameters{}): true,
+				reflect.TypeOf(&resourceapi.PodSchedulingContext{}):    true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}):           true,
+				reflect.TypeOf(&resourceapi.ResourceClaimParameters{}): true,
+				reflect.TypeOf(&resourceapi.ResourceClass{}):           true,
+				reflect.TypeOf(&resourceapi.ResourceClassParameters{}): true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -342,7 +342,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1alpha2().ResourceClaims().Informer()
+				resourceClaimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 			}
 

@@ -297,7 +297,7 @@ func New(ctx context.Context,
 
 	var resourceClaimCache *assumecache.AssumeCache
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		resourceClaimInformer := informerFactory.Resource().V1alpha2().ResourceClaims().Informer()
+		resourceClaimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
 		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 	}
 

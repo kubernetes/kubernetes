@@ -22,11 +22,11 @@ import (
 	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
+	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -41,7 +41,7 @@ func AddGraphEventHandlers(
 	pods corev1informers.PodInformer,
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
-	slices resourcev1alpha2informers.ResourceSliceInformer,
+	slices resourceinformers.ResourceSliceInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
@@ -201,7 +201,7 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 }
 
 func (g *graphPopulator) addResourceSlice(obj interface{}) {
-	slice, ok := obj.(*resourcev1alpha2.ResourceSlice)
+	slice, ok := obj.(*resourceapi.ResourceSlice)
 	if !ok {
 		klog.Infof("unexpected type %T", obj)
 		return
@@ -213,7 +213,7 @@ func (g *graphPopulator) deleteResourceSlice(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	slice, ok := obj.(*resourcev1alpha2.ResourceSlice)
+	slice, ok := obj.(*resourceapi.ResourceSlice)
 	if !ok {
 		klog.Infof("unexpected type %T", obj)
 		return

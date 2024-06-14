@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -44,24 +44,24 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 
 	for _, test := range []struct {
 		description    string
-		claim          *resourcev1alpha2.ResourceClaim
+		claim          *resourceapi.ResourceClaim
 		expectedResult *ClaimInfo
 	}{
 		{
 			description: "successfully created object",
-			claim: &resourcev1alpha2.ResourceClaim{
+			claim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       claimUID,
 					Name:      claimName,
 					Namespace: namespace,
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{},
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{},
 					},
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: className,
 				},
 			},
@@ -73,7 +73,7 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 					ClaimName:  claimName,
 					Namespace:  claimName,
 					PodUIDs:    sets.New[string](),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{},
 					},
 					CDIDevices: make(map[string][]string),
@@ -82,17 +82,17 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 		},
 		{
 			description: "successfully created object with empty allocation",
-			claim: &resourcev1alpha2.ResourceClaim{
+			claim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       claimUID,
 					Name:      claimName,
 					Namespace: namespace,
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{},
+					Allocation: &resourceapi.AllocationResult{},
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: className,
 				},
 			},
@@ -104,7 +104,7 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 					ClaimName:  claimName,
 					Namespace:  claimName,
 					PodUIDs:    sets.New[string](),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{},
 					},
 					CDIDevices: make(map[string][]string),
@@ -136,7 +136,7 @@ func TestNewClaimInfoFromState(t *testing.T) {
 				ClaimName:       "test-claim",
 				Namespace:       "test-namespace",
 				PodUIDs:         sets.New[string]("test-pod-uid"),
-				ResourceHandles: []resourcev1alpha2.ResourceHandle{},
+				ResourceHandles: []resourceapi.ResourceHandle{},
 				CDIDevices:      map[string][]string{},
 			},
 		},

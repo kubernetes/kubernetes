@@ -37,7 +37,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -48,7 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
-	resourceapiinformer "k8s.io/client-go/informers/resource/v1alpha2"
+	resourceapiinformer "k8s.io/client-go/informers/resource/v1alpha3"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
@@ -113,20 +113,20 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 		_, err = claimInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj any) {
 				defer ginkgo.GinkgoRecover()
-				claim := obj.(*resourcev1alpha2.ResourceClaim)
+				claim := obj.(*resourceapi.ResourceClaim)
 				framework.Logf("New claim:\n%s", format.Object(claim, 1))
 				validateClaim(claim)
 			},
 			UpdateFunc: func(oldObj, newObj any) {
 				defer ginkgo.GinkgoRecover()
-				oldClaim := oldObj.(*resourcev1alpha2.ResourceClaim)
-				newClaim := newObj.(*resourcev1alpha2.ResourceClaim)
+				oldClaim := oldObj.(*resourceapi.ResourceClaim)
+				newClaim := newObj.(*resourceapi.ResourceClaim)
 				framework.Logf("Updated claim:\n%s\nDiff:\n%s", format.Object(newClaim, 1), cmp.Diff(oldClaim, newClaim))
 				validateClaim(newClaim)
 			},
 			DeleteFunc: func(obj any) {
 				defer ginkgo.GinkgoRecover()
-				claim := obj.(*resourcev1alpha2.ResourceClaim)
+				claim := obj.(*resourceapi.ResourceClaim)
 				framework.Logf("Deleted claim:\n%s", format.Object(claim, 1))
 			},
 		})
@@ -140,7 +140,7 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 	return nodes
 }
 
-func validateClaim(claim *resourcev1alpha2.ResourceClaim) {
+func validateClaim(claim *resourceapi.ResourceClaim) {
 	// The apiserver doesn't enforce that a claim always has a finalizer
 	// while being allocated. This is a convention that whoever allocates a
 	// claim has to follow to prevent using a claim that is at risk of
@@ -267,7 +267,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		d.classParameterAPIKind = "ConfigMap"
 	case parameterModeStructured:
 		d.parameterAPIGroup = "resource.k8s.io"
-		d.parameterAPIVersion = "v1alpha2"
+		d.parameterAPIVersion = "v1alpha3"
 		d.claimParameterAPIKind = "ResourceClaimParameters"
 		d.classParameterAPIKind = "ResourceClassParameters"
 	default:
@@ -526,8 +526,8 @@ func (d *Driver) TearDown() {
 }
 
 func (d *Driver) IsGone(ctx context.Context) {
-	gomega.Eventually(ctx, func(ctx context.Context) ([]resourcev1alpha2.ResourceSlice, error) {
-		slices, err := d.f.ClientSet.ResourceV1alpha2().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: "driverName=" + d.Name})
+	gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
+		slices, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: "driverName=" + d.Name})
 		if err != nil {
 			return nil, err
 		}

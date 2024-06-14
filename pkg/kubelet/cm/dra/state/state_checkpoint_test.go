@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	cmerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -42,7 +42,7 @@ func assertStateEqual(t *testing.T, restoredState, expectedState ClaimInfoStateL
 
 // TODO (https://github.com/kubernetes/kubernetes/issues/123552): reconsider what data gets stored in checkpoints and whether that is really necessary.
 //
-// As it stands now, a "v1" checkpoint contains data for types like the resourcev1alpha2.ResourceHandle
+// As it stands now, a "v1" checkpoint contains data for types like the resourceapi.ResourceHandle
 // which may change over time as new fields get added in a backward-compatible way (not unusual
 // for API types). That breaks checksuming with pkg/util/hash because it is based on spew output.
 // That output includes those new fields.
@@ -72,7 +72,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 					ClaimName:  "example",
 					Namespace:  "default",
 					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: "test-driver.cdi.k8s.io",
 							Data:       `{"a": "b"}`,
@@ -96,7 +96,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 					ClaimName:  "example",
 					Namespace:  "default",
 					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: "test-driver-1.cdi.k8s.io",
 							Data:       `{"a": "b"}`,
@@ -125,7 +125,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 					ClaimName:  "example-1",
 					Namespace:  "default",
 					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: "test-driver.cdi.k8s.io",
 							Data:       `{"a": "b"}`,
@@ -142,7 +142,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 					ClaimName:  "example-2",
 					Namespace:  "default",
 					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: "test-driver.cdi.k8s.io",
 							Data:       `{"c": "d"}`,
@@ -217,7 +217,7 @@ func TestCheckpointStateStore(t *testing.T) {
 		ClaimName:  "example",
 		Namespace:  "default",
 		PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-		ResourceHandles: []resourcev1alpha2.ResourceHandle{
+		ResourceHandles: []resourceapi.ResourceHandle{
 			{
 				DriverName: "test-driver.cdi.k8s.io",
 				Data:       `{"a": "b"}`,

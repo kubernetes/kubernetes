@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -57,7 +57,7 @@ type ClaimInfoState struct {
 	PodUIDs sets.Set[string]
 
 	// ResourceHandles is a list of opaque resource data for processing by a specific kubelet plugin
-	ResourceHandles []resourcev1alpha2.ResourceHandle
+	ResourceHandles []resourceapi.ResourceHandle
 
 	// CDIDevices is a map of DriverName --> CDI devices returned by the
 	// GRPC API call NodePrepareResource

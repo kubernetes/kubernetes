@@ -29,7 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -679,30 +679,30 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 	}
 
 	defer func() {
-		if err := testCtx.ClientSet.ResourceV1alpha2().ResourceClasses().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+		if err := testCtx.ClientSet.ResourceV1alpha3().ResourceClasses().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
 			t.Errorf("Unexpected error deleting ResourceClasses: %v", err)
 		}
 	}()
-	class := &resourcev1alpha2.ResourceClass{
+	class := &resourceapi.ResourceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-class",
 		},
 		DriverName: "does-not-matter",
 	}
-	if _, err := testCtx.ClientSet.ResourceV1alpha2().ResourceClasses().Create(testCtx.Ctx, class, metav1.CreateOptions{}); err != nil {
+	if _, err := testCtx.ClientSet.ResourceV1alpha3().ResourceClasses().Create(testCtx.Ctx, class, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create class: %v", err)
 	}
 
-	claim := &resourcev1alpha2.ResourceClaim{
+	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-claim",
 			Namespace: testCtx.NS.Name,
 		},
-		Spec: resourcev1alpha2.ResourceClaimSpec{
+		Spec: resourceapi.ResourceClaimSpec{
 			ResourceClassName: class.Name,
 		},
 	}
-	if _, err := testCtx.ClientSet.ResourceV1alpha2().ResourceClaims(claim.Namespace).Create(testCtx.Ctx, claim, metav1.CreateOptions{}); err != nil {
+	if _, err := testCtx.ClientSet.ResourceV1alpha3().ResourceClaims(claim.Namespace).Create(testCtx.Ctx, claim, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create claim: %v", err)
 	}
 
@@ -719,11 +719,11 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 	}
 
 	// Check that the PodSchedulingContext exists and has a selected node.
-	var schedulingCtx *resourcev1alpha2.PodSchedulingContext
+	var schedulingCtx *resourceapi.PodSchedulingContext
 	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Microsecond, 30*time.Second, true,
 		func(context.Context) (bool, error) {
 			var err error
-			schedulingCtx, err = testCtx.ClientSet.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
+			schedulingCtx, err = testCtx.ClientSet.ResourceV1alpha3().PodSchedulingContexts(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return false, nil
 			}
@@ -756,12 +756,12 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 
 	// Now force the scheduler to update the PodSchedulingContext by setting UnsuitableNodes so that
 	// the selected node is not suitable.
-	schedulingCtx.Status.ResourceClaims = []resourcev1alpha2.ResourceClaimSchedulingStatus{{
+	schedulingCtx.Status.ResourceClaims = []resourceapi.ResourceClaimSchedulingStatus{{
 		Name:            podClaimName,
 		UnsuitableNodes: []string{schedulingCtx.Spec.SelectedNode},
 	}}
 
-	if _, err := testCtx.ClientSet.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).UpdateStatus(testCtx.Ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
+	if _, err := testCtx.ClientSet.ResourceV1alpha3().PodSchedulingContexts(pod.Namespace).UpdateStatus(testCtx.Ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Unexpected PodSchedulingContext status update error: %v", err)
 	}
 
