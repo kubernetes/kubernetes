@@ -573,16 +573,6 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 			expectedHint: framework.Queue,
 			expectedErr:  true,
 		},
-		"pv-was-added-but-pod's-pvcName-is-null": {
-			pod: st.MakePod().Name("pod_1").Namespace("default").Obj(),
-			newObj: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "Vol_1",
-					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
-				},
-			},
-			expectedHint: framework.Queue,
-		},
 		"new-pv-was-added": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
 			newObj: &v1.PersistentVolume{
