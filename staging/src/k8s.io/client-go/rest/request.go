@@ -123,7 +123,7 @@ type Request struct {
 	// output
 	err error
 
-	// only one of body / bodyBytes may be set. requests using body are not retriable.
+	// only one of body / bodyBytes may be set. requests using body are not retryable.
 	body      io.Reader
 	bodyBytes []byte
 
