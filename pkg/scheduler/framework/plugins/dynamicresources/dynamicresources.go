@@ -272,7 +272,6 @@ type dynamicResources struct {
 	enabled                    bool
 	fh                         framework.Handle
 	clientset                  kubernetes.Interface
-	claimLister                resourcev1alpha2listers.ResourceClaimLister
 	classLister                resourcev1alpha2listers.ResourceClassLister
 	podSchedulingContextLister resourcev1alpha2listers.PodSchedulingContextLister
 	claimParametersLister      resourcev1alpha2listers.ResourceClaimParametersLister
@@ -347,7 +346,6 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		enabled:                    true,
 		fh:                         fh,
 		clientset:                  fh.ClientSet(),
-		claimLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Lister(),
 		classLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
 		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingContexts().Lister(),
 		claimParametersLister:      fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaimParameters().Lister(),
@@ -791,9 +789,14 @@ func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 		if claimName == nil {
 			continue
 		}
-		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
+		obj, err := pl.claimAssumeCache.Get(pod.Namespace + "/" + *claimName)
 		if err != nil {
 			return err
+		}
+
+		claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
+		if !ok {
+			return fmt.Errorf("unexpected object type %T for assumed object %s/%s", obj, pod.Namespace, *claimName)
 		}
 
 		if claim.DeletionTimestamp != nil {

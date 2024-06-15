@@ -125,7 +125,8 @@ type AssumeCache struct {
 	rwMutex sync.RWMutex
 
 	// All registered event handlers.
-	eventHandlers []cache.ResourceEventHandler
+	eventHandlers       []cache.ResourceEventHandler
+	handlerRegistration cache.ResourceEventHandlerRegistration
 
 	// The eventQueue contains functions which deliver an event to one
 	// event handler.
@@ -203,7 +204,7 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 	// Unit tests don't use informers
 	if informer != nil {
 		// Cannot fail in practice?! No-one bothers checking the error.
-		_, _ = informer.AddEventHandler(
+		c.handlerRegistration, _ = informer.AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    c.add,
 				UpdateFunc: c.update,
@@ -257,18 +258,7 @@ func (c *AssumeCache) add(obj interface{}) {
 		c.logger.Info("Error occurred while updating stored object", "err", err)
 	} else {
 		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
-		for _, handler := range c.eventHandlers {
-			handler := handler
-			if oldObj == nil {
-				c.eventQueue.Push(func() {
-					handler.OnAdd(obj, false)
-				})
-			} else {
-				c.eventQueue.Push(func() {
-					handler.OnUpdate(oldObj, obj)
-				})
-			}
-		}
+		c.pushEvent(oldObj, obj)
 	}
 }
 
@@ -304,11 +294,32 @@ func (c *AssumeCache) delete(obj interface{}) {
 		c.logger.Error(err, "Failed to delete", "description", c.description, "cacheKey", name)
 	}
 
+	c.pushEvent(oldObj, nil)
+}
+
+// pushEvent gets called while the mutex is locked for writing.
+// It ensures that all currently registered event handlers get
+// notified about a change when the caller starts delivering
+// those with emitEvents.
+//
+// For a delete event, newObj is nil. For an add, oldObj is nil.
+// An update has both as non-nil.
+func (c *AssumeCache) pushEvent(oldObj, newObj interface{}) {
 	for _, handler := range c.eventHandlers {
 		handler := handler
-		c.eventQueue.Push(func() {
-			handler.OnDelete(oldObj)
-		})
+		if oldObj == nil {
+			c.eventQueue.Push(func() {
+				handler.OnAdd(newObj, false)
+			})
+		} else if newObj == nil {
+			c.eventQueue.Push(func() {
+				handler.OnDelete(oldObj)
+			})
+		} else {
+			c.eventQueue.Push(func() {
+				handler.OnUpdate(oldObj, newObj)
+			})
+		}
 	}
 }
 
@@ -441,13 +452,7 @@ func (c *AssumeCache) Assume(obj interface{}) error {
 		return fmt.Errorf("%v %q is out of sync (stored: %d, assume: %d)", c.description, name, storedVersion, newVersion)
 	}
 
-	for _, handler := range c.eventHandlers {
-		handler := handler
-		oldObj := objInfo.latestObj
-		c.eventQueue.Push(func() {
-			handler.OnUpdate(oldObj, obj)
-		})
-	}
+	c.pushEvent(objInfo.latestObj, obj)
 
 	// Only update the cached object
 	objInfo.latestObj = obj
@@ -467,14 +472,7 @@ func (c *AssumeCache) Restore(objName string) {
 		c.logger.V(5).Info("Restore object", "description", c.description, "cacheKey", objName, "err", err)
 	} else {
 		if objInfo.latestObj != objInfo.apiObj {
-			for _, handler := range c.eventHandlers {
-				handler := handler
-				oldObj, obj := objInfo.latestObj, objInfo.apiObj
-				c.eventQueue.Push(func() {
-					handler.OnUpdate(oldObj, obj)
-				})
-			}
-
+			c.pushEvent(objInfo.latestObj, objInfo.apiObj)
 			objInfo.latestObj = objInfo.apiObj
 		}
 		c.logger.V(4).Info("Restored object", "description", c.description, "cacheKey", objName)
@@ -485,7 +483,9 @@ func (c *AssumeCache) Restore(objName string) {
 // single handler are delivered sequentially, but there is no
 // coordination between different handlers. A handler may use the
 // cache.
-func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) {
+//
+// The return value can be used to wait for cache synchronization.
+func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.ResourceEventHandlerRegistration {
 	defer c.emitEvents()
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
@@ -497,6 +497,13 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) {
 			handler.OnAdd(obj, true)
 		})
 	}
+
+	if c.handlerRegistration == nil {
+		// No informer, so immediately synced.
+		return syncedHandlerRegistration{}
+	}
+
+	return c.handlerRegistration
 }
 
 // emitEvents delivers all pending events that are in the queue, in the order
@@ -516,3 +523,9 @@ func (c *AssumeCache) emitEvents() {
 		}()
 	}
 }
+
+// syncedHandlerRegistration is an implementation of ResourceEventHandlerRegistration
+// which always returns true.
+type syncedHandlerRegistration struct{}
+
+func (syncedHandlerRegistration) HasSynced() bool { return true }
