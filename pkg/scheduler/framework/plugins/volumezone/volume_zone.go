@@ -309,7 +309,7 @@ func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, po
 		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
 	}
 	if (addedStorageClass.VolumeBindingMode == nil) || (*addedStorageClass.VolumeBindingMode != storage.VolumeBindingWaitForFirstConsumer) {
-		logger.V(5).Info("StorageClass is created, but its VolumeBindingMode is not waitForFirstConsumer, which doesn't make the pod schedulable.", "storageClass", klog.KObj(addedStorageClass), "pod", klog.KObj(pod))
+		logger.V(5).Info("StorageClass is created, but its VolumeBindingMode is not waitForFirstConsumer, which doesn't make the pod schedulable", "storageClass", klog.KObj(addedStorageClass), "pod", klog.KObj(pod))
 		return framework.QueueSkip, nil
 	}
 
