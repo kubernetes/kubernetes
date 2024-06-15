@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/utils/ptr"
 )
 
 func createPodWithVolume(pod, pvc string) *v1.Pod {
@@ -542,29 +541,6 @@ func TestWithBinding(t *testing.T) {
 }
 
 func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
-	pvLister := tf.PersistentVolumeLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
-		},
-	}
-
-	pvcLister := tf.PersistentVolumeClaimLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
-			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: ptr.To("SC_1")},
-		},
-	}
-
-	scLister := tf.StorageClassLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
-		},
-	}
-
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
@@ -639,9 +615,9 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				scLister,
+				nil,
+				nil,
+				nil,
 			}
 
 			got, err := p.isSchedulableAfterPersistentVolumeClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
