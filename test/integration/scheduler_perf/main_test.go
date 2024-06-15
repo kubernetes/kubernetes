@@ -33,7 +33,7 @@ import (
 
 func TestMain(m *testing.M) {
 	// Run with -v=2, this is the default log level in production.
-	ktesting.SetDefaultVerbosity(6)
+	ktesting.SetDefaultVerbosity(5)
 
 	// test/integration/framework/flags.go unconditionally initializes the
 	// logging flags. That's correct for most tests, but in the
