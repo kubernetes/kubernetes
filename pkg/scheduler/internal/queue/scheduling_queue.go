@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -1098,11 +1099,25 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) {
 	activated := false
 	for _, pInfo := range podInfoList {
-		// Since there may be many gated pods and they will not move from the
-		// unschedulable pool, we skip calling the expensive isPodWorthRequeueing.
-		if pInfo.Gated {
+		// When handling events takes time, a scheduling throughput gets impacted negatively
+		// because of a shared lock within PriorityQueue, which Pop() also requires.
+		//
+		// Scheduling-gated Pods never get schedulable with any events,
+		// except the Pods themselves got updated, which isn't handled by movePodsToActiveOrBackoffQueue.
+		// So, we can skip them early here so that they don't go through isPodWorthRequeuing,
+		// which isn't fast enough to keep a sufficient scheduling throughput
+		// when the number of scheduling-gated Pods in unschedulablePods is large.
+		// https://github.com/kubernetes/kubernetes/issues/124384
+		// This is a hotfix for this issue, which might be changed
+		// once we have a better general solution for the shared lock issue.
+		//
+		// Note that we cannot skip all pInfo.Gated Pods here
+		// because PreEnqueue plugins apart from the scheduling gate plugin may change the gating status
+		// with these events.
+		if pInfo.Gated && pInfo.UnschedulablePlugins.Has(names.SchedulingGates) {
 			continue
 		}
+
 		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
 		if schedulingHint == framework.QueueSkip {
 			// QueueingHintFn determined that this Pod isn't worth putting to activeQ or backoffQ by this event.
