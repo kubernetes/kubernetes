@@ -2668,8 +2668,9 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 	}
 
 	tests := []struct {
-		name              string
-		withEvents        bool
+		name       string
+		withEvents bool
+		// count is the expected number of calls to PreEnqueue().
 		count             int
 		queueHintEnabled  []bool
 		expectedScheduled []bool
@@ -2686,7 +2687,7 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 		{
 			name:              "preEnqueue plugin with event registered",
 			withEvents:        true,
-			count:             2,
+			count:             3,
 			queueHintEnabled:  []bool{false, true},
 			expectedScheduled: []bool{true, true},
 		},
@@ -2700,7 +2701,7 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 			t.Run(tt.name+fmt.Sprintf(" queueHint(%v)", queueHintEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, queueHintEnabled)
 
-				// new plugin every time to clear counts
+				// use new plugin every time to clear counts
 				var plugin framework.PreEnqueuePlugin
 				if tt.withEvents {
 					plugin = &SchedulingGatesPluginWithEvents{SchedulingGates: schedulinggates.SchedulingGates{}}
