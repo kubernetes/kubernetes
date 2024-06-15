@@ -357,14 +357,24 @@ func TestCleanFieldValidation(t *testing.T) {
 	}
 }
 
-func TestResponseWriterDecorator(t *testing.T) {
-	decorator := &ResponseWriterDelegator{
-		ResponseWriter: &responsewritertesting.FakeResponseWriter{},
-	}
-	var w http.ResponseWriter = decorator
+func TestMetricsResponseWriterDecoratorConstruction(t *testing.T) {
+	inner := &responsewritertesting.FakeResponseWriter{}
+	middle := &ResponseWriterDelegator{ResponseWriter: inner}
+	outer := responsewriter.WrapForHTTP1Or2(middle)
 
-	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.ResponseWriter {
-		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+	// FakeResponseWriter does not implement http.Flusher, FlusherError,
+	// http.CloseNotifier, or http.Hijacker; so WrapForHTTP1Or2 is not
+	// expected to return an outer object.
+	if outer != middle {
+		t.Errorf("Did not expect a new outer object, but got %v", outer)
+	}
+
+	decorator, ok := outer.(responsewriter.UserProvidedDecorator)
+	if !ok {
+		t.Fatal("expected the middle to implement UserProvidedDecorator")
+	}
+	if want, got := inner, decorator.Unwrap(); want != got {
+		t.Errorf("expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
 

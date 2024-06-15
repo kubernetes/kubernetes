@@ -75,16 +75,30 @@ func (s *fakeAuditSink) Pop(timeout time.Duration) (*auditinternal.Event, error)
 	return result, err
 }
 
-func TestConstructResponseWriter(t *testing.T) {
+func TestAuditResponseWriterDecoratorConstruction(t *testing.T) {
 	inner := &responsewritertesting.FakeResponseWriter{}
-	actual := decorateResponseWriter(context.Background(), inner, nil, nil, nil)
-	switch v := actual.(type) {
+	middle := &auditResponseWriter{ResponseWriter: inner}
+	outer := responsewriter.WrapForHTTP1Or2(middle)
+
+	switch v := outer.(type) {
 	case *auditResponseWriter:
 	default:
 		t.Errorf("Expected auditResponseWriter, got %v", reflect.TypeOf(v))
 	}
-	if innerGot := actual.(responsewriter.UserProvidedDecorator).Unwrap(); inner != innerGot {
-		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
+
+	// FakeResponseWriter does not implement http.Flusher, FlusherError,
+	// http.CloseNotifier, or http.Hijacker; so WrapForHTTP1Or2 is not
+	// expected to return an outer object.
+	if outer != middle {
+		t.Errorf("did not expect a new outer object, but got %v", outer)
+	}
+
+	decorator, ok := outer.(responsewriter.UserProvidedDecorator)
+	if !ok {
+		t.Fatal("expected the middle to implement UserProvidedDecorator")
+	}
+	if want, got := inner, decorator.Unwrap(); want != got {
+		t.Errorf("expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
 
