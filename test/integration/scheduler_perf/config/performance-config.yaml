@@ -295,7 +295,7 @@
     collectMetrics: true
   workloads:
   - name: 15000Nodes
-    labels: [performance, fast]
+    labels: [fast]
     params:
       initNodes: 15000
       measurePods: 30000
