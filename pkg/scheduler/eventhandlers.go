@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
@@ -288,6 +289,7 @@ func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
+	resourceClaimCache *assumecache.AssumeCache,
 	gvkMap map[framework.GVK]framework.ActionType,
 ) error {
 	var (
@@ -456,12 +458,11 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClaims().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
+				// No need to wait for this cache to be
+				// populated. If a claim is not yet in the
+				// cache, scheduling will get retried once it
+				// is.
+				resourceClaimCache.AddEventHandler(buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"))
 			}
 		case framework.ResourceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {

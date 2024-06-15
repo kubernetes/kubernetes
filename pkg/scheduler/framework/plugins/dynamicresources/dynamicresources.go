@@ -354,7 +354,6 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &dynamicResources{}, nil
 	}
 
-	logger := klog.FromContext(ctx)
 	pl := &dynamicResources{
 		enabled:                    true,
 		fh:                         fh,
@@ -368,7 +367,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		classParametersIndexer:     fh.SharedInformerFactory().Resource().V1alpha2().ResourceClassParameters().Informer().GetIndexer(),
 		resourceSliceLister:        fh.SharedInformerFactory().Resource().V1alpha2().ResourceSlices().Lister(),
 		claimNameLookup:            resourceclaim.NewNameLookup(fh.ClientSet()),
-		claimAssumeCache:           assumecache.NewAssumeCache(logger, fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Informer(), "claim", "", nil),
+		claimAssumeCache:           fh.ResourceClaimCache(),
 	}
 
 	if err := pl.claimParametersIndexer.AddIndexers(cache.Indexers{generatedFromIndex: claimParametersGeneratedFromIndexFunc}); err != nil {
@@ -651,21 +650,6 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/123697):
 		// check that the pending claims depend on structured parameters (depends on refactoring foreachPodResourceClaim, see other TODO).
-		//
-		// There is a small race here:
-		// - The dynamicresources plugin allocates claim A and updates the assume cache.
-		// - A second pod gets marked as unschedulable based on that assume cache.
-		// - Before the informer cache here catches up, the pod runs, terminates and
-		//   the claim gets deallocated without ever sending the claim status with
-		//   allocation to the scheduler.
-		// - The comparison below is for a *very* old claim with no allocation and the
-		//   new claim where the allocation is already removed again, so no
-		//   RemovedClaimAllocation event gets emitted.
-		//
-		// This is extremely unlikely and thus a fix is not needed for alpha in Kubernetes 1.30.
-		// TODO (https://github.com/kubernetes/kubernetes/issues/123698): The solution is to somehow integrate the assume cache
-		// into the event mechanism. This can be tackled together with adding autoscaler
-		// support, which also needs to do something with the assume cache.
 		logger.V(6).Info("claim with structured parameters got deallocated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
 		return framework.Queue, nil
 	}
