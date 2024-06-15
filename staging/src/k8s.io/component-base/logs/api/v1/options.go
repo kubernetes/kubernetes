@@ -23,6 +23,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -55,9 +56,20 @@ const (
 )
 
 // NewLoggingConfiguration returns a struct holding the default logging configuration.
+// The initial verbosity is the same as currently configured in klog.
 func NewLoggingConfiguration() *LoggingConfiguration {
 	c := LoggingConfiguration{}
 	SetRecommendedLoggingConfiguration(&c)
+
+	if f := loggingFlags.Lookup("v"); f != nil {
+		value, _ := strconv.Atoi(f.Value.String())
+		c.Verbosity = VerbosityLevel(value)
+	}
+	if f := loggingFlags.Lookup("vmodule"); f != nil {
+		value := f.Value.String()
+		_ = VModuleConfigurationPflag(&c.VModule).Set(value)
+	}
+
 	return &c
 }
 

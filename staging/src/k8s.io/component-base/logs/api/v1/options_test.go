@@ -21,12 +21,15 @@ import (
 	"context"
 	"flag"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
@@ -261,4 +264,56 @@ func testContextualLogging(t *testing.T, enabled bool) {
 		assert.Equal(t, logger, klog.LoggerWithName(logger, "foo"), "LoggerWithName")
 		assert.Equal(t, logger, klog.LoggerWithValues(logger, "x", "y"), "LoggerWithValues")
 	}
+}
+
+func TestNewLoggingConfiguration(t *testing.T) {
+	defaultConfig := LoggingConfiguration{
+		Format: "text",
+		FlushFrequency: TimeOrMetaDuration{
+			Duration: metav1.Duration{
+				Duration: 5 * time.Second,
+			},
+			SerializeAsString: true,
+		},
+		Options: FormatOptions{
+			Text: TextOptions{
+				OutputRoutingOptions: OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
+			},
+			JSON: JSONOptions{
+				OutputRoutingOptions: OutputRoutingOptions{
+					InfoBufferSize: resource.QuantityValue{Quantity: resource.MustParse("0")},
+				},
+			},
+		},
+	}
+
+	t.Run("with-default-klog", func(t *testing.T) {
+		config := NewLoggingConfiguration()
+		assert.Equal(t, &defaultConfig, config)
+	})
+
+	t.Run("with-non-default-klog", func(t *testing.T) {
+		state := klog.CaptureState()
+		defer state.Restore()
+
+		var fs flag.FlagSet
+		klog.InitFlags(&fs)
+		require.NoError(t, fs.Set("v", "5"), "set v")
+		require.NoError(t, fs.Set("vmodule", "something=10"), "set vmodule")
+
+		config := NewLoggingConfiguration()
+
+		nonDefaultConfig := defaultConfig // shallow copy
+		nonDefaultConfig.Verbosity = 5
+		nonDefaultConfig.VModule = VModuleConfiguration{
+			{
+				FilePattern: "something",
+				Verbosity:   10,
+			},
+		}
+		assert.Equal(t, &nonDefaultConfig, config)
+	})
+
 }
