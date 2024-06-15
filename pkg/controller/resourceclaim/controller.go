@@ -657,6 +657,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			metrics.ResourceClaimCreateFailures.Inc()
 			return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
 		}
+		logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 		ec.claimCache.Mutation(claim)
 	}
 
