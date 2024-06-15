@@ -22,8 +22,6 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/util/net"
 )
 
@@ -67,7 +65,7 @@ func (WarningLogger) HandleWarningHeader(code int, agent string, message string)
 	if code != 299 || len(message) == 0 {
 		return
 	}
-	klog.Warning(message)
+	// klog.Warning(message)
 }
 
 type warningWriter struct {
