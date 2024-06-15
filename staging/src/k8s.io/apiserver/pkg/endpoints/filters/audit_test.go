@@ -86,8 +86,10 @@ func TestConstructResponseWriter(t *testing.T) {
 	if innerGot := actual.(responsewriter.UserProvidedDecorator).Unwrap(); inner != innerGot {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
+}
 
-	actual = decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
+func TestConstructResponseWriterWithFake(t *testing.T) {
+	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
 	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	if _, ok := actual.(http.CloseNotifier); !ok {
 		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
