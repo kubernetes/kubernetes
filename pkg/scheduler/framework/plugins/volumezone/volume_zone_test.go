@@ -541,19 +541,6 @@ func TestWithBinding(t *testing.T) {
 }
 
 func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
-	pvLister := tf.PersistentVolumeLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"}},
-		},
-	}
-
-	pvcLister := tf.PersistentVolumeClaimLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
-		},
-	}
-
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
@@ -640,8 +627,8 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
+				nil,
+				nil,
 				nil,
 			}
 

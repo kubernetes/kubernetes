@@ -306,7 +306,7 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logge
 		return framework.Queue, nil
 	}
 
-	logger.V(5).Info("PV was updated, but the topology is unchanged, which it doesn't make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+	logger.V(5).Info("PV was updated, but the topology is unchanged, which it doesn't make the pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
 	return framework.QueueSkip, nil
 }
 
