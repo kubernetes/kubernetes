@@ -290,7 +290,7 @@ func TestRestore(t *testing.T) {
 		events.verifyAndFlush(tCtx, []event{{What: "add", Obj: oldObj}})
 	})
 
-	// Restore object.
+	// Restore the same object.
 	ktesting.Step(tCtx, "initial Restore", func(tCtx ktesting.TContext) {
 		cache.Restore(oldObj.GetName())
 		verify(tCtx, cache, oldObj.GetName(), oldObj, oldObj)
@@ -306,7 +306,7 @@ func TestRestore(t *testing.T) {
 		events.verifyAndFlush(tCtx, []event{{What: "update", OldObj: oldObj, Obj: newObj}})
 	})
 
-	// Restore object.
+	// Restore the same object.
 	ktesting.Step(tCtx, "second Restore", func(tCtx ktesting.TContext) {
 		cache.Restore(oldObj.GetName())
 		verify(tCtx, cache, oldObj.GetName(), oldObj, oldObj)
@@ -346,6 +346,7 @@ func TestEvents(t *testing.T) {
 	ktesting.Step(tCtx, "nil add", func(tCtx ktesting.TContext) {
 		informer.add(nil)
 		verify(tCtx, cache, key, newObj, newObj)
+		events.verifyAndFlush(tCtx, nil)
 	})
 	ktesting.Step(tCtx, "nop update", func(tCtx ktesting.TContext) {
 		informer.update(oldObj)
@@ -378,7 +379,7 @@ func TestEventHandlers(t *testing.T) {
 	tCtx, cache, informer := newTest(t)
 	handlers := make([]mockEventHandler, 5)
 
-	objs := make([]metav1.Object, 0, 20)
+	var objs []metav1.Object
 	for i := 0; i < 5; i++ {
 		objs = append(objs, makeObj(fmt.Sprintf("test-pvc%v", i), "1", ""))
 		informer.add(objs[i])
@@ -437,7 +438,7 @@ func TestEventHandlerConcurrency(t *testing.T) {
 	tCtx, cache, informer := newTest(t)
 	handlers := make([]mockEventHandler, 5)
 
-	objs := make([]metav1.Object, 0, 20)
+	var objs []metav1.Object
 	for i := 0; i < 5; i++ {
 		objs = append(objs, makeObj(fmt.Sprintf("test-pvc%v", i), "1", ""))
 	}
@@ -487,7 +488,7 @@ func TestListNoIndexer(t *testing.T) {
 	tCtx, cache, informer := newTest(t)
 
 	// Add a bunch of objects.
-	objs := make([]interface{}, 0, 10)
+	var objs []interface{}
 	for i := 0; i < 10; i++ {
 		obj := makeObj(fmt.Sprintf("test-pvc%v", i), "1", "")
 		objs = append(objs, obj)
@@ -526,7 +527,7 @@ func TestListWithIndexer(t *testing.T) {
 
 	// Add a bunch of objects.
 	ns := "ns1"
-	objs := make([]interface{}, 0, 10)
+	var objs []interface{}
 	for i := 0; i < 10; i++ {
 		obj := makeObj(fmt.Sprintf("test-pvc%v", i), "1", ns)
 		objs = append(objs, obj)
