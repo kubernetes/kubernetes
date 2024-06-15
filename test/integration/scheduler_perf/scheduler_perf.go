@@ -651,7 +651,7 @@ func (so sleepOp) patchParams(_ *workload) (realOp, error) {
 	return &so, nil
 }
 
-var useTestingLog = flag.Bool("use-testing-log", false, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
+var useTestingLog = flag.Bool("use-testing-log", true, "Write log entries with testing.TB.Log. This is more suitable for unit testing and debugging, but less realistic in real benchmarks.")
 
 func initTestOutput(tb testing.TB) io.Writer {
 	var output io.Writer

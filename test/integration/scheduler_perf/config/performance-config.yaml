@@ -763,7 +763,7 @@
     collectMetrics: true
   workloads:
   - name: fast
-    labels: [integration-test, fast]
+    labels: [performance, fast]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -773,7 +773,7 @@
       measurePods: 10
       maxClaimsPerNode: 10
   - name: 2000pods_100nodes
-    labels: [performance, fast]
+    labels: [fast] # performance
     params:
       # In this testcase, the number of nodes is smaller
       # than the limit for the PodScheduling slices.
