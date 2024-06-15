@@ -167,60 +167,10 @@ func TestLoggedStatus(t *testing.T) {
 	}
 }
 
-func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
-	tests := []struct {
-		name       string
-		r          func() http.ResponseWriter
-		hijackable bool
-	}{
-		{
-			name: "http2",
-			r: func() http.ResponseWriter {
-				return &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{}
-			},
-			hijackable: false,
-		},
-		{
-			name: "http/1.x",
-			r: func() http.ResponseWriter {
-				return &responsewritertesting.FakeResponseWriterFlusherCloseNotifierHijacker{}
-			},
-			hijackable: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", "http://example.com", nil)
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
-
-			var handler http.Handler
-			handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch v := w.(type) {
-				case *respLogger:
-					t.Errorf("Did not expect %v", reflect.TypeOf(v))
-					return
-				default:
-				}
-
-				//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-				if _, ok := w.(http.CloseNotifier); !ok {
-					t.Errorf("Expected the ResponseWriter object to implement http.CloseNotifier")
-				}
-				if _, ok := w.(http.Flusher); !ok {
-					t.Errorf("Expected the ResponseWriter object to implement http.Flusher")
-				}
-				if _, ok := w.(http.Hijacker); test.hijackable != ok {
-					t.Errorf("http.Hijacker does not match, want: %t, got: %t", test.hijackable, ok)
-				}
-			})
-
-			handler = withLogging(handler, DefaultStacktracePred, func() bool { return true })
-			handler.ServeHTTP(test.r(), req)
-		})
-	}
+func TestHTTPLogResponseWriterDecoratorWithFake(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, func(h http.Handler) http.Handler {
+		return withLogging(h, DefaultStacktracePred, func() bool { return true })
+	})
 }
 
 func TestHTTPLogResponseWriterDecoratorConstruction(t *testing.T) {

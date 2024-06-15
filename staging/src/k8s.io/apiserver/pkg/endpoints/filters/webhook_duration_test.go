@@ -43,3 +43,7 @@ func TestLatencyTrackerResponseWriterDecoratorConstruction(t *testing.T) {
 		t.Errorf("expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
+
+func TestLatencyTrackerResponseWriterWithFake(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, WithLatencyTrackers)
+}

@@ -378,6 +378,12 @@ func TestMetricsResponseWriterDecoratorConstruction(t *testing.T) {
 	}
 }
 
+func TestMetricsResponseWriterDecoratorWithFake(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, func(verifier http.Handler) http.Handler {
+		return InstrumentHandlerFunc("", "", "", "", "", "", "", false, "", verifier.ServeHTTP)
+	})
+}
+
 func TestRecordDroppedRequests(t *testing.T) {
 	testedMetrics := []string{
 		"apiserver_request_total",

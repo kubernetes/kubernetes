@@ -540,6 +540,18 @@ func TestTimeoutResponseWriterDecoratorConstruction(t *testing.T) {
 	}
 }
 
+func TestTimeoutResponseWriterDecoratorWithFake(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, func(verifier http.Handler) http.Handler {
+		return WithTimeout(
+			http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				verifier.ServeHTTP(w, req)
+			}),
+			func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
+				return req, false, func() {}, nil
+			})
+	})
+}
+
 func isStackTraceLoggedByRuntime(message string) bool {
 	// Check the captured output for the following patterns to find out if the
 	// stack trace is included in the log:

@@ -102,30 +102,13 @@ func TestAuditResponseWriterDecoratorConstruction(t *testing.T) {
 	}
 }
 
-func TestConstructResponseWriterWithFake(t *testing.T) {
-	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
-	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-	if _, ok := actual.(http.CloseNotifier); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
-	}
-	if _, ok := actual.(http.Flusher); !ok {
-		t.Errorf("Expected the wrapper to implement http.Flusher")
-	}
-	if _, ok := actual.(http.Hijacker); ok {
-		t.Errorf("Expected http.ResponseWriter not to implement http.Hijacker")
-	}
-
-	actual = decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriterFlusherCloseNotifierHijacker{}, nil, nil, nil)
-	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-	if _, ok := actual.(http.CloseNotifier); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
-	}
-	if _, ok := actual.(http.Flusher); !ok {
-		t.Errorf("Expected the wrapper to implement http.Flusher")
-	}
-	if _, ok := actual.(http.Hijacker); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.Hijacker")
-	}
+func TestAuditResponseWriterDecoratorWithFake(t *testing.T) {
+	responsewritertesting.VerifyResponseWriterDecoratorWithFake(t, func(verifier http.Handler) http.Handler {
+		fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil)
+		handler := WithAudit(verifier, &fakeAuditSink{}, fakeRuleEvaluator, nil)
+		handler = WithAuditInit(handler)
+		return handler
+	})
 }
 
 func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
