@@ -542,24 +542,6 @@ func TestWithBinding(t *testing.T) {
 
 func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 	var modeWait = storagev1.VolumeBindingWaitForFirstConsumer
-	pvLister := tf.PersistentVolumeLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"}},
-		},
-	}
-
-	pvcLister := tf.PersistentVolumeClaimLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
-			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
-		},
-	}
-
-	scLister := tf.StorageClassLister{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "SC_1", Namespace: "default"},
-		},
-	}
 
 	testcases := map[string]struct {
 		pod            *v1.Pod
@@ -567,7 +549,7 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 		expectedHint   framework.QueueingHint
 		expectedErr    bool
 	}{
-		"backoff-wrong-new-object": {
+		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-storageclass",
 			expectedHint: framework.Queue,
@@ -594,9 +576,7 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			p := &VolumeZone{
-				pvLister,
-				pvcLister,
-				scLister,
+				nil, nil, nil,
 			}
 
 			got, err := p.isSchedulableAfterStorageClassAdded(logger, tc.pod, tc.oldObj, tc.newObj)
