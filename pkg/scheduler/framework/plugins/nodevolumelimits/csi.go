@@ -81,7 +81,6 @@ func (pl *CSILimits) EventsToRegister() []framework.ClusterEventWithHint {
 		// We don't register any `QueueingHintFn` intentionally
 		// because any new CSINode could make pods that were rejected by CSI volumes schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterPVCAdded},
 	}
@@ -122,7 +121,18 @@ func (pl *CSILimits) isSchedulableAfterPVCAdded(logger klog.Logger, pod *v1.Pod,
 	}
 
 	for _, volumes := range pod.Spec.Volumes {
-		if volumes.PersistentVolumeClaim != nil && volumes.PersistentVolumeClaim.ClaimName == addedPvc.Name {
+		var pvcName string
+		switch {
+		case volumes.PersistentVolumeClaim != nil:
+			pvcName = volumes.PersistentVolumeClaim.ClaimName
+		case volumes.Ephemeral != nil:
+			pvcName = ephemeral.VolumeClaimName(pod, &volumes)
+		default:
+			// Volume is not using a PVC, ignore
+			continue
+		}
+
+		if pvcName == addedPvc.Name {
 			return framework.Queue, nil
 		}
 	}
