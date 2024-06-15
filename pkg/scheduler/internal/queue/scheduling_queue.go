@@ -1119,6 +1119,9 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
 		// Return early before iterating all pods in unschedulablePods for preCheck.
+		if event.Resource == framework.ResourceClaim {
+			logger.Info("XXX ResourceClaim event not of interest?!", "event", event)
+		}
 		return
 	}
 
@@ -1127,6 +1130,9 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 		if preCheck == nil || preCheck(pInfo.Pod) {
 			unschedulablePods = append(unschedulablePods, pInfo)
 		}
+	}
+	if event.Resource == framework.ResourceClaim && event.ActionType&framework.Add != 0 {
+		logger.Info("ResourceClaim add event", "event", event, "newObj", newObj, "pods", klog.KObjSlice(unschedulablePods))
 	}
 	p.movePodsToActiveOrBackoffQueue(logger, unschedulablePods, event, oldObj, newObj)
 }
@@ -1188,6 +1194,9 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent, oldObj, newObj interface{}) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
+		if event.Resource == framework.ResourceClaim {
+			logger.Info("XXX ResourceClaim event not of interest?!", "event", event)
+		}
 		return
 	}
 
@@ -1196,6 +1205,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		// Since there may be many gated pods and they will not move from the
 		// unschedulable pool, we skip calling the expensive isPodWorthRequeueing.
 		if pInfo.Gated {
+			logger.V(5).Info("Pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event.Label)
 			continue
 		}
 		schedulingHint := p.isPodWorthRequeuing(logger, pInfo, event, oldObj, newObj)
