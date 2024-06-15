@@ -462,7 +462,13 @@ func addAllEventHandlers(
 				// populated. If a claim is not yet in the
 				// cache, scheduling will get retried once it
 				// is.
-				resourceClaimCache.AddEventHandler(buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"))
+				handlers := buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim")
+				addFunc := handlers.AddFunc
+				handlers.AddFunc = func(obj interface{}) {
+					logger.V(2).Info("Add ResourceClaim", "claim", obj)
+					addFunc(obj)
+				}
+				resourceClaimCache.AddEventHandler(handlers)
 			}
 		case framework.ResourceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {

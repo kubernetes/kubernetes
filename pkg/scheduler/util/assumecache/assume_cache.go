@@ -219,6 +219,8 @@ func (c *AssumeCache) add(obj interface{}) {
 		return
 	}
 
+	c.logger.Info("AssumeCache add event", "obj", obj)
+
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
 		c.logger.Error(&ObjectNameError{err}, "Add failed")
@@ -256,7 +258,7 @@ func (c *AssumeCache) add(obj interface{}) {
 	if err = c.store.Update(objInfo); err != nil {
 		c.logger.Info("Error occurred while updating stored object", "err", err)
 	} else {
-		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
+		c.logger.V(2).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
 		for _, handler := range c.eventHandlers {
 			handler := handler
 			if oldObj == nil {
