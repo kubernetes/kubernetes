@@ -2657,8 +2657,8 @@ func (pl *SchedulingGatesPluginWOEvents) EventsToRegister() []framework.ClusterE
 	return nil
 }
 
-// This test helps to verify registering nil events for schedulingGates plugin works as expected.
-func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
+// This test helps to verify registering nil events for PreEnqueue plugin works as expected.
+func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodSchedulingReadiness, true)()
 
 	testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
@@ -2678,7 +2678,8 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 	tests := []struct {
 		name          string
 		enqueuePlugin framework.PreEnqueuePlugin
-		count         int
+		// count is the expected number of calls to PreEnqueue().
+		count int
 	}{
 		{
 			name:          "preEnqueue plugin without event registered",
@@ -2688,7 +2689,7 @@ func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
 		{
 			name:          "preEnqueue plugin with event registered",
 			enqueuePlugin: &SchedulingGatesPluginWithEvents{SchedulingGates: schedulinggates.SchedulingGates{EnablePodSchedulingReadiness: true}},
-			count:         2,
+			count:         3,
 		},
 	}
 
