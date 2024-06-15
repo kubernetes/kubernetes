@@ -21,21 +21,21 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var _ httpstream.Dialer = &fallbackDialer{}
+var _ httpstream.Dialer = &FallbackDialer{}
 
-// fallbackDialer encapsulates a primary and secondary dialer, including
+// FallbackDialer encapsulates a primary and secondary dialer, including
 // the boolean function to determine if the primary dialer failed. Implements
 // the httpstream.Dialer interface.
-type fallbackDialer struct {
+type FallbackDialer struct {
 	primary        httpstream.Dialer
 	secondary      httpstream.Dialer
 	shouldFallback func(error) bool
 }
 
-// NewFallbackDialer creates the fallbackDialer with the primary and secondary dialers,
+// NewFallbackDialer creates the FallbackDialer with the primary and secondary dialers,
 // as well as the boolean function to determine if the primary dialer failed.
 func NewFallbackDialer(primary, secondary httpstream.Dialer, shouldFallback func(error) bool) httpstream.Dialer {
-	return &fallbackDialer{
+	return &FallbackDialer{
 		primary:        primary,
 		secondary:      secondary,
 		shouldFallback: shouldFallback,
@@ -47,7 +47,7 @@ func NewFallbackDialer(primary, secondary httpstream.Dialer, shouldFallback func
 // httstream.Connection and the negotiated protocol version accepted. If the initial
 // primary dialer fails, this function attempts the secondary dialer. Returns an error
 // if one occurs.
-func (f *fallbackDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
+func (f *FallbackDialer) Dial(protocols ...string) (httpstream.Connection, string, error) {
 	conn, version, err := f.primary.Dial(protocols...)
 	if err != nil && f.shouldFallback(err) {
 		klog.V(4).Infof("fallback to secondary dialer from primary dialer err: %v", err)
