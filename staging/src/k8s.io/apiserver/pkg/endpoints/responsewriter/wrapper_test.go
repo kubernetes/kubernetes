@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package responsewriter
+package responsewriter_test
 
 import (
 	"bufio"
@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
@@ -37,17 +38,17 @@ func TestWithHTTP1(t *testing.T) {
 				originalWant = w
 			}
 
-			assertCloseNotifierFlusherHijacker(t, true, w)
+			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, w, r)
 
 			decorator := &fakeResponseWriterDecorator{
 				ResponseWriter: w,
 				counter:        counterGot,
 			}
-			wrapped := WrapForHTTP1Or2(decorator)
+			wrapped := responsewriter.WrapForHTTP1Or2(decorator)
 
-			assertCloseNotifierFlusherHijacker(t, true, wrapped)
+			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, wrapped, r)
 
-			originalGot := GetOriginal(wrapped)
+			originalGot := responsewriter.GetOriginal(wrapped)
 			if originalWant != originalGot {
 				t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
 				return
@@ -92,17 +93,17 @@ func TestWithHTTP2(t *testing.T) {
 				originalWant = w
 			}
 
-			assertCloseNotifierFlusherHijacker(t, false, w)
+			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, w, r)
 
 			decorator := &fakeResponseWriterDecorator{
 				ResponseWriter: w,
 				counter:        counterGot,
 			}
-			wrapped := WrapForHTTP1Or2(decorator)
+			wrapped := responsewriter.WrapForHTTP1Or2(decorator)
 
-			assertCloseNotifierFlusherHijacker(t, false, wrapped)
+			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, wrapped, r)
 
-			originalGot := GetOriginal(wrapped)
+			originalGot := responsewriter.GetOriginal(wrapped)
 			if originalWant != originalGot {
 				t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
 				return
@@ -199,7 +200,7 @@ func TestGetOriginal(t *testing.T) {
 					}
 				}()
 
-				originalGot := GetOriginal(wrapped)
+				originalGot := responsewriter.GetOriginal(wrapped)
 				if originalExpected != originalGot {
 					t.Errorf("Expected to get tehe original http.ResponseWriter object")
 				}
@@ -234,24 +235,6 @@ func sendRequest(t *testing.T, server *httptest.Server) {
 	_, err = client.Do(req)
 	if err != nil {
 		t.Fatalf("Unexpected non-nil err from client.Do: %v", err)
-	}
-}
-
-func assertCloseNotifierFlusherHijacker(t *testing.T, hijackableExpected bool, w http.ResponseWriter) {
-	// the http.ResponseWriter object for both http/1.x and http2
-	// implement http.Flusher and http.CloseNotifier
-	if _, ok := w.(http.Flusher); !ok {
-		t.Errorf("Expected the http.ResponseWriter object to implement http.Flusher")
-	}
-
-	//nolint:staticcheck // SA1019
-	if _, ok := w.(http.CloseNotifier); !ok {
-		t.Errorf("Expected the http.ResponseWriter object to implement http.CloseNotifier")
-	}
-
-	// http/1.x implements http.Hijacker, not http2
-	if _, ok := w.(http.Hijacker); ok != hijackableExpected {
-		t.Errorf("Unexpected http.Hijacker implementation, expected: %t, but got: %t", hijackableExpected, ok)
 	}
 }
 

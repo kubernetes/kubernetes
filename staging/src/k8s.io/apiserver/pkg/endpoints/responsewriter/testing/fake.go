@@ -89,3 +89,26 @@ func AssertResponseWriterInterfaceCompatibility(t *testing.T, inner, outer http.
 		t.Errorf("Expected the inner and outer http.ResponseWriter object to be compatible with http.Hijacker, but got - inner: %t, outer: %t", innerHijackable, outerHijackable)
 	}
 }
+
+func AssertResponseWriterImplementsExtendedInterfaces(t *testing.T, w http.ResponseWriter, req *http.Request) {
+	t.Helper()
+
+	_, flushable := w.(http.Flusher)
+	if !flushable {
+		t.Errorf("Expected the http.ResponseWriter object of type: %T to implement http.Flusher", w)
+	}
+
+	//nolint:staticcheck // SA1019
+	_, closeNotifiable := w.(http.CloseNotifier)
+	if !closeNotifiable {
+		t.Errorf("Expected the http.ResponseWriter object of type: %T to implement http.CloseNotifier", w)
+	}
+
+	// only http/1.x implements http.Hijacker
+	if req.Proto == "HTTP/1.1" {
+		_, hijackable := w.(http.Hijacker)
+		if !hijackable {
+			t.Errorf("Expected the http.ResponseWriter object of type: %T to implement http.Hijacker", w)
+		}
+	}
+}
