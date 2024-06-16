@@ -236,6 +236,87 @@ func TestGetOriginal(t *testing.T) {
 	}
 }
 
+func TestResponseWriterDecorator(t *testing.T) {
+	tests := []struct {
+		name      string
+		http1x    bool
+		decorator func(inner http.ResponseWriter) responsewriter.UserProvidedDecorator
+	}{
+		{
+			name: "decorator overrides Write only",
+			decorator: func(inner http.ResponseWriter) responsewriter.UserProvidedDecorator {
+				return &fakeWriteOnly{ResponseWriter: inner}
+			},
+		},
+		{
+			name: "decorator overrides Hijack only",
+			decorator: func(inner http.ResponseWriter) responsewriter.UserProvidedDecorator {
+				return &fakeHijackOnly{ResponseWriter: inner}
+			},
+		},
+		{
+			name: "decorator overrides no method",
+			decorator: func(inner http.ResponseWriter) responsewriter.UserProvidedDecorator {
+				return &fakeDecoratorNone{ResponseWriter: inner}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		for _, proto := range []string{"HTTP/1.1", "HTTP/2.0"} {
+			t.Run(fmt.Sprintf("%s/%s", test.name, proto), func(t *testing.T) {
+				// this handler wraps the ResponseWriter object
+				decorator := func(d http.Handler) http.Handler {
+					return http.HandlerFunc(func(inner http.ResponseWriter, r *http.Request) {
+						if r.Proto != proto {
+							t.Errorf("expected protocol: %q, but got: %q", proto, r.Proto)
+						}
+						responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, inner, r)
+
+						middle := test.decorator(inner)
+						outer := responsewriter.WrapForHTTP1Or2(middle)
+
+						responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner, outer)
+
+						d.ServeHTTP(outer, r)
+					})
+				}
+
+				// this is the inner handler that gets passed the wrapped ResponseWriter object
+				doneCh := make(chan struct{}, 1)
+				handler := decorator(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					defer close(doneCh)
+					responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, w, r)
+				}))
+
+				server := httptest.NewUnstartedServer(handler)
+				defer server.Close()
+				if proto == "HTTP/2.0" {
+					server.EnableHTTP2 = true
+				}
+				server.StartTLS()
+
+				client := server.Client()
+				client.Timeout = wait.ForeverTestTimeout
+				resp, err := client.Get(server.URL)
+				if err != nil {
+					t.Errorf("unexpected error from client.Get: %v", err)
+					return
+				}
+				if resp.StatusCode != http.StatusOK {
+					t.Errorf("Expected an OK response from the server, but got: %v", resp)
+				}
+
+				select {
+				case <-doneCh:
+				case <-time.After(wait.ForeverTestTimeout):
+					t.Errorf("expected the request handler to have terminated")
+				}
+			})
+		}
+	}
+}
+
 type counter struct {
 	FlushInvoked       int
 	HijackInvoked      int
@@ -273,3 +354,25 @@ func (fw *fakeResponseWriterDecorator) CloseNotify() <-chan bool {
 	// we short circuit the call here
 	return nil
 }
+
+type fakeWriteOnly struct {
+	http.ResponseWriter
+}
+
+func (fw *fakeWriteOnly) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
+func (fw *fakeWriteOnly) Write(b []byte) (int, error) { return fw.ResponseWriter.Write(b) }
+
+type fakeHijackOnly struct {
+	http.ResponseWriter
+}
+
+func (fw *fakeHijackOnly) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
+func (fw *fakeHijackOnly) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return fw.ResponseWriter.(http.Hijacker).Hijack()
+}
+
+type fakeDecoratorNone struct {
+	http.ResponseWriter
+}
+
+func (fw *fakeDecoratorNone) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
