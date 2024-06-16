@@ -24,17 +24,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	netutils "k8s.io/utils/net"
 )
 
 // TestServiceAllocPerformance measure the latency to create N services with a parallelism of K
@@ -88,18 +84,25 @@ func TestServiceAllocPerformance(t *testing.T) {
 
 	for _, gate := range []bool{false, true} {
 		t.Run(fmt.Sprintf("feature-gate=%v", gate), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, gate)
-
-			tCtx := ktesting.Init(t)
-			client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
-				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-					// use the larget range possible , this is limited by the old allocator
-					opts.ServiceClusterIPRanges = "10.0.0.0/12"
-					opts.GenericServerRunOptions.AdvertiseAddress = netutils.ParseIPSloppy("10.0.0.1")
-					opts.APIEnablement.RuntimeConfig.Set("networking.k8s.io/v1alpha1=true") // nolint: errcheck
+			etcdOptions := framework.SharedEtcd()
+			apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+			s1 := kubeapiservertesting.StartTestServerOrDie(t,
+				apiServerOptions,
+				[]string{
+					"--runtime-config=networking.k8s.io/v1alpha1=true",
+					"--service-cluster-ip-range=" + "10.0.0.0/12",
+					"--advertise-address=10.0.0.1",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 				},
-			})
-			defer tearDownFn()
+				etcdOptions)
+
+			defer s1.TearDownFn()
+
+			client, err := clientset.NewForConfig(s1.ClientConfig)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
 
 			legacyregistry.Reset()
 

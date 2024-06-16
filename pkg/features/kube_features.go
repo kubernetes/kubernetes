@@ -178,6 +178,14 @@ const (
 	// Add support for CDI Device IDs in the Device Plugin API.
 	DevicePluginCDIDevices featuregate.Feature = "DevicePluginCDIDevices"
 
+	// owner: @aojea
+	// alpha: v1.31
+	//
+	// The apiservers with the MultiCIDRServiceAllocator feature enable, in order to support live migration from the old bitmap ClusterIP
+	// allocators to the new IPAddress allocators introduced by the MultiCIDRServiceAllocator feature, performs a dual-write on
+	// both allocators. This feature gate disables the dual write on the new Cluster IP allocators.
+	DisableAllocatorDualWrite featuregate.Feature = "DisableAllocatorDualWrite"
+
 	// owner: @andrewsykim
 	// alpha: v1.22
 	// beta: v1.29
@@ -1002,6 +1010,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ContainerCheckpoint: {Default: true, PreRelease: featuregate.Beta},
 
 	CronJobsScheduledAnnotation: {Default: true, PreRelease: featuregate.Beta},
+
+	DisableAllocatorDualWrite: {Default: false, PreRelease: featuregate.Alpha}, // remove after MultiCIDRServiceAllocator is GA
 
 	DisableCloudProviders: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

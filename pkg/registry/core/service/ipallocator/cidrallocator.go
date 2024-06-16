@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	networkingv1alpha1informers "k8s.io/client-go/informers/networking/v1alpha1"
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	networkingv1alpha1listers "k8s.io/client-go/listers/networking/v1alpha1"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/servicecidr"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -69,6 +71,9 @@ type MetaAllocator struct {
 
 	ipFamily api.IPFamily
 	metrics  bool // enable the metrics collection
+
+	// TODO(aojea): remove with the feature gate DisableAllocatorDualWrite
+	bitmapAllocator Interface
 }
 
 type item struct {
@@ -86,9 +91,10 @@ func NewMetaAllocator(
 	serviceCIDRInformer networkingv1alpha1informers.ServiceCIDRInformer,
 	ipAddressInformer networkingv1alpha1informers.IPAddressInformer,
 	isIPv6 bool,
+	bitmapAllocator Interface,
 ) (*MetaAllocator, error) {
 
-	c := newMetaAllocator(client, serviceCIDRInformer, ipAddressInformer, isIPv6)
+	c := newMetaAllocator(client, serviceCIDRInformer, ipAddressInformer, isIPv6, bitmapAllocator)
 	go c.run()
 	return c, nil
 }
@@ -98,6 +104,7 @@ func newMetaAllocator(client networkingv1alpha1client.NetworkingV1alpha1Interfac
 	serviceCIDRInformer networkingv1alpha1informers.ServiceCIDRInformer,
 	ipAddressInformer networkingv1alpha1informers.IPAddressInformer,
 	isIPv6 bool,
+	bitmapAllocator Interface,
 ) *MetaAllocator {
 	// TODO: make the NewMetaAllocator agnostic of the IP family
 	family := api.IPv4Protocol
@@ -116,10 +123,11 @@ func newMetaAllocator(client networkingv1alpha1client.NetworkingV1alpha1Interfac
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: ControllerName},
 		),
-		internalStopCh: make(chan struct{}),
-		allocators:     make(map[string]*item),
-		ipFamily:       family,
-		metrics:        false,
+		internalStopCh:  make(chan struct{}),
+		allocators:      make(map[string]*item),
+		ipFamily:        family,
+		metrics:         false,
+		bitmapAllocator: bitmapAllocator,
 	}
 
 	_, _ = serviceCIDRInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -329,15 +337,27 @@ func (c *MetaAllocator) AllocateService(service *api.Service, ip net.IP) error {
 	if err != nil {
 		return err
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+		cidr := c.bitmapAllocator.CIDR()
+		if cidr.Contains(ip) {
+			err := c.bitmapAllocator.Allocate(ip)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return allocator.AllocateService(service, ip)
 }
 
+// Allocate attempts to reserve the provided IP. ErrNotInRange or
+// ErrAllocated will be returned if the IP is not valid for this range
+// or has already been reserved.  ErrFull will be returned if there
+// are no addresses left.
+// Only for testing, it will fail to create the IPAddress object because
+// the Service reference is required.s
 func (c *MetaAllocator) Allocate(ip net.IP) error {
-	allocator, err := c.getAllocator(ip, true)
-	if err != nil {
-		return err
-	}
-	return allocator.Allocate(ip)
+	return c.AllocateService(nil, ip)
+
 }
 
 func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error) {
@@ -356,38 +376,38 @@ func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error
 		}
 		ip, err := item.allocator.AllocateNextService(service)
 		if err == nil {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+				cidr := c.bitmapAllocator.CIDR()
+				if cidr.Contains(ip) {
+					err := c.bitmapAllocator.Allocate(ip)
+					if err != nil {
+						continue
+					}
+				}
+			}
 			return ip, nil
 		}
 	}
 	return nil, ErrFull
 }
 
+// AllocateNext return an IP address that wasn't allocated yet.
+// Only for testing, it will fail to create the IPAddress object because
+// the Service reference is required
 func (c *MetaAllocator) AllocateNext() (net.IP, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	// TODO(aojea) add strategy to return a random allocator but
-	// taking into consideration the number of addresses of each allocator.
-	// Per example, if we have allocator A and B with 256 and 1024 possible
-	// addresses each, the chances to get B has to be 4 times the chances to
-	// get A so we can spread the load of IPs randomly.
-	// However, we need to validate the best strategy before going to Beta.
-	isIPv6 := c.ipFamily == api.IPFamily(v1.IPv6Protocol)
-	for cidr, item := range c.allocators {
-		if netutils.IsIPv6String(cidr) != isIPv6 {
-			continue
-		}
-		ip, err := item.allocator.AllocateNext()
-		if err == nil {
-			return ip, nil
-		}
-	}
-	return nil, ErrFull
+	return c.AllocateNextService(nil)
 }
 
 func (c *MetaAllocator) Release(ip net.IP) error {
 	allocator, err := c.getAllocator(ip, false)
 	if err != nil {
 		return err
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+		cidr := c.bitmapAllocator.CIDR()
+		if cidr.Contains(ip) {
+			_ = c.bitmapAllocator.Release(ip)
+		}
 	}
 	return allocator.Release(ip)
 
@@ -424,6 +444,9 @@ func (c *MetaAllocator) Destroy() {
 	select {
 	case <-c.internalStopCh:
 	default:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+			c.bitmapAllocator.Destroy()
+		}
 		close(c.internalStopCh)
 	}
 }
