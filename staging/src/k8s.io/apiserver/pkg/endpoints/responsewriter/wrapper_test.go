@@ -18,13 +18,14 @@ package responsewriter_test
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
@@ -32,63 +33,129 @@ import (
 func TestWrapForHTTP1Or2(t *testing.T) {
 	for _, proto := range []string{"HTTP/1.1", "HTTP/2.0"} {
 		t.Run(proto, func(t *testing.T) {
-			var originalWant http.ResponseWriter
-			counterGot := &counter{}
-			chain := func(h http.Handler) http.Handler {
+			// this is the first handler in the chain, it executes first:
+			//  - it keeps track of the original ResponseWriter
+			//  object passed to the request handler by net/http
+			var originalResponseWriterWant http.ResponseWriter
+			first := func(h http.Handler) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if originalWant == nil {
-						originalWant = w
+					if r.Proto != proto {
+						t.Errorf("expected protocol: %q, but got: %q", proto, r.Proto)
 					}
 
-					responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, w, r)
-
-					decorator := &fakeResponseWriterDecorator{
-						ResponseWriter: w,
-						counter:        counterGot,
-					}
-					wrapped := responsewriter.WrapForHTTP1Or2(decorator)
-
-					responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, wrapped, r)
-
-					originalGot := responsewriter.GetOriginal(wrapped)
-					if originalWant != originalGot {
-						t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
-						return
+					originalResponseWriterWant = w
+					if want, got := originalResponseWriterWant, responsewriter.GetOriginal(w); want != got {
+						t.Errorf("expected GetOriginal to return the original ResponseWriter object")
 					}
 
-					h.ServeHTTP(wrapped, r)
+					h.ServeHTTP(w, r)
 				})
 			}
 
-			// wrap the original http.ResponseWriter multiple times
-			handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// at this point, the original ResponseWriter object has been wrapped three times
-				// so each decorator is expected to tick the count by one for each method.
-				counterWant := &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 0}
+			// this is the handler in the middle:
+			//  - it wraps the given ResponseWriter object with a
+			//  fake decorator, in addition,
+			//  - it asserts that the outer and inner ResponseWriter
+			//  objects interface compatible.
+			counterGot := &counter{}
+			decorator := func(h http.Handler) http.Handler {
+				return http.HandlerFunc(func(inner http.ResponseWriter, r *http.Request) {
+					responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, inner, r)
+
+					// wrap the inner ResponseWriter object
+					middle := &fakeResponseWriterDecorator{
+						ResponseWriter: inner,
+						counter:        counterGot,
+					}
+					outer := responsewriter.WrapForHTTP1Or2(middle)
+
+					// the wrapped ResponseWriter must satisfy the same interface compatibility
+					responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, outer, r)
+					responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner, outer)
+
+					if want, got := originalResponseWriterWant, responsewriter.GetOriginal(inner); want != got {
+						t.Errorf("expected GetOriginal to return the original ResponseWriter object")
+					}
+
+					h.ServeHTTP(outer, r)
+				})
+			}
+
+			// this is the last handler in the chain, it executes last:
+			// a) it gets passed the wrapped ResponseWriter
+			// b) it invokes CloseNotify, Flush, and Hijack on the wrapped ResponseWriter
+			// c) it verifies that the decorated methods have been invoked as expected
+			handlerDoneCh := make(chan struct{})
+			last := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(handlerDoneCh)
+				// the server will execute the following handler chain:
+				//   first -> decorator(1) -> decorator(2) -> decorator(3) -> last
+				counterWant := &counter{
+					FlushInvoked:       3,
+					CloseNotifyInvoked: 1, // the wrapper short circuits this call
+					HijackInvoked:      0,
+				}
+				if r.Proto == "HTTP/1.1" {
+					counterWant.HijackInvoked = 3
+				}
 				defer counterGot.assert(t, counterWant)
 
 				//nolint:staticcheck // SA1019
 				w.(http.CloseNotifier).CloseNotify()
 				w.(http.Flusher).Flush()
 
-				if proto == "HTTP/1.1" {
-					counterWant.HijackInvoked = 3
-					conn, _, err := w.(http.Hijacker).Hijack()
+				if r.Proto == "HTTP/1.1" {
+					conn, bufrw, err := w.(http.Hijacker).Hijack()
 					if err != nil {
 						t.Errorf("Expected Hijack to succeed, but got error: %v", err)
 						return
 					}
-					conn.Close()
+					msg := "hello"
+					payload := fmt.Sprintf("HTTP/1.0 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(msg), msg)
+					if _, err := bufrw.Write([]byte(payload)); err != nil {
+						t.Errorf("unexpected error from Write: %v", err)
+						return
+					}
+					if err := bufrw.Flush(); err != nil {
+						t.Errorf("unexpected error from Flush: %v", err)
+						return
+					}
+					if err := conn.Close(); err != nil {
+						t.Errorf("unexpected error while closing the hijacked connection: %v", err)
+					}
 				}
-			}))
-			handler = chain(handler)
-			handler = chain(handler)
+			})
 
-			server := newServer(t, handler, proto == "HTTP/2.0")
+			// the server will execute the following handler chain:
+			//   first -> decorator(1) -> decorator(2) -> decorator(3) -> last
+			handler := decorator(last)
+			handler = decorator(handler)
+			handler = decorator(handler)
+			handler = first(handler)
+
+			server := httptest.NewUnstartedServer(handler)
 			defer server.Close()
+			if proto == "HTTP/2.0" {
+				server.EnableHTTP2 = true
+			}
+			server.StartTLS()
 
-			sendRequest(t, server)
+			client := server.Client()
+			client.Timeout = wait.ForeverTestTimeout
+			resp, err := client.Get(server.URL)
+			if err != nil {
+				t.Errorf("unexpected error from client.Get: %v", err)
+				return
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected an OK response from the server, but got: %v", resp)
+			}
 
+			select {
+			case <-handlerDoneCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("expected the request handler to have terminated")
+			}
 		})
 	}
 }
@@ -169,35 +236,6 @@ func TestGetOriginal(t *testing.T) {
 	}
 }
 
-func newServer(t *testing.T, h http.Handler, http2 bool) *httptest.Server {
-	server := httptest.NewUnstartedServer(h)
-	if http2 {
-		server.EnableHTTP2 = true
-		server.StartTLS()
-	} else {
-		server.Start()
-	}
-	_, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatalf("Expected the server to have a valid URL, but got: %s", server.URL)
-	}
-	return server
-}
-
-func sendRequest(t *testing.T, server *httptest.Server) {
-	req, err := http.NewRequest("GET", server.URL, nil)
-	if err != nil {
-		t.Fatalf("error creating request: %v", err)
-	}
-
-	client := server.Client()
-	client.Timeout = 30 * time.Second
-	_, err = client.Do(req)
-	if err != nil {
-		t.Fatalf("Unexpected non-nil err from client.Do: %v", err)
-	}
-}
-
 type counter struct {
 	FlushInvoked       int
 	HijackInvoked      int
@@ -223,21 +261,15 @@ type fakeResponseWriterDecorator struct {
 
 func (fw *fakeResponseWriterDecorator) Unwrap() http.ResponseWriter { return fw.ResponseWriter }
 func (fw *fakeResponseWriterDecorator) Flush() {
-	if fw.counter != nil {
-		fw.counter.FlushInvoked++
-	}
+	fw.counter.FlushInvoked++
 	fw.ResponseWriter.(http.Flusher).Flush()
 }
 func (fw *fakeResponseWriterDecorator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if fw.counter != nil {
-		fw.counter.HijackInvoked++
-	}
+	fw.counter.HijackInvoked++
 	return fw.ResponseWriter.(http.Hijacker).Hijack()
 }
 func (fw *fakeResponseWriterDecorator) CloseNotify() <-chan bool {
-	if fw.counter != nil {
-		fw.counter.CloseNotifyInvoked++
-	}
-	//nolint:staticcheck // SA1019
-	return fw.ResponseWriter.(http.CloseNotifier).CloseNotify()
+	fw.counter.CloseNotifyInvoked++
+	// we short circuit the call here
+	return nil
 }
