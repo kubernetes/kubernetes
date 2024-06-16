@@ -404,13 +404,6 @@ func (t *traceLocation) Set(value string) error {
 	return nil
 }
 
-// flushSyncWriter is the interface satisfied by logging destinations.
-type flushSyncWriter interface {
-	Flush() error
-	Sync() error
-	io.Writer
-}
-
 var logging loggingT
 var commandLine flag.FlagSet
 
@@ -486,7 +479,7 @@ type settings struct {
 	// Access to all of the following fields must be protected via a mutex.
 
 	// file holds writer for each of the log types.
-	file [severity.NumSeverity]flushSyncWriter
+	file [severity.NumSeverity]io.Writer
 	// flushInterval is the interval for periodic flushing. If zero,
 	// the global default will be used.
 	flushInterval time.Duration
@@ -831,32 +824,12 @@ func (l *loggingT) printS(err error, s severity.Severity, depth int, msg string,
 	buffer.PutBuffer(b)
 }
 
-// redirectBuffer is used to set an alternate destination for the logs
-type redirectBuffer struct {
-	w io.Writer
-}
-
-func (rb *redirectBuffer) Sync() error {
-	return nil
-}
-
-func (rb *redirectBuffer) Flush() error {
-	return nil
-}
-
-func (rb *redirectBuffer) Write(bytes []byte) (n int, err error) {
-	return rb.w.Write(bytes)
-}
-
 // SetOutput sets the output destination for all severities
 func SetOutput(w io.Writer) {
 	logging.mu.Lock()
 	defer logging.mu.Unlock()
 	for s := severity.FatalLog; s >= severity.InfoLog; s-- {
-		rb := &redirectBuffer{
-			w: w,
-		}
-		logging.file[s] = rb
+		logging.file[s] = w
 	}
 }
 
@@ -868,10 +841,7 @@ func SetOutputBySeverity(name string, w io.Writer) {
 	if !ok {
 		panic(fmt.Sprintf("SetOutputBySeverity(%q): unrecognized severity name", name))
 	}
-	rb := &redirectBuffer{
-		w: w,
-	}
-	logging.file[sev] = rb
+	logging.file[sev] = w
 }
 
 // LogToStderr sets whether to log exclusively to stderr, bypassing outputs
@@ -1011,7 +981,8 @@ func (l *loggingT) exit(err error) {
 		logExitFunc(err)
 		return
 	}
-	l.flushAll()
+	needToSync := l.flushAll()
+	l.syncAll(needToSync)
 	OsExit(2)
 }
 
@@ -1026,10 +997,6 @@ type syncBuffer struct {
 	sev      severity.Severity
 	nbytes   uint64 // The number of bytes written to this file
 	maxbytes uint64 // The max number of bytes this syncBuffer.file can hold before cleaning up.
-}
-
-func (sb *syncBuffer) Sync() error {
-	return sb.file.Sync()
 }
 
 // CalculateMaxSize returns the real max size in bytes after considering the default max size and the flag options.
@@ -1223,23 +1190,44 @@ func StartFlushDaemon(interval time.Duration) {
 // lockAndFlushAll is like flushAll but locks l.mu first.
 func (l *loggingT) lockAndFlushAll() {
 	l.mu.Lock()
-	l.flushAll()
+	needToSync := l.flushAll()
 	l.mu.Unlock()
+	// Some environments are slow when syncing and holding the lock might cause contention.
+	l.syncAll(needToSync)
 }
 
-// flushAll flushes all the logs and attempts to "sync" their data to disk.
+// flushAll flushes all the logs
 // l.mu is held.
-func (l *loggingT) flushAll() {
+//
+// The result is the number of files which need to be synced and the pointers to them.
+func (l *loggingT) flushAll() fileArray {
+	var needToSync fileArray
+
 	// Flush from fatal down, in case there's trouble flushing.
 	for s := severity.FatalLog; s >= severity.InfoLog; s-- {
 		file := l.file[s]
-		if file != nil {
-			_ = file.Flush() // ignore error
-			_ = file.Sync()  // ignore error
+		if sb, ok := file.(*syncBuffer); ok && sb.file != nil {
+			_ = sb.Flush() // ignore error
+			needToSync.files[needToSync.num] = sb.file
+			needToSync.num++
 		}
 	}
 	if logging.loggerOptions.flush != nil {
 		logging.loggerOptions.flush()
+	}
+	return needToSync
+}
+
+type fileArray struct {
+	num   int
+	files [severity.NumSeverity]*os.File
+}
+
+// syncAll attempts to "sync" their data to disk.
+func (l *loggingT) syncAll(needToSync fileArray) {
+	// Flush from fatal down, in case there's trouble flushing.
+	for i := 0; i < needToSync.num; i++ {
+		_ = needToSync.files[i].Sync() // ignore error
 	}
 }
 
