@@ -286,7 +286,7 @@ func (q *delayingType[T]) waitingLoop() {
 			}
 
 			entry = heap.Pop(waitingForQueue).(*waitFor)
-			q.metrics.removeFromWaitingForQueue()
+			q.metrics.setWaitingForQueueSize(float64(waitingForQueue.Len()))
 			q.Add(entry.data.(T))
 			delete(waitingEntryByData, entry.data)
 		}
@@ -314,9 +314,7 @@ func (q *delayingType[T]) waitingLoop() {
 
 		case waitEntry := <-q.waitingForAddCh:
 			if waitEntry.readyAt.After(q.clock.Now()) {
-				if insert(waitingForQueue, waitingEntryByData, waitEntry) {
-					q.metrics.addToWaitingForQueue()
-				}
+				q.insert(waitingForQueue, waitingEntryByData, waitEntry)
 			} else {
 				q.Add(waitEntry.data.(T))
 			}
@@ -326,9 +324,7 @@ func (q *delayingType[T]) waitingLoop() {
 				select {
 				case waitEntry := <-q.waitingForAddCh:
 					if waitEntry.readyAt.After(q.clock.Now()) {
-						if insert(waitingForQueue, waitingEntryByData, waitEntry) {
-							q.metrics.addToWaitingForQueue()
-						}
+						q.insert(waitingForQueue, waitingEntryByData, waitEntry)
 					} else {
 						q.Add(waitEntry.data.(T))
 					}
@@ -341,20 +337,19 @@ func (q *delayingType[T]) waitingLoop() {
 }
 
 // insert adds the entry to the priority queue, or updates the readyAt if it already exists in the queue.
-// Returns true if the item was added to the priority queue and false otherwise.
-func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) bool {
+func (q *delayingType[T]) insert(pq *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) {
 	// if the entry already exists, update the time only if it would cause the item to be queued sooner
 	existing, exists := knownEntries[entry.data]
 	if exists {
 		if existing.readyAt.After(entry.readyAt) {
 			existing.readyAt = entry.readyAt
-			heap.Fix(q, existing.index)
+			heap.Fix(pq, existing.index)
 		}
 
-		return false
+		return
 	}
 
-	heap.Push(q, entry)
+	heap.Push(pq, entry)
 	knownEntries[entry.data] = entry
-	return true
+	q.metrics.setWaitingForQueueSize(float64(pq.Len()))
 }

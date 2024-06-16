@@ -156,13 +156,12 @@ func (m *defaultQueueMetrics) sinceInSeconds(start time.Time) float64 {
 type delayQueueMetrics interface {
 	retry()
 
-	addToWaitingForQueue()
-	removeFromWaitingForQueue()
+	setWaitingForQueueSize(n float64)
 }
 
 type defaultDelayQueueMetrics struct {
 	retries              CounterMetric
-	waitingForQueueDepth GaugeMetric
+	waitingForQueueDepth SettableGaugeMetric
 }
 
 func (m *defaultDelayQueueMetrics) retry() {
@@ -173,19 +172,11 @@ func (m *defaultDelayQueueMetrics) retry() {
 	m.retries.Inc()
 }
 
-func (m *defaultDelayQueueMetrics) addToWaitingForQueue() {
+func (m *defaultDelayQueueMetrics) setWaitingForQueueSize(n float64) {
 	if m == nil {
 		return
 	}
-	m.waitingForQueueDepth.Inc()
-}
-
-func (m *defaultDelayQueueMetrics) removeFromWaitingForQueue() {
-	if m == nil {
-		return
-	}
-
-	m.waitingForQueueDepth.Dec()
+	m.waitingForQueueDepth.Set(n)
 }
 
 // MetricsProvider generates various metrics used by the queue.
@@ -197,7 +188,7 @@ type MetricsProvider interface {
 	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
 	NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
 	NewRetriesMetric(name string) CounterMetric
-	NewWaitingForQueueDepthMetric(name string) GaugeMetric
+	NewWaitingForQueueDepthMetric(name string) SettableGaugeMetric
 }
 
 type noopMetricsProvider struct{}
@@ -230,7 +221,7 @@ func (_ noopMetricsProvider) NewRetriesMetric(name string) CounterMetric {
 	return noopMetric{}
 }
 
-func (noopMetricsProvider) NewWaitingForQueueDepthMetric(name string) GaugeMetric {
+func (noopMetricsProvider) NewWaitingForQueueDepthMetric(name string) SettableGaugeMetric {
 	return noopMetric{}
 }
 

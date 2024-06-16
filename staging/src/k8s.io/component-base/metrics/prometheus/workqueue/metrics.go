@@ -144,6 +144,6 @@ func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.Counter
 	return retries.WithLabelValues(name)
 }
 
-func (prometheusMetricsProvider) NewWaitingForQueueDepthMetric(name string) workqueue.GaugeMetric {
+func (prometheusMetricsProvider) NewWaitingForQueueDepthMetric(name string) workqueue.SettableGaugeMetric {
 	return waitingForQueueDepth.WithLabelValues(name)
 }

@@ -38,8 +38,8 @@ func TestSimpleQueue(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getInc() != 1 {
-		t.Fatalf("expected %v, got %v", 1, mp.waitingForDepth.inc)
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
 	}
 
 	if q.Len() != 0 {
@@ -51,8 +51,8 @@ func TestSimpleQueue(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
 	}
-	if mp.waitingForDepth.getDec() != 1 {
-		t.Fatalf("expected %v, got %v", 1, mp.waitingForDepth.dec)
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	item, _ := q.Get()
 	q.Done(item)
@@ -91,8 +91,8 @@ func TestDeduping(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getInc() != 1 {
-		t.Fatalf("expected %v, got %v", 1, mp.waitingForDepth.inc)
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
 	}
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
@@ -103,8 +103,8 @@ func TestDeduping(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
 	}
-	if mp.waitingForDepth.getDec() != 1 {
-		t.Fatalf("expected %v, got %v", 1, mp.waitingForDepth.dec)
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	item, _ := q.Get()
 	q.Done(item)
@@ -121,8 +121,8 @@ func TestDeduping(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getInc() != 2 {
-		t.Fatalf("expected %v, got %v", 2, mp.waitingForDepth.inc)
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
 	}
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
@@ -132,8 +132,8 @@ func TestDeduping(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
 	}
-	if mp.waitingForDepth.getDec() != 2 {
-		t.Fatalf("expected %v, got %v", 2, mp.waitingForDepth.dec)
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	item, _ = q.Get()
 	q.Done(item)
@@ -159,8 +159,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getInc() != 2 {
-		t.Fatalf("expected %v, got %v", 2, mp.waitingForDepth.inc)
+	if val := mp.waitingForDepth.gaugeValue(); val != 2 {
+		t.Fatalf("expected %v, got %v", 2, val)
 	}
 
 	if q.Len() != 0 {
@@ -172,8 +172,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getDec() != 1 {
-		t.Fatalf("expected %v, got %v", 1, mp.waitingForDepth.dec)
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
 	}
 	item, _ := q.Get()
 	if !reflect.DeepEqual(item, second) {
@@ -186,11 +186,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getInc() != 3 {
-		t.Fatalf("expected %v, got %v", 3, mp.waitingForDepth.inc)
-	}
-	if mp.waitingForDepth.getDec() != 2 {
-		t.Fatalf("expected %v, got %v", 2, mp.waitingForDepth.dec)
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
 	}
 	item, _ = q.Get()
 	if !reflect.DeepEqual(item, first) {
@@ -201,8 +198,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getDec() != 3 {
-		t.Fatalf("expected %v, got %v", 3, mp.waitingForDepth.dec)
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 3, val)
 	}
 	item, _ = q.Get()
 	if !reflect.DeepEqual(item, third) {
@@ -225,8 +222,8 @@ func TestCopyShifting(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getInc() != 3 {
-		t.Fatalf("expected %v, got %v", 3, mp.waitingForDepth.inc)
+	if val := mp.waitingForDepth.gaugeValue(); val != 3 {
+		t.Fatalf("expected %v, got %v", 3, val)
 	}
 
 	if q.Len() != 0 {
@@ -238,8 +235,8 @@ func TestCopyShifting(t *testing.T) {
 	if err := waitForAdded(q, 3); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if mp.waitingForDepth.getDec() != 3 {
-		t.Fatalf("expected %v, got %v", 3, mp.waitingForDepth.dec)
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	actualFirst, _ := q.Get()
 	if !reflect.DeepEqual(actualFirst, third) {
