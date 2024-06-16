@@ -18,11 +18,26 @@ You must install and configure Google Cloud SDK if you want to upload your relea
 
 ## Overview
 
-While it is possible to build Kubernetes using a local golang installation, we have a build process that runs in a Docker container.  This simplifies initial set up and provides for a very consistent build and test environment.
+You can build Kubernetes in two environments:
+1. **Local `Go`** Environment, and
+2. **Docker Container** Environment
+
+Building Kubernetes in a Docker container **simplifies the initial set-up** and provides a very consistent build and test environment.
+
+## Clone the Repository
+Before you start building Kubernetes, make sure to clone the repository using the following command:
+```bash
+git clone https://github.com/kubernetes/kubernetes.git
+```
+Navigate to Kubernetes directory before executing scripts files:
+```bash
+cd kubernetes
+```
 
 ## Key scripts
+**Note:** Ensure you run all the scripts from the Kubernetes root directory.
 
-The following scripts are found in the [`build/`](.) directory. Note that all scripts must be run from the Kubernetes root directory.
+The following scripts are found in the [`build/`](.) directory. 
 
 * [`build/run.sh`](run.sh): Run a command in a build docker container.  Common invocations:
   *  `build/run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
