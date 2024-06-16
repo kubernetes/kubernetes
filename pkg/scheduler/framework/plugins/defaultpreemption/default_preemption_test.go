@@ -18,6 +18,7 @@ package defaultpreemption
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -27,11 +28,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -39,6 +42,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -1691,8 +1695,30 @@ func TestPreempt(t *testing.T) {
 
 			deletedPodNames := sets.New[string]()
 			patchedPodNames := sets.New[string]()
+			patchedPods := []*v1.Pod{}
 			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-				patchedPodNames.Insert(action.(clienttesting.PatchAction).GetName())
+				patchAction := action.(clienttesting.PatchAction)
+				podName := patchAction.GetName()
+				namespace := patchAction.GetNamespace()
+				patch := patchAction.GetPatch()
+				pod, err := informerFactory.Core().V1().Pods().Lister().Pods(namespace).Get(podName)
+				if err != nil {
+					t.Fatalf("Failed to get the original pod %s/%s before patching: %v\n", namespace, podName, err)
+				}
+				marshalledPod, err := json.Marshal(pod)
+				if err != nil {
+					t.Fatalf("Failed to marshal the original pod %s/%s: %v", namespace, podName, err)
+				}
+				updated, err := strategicpatch.StrategicMergePatch(marshalledPod, patch, v1.Pod{})
+				if err != nil {
+					t.Fatalf("Failed to apply strategic merge patch %q on pod %#v: %v", patch, marshalledPod, err)
+				}
+				updatedPod := &v1.Pod{}
+				if err := json.Unmarshal(updated, updatedPod); err != nil {
+					t.Fatalf("Failed to unmarshal updated pod %q: %v", updated, err)
+				}
+				patchedPods = append(patchedPods, updatedPod)
+				patchedPodNames.Insert(podName)
 				return true, nil, nil
 			})
 			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -1798,6 +1824,22 @@ func TestPreempt(t *testing.T) {
 			if diff := cmp.Diff(sets.List(patchedPodNames), sets.List(deletedPodNames)); diff != "" {
 				t.Errorf("unexpected difference in the set of patched and deleted pods: %s", diff)
 			}
+
+			// Make sure that the DisruptionTarget condition has been added to the pod status
+			for _, patchedPod := range patchedPods {
+				expectedPodCondition := &v1.PodCondition{
+					Type:    v1.DisruptionTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonPreemptionByScheduler,
+					Message: fmt.Sprintf("%s: preempting to accommodate a higher priority pod", patchedPod.Spec.SchedulerName),
+				}
+
+				_, condition := apipod.GetPodCondition(&patchedPod.Status, v1.DisruptionTarget)
+				if diff := cmp.Diff(condition, expectedPodCondition, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime")); diff != "" {
+					t.Fatalf("unexpected difference in the pod %q DisruptionTarget condition: %s", patchedPod.Name, diff)
+				}
+			}
+
 			for victimName := range deletedPodNames {
 				found := false
 				for _, expPod := range test.expectedPods {
