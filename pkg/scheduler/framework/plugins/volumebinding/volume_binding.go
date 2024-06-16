@@ -148,7 +148,7 @@ func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, p
 		}
 	}
 
-	logger.V(5).Info("CISDriver was created or updated but it doesn't make this pod schedulable")
+	logger.V(5).Info("CSIDriver was created or updated but it doesn't make this pod schedulable")
 	return framework.QueueSkip, nil
 }
 
