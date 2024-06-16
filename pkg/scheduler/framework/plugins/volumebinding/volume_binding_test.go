@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -892,8 +893,6 @@ func TestVolumeBinding(t *testing.T) {
 }
 
 func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
-	trueVar := true
-	falseVar := false
 	table := []struct {
 		name   string
 		pod    *v1.Pod
@@ -910,7 +909,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &trueVar,
+					StorageCapacity: ptr.To(true),
 				},
 			},
 			oldObj: &storagev1.CSIDriver{
@@ -922,7 +921,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 			expect: framework.QueueSkip,
 		},
 		{
-			name:   "type conversion error",
+			name:   "unexpected objects are passed",
 			pod:    makePod("pod-a").Pod,
 			newObj: new(struct{}),
 			oldObj: new(struct{}),
@@ -930,14 +929,14 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 			expect: framework.Queue,
 		},
 		{
-			name: "driver name in pod and csidriver name are different.",
+			name: "driver name in pod and csidriver name are different",
 			pod:  makePod("pod-a").withCSI("test1").Pod,
 			newObj: &storagev1.CSIDriver{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test2",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &trueVar,
+					StorageCapacity: ptr.To(true),
 				},
 			},
 			oldObj: &storagev1.CSIDriver{
@@ -945,7 +944,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test2",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &trueVar,
+					StorageCapacity: ptr.To(false),
 				},
 			},
 			err:    false,
@@ -981,7 +980,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &falseVar,
+					StorageCapacity: ptr.To(false),
 				},
 			},
 			oldObj: &storagev1.CSIDriver{
@@ -989,7 +988,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &falseVar,
+					StorageCapacity: ptr.To(false),
 				},
 			},
 			err:    false,
@@ -1011,7 +1010,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &trueVar,
+					StorageCapacity: ptr.To(true),
 				},
 			},
 			err:    false,
@@ -1025,7 +1024,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &trueVar,
+					StorageCapacity: ptr.To(true),
 				},
 			},
 			oldObj: &storagev1.CSIDriver{
@@ -1033,7 +1032,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &trueVar,
+					StorageCapacity: ptr.To(true),
 				},
 			},
 			err:    false,
@@ -1048,7 +1047,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &falseVar,
+					StorageCapacity: ptr.To(false),
 				},
 			},
 			oldObj: &storagev1.CSIDriver{
@@ -1056,7 +1055,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 					Name: "test1",
 				},
 				Spec: storagev1.CSIDriverSpec{
-					StorageCapacity: &trueVar,
+					StorageCapacity: ptr.To(true),
 				},
 			},
 			err:    false,
