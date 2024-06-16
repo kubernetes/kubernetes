@@ -29,108 +29,68 @@ import (
 	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
-func TestWithHTTP1(t *testing.T) {
-	var originalWant http.ResponseWriter
-	counterGot := &counter{}
-	chain := func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if originalWant == nil {
-				originalWant = w
+func TestWrapForHTTP1Or2(t *testing.T) {
+	for _, proto := range []string{"HTTP/1.1", "HTTP/2.0"} {
+		t.Run(proto, func(t *testing.T) {
+			var originalWant http.ResponseWriter
+			counterGot := &counter{}
+			chain := func(h http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if originalWant == nil {
+						originalWant = w
+					}
+
+					responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, w, r)
+
+					decorator := &fakeResponseWriterDecorator{
+						ResponseWriter: w,
+						counter:        counterGot,
+					}
+					wrapped := responsewriter.WrapForHTTP1Or2(decorator)
+
+					responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, wrapped, r)
+
+					originalGot := responsewriter.GetOriginal(wrapped)
+					if originalWant != originalGot {
+						t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
+						return
+					}
+
+					h.ServeHTTP(wrapped, r)
+				})
 			}
 
-			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, w, r)
+			// wrap the original http.ResponseWriter multiple times
+			handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// at this point, the original ResponseWriter object has been wrapped three times
+				// so each decorator is expected to tick the count by one for each method.
+				counterWant := &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 0}
+				defer counterGot.assert(t, counterWant)
 
-			decorator := &fakeResponseWriterDecorator{
-				ResponseWriter: w,
-				counter:        counterGot,
-			}
-			wrapped := responsewriter.WrapForHTTP1Or2(decorator)
+				//nolint:staticcheck // SA1019
+				w.(http.CloseNotifier).CloseNotify()
+				w.(http.Flusher).Flush()
 
-			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, wrapped, r)
+				if proto == "HTTP/1.1" {
+					counterWant.HijackInvoked = 3
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Errorf("Expected Hijack to succeed, but got error: %v", err)
+						return
+					}
+					conn.Close()
+				}
+			}))
+			handler = chain(handler)
+			handler = chain(handler)
 
-			originalGot := responsewriter.GetOriginal(wrapped)
-			if originalWant != originalGot {
-				t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
-				return
-			}
+			server := newServer(t, handler, proto == "HTTP/2.0")
+			defer server.Close()
 
-			h.ServeHTTP(wrapped, r)
+			sendRequest(t, server)
+
 		})
 	}
-
-	// wrap the original http.ResponseWriter multiple times
-	handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// at this point, the original ResponseWriter object has been wrapped three times
-		// so each decorator is expected to tick the count by one for each method.
-		defer counterGot.assert(t, &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 3})
-
-		//nolint:staticcheck // SA1019
-		w.(http.CloseNotifier).CloseNotify()
-		w.(http.Flusher).Flush()
-
-		conn, _, err := w.(http.Hijacker).Hijack()
-		if err != nil {
-			t.Errorf("Expected Hijack to succeed, but got error: %v", err)
-			return
-		}
-		conn.Close()
-	}))
-	handler = chain(handler)
-	handler = chain(handler)
-
-	server := newServer(t, handler, false)
-	defer server.Close()
-
-	sendRequest(t, server)
-}
-
-func TestWithHTTP2(t *testing.T) {
-	var originalWant http.ResponseWriter
-	counterGot := &counter{}
-	chain := func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if originalWant == nil {
-				originalWant = w
-			}
-
-			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, w, r)
-
-			decorator := &fakeResponseWriterDecorator{
-				ResponseWriter: w,
-				counter:        counterGot,
-			}
-			wrapped := responsewriter.WrapForHTTP1Or2(decorator)
-
-			responsewritertesting.AssertResponseWriterImplementsExtendedInterfaces(t, wrapped, r)
-
-			originalGot := responsewriter.GetOriginal(wrapped)
-			if originalWant != originalGot {
-				t.Errorf("Expected GetOriginal to return the original ResponseWriter object")
-				return
-			}
-
-			h.ServeHTTP(wrapped, r)
-		})
-	}
-
-	// wrap the original http.ResponseWriter multiple times
-	handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// at this point, the original ResponseWriter object has been wrapped three times
-		// so each decorator is expected to tick the count by one for each method.
-		defer counterGot.assert(t, &counter{FlushInvoked: 3, CloseNotifyInvoked: 3, HijackInvoked: 0})
-
-		//nolint:staticcheck // SA1019
-		w.(http.CloseNotifier).CloseNotify()
-		w.(http.Flusher).Flush()
-
-	}))
-	handler = chain(handler)
-	handler = chain(handler)
-
-	server := newServer(t, handler, true)
-	defer server.Close()
-
-	sendRequest(t, server)
 }
 
 func TestGetOriginal(t *testing.T) {
