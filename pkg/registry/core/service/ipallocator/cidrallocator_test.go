@@ -28,9 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -85,7 +88,7 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 		return false, ip, err
 	}))
 
-	c := newMetaAllocator(client.NetworkingV1alpha1(), serviceCIDRInformer, ipInformer, false)
+	c := newMetaAllocator(client.NetworkingV1alpha1(), serviceCIDRInformer, ipInformer, false, nil)
 
 	c.serviceCIDRSynced = func() bool { return true }
 	c.ipAddressSynced = func() bool { return true }
@@ -94,6 +97,7 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 }
 
 func TestCIDRAllocateMultiple(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -191,6 +195,7 @@ func TestCIDRAllocateMultiple(t *testing.T) {
 }
 
 func TestCIDRAllocateShadow(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -263,6 +268,7 @@ func TestCIDRAllocateShadow(t *testing.T) {
 }
 
 func TestCIDRAllocateGrow(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -354,6 +360,7 @@ func TestCIDRAllocateGrow(t *testing.T) {
 }
 
 func TestCIDRAllocateShrink(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, true)
 	r, err := newTestMetaAllocator()
 	if err != nil {
 		t.Fatal(err)
@@ -464,6 +471,134 @@ func TestCIDRAllocateShrink(t *testing.T) {
 		t.Fatal(err)
 	}
 
+}
+
+func TestCIDRAllocateDualWrite(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
+	r, err := newTestMetaAllocator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	if f := r.Free(); f != 0 {
+		t.Errorf("free: %d", f)
+	}
+	if _, err := r.AllocateNext(); err == nil {
+		t.Error(err)
+	}
+
+	cidr := newServiceCIDR("test", "192.168.0.0/28")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueServiceCIDR(cidr)
+	// wait for the cidr to be processed and set the informer synced
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		if err != nil {
+			t.Logf("unexpected error %v", err)
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a bitmap allocator that will mirror the ip allocator
+	_, ipnet, err := netutils.ParseCIDRSloppy(cidr.Spec.CIDRs[0])
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	bitmapAllocator, err := NewInMemory(ipnet)
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	r.bitmapAllocator = bitmapAllocator
+
+	found := sets.NewString()
+	count := 0
+	for r.Free() > 0 {
+		ip, err := r.AllocateNext()
+		if err != nil {
+			t.Fatalf("error @ free: %d count: %d: %v", r.Free(), count, err)
+		}
+		if r.Free() != bitmapAllocator.Free() {
+			t.Fatalf("ip and bitmap allocator out of sync: %d %d", r.Free(), bitmapAllocator.Free())
+		}
+		count++
+		if found.Has(ip.String()) {
+			t.Fatalf("allocated %s twice: %d", ip, count)
+		}
+		found.Insert(ip.String())
+	}
+	if count != 14 {
+		t.Fatalf("expected 14 IPs got %d", count)
+	}
+	if _, err := r.AllocateNext(); err == nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCIDRAllocateDualWriteCollision(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
+	r, err := newTestMetaAllocator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	if f := r.Free(); f != 0 {
+		t.Errorf("free: %d", f)
+	}
+	if _, err := r.AllocateNext(); err == nil {
+		t.Error(err)
+	}
+
+	cidr := newServiceCIDR("test", "192.168.0.0/28")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueServiceCIDR(cidr)
+	// wait for the cidr to be processed and set the informer synced
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		if err != nil {
+			t.Logf("unexpected error %v", err)
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a bitmap allocator that will mirror the ip allocator
+	_, ipnet, err := netutils.ParseCIDRSloppy(cidr.Spec.CIDRs[0])
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	bitmapAllocator, err := NewInMemory(ipnet)
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	r.bitmapAllocator = bitmapAllocator
+
+	// preallocate one IP in the bitmap allocator
+	err = bitmapAllocator.Allocate(netutils.ParseIPSloppy("192.168.0.5"))
+	if err != nil {
+		t.Fatalf("unexpected error allocating an IP on the bitmap allocator: %v", err)
+	}
+	// the ipallocator must not be able to allocate
+	err = r.Allocate(netutils.ParseIPSloppy("192.168.0.5"))
+	if err == nil {
+		t.Fatalf("unexpected allocation: %v", err)
+	}
 }
 
 // TODO: add IPv6 and dual stack test cases

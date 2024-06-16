@@ -29,10 +29,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
@@ -40,8 +38,6 @@ import (
 )
 
 func TestServiceAllocNewServiceCIDR(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
-
 	etcdOptions := framework.SharedEtcd()
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 	s := kubeapiservertesting.StartTestServerOrDie(t,
@@ -51,6 +47,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=192.168.0.0/29",
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
+			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 	defer s.TearDownFn()
@@ -134,7 +131,6 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 // Deletes the Service with the IPAddress blocking the deletion
 // cidr3 must not exist at this point
 func TestServiceCIDRDeletion(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 	cidr1 := "192.168.0.0/29" // same as the default
 	cidr2 := "10.0.0.0/24"    // new range
 	cidr3 := "10.0.0.0/16"    // contains cidr2
@@ -148,6 +144,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 			"--service-cluster-ip-range=" + cidr1,
 			"--advertise-address=172.16.1.1",
 			"--disable-admission-plugins=ServiceAccount",
+			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 	defer s.TearDownFn()

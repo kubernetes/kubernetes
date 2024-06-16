@@ -30,7 +30,6 @@ import (
 )
 
 func TestEnableDisableServiceCIDR(t *testing.T) {
-
 	svc := func(i int) *v1.Service {
 		return &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -119,6 +118,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
 		etcdOptions)
+	defer s3.TearDownFn()
 
 	client3, err := clientset.NewForConfig(s3.ClientConfig)
 	if err != nil {

@@ -27,10 +27,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
@@ -49,7 +47,6 @@ import (
 // 6. start the new apiserver with the new ServiceCIDRs on the flags and shutdown the old one
 // 7. delete the kubernetes.default service, the new apiserver will recreate it within the new ServiceCIDR
 func TestMigrateServiceCIDR(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 	tCtx := ktesting.Init(t)
 
 	cidr1 := "192.168.0.0/29"
@@ -64,6 +61,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=" + cidr1,
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
+			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 
