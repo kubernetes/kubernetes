@@ -575,9 +575,7 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			p := &VolumeZone{
-				nil, nil, nil,
-			}
+			p := &VolumeZone{}
 
 			got, err := p.isSchedulableAfterStorageClassAdded(logger, tc.pod, tc.oldObj, tc.newObj)
 			if err != nil && !tc.expectedErr {
