@@ -299,7 +299,8 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		// get value of target metric before accessing localhost nodeports
 		metrics, err := metricsGrabber.GrabFromKubeProxy(ctx, nodeName)
 		framework.ExpectNoError(err)
-		targetMetricBefore := metrics.GetCounterMetricValue(metricName)
+		targetMetricBefore, err := metrics.GetCounterMetricValue(metricName)
+		framework.ExpectNoError(err)
 
 		// create pod
 		ginkgo.By("creating test pod")
@@ -359,7 +360,8 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		if err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 2*time.Minute, true, func(_ context.Context) (bool, error) {
 			metrics, err := metricsGrabber.GrabFromKubeProxy(ctx, nodeName)
 			framework.ExpectNoError(err)
-			targetMetricAfter := metrics.GetCounterMetricValue(metricName)
+			targetMetricAfter, err := metrics.GetCounterMetricValue(metricName)
+			framework.ExpectNoError(err)
 			return targetMetricAfter > targetMetricBefore, nil
 		}); err != nil {
 			framework.Failf("expected %s metric to be updated after accessing endpoints via localhost nodeports", metricName)
