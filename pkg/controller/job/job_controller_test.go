@@ -520,6 +520,17 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedActive:     3,
 			expectedReady:      ptr.To[int32](0),
 		},
+		"count ready pods when too many active pods": {
+			parallelism:        2,
+			completions:        5,
+			backoffLimit:       6,
+			activePods:         3,
+			readyPods:          3,
+			expectedDeletions:  1,
+			expectedActive:     2,
+			expectedPodPatches: 1,
+			expectedReady:      ptr.To[int32](2),
+		},
 		"failed + succeed pods: reset backoff delay": {
 			parallelism:        2,
 			completions:        5,
@@ -799,6 +810,21 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedDeletions:       1,
 			expectedTerminating:     ptr.To[int32](1),
 		},
+		"count ready pods when job fails": {
+			parallelism:             2,
+			completions:             3,
+			backoffLimit:            0,
+			activePods:              2,
+			readyPods:               2,
+			failedPods:              1,
+			expectedFailed:          3,
+			expectedCondition:       &jobConditionFailed,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "BackoffLimitExceeded",
+			expectedPodPatches:      3,
+			expectedReady:           ptr.To[int32](0),
+			expectedDeletions:       2,
+		},
 		"indexed job repeated completed index": {
 			parallelism:    2,
 			completions:    3,
@@ -961,6 +987,22 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedReady:           ptr.To[int32](0),
 			expectedTerminating:     ptr.To[int32](2),
 		},
+		"count ready pods when suspending a job with satisfied expectations": {
+			suspend:                 true,
+			parallelism:             2,
+			activePods:              2, // parallelism == active, expectations satisfied
+			readyPods:               2,
+			completions:             4,
+			backoffLimit:            6,
+			expectedCreations:       0,
+			expectedDeletions:       2,
+			expectedActive:          0,
+			expectedCondition:       &jobConditionSuspended,
+			expectedConditionStatus: v1.ConditionTrue,
+			expectedConditionReason: "JobSuspended",
+			expectedPodPatches:      2,
+			expectedReady:           ptr.To[int32](0),
+		},
 		"suspending a job with unsatisfied expectations": {
 			// Unlike the previous test, we expect the controller to NOT suspend the
 			// Job in the syncJob call because the controller will wait for
@@ -976,6 +1018,19 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedDeletions:         0,
 			expectedActive:            3,
 			expectedReady:             ptr.To[int32](0),
+		},
+		"count ready pods when suspending a job with unsatisfied expectations": {
+			suspend:                   true,
+			parallelism:               2,
+			activePods:                3, // active > parallelism, expectations unsatisfied
+			readyPods:                 3,
+			fakeExpectationAtCreation: -1, // the controller is expecting a deletion
+			completions:               4,
+			backoffLimit:              6,
+			expectedCreations:         0,
+			expectedDeletions:         0,
+			expectedActive:            3,
+			expectedReady:             ptr.To[int32](3),
 		},
 		"suspending a job with unsatisfied expectations; PodReplacementPolicy enabled": {
 			suspend:                   true,
