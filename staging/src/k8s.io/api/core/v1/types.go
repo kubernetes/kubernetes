@@ -6370,7 +6370,6 @@ type NamespaceList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
-// +k8s:prerelease-lifecycle-gen:deprecated=1.6
 
 // Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
 // Deprecated in 1.7, please use the bindings subresource of pods instead.
