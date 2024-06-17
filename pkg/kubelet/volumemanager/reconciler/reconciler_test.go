@@ -1660,6 +1660,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 		volumeState            operationexecutor.VolumeMountState
 		unmountDeviceCallCount int
 		unmountVolumeCount     int
+		tearDownCallCount      int
 		volumeName             string
 		supportRemount         bool
 		pvcStatusSize          resource.Quantity
@@ -1670,6 +1671,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeState:            operationexecutor.VolumeMountUncertain,
 			unmountDeviceCallCount: 1,
 			unmountVolumeCount:     1,
+			tearDownCallCount:      1,
 			volumeName:             volumetesting.TimeoutOnSetupVolumeName,
 		},
 		{
@@ -1677,13 +1679,15 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeState:            operationexecutor.VolumeNotMounted,
 			unmountDeviceCallCount: 1,
 			unmountVolumeCount:     0,
+			tearDownCallCount:      0,
 			volumeName:             volumetesting.FailOnSetupVolumeName,
 		},
 		{
 			name:                   "timeout followed by failed operation should result in non-mounted volume",
 			volumeState:            operationexecutor.VolumeNotMounted,
 			unmountDeviceCallCount: 1,
-			unmountVolumeCount:     0,
+			unmountVolumeCount:     1, // See https://github.com/kubernetes/kubernetes/pull/88660 for more details
+			tearDownCallCount:      0,
 			volumeName:             volumetesting.TimeoutAndFailOnSetupVolumeName,
 		},
 		{
@@ -1691,6 +1695,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeState:            operationexecutor.VolumeMounted,
 			unmountDeviceCallCount: 1,
 			unmountVolumeCount:     1,
+			tearDownCallCount:      1,
 			volumeName:             volumetesting.SuccessAndTimeoutSetupVolumeName,
 			supportRemount:         true,
 		},
@@ -1699,6 +1704,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeState:            operationexecutor.VolumeMounted,
 			unmountDeviceCallCount: 1,
 			unmountVolumeCount:     1,
+			tearDownCallCount:      1,
 			volumeName:             volumetesting.SuccessAndFailOnSetupVolumeName,
 			supportRemount:         true,
 		},
@@ -1707,6 +1713,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeState:            operationexecutor.VolumeMountUncertain,
 			unmountDeviceCallCount: 1,
 			unmountVolumeCount:     1,
+			tearDownCallCount:      1,
 			volumeName:             volumetesting.FailVolumeExpansion,
 			supportRemount:         true,
 			pvSize:                 resource.MustParse("10G"),
@@ -1868,7 +1875,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					if err := volumetesting.VerifyUnmountDeviceCallCount(tc.unmountDeviceCallCount, fakePlugin); err != nil {
 						t.Errorf("Error verifying UnMountDeviceCallCount: %v", err)
 					}
-					if err := volumetesting.VerifyTearDownCallCount(tc.unmountVolumeCount, fakePlugin); err != nil {
+					if err := volumetesting.VerifyTearDownCallCount(tc.tearDownCallCount, fakePlugin); err != nil {
 						t.Errorf("Error verifying UnMountDeviceCallCount: %v", err)
 					}
 				} else {
