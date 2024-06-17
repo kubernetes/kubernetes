@@ -17,11 +17,12 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/pflag"
 
-	cliflag "k8s.io/component-base/cli/flag"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -53,13 +54,19 @@ func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]st
 }
 
 // AddControlPlanExtraArgsFlags adds the ExtraArgs flags for control plane components
-func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, controllerManagerExtraArgs, schedulerExtraArgs *map[string]string) {
-	// TODO: https://github.com/kubernetes/kubeadm/issues/1601
-	// Either deprecate these flags or handle duplicate keys.
-	// Currently the map[string]string returned by NewMapStringString() doesn't allow this.
-	fs.Var(cliflag.NewMapStringString(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
-	fs.Var(cliflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
-	fs.Var(cliflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
+func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, controllerManagerExtraArgs, schedulerExtraArgs *[]kubeadmapiv1.Arg) {
+	// TODO: these flags are deprecated, remove them and related logic:
+	// - AddControlPlanExtraArgsFlag()
+	// - files app/cmd/options/argslice*.go
+	// - options.*ExtraArgs
+	// - usages in app/cmd/init.go and app/cmd/phases/init/controlplane.go
+	fs.Var(newArgSlice(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
+	fs.Var(newArgSlice(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
+	fs.Var(newArgSlice(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
+	const future = "This flag will be removed in a future version"
+	_ = fs.MarkDeprecated(APIServerExtraArgs, fmt.Sprintf("use 'ClusterConfiguration.apiServer.extraArgs' instead. %s", future))
+	_ = fs.MarkDeprecated(ControllerManagerExtraArgs, fmt.Sprintf("use 'ClusterConfiguration.controllerManager.extraArgs' instead. %s", future))
+	_ = fs.MarkDeprecated(SchedulerExtraArgs, fmt.Sprintf("use 'ClusterConfiguration.scheduler.extraArgs' instead. %s", future))
 }
 
 // AddImageMetaFlags adds the --image-repository flag to the given flagset

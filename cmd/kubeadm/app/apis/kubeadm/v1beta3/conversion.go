@@ -77,12 +77,14 @@ func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *Cl
 	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
 	out.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
 	out.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
+	if in.APIServer.TimeoutForControlPlane != nil && in.APIServer.TimeoutForControlPlane.Duration != 0 {
+		kubeadm.SetConversionTimeoutControlPlane(in.APIServer.TimeoutForControlPlane)
+	}
 	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
-// Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent is required due to the missing ControlPlaneComponent.ExtraEnvs in v1beta3.
+// Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent is required due to the different ControlPlaneComponent.ExtraArgs in v1beta3.
 func Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *ControlPlaneComponent, out *kubeadm.ControlPlaneComponent, s conversion.Scope) error {
-	out.ExtraEnvs = []kubeadm.EnvVar{}
 	out.ExtraArgs = convertToArgs(in.ExtraArgs)
 	return autoConvert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in, out, s)
 }
@@ -93,9 +95,8 @@ func Convert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in *
 	return autoConvert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in, out, s)
 }
 
-// Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd is required due to the missing LocalEtcd.ExtraEnvs in v1beta3.
+// Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd is required due to the different LocalEtcd.Args in v1beta3.
 func Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kubeadm.LocalEtcd, s conversion.Scope) error {
-	out.ExtraEnvs = []kubeadm.EnvVar{}
 	out.ExtraArgs = convertToArgs(in.ExtraArgs)
 	return autoConvert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in, out, s)
 }
@@ -125,7 +126,7 @@ func Convert_kubeadm_DNS_To_v1beta3_DNS(in *kubeadm.DNS, out *DNS, s conversion.
 }
 
 // convertToArgs takes a argument map and converts it to a slice of arguments.
-// Te resulting argument slice is sorted alpha-numerically.
+// The resulting argument slice is sorted alpha-numerically.
 func convertToArgs(in map[string]string) []kubeadm.Arg {
 	if in == nil {
 		return nil

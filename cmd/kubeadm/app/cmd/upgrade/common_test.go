@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -153,6 +153,7 @@ func TestPrintConfiguration(t *testing.T) {
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
 	networking: {}
+	proxy: {}
 	scheduler: {}
 `, kubeadmapiv1.SchemeGroupVersion.String())),
 		},
@@ -185,6 +186,7 @@ func TestPrintConfiguration(t *testing.T) {
 	kubernetesVersion: v1.7.1
 	networking:
 	  serviceSubnet: 10.96.0.1/12
+	proxy: {}
 	scheduler: {}
 `),
 		},
